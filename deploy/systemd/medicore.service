@@ -1,0 +1,15 @@
+[Unit]
+Description=MediCore Django API
+After=network.target mysql.service
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/medicore
+EnvironmentFile=/var/www/medicore/.env
+ExecStart=/var/www/medicore/venv/bin/gunicorn config.wsgi:application --bind 127.0.0.1:8000 --workers 3 --timeout 120
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,44 @@
+export interface ClinicSettings {
+  id: number;
+  clinic: number;
+  clinic_nombre?: string;
+  logo_url: string;
+  primary_color: string;
+  secondary_color: string;
+  accent_color: string;
+  currency: string;
+  country: string;
+  timezone: string;
+  language: string;
+  tax_enabled: boolean;
+  default_tax_rate: string;
+  invoice_prefix: string;
+  patient_prefix: string;
+  medical_record_prefix: string;
+  prescription_prefix: string;
+  medical_order_prefix: string;
+  purchase_order_prefix: string;
+  appointment_duration_minutes: number;
+  allow_online_appointments: boolean;
+  allow_patient_cancellations: boolean;
+  cancellation_hours_limit: number;
+  require_appointment_confirmation: boolean;
+  allow_patient_portal: boolean;
+  allow_patient_medical_record_view: boolean;
+  allow_patient_prescription_view: boolean;
+  allow_patient_invoice_view: boolean;
+  business_start_time: string;
+  business_end_time: string;
+  working_days: string[];
+  fiscal_name: string;
+  fiscal_rtn: string;
+  fiscal_address: string;
+  fiscal_phone: string;
+  fiscal_email: string;
+  footer_invoice_text: string;
+  terms_and_conditions: string;
+  privacy_policy: string;
+  active: boolean;
+}
+
+export type ClinicSettingsPayload = Partial<ClinicSettings>;

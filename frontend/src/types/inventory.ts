@@ -1,0 +1,8 @@
+export type InventoryItemType = "medicamento" | "insumo" | "equipo" | "material" | "laboratorio" | "otro";
+export type InventoryMovementType = "entrada" | "salida" | "ajuste_positivo" | "ajuste_negativo" | "devolucion" | "perdida" | "vencimiento";
+
+export interface InventoryCategory { id: number; clinic: number | null; name: string; description: string; active: boolean; }
+export interface InventoryItem { id: number; clinic: number; category: number; category_nombre?: string; name: string; description: string; sku: string; barcode: string; item_type: InventoryItemType; unit: string; presentation: string; cost_price: string; sale_price: string; stock_current: string; stock_minimum: string; stock_maximum: string; requires_lot: boolean; requires_expiration: boolean; low_stock: boolean; active: boolean; }
+export interface InventoryLot { id: number; clinic: number; item: number; item_nombre?: string; lot_number: string; expiration_date: string | null; quantity_current: string; cost_price: string; received_date: string; expired: boolean; expiring_soon: boolean; active: boolean; }
+export interface InventoryMovement { id: number; clinic: number; item: number; item_nombre?: string; lot: number | null; lot_number?: string; movement_type: InventoryMovementType; quantity: string; unit_cost: string; reason: string; reference_type: string; reference_id: string; notes: string; performed_by_nombre?: string; active: boolean; creado_en: string; }
+export interface InventoryStats { total_items: number; active_items: number; low_stock_items: number; expired_lots: number; expiring_soon_lots: number; total_stock_value: string; total_movements_today: number; medicines_count: number; supplies_count: number; }

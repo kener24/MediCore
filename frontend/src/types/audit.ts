@@ -1,0 +1,9 @@
+export type AuditSeverity = "info" | "warning" | "error" | "critical";
+export type AuditAction = "login_success" | "login_failed" | "logout" | "create" | "update" | "delete" | "activate" | "deactivate" | "view" | "export" | "approve" | "cancel" | "void" | "finalize" | "issue" | "payment" | "stock_in" | "stock_out" | "stock_adjustment" | "purchase_receive" | "password_change" | "password_reset" | "permission_denied" | "system_error";
+export type AuditModule = "auth" | "users" | "clinics" | "doctors" | "patients" | "appointments" | "medical_records" | "consultations" | "prescriptions" | "billing" | "payments" | "cash" | "inventory" | "purchases" | "reports" | "settings" | "system";
+
+export interface AuditLog { id: number; clinic: number | null; clinic_nombre?: string; user: number | null; user_nombre?: string; user_email?: string; action: AuditAction; module: AuditModule; model_name: string; object_id: string; object_repr: string; description: string; severity: AuditSeverity; ip_address: string | null; user_agent?: string; request_method: string; request_path: string; old_values?: Record<string, unknown>; new_values?: Record<string, unknown>; metadata?: Record<string, unknown>; created_at: string; }
+export interface AuditStats { total_logs: number; logs_today: number; warnings: number; errors: number; critical: number; login_success: number; login_failed: number; top_actions: Array<{ action: AuditAction; count: number }>; top_modules: Array<{ module: AuditModule; count: number }>; }
+export interface AuditFilters { user?: string; clinic?: string; action?: string; module?: string; severity?: string; model_name?: string; object_id?: string; date_from?: string; date_to?: string; search?: string; page?: string; page_size?: string; }
+export interface PaginatedAuditLogs { count: number; next: string | null; previous: string | null; results: AuditLog[]; }
+

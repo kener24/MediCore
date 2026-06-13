@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 
 import type { VitalSigns, VitalSignsPayload } from "../../types/medicalRecord";
+import { cleanDecimal } from "../../utils/inputSanitizers";
 
 interface VitalSignsFormProps {
   vitalSigns?: VitalSigns | null;
@@ -30,7 +31,8 @@ export function VitalSignsForm({ vitalSigns, disabled = false, isSubmitting, onS
   }, [payload.height, payload.weight, vitalSigns?.bmi]);
 
   function update(key: keyof VitalSignsPayload, value: string) {
-    setPayload((current) => ({ ...current, [key]: value === "" ? "" : value }));
+    const decimals = key === "temperature" ? 1 : 2;
+    setPayload((current) => ({ ...current, [key]: value === "" ? "" : cleanDecimal(value, decimals) }));
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -41,19 +43,19 @@ export function VitalSignsForm({ vitalSigns, disabled = false, isSubmitting, onS
   return (
     <form className="grid gap-3 md:grid-cols-4" onSubmit={submit}>
       {[
-        ["temperature", "Temperatura", "number"],
-        ["blood_pressure_systolic", "Sistolica", "number"],
-        ["blood_pressure_diastolic", "Diastolica", "number"],
-        ["heart_rate", "Pulso", "number"],
-        ["respiratory_rate", "Respiracion", "number"],
-        ["oxygen_saturation", "Oxigeno", "number"],
-        ["weight", "Peso kg", "number"],
-        ["height", "Altura m", "number"],
-        ["glucose", "Glucosa", "number"],
-      ].map(([key, label, type]) => (
+        ["temperature", "Temperatura"],
+        ["blood_pressure_systolic", "Sistolica"],
+        ["blood_pressure_diastolic", "Diastolica"],
+        ["heart_rate", "Pulso"],
+        ["respiratory_rate", "Respiracion"],
+        ["oxygen_saturation", "Oxigeno"],
+        ["weight", "Peso kg"],
+        ["height", "Altura m"],
+        ["glucose", "Glucosa"],
+      ].map(([key, label]) => (
         <label key={key} className="space-y-1 text-sm font-medium text-slate-700">
           {label}
-          <input className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm" disabled={disabled} step="0.01" type={type} value={String(payload[key as keyof VitalSignsPayload] ?? "")} onChange={(event) => update(key as keyof VitalSignsPayload, event.target.value)} />
+          <input className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm" disabled={disabled} inputMode="decimal" value={String(payload[key as keyof VitalSignsPayload] ?? "")} onChange={(event) => update(key as keyof VitalSignsPayload, event.target.value)} />
         </label>
       ))}
       <div className="space-y-1 text-sm font-medium text-slate-700">

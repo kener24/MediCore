@@ -20,14 +20,14 @@ class PatientsModuleTests(APITestCase):
         self.medico = User.objects.create_user(email="medico@x.com", password="x", nombre_completo="Medico", role=self.medico_role, clinica=self.clinic)
         self.recepcion = User.objects.create_user(email="recepcion@x.com", password="x", nombre_completo="Recepcion", role=self.recepcion_role, clinica=self.clinic)
         self.patient_user = User.objects.create_user(email="paciente@x.com", password="x", nombre_completo="Paciente", role=self.paciente_role, clinica=self.clinic)
-        self.patient = Patient.objects.create(clinic=self.clinic, user=self.patient_user, nombres="Juan", apellidos="Perez", identidad="0801")
-        Patient.objects.create(clinic=self.other_clinic, nombres="Maria", apellidos="Lopez", identidad="0802")
+        self.patient = Patient.objects.create(clinic=self.clinic, user=self.patient_user, nombres="Juan", apellidos="Perez", identidad="080119900001")
+        Patient.objects.create(clinic=self.other_clinic, nombres="Maria", apellidos="Lopez", identidad="080219900002")
 
     def auth(self, user):
         self.client.force_authenticate(user=user)
 
     def payload(self):
-        return {"nombres": "Ana", "apellidos": "Soto", "identidad": "0803", "genero": "femenino", "tipo_sangre": "A+", "telefono": "9999"}
+        return {"nombres": "Ana", "apellidos": "Soto", "identidad": "080319900003", "genero": "femenino", "tipo_sangre": "A+", "telefono": "9999-9999"}
 
     def test_superadmin_puede_listar_todas_las_clinicas(self):
         self.auth(self.superadmin)
@@ -45,7 +45,7 @@ class PatientsModuleTests(APITestCase):
         self.auth(self.admin)
         response = self.client.post("/api/patients/", {**self.payload(), "clinic": self.other_clinic.id}, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(Patient.objects.get(identidad="0803").clinic_id, self.clinic.id)
+        self.assertEqual(Patient.objects.get(identidad="080319900003").clinic_id, self.clinic.id)
 
     def test_recepcionista_puede_crear_paciente(self):
         self.auth(self.recepcion)
@@ -71,7 +71,7 @@ class PatientsModuleTests(APITestCase):
 
     def test_identidad_no_se_repite_en_misma_clinica(self):
         self.auth(self.admin)
-        response = self.client.post("/api/patients/", {**self.payload(), "identidad": "0801"}, format="json")
+        response = self.client.post("/api/patients/", {**self.payload(), "identidad": "080119900001"}, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_codigo_se_genera_automaticamente(self):

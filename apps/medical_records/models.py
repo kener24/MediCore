@@ -162,6 +162,7 @@ class VitalSigns(TimeStampedModel):
         verbose_name_plural = "Vital signs"
 
     def clean(self):
+        errors = {}
         ranges = [
             (self.temperature, Decimal("30"), Decimal("45"), "temperature"),
             (self.blood_pressure_systolic, 50, 260, "blood_pressure_systolic"),
@@ -181,7 +182,6 @@ class VitalSigns(TimeStampedModel):
             errors["blood_pressure_diastolic"] = "La presion diastolica debe ser positiva."
         if not self.consultation_id and not self.patient_visit_id:
             errors["patient_visit"] = "Los signos vitales deben relacionarse a una visita o consulta."
-        errors = {}
         for value, low, high, field in ranges:
             if value is not None and (value < low or value > high):
                 errors[field] = "Valor fuera de rango clinico razonable."

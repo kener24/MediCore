@@ -5,11 +5,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import type { Clinic, ClinicPayload } from "../../types/clinic";
+import { digitInputProps, onlyDigits, onlyPhoneChars, phoneInputProps } from "../../utils/inputSanitizers";
 
 const schema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio."),
-  rtn: z.string().optional(),
-  telefono: z.string().optional(),
+  rtn: z.string().regex(/^\d*$/, "El RTN solo debe contener numeros.").optional(),
+  telefono: z.string().regex(/^[0-9+()\-\s]*$/, "Solo numeros, espacios, +, guiones y parentesis.").optional(),
   correo: z.string().email("Ingresa un correo válido.").or(z.literal("")),
   direccion: z.string().optional(),
   activo: z.boolean(),
@@ -55,8 +56,8 @@ export function ClinicForm({ clinic, isSubmitting, onSubmit }: ClinicFormProps) 
     <form className="space-y-4" onSubmit={handleSubmit(submit)}>
       <div className="grid gap-4 md:grid-cols-2">
         <Input label="Nombre" error={errors.nombre?.message} {...register("nombre")} />
-        <Input label="RTN" error={errors.rtn?.message} {...register("rtn")} />
-        <Input label="Teléfono" error={errors.telefono?.message} {...register("telefono")} />
+        <Input label="RTN" maxLength={20} error={errors.rtn?.message} {...digitInputProps} {...register("rtn", { setValueAs: onlyDigits })} />
+        <Input label="Teléfono" maxLength={30} error={errors.telefono?.message} {...phoneInputProps} {...register("telefono", { setValueAs: onlyPhoneChars })} />
         <Input label="Correo" type="email" error={errors.correo?.message} {...register("correo")} />
       </div>
       <label className="block space-y-1.5">

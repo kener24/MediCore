@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 from apps.clinic_settings.models import ClinicSettings
 from apps.clinics.models import Clinic
+from apps.core.validators import validate_digits_identifier, validate_phone
 
 
 class ClinicSettingsSerializer(serializers.ModelSerializer):
@@ -16,6 +17,12 @@ class ClinicSettingsSerializer(serializers.ModelSerializer):
 class ClinicSettingsUpdateSerializer(ClinicSettingsSerializer):
     class Meta(ClinicSettingsSerializer.Meta):
         read_only_fields = ["id", "clinic", "clinic_nombre", "creado_en", "actualizado_en"]
+
+    def validate_fiscal_rtn(self, value):
+        return validate_digits_identifier(value, "El RTN fiscal", min_length=8, max_length=20)
+
+    def validate_fiscal_phone(self, value):
+        return validate_phone(value)
 
 
 class PublicClinicSettingsSerializer(serializers.ModelSerializer):

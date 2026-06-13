@@ -31,8 +31,8 @@ class AdmissionsFlowTests(APITestCase):
         self.specialty = MedicalSpecialty.objects.create(nombre="General")
         self.doctor = DoctorProfile.objects.create(clinic=self.clinic, user=self.doctor_user, specialty=self.specialty, numero_colegiacion="MED-1")
         DoctorSchedule.objects.create(doctor=self.doctor, dia_semana=weekday_name(timezone.localdate()), hora_inicio=time(8, 0), hora_fin=time(17, 0))
-        self.patient = Patient.objects.create(clinic=self.clinic, nombres="Juan", apellidos="Perez", identidad="0801")
-        self.other_patient = Patient.objects.create(clinic=self.other_clinic, nombres="Ana", apellidos="Lopez", identidad="0802")
+        self.patient = Patient.objects.create(clinic=self.clinic, nombres="Juan", apellidos="Perez", identidad="080119900001")
+        self.other_patient = Patient.objects.create(clinic=self.other_clinic, nombres="Ana", apellidos="Lopez", identidad="080219900002")
         self.category = InventoryCategory.objects.create(clinic=self.clinic, name="Medicamentos")
         self.item = InventoryItem.objects.create(clinic=self.clinic, category=self.category, name="Suero", sale_price=Decimal("200.00"), stock_current=Decimal("2.00"))
 
@@ -49,11 +49,11 @@ class AdmissionsFlowTests(APITestCase):
         self.auth(self.rec)
         res = self.client.post(
             "/api/admissions/register-walk-in/",
-            {"patient": None, "patient_data": {"nombres": "Luis", "apellidos": "Mora", "identidad": "999", "genero": "masculino"}, "visit": {"reason": "Fiebre", "symptoms": "2 dias"}},
+            {"patient": None, "patient_data": {"nombres": "Luis", "apellidos": "Mora", "identidad": "080319900003", "genero": "masculino"}, "visit": {"reason": "Fiebre", "symptoms": "2 dias"}},
             format="json",
         )
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
-        patient = Patient.objects.get(identidad="999")
+        patient = Patient.objects.get(identidad="080319900003")
         self.assertTrue(MedicalRecord.objects.filter(patient=patient).exists())
         self.assertEqual(res.data["patient"], patient.id)
 
@@ -61,11 +61,11 @@ class AdmissionsFlowTests(APITestCase):
         self.auth(self.rec)
         res = self.client.post(
             "/api/admissions/register-walk-in/",
-            {"patient": None, "patient_data": {"nombres": "Juan 2", "apellidos": "Perez", "identidad": "0801"}, "visit": {"reason": "Dolor"}},
+            {"patient": None, "patient_data": {"nombres": "Juan 2", "apellidos": "Perez", "identidad": "080119900001"}, "visit": {"reason": "Dolor"}},
             format="json",
         )
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(Patient.objects.filter(clinic=self.clinic, identidad="0801").count(), 1)
+        self.assertEqual(Patient.objects.filter(clinic=self.clinic, identidad="080119900001").count(), 1)
         self.assertEqual(res.data["patient"], self.patient.id)
 
     def test_no_crea_dos_visitas_activas_mismo_dia(self):

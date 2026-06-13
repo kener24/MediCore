@@ -24,8 +24,8 @@ class PurchaseApiTests(APITestCase):
         self.item = InventoryItem.objects.create(clinic=self.clinic, category=self.category, name="Acetaminofen", sku="MED-1", item_type="medicamento", unit="tableta", cost_price=Decimal("2.00"), stock_current=Decimal("0.00"), requires_lot=True, requires_expiration=True)
         self.other_category = InventoryCategory.objects.create(clinic=self.other_clinic, name="Otra")
         self.other_item = InventoryItem.objects.create(clinic=self.other_clinic, category=self.other_category, name="Otro", sku="OTR-1")
-        self.supplier = Supplier.objects.create(clinic=self.clinic, name="Drogueria Central", rtn="123")
-        self.other_supplier = Supplier.objects.create(clinic=self.other_clinic, name="Proveedor otra", rtn="456")
+        self.supplier = Supplier.objects.create(clinic=self.clinic, name="Drogueria Central", rtn="080119900001")
+        self.other_supplier = Supplier.objects.create(clinic=self.other_clinic, name="Proveedor otra", rtn="080219900002")
 
     def auth(self, user):
         self.client.force_authenticate(user=user)
@@ -38,7 +38,7 @@ class PurchaseApiTests(APITestCase):
 
     def test_admin_can_create_supplier_and_patient_cannot_access(self):
         self.auth(self.admin)
-        response = self.client.post("/api/purchases/suppliers/", {"name": "FarmaSalud", "rtn": "789"})
+        response = self.client.post("/api/purchases/suppliers/", {"name": "FarmaSalud", "rtn": "080319900003"})
         self.assertEqual(response.status_code, 201, response.content)
         self.auth(self.patient)
         self.assertEqual(self.client.get("/api/purchases/suppliers/").status_code, 200)
@@ -46,7 +46,7 @@ class PurchaseApiTests(APITestCase):
 
     def test_rtn_is_unique_per_clinic(self):
         self.auth(self.admin)
-        response = self.client.post("/api/purchases/suppliers/", {"name": "Duplicado", "rtn": "123"})
+        response = self.client.post("/api/purchases/suppliers/", {"name": "Duplicado", "rtn": "080119900001"})
         self.assertEqual(response.status_code, 400)
 
     def test_cannot_create_order_with_supplier_from_other_clinic(self):

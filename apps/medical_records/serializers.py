@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.utils import timezone
@@ -368,6 +370,9 @@ class ClinicalSupplyUsageSerializer(serializers.ModelSerializer):
 
 
 class ClinicalSupplyUsageCreateSerializer(serializers.ModelSerializer):
+    quantity = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0.01"))
+    unit_price = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0.00"), required=False)
+
     class Meta:
         model = ClinicalSupplyUsage
         fields = ["id", "patient", "consultation", "appointment", "inventory_item", "inventory_lot", "quantity", "unit_price", "usage_type", "description", "notes", "billable"]

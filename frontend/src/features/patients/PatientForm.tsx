@@ -4,6 +4,7 @@ import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { Input } from "../../components/ui/Input";
 import type { Patient, PatientPayload } from "../../types/patient";
+import { digitInputProps, onlyDigits, onlyPhoneChars, phoneInputProps } from "../../utils/inputSanitizers";
 
 interface PatientFormProps {
   patient?: Patient | null;
@@ -12,7 +13,7 @@ interface PatientFormProps {
 }
 
 export function PatientForm({ patient, isSubmitting, onSubmit }: PatientFormProps) {
-  const { register, handleSubmit } = useForm<PatientPayload>({
+  const { register, handleSubmit, formState: { errors } } = useForm<PatientPayload>({
     defaultValues: {
       nombres: patient?.nombres ?? "",
       apellidos: patient?.apellidos ?? "",
@@ -42,7 +43,7 @@ export function PatientForm({ patient, isSubmitting, onSubmit }: PatientFormProp
         <div className="grid gap-4 md:grid-cols-2">
           <Input label="Nombres" required {...register("nombres", { required: true })} />
           <Input label="Apellidos" required {...register("apellidos", { required: true })} />
-          <Input label="Identidad" {...register("identidad")} />
+          <Input label="Identidad" maxLength={20} error={errors.identidad?.message} {...digitInputProps} {...register("identidad", { setValueAs: onlyDigits, minLength: { value: 8, message: "Minimo 8 digitos." }, maxLength: { value: 20, message: "Maximo 20 digitos." } })} />
           <Input label="Fecha nacimiento" type="date" {...register("fecha_nacimiento")} />
           <label className="block space-y-1.5">
             <span className="text-sm font-medium text-slate-700">Genero</span>
@@ -63,7 +64,7 @@ export function PatientForm({ patient, isSubmitting, onSubmit }: PatientFormProp
       </Card>
       <Card title="Contacto">
         <div className="grid gap-4 md:grid-cols-2">
-          <Input label="Telefono" {...register("telefono")} />
+          <Input label="Telefono" maxLength={30} error={errors.telefono?.message} {...phoneInputProps} {...register("telefono", { setValueAs: onlyPhoneChars })} />
           <Input label="Correo" type="email" {...register("correo")} />
           <Input label="Ciudad" {...register("ciudad")} />
           <Input label="Departamento" {...register("departamento")} />
@@ -77,7 +78,7 @@ export function PatientForm({ patient, isSubmitting, onSubmit }: PatientFormProp
       <Card title="Emergencia">
         <div className="grid gap-4 md:grid-cols-3">
           <Input label="Contacto" {...register("contacto_emergencia_nombre")} />
-          <Input label="Telefono emergencia" {...register("contacto_emergencia_telefono")} />
+          <Input label="Telefono emergencia" maxLength={30} error={errors.contacto_emergencia_telefono?.message} {...phoneInputProps} {...register("contacto_emergencia_telefono", { setValueAs: onlyPhoneChars })} />
           <Input label="Parentesco" {...register("contacto_emergencia_parentesco")} />
         </div>
       </Card>

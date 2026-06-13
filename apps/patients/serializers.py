@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 from apps.accounts.permissions import get_role_name
 from apps.clinics.models import Clinic
+from apps.core.validators import validate_digits_identifier, validate_phone
 from apps.patients.models import Patient
 from apps.subscriptions.services import ensure_can_create_patient
 
@@ -82,6 +83,15 @@ class PatientCreateSerializer(serializers.ModelSerializer):
             "codigo_paciente": {"required": False},
         }
         validators = []
+
+    def validate_identidad(self, value):
+        return validate_digits_identifier(value, "La identidad", min_length=8, max_length=20)
+
+    def validate_telefono(self, value):
+        return validate_phone(value)
+
+    def validate_contacto_emergencia_telefono(self, value):
+        return validate_phone(value)
 
     def _resolve_clinic(self, attrs):
         request = self.context["request"]

@@ -8,12 +8,13 @@ import { Input } from "../../components/ui/Input";
 import type { Clinic } from "../../types/clinic";
 import type { Role } from "../../types/role";
 import type { User, UserPayload } from "../../types/user";
+import { onlyPhoneChars, phoneInputProps } from "../../utils/inputSanitizers";
 
 const schema = z
   .object({
     nombre_completo: z.string().min(1, "El nombre completo es obligatorio."),
     email: z.string().email("Ingresa un email válido."),
-    telefono: z.string().optional(),
+    telefono: z.string().regex(/^[0-9+()\-\s]*$/, "Solo numeros, espacios, +, guiones y parentesis.").optional(),
     password: z.string().optional(),
     role: z.coerce.number().min(1, "Selecciona un rol."),
     clinica: z.coerce.number().nullable().optional(),
@@ -94,7 +95,7 @@ export function UserForm({ roles, clinics, user, isSubmitting, onSubmit }: UserF
       <div className="grid gap-4 md:grid-cols-2">
         <Input label="Nombre completo" error={errors.nombre_completo?.message} {...register("nombre_completo")} />
         <Input label="Email" type="email" error={errors.email?.message} {...register("email")} />
-        <Input label="Teléfono" error={errors.telefono?.message} {...register("telefono")} />
+        <Input label="Teléfono" maxLength={30} error={errors.telefono?.message} {...phoneInputProps} {...register("telefono", { setValueAs: onlyPhoneChars })} />
         {!isEditing ? <Input label="Contraseña" type="password" error={errors.password?.message} {...register("password")} /> : null}
       </div>
       <div className="grid gap-4 md:grid-cols-2">

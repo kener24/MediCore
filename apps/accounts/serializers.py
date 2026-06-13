@@ -4,6 +4,7 @@ from rest_framework import serializers
 
 from apps.accounts.models import Role, User
 from apps.clinics.models import Clinic
+from apps.core.validators import validate_digits_identifier, validate_phone
 from apps.security.services import validate_password_policy
 from apps.subscriptions.services import ensure_can_create_user
 
@@ -71,6 +72,9 @@ class UserCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Ya existe un usuario con este email.")
         return email
 
+    def validate_telefono(self, value):
+        return validate_phone(value)
+
     def validate(self, attrs):
         request = self.context.get("request")
         role = attrs.get("role")
@@ -131,6 +135,9 @@ class UserUpdateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Ya existe un usuario con este email.")
         return email
 
+    def validate_telefono(self, value):
+        return validate_phone(value)
+
     def validate(self, attrs):
         role = attrs.get("role", getattr(self.instance, "role", None))
         clinica = attrs.get("clinica", getattr(self.instance, "clinica", None))
@@ -166,6 +173,9 @@ class MeUpdateSerializer(serializers.ModelSerializer):
         if not value or not value.strip():
             raise serializers.ValidationError("El nombre completo es obligatorio.")
         return value.strip()
+
+    def validate_telefono(self, value):
+        return validate_phone(value)
 
 
 class ChangePasswordSerializer(serializers.Serializer):
@@ -208,6 +218,12 @@ class MyClinicSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "activo", "creado_en", "actualizado_en"]
 
+    def validate_rtn(self, value):
+        return validate_digits_identifier(value, "El RTN", min_length=8, max_length=20)
+
+    def validate_telefono(self, value):
+        return validate_phone(value)
+
 
 class ClinicAdminUserCreateSerializer(serializers.ModelSerializer):
     role = serializers.CharField()
@@ -223,6 +239,9 @@ class ClinicAdminUserCreateSerializer(serializers.ModelSerializer):
         if User.objects.filter(email__iexact=email).exists():
             raise serializers.ValidationError("Ya existe un usuario con este email.")
         return email
+
+    def validate_telefono(self, value):
+        return validate_phone(value)
 
     def validate_role(self, value):
         allowed = ["admin", "medico", "enfermera", "recepcionista", "paciente"]
@@ -269,6 +288,9 @@ class ClinicAdminUserUpdateSerializer(serializers.ModelSerializer):
         if qs.exists():
             raise serializers.ValidationError("Ya existe un usuario con este email.")
         return email
+
+    def validate_telefono(self, value):
+        return validate_phone(value)
 
     def validate_role(self, value):
         allowed = ["admin", "medico", "enfermera", "recepcionista", "paciente"]

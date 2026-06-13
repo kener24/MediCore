@@ -11,6 +11,7 @@ import { PageHeader } from "../../components/ui/PageHeader";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import type { Clinic } from "../../types/clinic";
 import type { MyClinicUpdatePayload } from "../../types/clinicAdmin";
+import { digitInputProps, onlyDigits, onlyPhoneChars, phoneInputProps } from "../../utils/inputSanitizers";
 
 export function MyClinicPage() {
   const [clinic, setClinic] = useState<Clinic | null>(null);
@@ -85,9 +86,9 @@ export function MyClinicPage() {
           <div className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <Input label="Nombre" value={form.nombre ?? ""} onChange={(event) => setForm({ ...form, nombre: event.target.value })} />
-              <Input label="RTN" value={form.rtn ?? ""} onChange={(event) => setForm({ ...form, rtn: event.target.value })} />
+              <Input label="RTN" maxLength={20} value={form.rtn ?? ""} {...digitInputProps} onChange={(event) => setForm({ ...form, rtn: onlyDigits(event.target.value) })} />
               <Input label="Correo" type="email" value={form.correo ?? ""} onChange={(event) => setForm({ ...form, correo: event.target.value })} />
-              <Input label="Telefono" value={form.telefono ?? ""} onChange={(event) => setForm({ ...form, telefono: event.target.value })} />
+              <Input label="Telefono" maxLength={30} value={form.telefono ?? ""} {...phoneInputProps} onChange={(event) => setForm({ ...form, telefono: onlyPhoneChars(event.target.value) })} />
             </div>
             <label className="block space-y-1.5">
               <span className="text-sm font-medium text-slate-700">Direccion</span>

@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 from apps.appointments.serializers import AppointmentDetailSerializer, AppointmentListSerializer
 from apps.billing.serializers import InvoiceDetailSerializer, InvoiceListSerializer, PaymentListSerializer
+from apps.core.validators import validate_phone
 from apps.doctors.models import DoctorProfile, MedicalSpecialty
 from apps.medical_records.models import ClinicalConsultation, MedicalRecord
 from apps.patients.models import Patient
@@ -41,6 +42,12 @@ class PatientPortalProfileUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Patient
         fields = ["telefono", "correo", "direccion", "ciudad", "departamento", "contacto_emergencia_nombre", "contacto_emergencia_telefono", "contacto_emergencia_parentesco"]
+
+    def validate_telefono(self, value):
+        return validate_phone(value)
+
+    def validate_contacto_emergencia_telefono(self, value):
+        return validate_phone(value)
 
 
 class PatientAppointmentRequestSerializer(serializers.Serializer):
@@ -92,4 +99,3 @@ class PatientPortalDashboardSerializer(serializers.Serializer):
     unread_notifications = serializers.IntegerField()
     clinic = serializers.DictField()
     permissions = serializers.DictField()
-

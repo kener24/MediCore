@@ -7,6 +7,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from apps.accounts.permissions import get_role_name
+from apps.core.validators import validate_digits_identifier, validate_phone as validate_phone_number
 from apps.inventory.models import InventoryItem
 from apps.purchases.models import PurchaseOrder, PurchaseOrderItem, PurchaseReceipt, PurchaseReceiptItem, Supplier
 
@@ -47,6 +48,12 @@ class SupplierSerializer(serializers.ModelSerializer):
         fields = ["id", "clinic", "clinic_nombre", "name", "rtn", "contact_name", "phone", "email", "address", "city", "country", "notes", "active", "creado_en", "actualizado_en"]
         extra_kwargs = {"clinic": {"required": False}}
         validators = []
+
+    def validate_rtn(self, value):
+        return validate_digits_identifier(value, "El RTN", min_length=8, max_length=20)
+
+    def validate_phone(self, value):
+        return validate_phone_number(value)
 
     def validate(self, attrs):
         request = self.context["request"]
@@ -106,6 +113,18 @@ class PurchaseOrderItemCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("El producto debe pertenecer a la misma clinica.")
         if order.status in [PurchaseOrder.Status.CANCELADA, PurchaseOrder.Status.RECIBIDA]:
             raise serializers.ValidationError("No puedes modificar una orden cancelada o recibida.")
+        quantity = attrs.get("quantity_ordered", getattr(self.instance, "quantity_ordered", None))
+        unit_cost = attrs.get("unit_cost", getattr(self.instance, "unit_cost", None))
+        discount = attrs.get("discount_amount", getattr(self.instance, "discount_amount", Decimal("0.00")))
+        tax_rate = attrs.get("tax_rate", getattr(self.instance, "tax_rate", Decimal("0.00")))
+        if quantity is not None and quantity <= 0:
+            raise serializers.ValidationError({"quantity_ordered": "La cantidad debe ser mayor que cero."})
+        if unit_cost is not None and unit_cost < 0:
+            raise serializers.ValidationError({"unit_cost": "El costo no puede ser negativo."})
+        if discount is not None and discount < 0:
+            raise serializers.ValidationError({"discount_amount": "El descuento no puede ser negativo."})
+        if tax_rate is not None and (tax_rate < 0 or tax_rate > 100):
+            raise serializers.ValidationError({"tax_rate": "El impuesto debe estar entre 0 y 100."})
         return attrs
 
     def create(self, validated_data):
@@ -223,8 +242,8 @@ class PurchaseReceiptCreateSerializer(serializers.ModelSerializer):
 
 class PurchaseReceiveItemSerializer(serializers.Serializer):
     purchase_order_item = serializers.IntegerField()
-    quantity_received = serializers.DecimalField(max_digits=12, decimal_places=2)
-    unit_cost = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
+    quantity_received = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0.01"))
+    unit_cost = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0.00"), required=False)
     lot_number = serializers.CharField(required=False, allow_blank=True)
     expiration_date = serializers.DateField(required=False, allow_null=True)
     notes = serializers.CharField(required=False, allow_blank=True)

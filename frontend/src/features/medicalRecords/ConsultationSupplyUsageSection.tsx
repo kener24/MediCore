@@ -10,6 +10,7 @@ import { EmptyState } from "../../components/ui/EmptyState";
 import { Table } from "../../components/ui/Table";
 import type { InventoryItem, InventoryLot } from "../../types/inventory";
 import type { ClinicalSupplyUsage, ClinicalSupplyUsageType } from "../../types/medicalRecord";
+import { cleanDecimal } from "../../utils/inputSanitizers";
 
 const money = (value?: string | number | null) => `L ${Number(value ?? 0).toFixed(2)}`;
 
@@ -97,7 +98,7 @@ export function ConsultationSupplyUsageSection({ consultationId, canEdit }: { co
             <option value="">Sin lote/FIFO</option>
             {lots.map((lot) => <option key={lot.id} value={lot.id}>{lot.lot_number} | {lot.quantity_current}</option>)}
           </select>
-          <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" min="0.01" required step="0.01" type="number" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
+          <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" inputMode="decimal" min="0.01" required step="0.01" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: cleanDecimal(e.target.value) })} />
           <select className="h-10 rounded-md border border-slate-300 px-3 text-sm" value={form.usage_type} onChange={(e) => setForm({ ...form, usage_type: e.target.value })}>
             <option value="medication">Medicamento</option>
             <option value="supply">Insumo</option>

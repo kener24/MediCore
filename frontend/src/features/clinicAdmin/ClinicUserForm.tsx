@@ -6,13 +6,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import type { ClinicAdminUser, ClinicUserCreatePayload, ClinicUserUpdatePayload } from "../../types/clinicAdmin";
+import { onlyPhoneChars, phoneInputProps } from "../../utils/inputSanitizers";
 
 const allowedRoles = ["admin", "medico", "enfermera", "recepcionista", "paciente"];
 
 const schema = z.object({
   nombre_completo: z.string().min(1, "El nombre completo es obligatorio."),
   email: z.string().email("Ingresa un email valido."),
-  telefono: z.string().optional(),
+  telefono: z.string().regex(/^[0-9+()\-\s]*$/, "Solo numeros, espacios, +, guiones y parentesis.").optional(),
   role: z.string().refine((value) => allowedRoles.includes(value), "Selecciona un rol valido."),
   password: z.string().optional(),
   is_active: z.boolean(),
@@ -77,7 +78,7 @@ export function ClinicUserForm({ user, isSubmitting, onSubmit }: ClinicUserFormP
       <div className="grid gap-4 md:grid-cols-2">
         <Input label="Nombre completo" error={errors.nombre_completo?.message} {...register("nombre_completo")} />
         <Input label="Email" type="email" error={errors.email?.message} {...register("email")} />
-        <Input label="Telefono" error={errors.telefono?.message} {...register("telefono")} />
+        <Input label="Telefono" maxLength={30} error={errors.telefono?.message} {...phoneInputProps} {...register("telefono", { setValueAs: onlyPhoneChars })} />
         {!isEditing ? <Input label="Contrasena" type="password" error={errors.password?.message} {...register("password")} /> : null}
       </div>
       <div className="grid gap-4 md:grid-cols-2">

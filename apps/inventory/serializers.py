@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
+from decimal import Decimal
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -131,8 +132,8 @@ class InventoryMovementCreateSerializer(serializers.ModelSerializer):
 
 
 class StockInSerializer(serializers.Serializer):
-    quantity = serializers.DecimalField(max_digits=12, decimal_places=2)
-    unit_cost = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, default=0)
+    quantity = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0.01"))
+    unit_cost = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0.00"), required=False, default=0)
     lot_number = serializers.CharField(required=False, allow_blank=True)
     expiration_date = serializers.DateField(required=False, allow_null=True)
     reason = serializers.CharField()
@@ -140,7 +141,7 @@ class StockInSerializer(serializers.Serializer):
 
 
 class StockOutSerializer(serializers.Serializer):
-    quantity = serializers.DecimalField(max_digits=12, decimal_places=2)
+    quantity = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0.01"))
     lot = serializers.IntegerField(required=False)
     reason = serializers.CharField()
     notes = serializers.CharField(required=False, allow_blank=True)

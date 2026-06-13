@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { CalendarCheck, Clock } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { getAppointmentAvailability } from "../../api/appointmentsApi";
@@ -19,12 +20,14 @@ interface AppointmentFormProps {
 }
 
 export function AppointmentForm({ appointment, isSubmitting, onSubmit }: AppointmentFormProps) {
+  const [searchParams] = useSearchParams();
+  const initialPatient = searchParams.get("patient") ?? "";
   const [patients, setPatients] = useState<Patient[]>([]);
   const [doctors, setDoctors] = useState<DoctorProfile[]>([]);
   const [availableSlots, setAvailableSlots] = useState<Array<{ start_time: string; end_time: string }>>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [payload, setPayload] = useState<AppointmentPayload>({
-    patient: appointment?.patient ?? "",
+    patient: appointment?.patient ?? initialPatient,
     doctor: appointment?.doctor ?? "",
     scheduled_date: appointment?.scheduled_date ?? todayIso(),
     start_time: appointment?.start_time?.slice(0, 5) ?? "",

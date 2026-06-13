@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { ArrowLeft, DollarSign, Plus, Printer, Trash2 } from "lucide-react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { addConsumptionToInvoice, addInventoryItemToInvoice, createBillableService, createCashMovement, createInvoice, createPayment, getBillableServices, getBillingStats, getCashSessions, getCurrentCashSession, getInvoice, getInvoicePayments, getInvoicePrintData, getInvoices, getMyInvoices, getMyPayments, getPayments, getPendingConsumptions, getTodayInvoiceSummary, getTodayInvoices, openCashSession, closeCashSession, voidInvoice } from "../../api/billingApi";
@@ -173,13 +173,15 @@ export function BillableServicesPage() {
 }
 
 export function InvoicesPage({ patientOnly = false }: { patientOnly?: boolean }) {
+  const [searchParams] = useSearchParams();
+  const initialPatient = searchParams.get("patient") ?? "";
   const [items, setItems] = useState<Invoice[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [services, setServices] = useState<BillableService[]>([]);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [pendingConsumptions, setPendingConsumptions] = useState<ClinicalSupplyUsage[]>([]);
-  const [form, setForm] = useState({ patient: "", issue_date: today(), due_date: addDays(7), notes: "" });
-  const [filters, setFilters] = useState({ date_from: "", date_to: "", patient: "", status: "", payment_method: "", invoice_number: "", search: "", has_balance: "" });
+  const [form, setForm] = useState({ patient: initialPatient, issue_date: today(), due_date: addDays(7), notes: "" });
+  const [filters, setFilters] = useState({ date_from: "", date_to: "", patient: initialPatient, status: "", payment_method: "", invoice_number: "", search: "", has_balance: "" });
   const [draftItems, setDraftItems] = useState<InvoiceDraftItem[]>([emptyInvoiceItem()]);
   const [saving, setSaving] = useState(false);
   const [paying, setPaying] = useState<Invoice | null>(null);

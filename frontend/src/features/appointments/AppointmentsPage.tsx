@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { CalendarPlus, CheckCircle2, Eye, Pencil, Search, UserCheck, UserX, XCircle } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { cancelAppointment, confirmAppointment, getAppointments, getMyDoctorAppointments, getMyPatientAppointments, markAppointmentAttended, markAppointmentNoShow } from "../../api/appointmentsApi";
@@ -24,6 +24,8 @@ import { appointmentStatusOptions, formatDateOnly, formatTime, listPathForRole, 
 type Mode = "clinic" | "doctor" | "patient" | "superadmin";
 
 export function AppointmentsPage({ mode = "clinic" }: { mode?: Mode }) {
+  const [searchParams] = useSearchParams();
+  const initialPatient = searchParams.get("patient") ?? "";
   const { user } = useAuth();
   const roleName = roleNameFrom(user);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -32,7 +34,7 @@ export function AppointmentsPage({ mode = "clinic" }: { mode?: Mode }) {
   const [date, setDate] = useState("");
   const [status, setStatus] = useState("");
   const [doctor, setDoctor] = useState("");
-  const [patient, setPatient] = useState("");
+  const [patient, setPatient] = useState(initialPatient);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<number | null>(null);
@@ -103,7 +105,7 @@ export function AppointmentsPage({ mode = "clinic" }: { mode?: Mode }) {
   }
 
   const title = mode === "doctor" ? "Mis citas" : mode === "patient" ? "Mis citas medicas" : mode === "superadmin" ? "Citas globales" : "Citas";
-  const newPath = roleName === "paciente" ? "/patient/appointments/new" : "/clinic/appointments/new";
+  const newPath = roleName === "paciente" ? "/patient/appointments/new" : `/clinic/appointments/new${patient ? `?patient=${patient}` : ""}`;
   const detailBase = listPathForRole(roleName);
 
   return (

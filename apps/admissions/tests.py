@@ -15,6 +15,10 @@ from apps.medical_records.models import ClinicalConsultation, ClinicalSupplyUsag
 from apps.patients.models import Patient
 
 
+def weekday_name(value):
+    return ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"][value.weekday()]
+
+
 class AdmissionsFlowTests(APITestCase):
     def setUp(self):
         self.roles = {name: Role.objects.create(nombre=name) for name in ["admin", "recepcionista", "enfermera", "medico", "paciente"]}
@@ -26,7 +30,7 @@ class AdmissionsFlowTests(APITestCase):
         self.doctor_user = User.objects.create_user(email="doc@x.com", password="x", role=self.roles["medico"], clinica=self.clinic)
         self.specialty = MedicalSpecialty.objects.create(nombre="General")
         self.doctor = DoctorProfile.objects.create(clinic=self.clinic, user=self.doctor_user, specialty=self.specialty, numero_colegiacion="MED-1")
-        DoctorSchedule.objects.create(doctor=self.doctor, dia_semana="jueves", hora_inicio=time(8, 0), hora_fin=time(17, 0))
+        DoctorSchedule.objects.create(doctor=self.doctor, dia_semana=weekday_name(timezone.localdate()), hora_inicio=time(8, 0), hora_fin=time(17, 0))
         self.patient = Patient.objects.create(clinic=self.clinic, nombres="Juan", apellidos="Perez", identidad="0801")
         self.other_patient = Patient.objects.create(clinic=self.other_clinic, nombres="Ana", apellidos="Lopez", identidad="0802")
         self.category = InventoryCategory.objects.create(clinic=self.clinic, name="Medicamentos")

@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { getErrorMessage } from "../../api/axios";
@@ -17,10 +18,12 @@ interface ConsultationFormProps {
 }
 
 export function ConsultationForm({ consultation, isSubmitting, onSubmit }: ConsultationFormProps) {
+  const [searchParams] = useSearchParams();
+  const initialPatient = searchParams.get("patient") ?? "";
   const [patients, setPatients] = useState<Patient[]>([]);
   const [doctors, setDoctors] = useState<DoctorProfile[]>([]);
   const [payload, setPayload] = useState<ConsultationPayload>({
-    patient: consultation?.patient ?? "",
+    patient: consultation?.patient ?? initialPatient,
     doctor: consultation?.doctor ?? "",
     consultation_date: consultation?.consultation_date ?? todayIso(),
     start_time: consultation?.start_time?.slice(0, 5) ?? "",

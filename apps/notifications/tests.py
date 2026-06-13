@@ -1,4 +1,4 @@
-from datetime import date, time
+from datetime import date, time, timedelta
 from decimal import Decimal
 
 from django.utils import timezone
@@ -13,6 +13,10 @@ from apps.notifications.models import Notification, NotificationPreference
 from apps.notifications.services import create_notification
 from apps.patients.models import Patient
 from apps.clinics.models import Clinic
+
+
+def weekday_name(value):
+    return ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"][value.weekday()]
 
 
 class NotificationTests(APITestCase):
@@ -80,7 +84,15 @@ class NotificationTests(APITestCase):
 
     def test_appointment_create_and_cancel_generate_notifications(self):
         self.auth(self.admin)
-        response = self.client.post("/api/appointments/", {"patient": self.patient.id, "doctor": self.doctor.id, "scheduled_date": "2026-06-08", "start_time": "09:00", "end_time": "09:30", "reason": "Control"}, format="json")
+        appointment_date = timezone.localdate() + timedelta(days=1)
+        DoctorSchedule.objects.update_or_create(
+            doctor=self.doctor,
+            dia_semana=weekday_name(appointment_date),
+            hora_inicio=time(8),
+            hora_fin=time(17),
+            defaults={"activo": True},
+        )
+        response = self.client.post("/api/appointments/", {"patient": self.patient.id, "doctor": self.doctor.id, "scheduled_date": appointment_date.isoformat(), "start_time": "09:00", "end_time": "09:30", "reason": "Control"}, format="json")
         self.assertEqual(response.status_code, 201)
         self.assertTrue(Notification.objects.filter(recipient=self.doctor_user, module="appointments").exists())
         appointment_id = response.json()["id"]

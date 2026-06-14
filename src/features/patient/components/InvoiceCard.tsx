@@ -4,9 +4,19 @@ import { AppCard } from '@/components/AppCard';
 import { colors } from '@/core/theme/colors';
 import { StatusPill } from '@/features/patient/components/StatusPill';
 import type { PatientInvoice } from '@/features/patient/types/patientInvoices.types';
-import { formatCurrency, formatDate, getInvoiceTone } from '@/features/patient/utils/formatters';
+import { formatDate } from '@/core/utils/dateUtils';
+import { formatCurrency } from '@/core/utils/moneyUtils';
+import { getInvoiceTone } from '@/features/patient/utils/formatters';
 
-export function InvoiceCard({ invoice, onPress }: { invoice: PatientInvoice; onPress?: () => void }) {
+export function InvoiceCard({
+  currency = 'HNL',
+  invoice,
+  onPress,
+}: {
+  currency?: string;
+  invoice: PatientInvoice;
+  onPress?: () => void;
+}) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => pressed && styles.pressed}>
       <AppCard>
@@ -16,8 +26,8 @@ export function InvoiceCard({ invoice, onPress }: { invoice: PatientInvoice; onP
         </View>
         <Text style={styles.date}>{formatDate(invoice.issue_date)}</Text>
         <View style={styles.amounts}>
-          <Text style={styles.total}>{formatCurrency(invoice.total_amount)}</Text>
-          <Text style={styles.balance}>Saldo {formatCurrency(invoice.balance_due)}</Text>
+          <Text style={styles.total}>{formatCurrency(invoice.total_amount, currency)}</Text>
+          <Text style={styles.balance}>Saldo {formatCurrency(invoice.balance_due, currency)}</Text>
         </View>
       </AppCard>
     </Pressable>

@@ -37,3 +37,44 @@ export type PatientDashboard = {
   clinic?: PatientClinicInfo;
   permissions?: PatientPortalPermissions;
 };
+
+export type PatientDashboardResponse = PatientDashboard & {
+  patient?: PatientProfile & {
+    full_name?: string;
+    code?: string;
+    email?: string;
+    phone?: string;
+  };
+  clinic?: PatientClinicInfo & {
+    name?: string;
+    logo_url?: string | null;
+    primary_color?: string | null;
+  };
+  stats?: {
+    upcoming_appointments?: number;
+    pending_invoices?: number;
+    unread_notifications?: number;
+    recent_documents?: number;
+    active_prescriptions?: number;
+  };
+};
+
+export type NormalizedPatientDashboard = {
+  clinicName?: string;
+  currency: string;
+  documentsCount: number;
+  nextAppointment: PatientAppointment | null;
+  patientCode?: string;
+  patientName?: string;
+  pendingInvoices: PatientInvoice[];
+  recentDocuments: PatientDocument[];
+  recentNotifications: PatientNotification[];
+  recentPrescriptions: PatientPrescription[];
+  stats: {
+    activePrescriptions: number;
+    pendingInvoices: number;
+    recentDocuments: number;
+    unreadNotifications: number;
+    upcomingAppointments: number;
+  };
+};

@@ -12,7 +12,7 @@ export function NurseHomeScreen() {
             title: 'Triaje',
           },
           {
-            description: 'Signos vitales y notas de enfermeria.',
+            description: 'Signos vitales y notas de enfermería.',
             icon: 'heart-pulse',
             title: 'Signos vitales',
           },
@@ -22,7 +22,7 @@ export function NurseHomeScreen() {
             title: 'Pendientes',
           },
         ]}
-        headline="Cuidado clinico organizado"
+        headline="Cuidado clínico organizado"
         roleLabel="Enfermeria"
         subtitle="Base lista para triaje, signos vitales y seguimiento de pacientes."
       />

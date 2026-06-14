@@ -7,7 +7,7 @@ export const apiClient = create({
   baseURL: appConfig.API_BASE_URL,
   headers: {
     Accept: 'application/json',
-    'Content-Type': 'application/json',
+    'Content-Type': 'application/json; charset=utf-8',
   },
   timeout: 20000,
 });

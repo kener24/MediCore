@@ -17,11 +17,11 @@ export function UnsupportedRoleScreen() {
         </View>
         <Text style={styles.title}>Rol no habilitado</Text>
         <Text style={styles.message}>
-          {user?.nombre_completo ?? 'Este usuario'} inicio sesion correctamente, pero el rol
+          {user?.nombre_completo ?? 'Este usuario'} inició sesión correctamente, pero el rol
           <Text style={styles.roleName}> {role ?? 'sin rol'} </Text>
-          aun no tiene panel movil activo.
+          aún no tiene panel móvil activo.
         </Text>
-        <AppButton label="Cerrar sesion" onPress={signOut} variant="secondary" />
+        <AppButton label="Cerrar sesión" onPress={signOut} variant="secondary" />
       </View>
     </SafeAreaView>
   );

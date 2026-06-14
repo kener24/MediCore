@@ -65,14 +65,14 @@ export function RequestAppointmentScreen() {
     try {
       setDoctors(await getPatientDoctors(nextSpecialty.id));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al cargar medicos.');
+      setError(err instanceof Error ? err.message : 'Error al cargar médicos.');
     }
   }
 
   async function loadAvailability() {
     const validation = validateDate(date);
     if (!doctor) {
-      Alert.alert('Disponibilidad', 'Selecciona un medico.');
+      Alert.alert('Disponibilidad', 'Selecciona un médico.');
       return;
     }
     if (validation) {
@@ -85,7 +85,7 @@ export function RequestAppointmentScreen() {
       setSlots((availability.available_slots ?? []).filter((item) => item.available !== false));
       setSlot(null);
       if (availability.allow_online_appointments === false) {
-        Alert.alert('Citas en linea', 'La clinica no permite citas en linea.');
+        Alert.alert('Citas en línea', 'La clínica no permite citas en línea.');
       }
     } catch (err) {
       Alert.alert('Disponibilidad', err instanceof Error ? err.message : 'No hay horarios disponibles.');
@@ -96,7 +96,7 @@ export function RequestAppointmentScreen() {
 
   async function submit() {
     if (!specialty) return Alert.alert('Solicitud', 'Selecciona una especialidad.');
-    if (!doctor) return Alert.alert('Solicitud', 'Selecciona un medico.');
+    if (!doctor) return Alert.alert('Solicitud', 'Selecciona un médico.');
     const dateValidation = validateDate(date);
     if (dateValidation) return Alert.alert('Solicitud', dateValidation);
     if (!slot) return Alert.alert('Solicitud', 'Selecciona un horario.');
@@ -129,7 +129,7 @@ export function RequestAppointmentScreen() {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <PatientHeader subtitle="Completa los datos requeridos para enviar tu solicitud." title="Solicitar cita" />
-        {error ? <ErrorState message={error} title="No se pudo cargar informacion" /> : null}
+        {error ? <ErrorState message={error} title="No se pudo cargar información" /> : null}
 
         <Step title="1. Especialidad">
           {specialties.length ? (
@@ -144,17 +144,17 @@ export function RequestAppointmentScreen() {
               ))}
             </View>
           ) : (
-            <EmptyState description="La clinica no tiene especialidades disponibles." title="Sin especialidades" />
+            <EmptyState description="La clínica no tiene especialidades disponibles." title="Sin especialidades" />
           )}
         </Step>
 
-        <Step title="2. Medico">
+        <Step title="2. Médico">
           {doctors.length ? (
             <View style={styles.options}>
               {doctors.map((item) => (
                 <AppButton
                   key={item.id}
-                  label={item.nombre_completo || item.full_name || item.nombre || item.name || `Medico ${item.id}`}
+                  label={item.nombre_completo || item.full_name || item.nombre || item.name || `Médico ${item.id}`}
                   onPress={() => {
                     setDoctor(item);
                     setSlot(null);
@@ -165,7 +165,7 @@ export function RequestAppointmentScreen() {
               ))}
             </View>
           ) : (
-            <Text style={styles.help}>Selecciona una especialidad para ver medicos.</Text>
+            <Text style={styles.help}>Selecciona una especialidad para ver médicos.</Text>
           )}
         </Step>
 
@@ -180,13 +180,13 @@ export function RequestAppointmentScreen() {
           />
           <View style={styles.dateActions}>
             <AppButton
-              label="Manana"
+              label="Mañana"
               onPress={() => setDate(toISODate(addDays(1)))}
               style={styles.dateAction}
               variant="secondary"
             />
             <AppButton
-              label="En 7 dias"
+              label="En 7 días"
               onPress={() => setDate(toISODate(addDays(7)))}
               style={styles.dateAction}
               variant="secondary"
@@ -231,9 +231,9 @@ function addDays(days: number) {
 function validateDate(value: string) {
   const trimmed = value.trim();
   if (!trimmed) return 'Selecciona una fecha.';
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return 'Ingresa una fecha valida en formato YYYY-MM-DD.';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return 'Ingresa una fecha válida en formato YYYY-MM-DD.';
   const parsed = new Date(`${trimmed}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) return 'Ingresa una fecha valida.';
+  if (Number.isNaN(parsed.getTime())) return 'Ingresa una fecha válida.';
   if (isPastISODate(trimmed)) return 'La fecha no puede ser pasada.';
   return '';
 }

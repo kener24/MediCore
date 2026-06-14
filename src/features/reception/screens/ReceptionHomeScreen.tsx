@@ -24,7 +24,7 @@ export function ReceptionHomeScreen() {
         ]}
         headline="Recepcion sin friccion"
         roleLabel="Recepcion"
-        subtitle="Base movil para admisiones, citas y cobros de la clinica."
+        subtitle="Base móvil para admisiones, citas y cobros de la clínica."
       />
     </RoleGuard>
   );

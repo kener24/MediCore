@@ -11,7 +11,7 @@ export function isNotificationRead(notification: PatientNotification) {
   if (typeof notification.is_read === 'boolean') return notification.is_read;
   if (typeof notification.read === 'boolean') return notification.read;
   if (notification.read_at) return true;
-  if (status) return ['read', 'leida', 'leido'].includes(status);
+  if (status) return ['read', 'leída', 'leido', 'leído', 'leida'].includes(status);
   return false;
 }
 
@@ -57,7 +57,7 @@ export function NotificationCard({
         </View>
         {!isRead && markRead ? (
           <Pressable onPress={markRead} style={styles.action}>
-            <Text style={styles.actionText}>Marcar como leida</Text>
+            <Text style={styles.actionText}>Marcar como leída</Text>
           </Pressable>
         ) : null}
       </AppCard>

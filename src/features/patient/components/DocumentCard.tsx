@@ -18,7 +18,7 @@ export function DocumentCard({ document, onPress }: { document: PatientDocument;
             <MaterialCommunityIcons color={colors.primary} name={getFileIcon(fileKind)} size={24} />
           </View>
           <View style={styles.copy}>
-            <Text style={styles.title}>{document.title || document.original_filename || 'Documento clinico'}</Text>
+            <Text style={styles.title}>{document.title || document.original_filename || 'Documento clínico'}</Text>
             <Text style={styles.meta}>
               {document.category_name || document.category || 'Documento'} ·{' '}
               {formatDate(document.created_at || document.creado_en)}

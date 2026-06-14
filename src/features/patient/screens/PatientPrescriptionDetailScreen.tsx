@@ -37,7 +37,7 @@ export function PatientPrescriptionDetailScreen() {
   useEffect(() => { load(); }, [load]);
 
   if (loading) return <LoadingState label="Cargando receta..." />;
-  if (error || !prescription) return <ErrorState message={error || 'No hay informacion disponible.'} onRetry={load} />;
+  if (error || !prescription) return <ErrorState message={error || 'No hay información disponible.'} onRetry={load} />;
 
   const medications = normalizeMedications(prescription);
 

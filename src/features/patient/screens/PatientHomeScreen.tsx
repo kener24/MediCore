@@ -7,19 +7,19 @@ export function PatientHomeScreen() {
       <RoleHomeScreen
         actions={[
           {
-            description: 'Consulta proximas citas, solicitudes y cambios de horario.',
+            description: 'Consulta próximas citas, solicitudes y cambios de horario.',
             icon: 'calendar-check-outline',
             title: 'Mis citas',
           },
           {
-            description: 'Resumen clinico, documentos y antecedentes importantes.',
+            description: 'Resumen clínico, documentos y antecedentes importantes.',
             icon: 'file-document-outline',
             title: 'Expediente',
           },
           {
             description: 'Facturas, saldos y comprobantes disponibles.',
             icon: 'receipt-text-outline',
-            title: 'Facturacion',
+            title: 'Facturación',
           },
         ]}
         headline="Tu salud en un solo lugar"

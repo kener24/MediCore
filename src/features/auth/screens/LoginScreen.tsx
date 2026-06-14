@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppButton } from '@/components/AppButton';
 import { AppInput } from '@/components/AppInput';
 import { ApiClientError } from '@/core/api/authInterceptor';
+import { es } from '@/core/i18n/es';
 import { colors } from '@/core/theme/colors';
 import { useAuth } from '@/features/auth/context/AuthContext';
 
@@ -40,9 +41,9 @@ export function LoginScreen() {
       const message =
         err instanceof ApiClientError
           ? err.message
-          : 'No se pudo iniciar sesion. Revisa tu conexion.';
+          : 'No se pudo iniciar sesión. Revisa tu conexión.';
       setError(message);
-      Alert.alert('Inicio de sesion', message);
+      Alert.alert('Inicio de sesión', message);
     } finally {
       setSubmitting(false);
     }
@@ -63,14 +64,14 @@ export function LoginScreen() {
               <MaterialCommunityIcons color={colors.white} name="heart-pulse" size={34} />
             </View>
             <Text style={styles.brand}>MediCore</Text>
-            <Text style={styles.subtitle}>Portal movil seguro</Text>
+            <Text style={styles.subtitle}>Portal móvil seguro</Text>
           </View>
 
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <Text style={styles.title}>Bienvenido</Text>
               <Text style={styles.description}>
-                Accede a la informacion autorizada segun tu rol dentro de MediCore.
+                Accede a la información autorizada según tu rol dentro de MediCore.
               </Text>
             </View>
 
@@ -80,7 +81,7 @@ export function LoginScreen() {
                 autoComplete="email"
                 icon="email-outline"
                 keyboardType="email-address"
-                label="Correo electronico"
+                label={es.auth.email}
                 onChangeText={setEmail}
                 placeholder="usuario@correo.com"
                 textContentType="emailAddress"
@@ -89,9 +90,9 @@ export function LoginScreen() {
 
               <View style={styles.passwordRow}>
                 <View style={styles.passwordLabelRow}>
-                  <Text style={styles.passwordLabel}>Contrasena</Text>
+                  <Text style={styles.passwordLabel}>{es.auth.password}</Text>
                   <Pressable hitSlop={10}>
-                    <Text style={styles.textLink}>Olvide mi contrasena</Text>
+                    <Text style={styles.textLink}>{es.auth.forgotPassword}</Text>
                   </Pressable>
                 </View>
                 <AppInput
@@ -100,7 +101,7 @@ export function LoginScreen() {
                   label=""
                   onChangeText={setPassword}
                   onSubmitEditing={handleLogin}
-                  placeholder="Ingresa tu contrasena"
+                  placeholder="Ingresa tu contraseña"
                   rightIcon={securePassword ? 'eye-outline' : 'eye-off-outline'}
                   onPressRightIcon={() => setSecurePassword((current) => !current)}
                   secureTextEntry={securePassword}
@@ -124,7 +125,7 @@ export function LoginScreen() {
               <View style={styles.securityText}>
                 <Text style={styles.securityTitle}>Acceso protegido</Text>
                 <Text style={styles.securityDescription}>
-                  Tokens JWT guardados en SecureStore y menus filtrados por rol.
+                  Tokens JWT guardados en SecureStore y menús filtrados por rol.
                 </Text>
               </View>
             </View>

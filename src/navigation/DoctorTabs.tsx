@@ -28,7 +28,7 @@ export function DoctorTabs() {
       <Tab.Screen
         name="DoctorRecords"
         options={{ tabBarIcon: tabIcon('clipboard-pulse-outline'), title: 'Expediente' }}>
-        {() => <RolePlaceholderScreen description="Acceso clinico autorizado" title="Expedientes" />}
+        {() => <RolePlaceholderScreen description="Acceso clínico autorizado" title="Expedientes" />}
       </Tab.Screen>
     </Tab.Navigator>
   );

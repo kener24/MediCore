@@ -25,7 +25,7 @@ export function ClinicInfoScreen() {
     try {
       setClinic(await getClinicInfo());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo cargar la informacion.');
+      setError(err instanceof Error ? err.message : 'No se pudo cargar la información.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -34,7 +34,7 @@ export function ClinicInfoScreen() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  if (loading) return <LoadingState label="Cargando clinica..." />;
+  if (loading) return <LoadingState label="Cargando clínica..." />;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -42,13 +42,13 @@ export function ClinicInfoScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl onRefresh={() => load(true)} refreshing={refreshing} />}
         showsVerticalScrollIndicator={false}>
-        <PatientHeader subtitle="Informacion publica de tu clinica." title="Clinica" />
+        <PatientHeader subtitle="Información pública de tu clínica." title="Clínica" />
         {error ? (
-          <ErrorState message={error} onRetry={() => load()} title="No se pudo cargar la clinica" />
+          <ErrorState message={error} onRetry={() => load()} title="No se pudo cargar la clínica" />
         ) : clinic ? (
           <ClinicInfoCard clinic={clinic} />
         ) : (
-          <EmptyState description="No hay datos disponibles." title="Sin informacion" />
+          <EmptyState description="No hay datos disponibles." title="Sin información" />
         )}
       </ScrollView>
     </SafeAreaView>

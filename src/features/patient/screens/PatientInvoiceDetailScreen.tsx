@@ -38,7 +38,7 @@ export function PatientInvoiceDetailScreen() {
   useEffect(() => { load(); }, [load]);
 
   if (loading) return <LoadingState label="Cargando factura..." />;
-  if (error || !invoice) return <ErrorState message={error || 'No hay informacion disponible.'} onRetry={load} />;
+  if (error || !invoice) return <ErrorState message={error || 'No hay información disponible.'} onRetry={load} />;
 
   const pdfUrl = invoice.pdf_url || invoice.file_url;
 

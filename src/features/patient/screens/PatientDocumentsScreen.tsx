@@ -61,7 +61,7 @@ export function PatientDocumentsScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl onRefresh={() => load(true)} refreshing={refreshing} />}
         showsVerticalScrollIndicator={false}>
-        <PatientHeader subtitle="Solo veras documentos autorizados por tu clinica." title="Mis documentos" />
+        <PatientHeader subtitle="Solo verás documentos autorizados por tu clínica." title="Mis documentos" />
         {documentTypes.length > 2 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.filterRow}>

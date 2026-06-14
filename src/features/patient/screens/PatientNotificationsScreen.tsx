@@ -65,9 +65,9 @@ export function PatientNotificationsScreen() {
         ),
       );
       setUnreadCount((current) => Math.max(current - 1, 0));
-      Alert.alert('Notificaciones', 'Notificacion marcada como leida.');
+      Alert.alert('Notificaciones', 'Notificación marcada como leída.');
     } catch (err) {
-      Alert.alert('Notificaciones', err instanceof Error ? err.message : 'No se pudo marcar como leida.');
+      Alert.alert('Notificaciones', err instanceof Error ? err.message : 'No se pudo marcar como leída.');
     }
   }
 
@@ -83,17 +83,17 @@ export function PatientNotificationsScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl onRefresh={() => load(true)} refreshing={refreshing} />}
         showsVerticalScrollIndicator={false}>
-        <PatientHeader subtitle="Avisos enviados por tu clinica." title="Notificaciones" />
+        <PatientHeader subtitle="Avisos enviados por tu clínica." title="Notificaciones" />
         <View style={styles.counterCard}>
           <View>
-            <Text style={styles.counterLabel}>No leidas</Text>
+            <Text style={styles.counterLabel}>No leídas</Text>
             <Text style={styles.counterText}>{unreadCount}</Text>
           </View>
           <UnreadBadge count={unreadCount} />
         </View>
         <View style={styles.filters}>
           <FilterButton active={filter === 'all'} label="Todas" onPress={() => setFilter('all')} />
-          <FilterButton active={filter === 'unread'} label="No leidas" onPress={() => setFilter('unread')} />
+          <FilterButton active={filter === 'unread'} label="No leídas" onPress={() => setFilter('unread')} />
         </View>
         {error ? (
           <ErrorState message={error} onRetry={() => load()} title="No se pudieron cargar las notificaciones" />
@@ -109,7 +109,7 @@ export function PatientNotificationsScreen() {
         ) : (
           <EmptyState
             description={filter === 'unread' ? 'No tienes notificaciones pendientes.' : 'No tienes notificaciones.'}
-            title={filter === 'unread' ? 'Todo al dia' : 'Sin notificaciones'}
+            title={filter === 'unread' ? 'Todo al día' : 'Sin notificaciones'}
           />
         )}
       </ScrollView>

@@ -23,7 +23,7 @@ export function SettingsScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <PatientHeader subtitle="Gestiona tu cuenta y preferencias." title="Configuracion" />
+        <PatientHeader subtitle="Gestiona tu cuenta y preferencias." title="Configuración" />
         <AppCard style={styles.options}>
           <SettingsOption
             icon="account-circle-outline"
@@ -34,14 +34,14 @@ export function SettingsScreen() {
           <SettingsOption
             icon="lock-reset"
             onPress={() => navigation.navigate('ChangePassword')}
-            subtitle="Actualiza tu contrasena"
-            title="Cambiar contrasena"
+            subtitle="Actualiza tu contraseña"
+            title="Cambiar contraseña"
           />
           <SettingsOption
             icon="hospital-building"
             onPress={() => navigation.navigate('ClinicInfo')}
-            subtitle="Telefono, correo y horarios"
-            title="Informacion de clinica"
+            subtitle="Teléfono, correo y horarios"
+            title="Información de clínica"
           />
           <SettingsOption
             icon="bell-outline"
@@ -53,8 +53,8 @@ export function SettingsScreen() {
             danger
             icon="logout"
             onPress={() => setLogoutVisible(true)}
-            subtitle="Finaliza tu sesion en este dispositivo"
-            title="Cerrar sesion"
+            subtitle="Finaliza tu sesión en este dispositivo"
+            title="Cerrar sesión"
           />
         </AppCard>
       </ScrollView>

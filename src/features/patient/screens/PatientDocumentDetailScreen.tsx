@@ -45,7 +45,7 @@ export function PatientDocumentDetailScreen() {
   }
 
   if (loading) return <LoadingState label="Cargando documento..." />;
-  if (error || !document) return <ErrorState message={error || 'No hay informacion disponible.'} onRetry={load} />;
+  if (error || !document) return <ErrorState message={error || 'No hay información disponible.'} onRetry={load} />;
 
   const fileValue = document.preview_url || document.file_url || document.file || document.original_filename;
 
@@ -54,7 +54,7 @@ export function PatientDocumentDetailScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <AppButton label="Volver" onPress={() => navigation.goBack()} variant="secondary" />
         <AppCard>
-          <Text style={styles.title}>{document.title || document.original_filename || 'Documento clinico'}</Text>
+          <Text style={styles.title}>{document.title || document.original_filename || 'Documento clínico'}</Text>
           <Text style={styles.meta}>{document.category_name || document.category || 'Documento'}</Text>
           <Text style={styles.meta}>Fecha: {formatDate(document.created_at || document.creado_en)}</Text>
           <Text style={styles.meta}>Tipo: {document.file_type || document.mime_type || document.file_extension || 'No indicado'}</Text>

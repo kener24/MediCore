@@ -29,13 +29,13 @@ export function PatientQuickActions({
   return (
     <View style={styles.container}>
       <QuickActionCard
-        description="Consulta tus proximas citas e historial."
+        description="Consulta tus próximas citas e historial."
         icon="calendar-check-outline"
         onPress={() => navigate('appointments', onAppointments)}
         title="Mis citas"
       />
       <QuickActionCard
-        description="Solicita una nueva cita en linea."
+        description="Solicita una nueva cita en línea."
         icon="calendar-plus"
         onPress={() => navigate('requestAppointment', onRequestAppointment)}
         title="Solicitar cita"
@@ -53,7 +53,7 @@ export function PatientQuickActions({
         title="Facturas"
       />
       <QuickActionCard
-        description="Documentos clinicos visibles."
+        description="Documentos clínicos visibles."
         icon="file-document-outline"
         onPress={() => navigate('documents', onDocuments)}
         title="Documentos"

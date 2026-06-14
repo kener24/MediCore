@@ -42,7 +42,7 @@ export function PatientProfileScreen() {
     try {
       setProfile(await getPatientProfile());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo cargar la informacion.');
+      setError(err instanceof Error ? err.message : 'No se pudo cargar la información.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -72,18 +72,18 @@ export function PatientProfileScreen() {
               items={[
                 { label: 'Nombre legal', value: getFullName(profile) },
                 { label: 'Identidad', value: profile.identity_number ?? profile.identidad },
-                { label: 'Codigo paciente', value: profile.patient_code ?? profile.codigo_paciente },
+                { label: 'Código paciente', value: profile.patient_code ?? profile.codigo_paciente },
                 { label: 'Fecha nacimiento', value: profile.birth_date ?? profile.fecha_nacimiento },
-                { label: 'Genero', value: profile.gender ?? profile.genero },
-                { label: 'Clinica', value: getClinicName(profile) },
+                { label: 'Género', value: profile.gender ?? profile.genero },
+                { label: 'Clínica', value: getClinicName(profile) },
               ]}
-              title="Informacion no editable"
+              title="Información no editable"
             />
             <ProfileInfoCard
               items={[
-                { label: 'Telefono', value: profile.phone ?? profile.telefono },
+                { label: 'Teléfono', value: profile.phone ?? profile.telefono },
                 { label: 'Correo', value: profile.email ?? profile.correo },
-                { label: 'Direccion', value: profile.address ?? profile.direccion },
+                { label: 'Dirección', value: profile.address ?? profile.direccion },
                 { label: 'Ciudad', value: profile.city ?? profile.ciudad },
                 { label: 'Departamento', value: profile.department ?? profile.departamento },
               ]}
@@ -92,7 +92,7 @@ export function PatientProfileScreen() {
             <ProfileInfoCard
               items={[
                 { label: 'Nombre', value: profile.emergency_contact_name ?? profile.contacto_emergencia_nombre },
-                { label: 'Telefono', value: profile.emergency_contact_phone ?? profile.contacto_emergencia_telefono },
+                { label: 'Teléfono', value: profile.emergency_contact_phone ?? profile.contacto_emergencia_telefono },
                 {
                   label: 'Parentesco',
                   value: profile.emergency_contact_relationship ?? profile.contacto_emergencia_parentesco,
@@ -102,7 +102,7 @@ export function PatientProfileScreen() {
             />
             <AppButton label="Editar perfil" onPress={() => navigation.navigate('EditPatientProfile')} />
             <AppButton
-              label="Configuracion"
+              label="Configuración"
               onPress={() => navigation.navigate('PatientSettings')}
               variant="secondary"
             />

@@ -12,12 +12,12 @@ export function DoctorHomeScreen() {
             title: 'Consultas',
           },
           {
-            description: 'Acceso rapido a expedientes clinicos autorizados.',
+            description: 'Acceso rápido a expedientes clínicos autorizados.',
             icon: 'clipboard-pulse-outline',
             title: 'Expedientes',
           },
           {
-            description: 'Pendientes clinicos, notas y resultados.',
+            description: 'Pendientes clínicos, notas y resultados.',
             icon: 'stethoscope',
             title: 'Atenciones',
           },

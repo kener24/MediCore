@@ -1,0 +1,33 @@
+export const es = {
+  auth: {
+    email: 'Correo electrónico',
+    forgotPassword: '¿Olvidaste tu contraseña?',
+    login: 'Iniciar sesión',
+    logout: 'Cerrar sesión',
+    password: 'Contraseña',
+    sessionExpired: 'Tu sesión expiró. Inicia sesión nuevamente.',
+  },
+  common: {
+    cancel: 'Cancelar',
+    confirm: 'Confirmar',
+    delete: 'Eliminar',
+    edit: 'Editar',
+    error: 'Ocurrió un error.',
+    loading: 'Cargando...',
+    noConnection: 'No se pudo conectar con el servidor.',
+    retry: 'Reintentar',
+    save: 'Guardar',
+    success: 'Operación realizada correctamente.',
+  },
+  patient: {
+    appointments: 'Citas',
+    dashboard: 'Inicio',
+    documents: 'Documentos',
+    invoices: 'Facturas',
+    noUpcomingAppointments: 'No tienes citas próximas.',
+    notifications: 'Notificaciones',
+    prescriptions: 'Recetas',
+    profile: 'Perfil',
+    requestAppointment: 'Solicitar cita',
+  },
+};

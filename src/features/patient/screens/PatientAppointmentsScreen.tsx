@@ -96,7 +96,7 @@ export function PatientAppointmentsScreen() {
           </View>
         ) : (
           <EmptyState
-            description="Cuando tengas citas registradas apareceran en esta seccion."
+            description="Cuando tengas citas registradas aparecerán en esta sección."
             title="No hay citas disponibles"
           />
         )}

@@ -5,7 +5,7 @@ export function AdminDashboardScreen() {
   return (
     <RoleGuard roles={['admin']}>
       <RoleDashboardScreen
-        description="Indicadores generales de la clinica"
+        description="Indicadores generales de la clínica"
         stats={[
           { icon: 'account-group-outline', label: 'Pacientes', value: '0' },
           { icon: 'calendar-today-outline', label: 'Citas hoy', tone: 'blue', value: '0' },

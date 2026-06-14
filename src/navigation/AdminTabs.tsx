@@ -28,7 +28,7 @@ export function AdminTabs() {
       <Tab.Screen
         name="AdminReports"
         options={{ tabBarIcon: tabIcon('chart-box-outline'), title: 'Reportes' }}>
-        {() => <RolePlaceholderScreen description="Indicadores de la clinica" title="Reportes" />}
+        {() => <RolePlaceholderScreen description="Indicadores de la clínica" title="Reportes" />}
       </Tab.Screen>
     </Tab.Navigator>
   );

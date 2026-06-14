@@ -49,7 +49,7 @@ export function RoleHomeScreen({ actions, headline, roleLabel, subtitle }: RoleH
           ))}
         </View>
 
-        <AppButton label="Cerrar sesion" onPress={signOut} variant="secondary" />
+        <AppButton label="Cerrar sesión" onPress={signOut} variant="secondary" />
       </ScrollView>
     </SafeAreaView>
   );

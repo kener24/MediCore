@@ -26,14 +26,14 @@ export class ApiClientError extends Error {
 
 function extractErrorMessage(error: AxiosError) {
   if (!error.response) {
-    return 'No hay conexion con el servidor. Revisa tu internet e intenta nuevamente.';
+    return 'No hay conexión con el servidor. Revisa tu internet e intenta nuevamente.';
   }
 
   const status = error.response.status;
   const payload = error.response.data;
 
-  if (status === 401) return 'Tu sesion expiro. Inicia sesion nuevamente.';
-  if (status === 403) return 'No tienes permisos para realizar esta accion.';
+  if (status === 401) return 'Tu sesión expiró. Inicia sesión nuevamente.';
+  if (status === 403) return 'No tienes permisos para realizar esta acción.';
   if (status >= 500) return 'El servidor no pudo responder. Intenta mas tarde.';
 
   if (payload && typeof payload === 'object') {

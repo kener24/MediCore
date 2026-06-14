@@ -23,7 +23,7 @@ export function CancelAppointmentModal({
       <View style={styles.overlay}>
         <View style={styles.card}>
           <Text style={styles.title}>Cancelar cita</Text>
-          <Text style={styles.description}>Escribe el motivo de cancelacion para enviarlo a la clinica.</Text>
+          <Text style={styles.description}>Escribe el motivo de cancelación para enviarlo a la clínica.</Text>
           <TextInput
             multiline
             onChangeText={onChangeReason}
@@ -34,7 +34,7 @@ export function CancelAppointmentModal({
           />
           <View style={styles.actions}>
             <AppButton label="Cerrar" onPress={onCancel} variant="secondary" />
-            <AppButton label="Confirmar cancelacion" loading={loading} onPress={onConfirm} variant="danger" />
+            <AppButton label="Confirmar cancelación" loading={loading} onPress={onConfirm} variant="danger" />
           </View>
         </View>
       </View>

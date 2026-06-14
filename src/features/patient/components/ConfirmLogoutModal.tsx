@@ -1,6 +1,7 @@
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
+import { es } from '@/core/i18n/es';
 import { colors } from '@/core/theme/colors';
 
 export function ConfirmLogoutModal({
@@ -16,11 +17,11 @@ export function ConfirmLogoutModal({
     <Modal animationType="fade" transparent visible={visible}>
       <Pressable onPress={onCancel} style={styles.overlay}>
         <Pressable style={styles.modal}>
-          <Text style={styles.title}>Cerrar sesion</Text>
-          <Text style={styles.message}>Deseas cerrar sesion?</Text>
+          <Text style={styles.title}>{es.auth.logout}</Text>
+          <Text style={styles.message}>¿Deseas cerrar sesión?</Text>
           <View style={styles.actions}>
-            <AppButton label="Cancelar" onPress={onCancel} variant="secondary" />
-            <AppButton label="Cerrar sesion" onPress={onConfirm} variant="danger" />
+            <AppButton label={es.common.cancel} onPress={onCancel} variant="secondary" />
+            <AppButton label={es.auth.logout} onPress={onConfirm} variant="danger" />
           </View>
         </Pressable>
       </Pressable>

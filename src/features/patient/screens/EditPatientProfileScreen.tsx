@@ -27,7 +27,7 @@ export function EditPatientProfileScreen() {
     try {
       setProfile(await getPatientProfile());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo cargar la informacion.');
+      setError(err instanceof Error ? err.message : 'No se pudo cargar la información.');
     } finally {
       setLoading(false);
     }

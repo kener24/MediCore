@@ -37,7 +37,7 @@ export function PatientDashboardScreen() {
     try {
       setDashboard(await getPatientDashboard());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo cargar tu informacion.');
+      setError(err instanceof Error ? err.message : 'No se pudo cargar tu información.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -86,9 +86,9 @@ export function PatientDashboardScreen() {
         showsVerticalScrollIndicator={false}>
         {error ? (
           <ErrorState
-            message={`${error} Revisa tu conexion e intenta de nuevo.`}
+            message={`${error} Revisa tu conexión e intenta de nuevo.`}
             onRetry={() => load()}
-            title="No se pudo cargar tu informacion"
+            title="No se pudo cargar tu información"
           />
         ) : dashboard && hasAnyData ? (
           <>
@@ -134,8 +134,8 @@ export function PatientDashboardScreen() {
           </>
         ) : (
           <EmptyState
-            description="No tienes datos disponibles todavia. Cuando tu clinica registre citas, recetas, documentos o facturas apareceran aqui."
-            title="No tienes datos disponibles todavia"
+            description="No tienes datos disponibles todavía. Cuando tu clínica registre citas, recetas, documentos o facturas aparecerán aquí."
+            title="No tienes datos disponibles todavía"
           />
         )}
       </ScrollView>

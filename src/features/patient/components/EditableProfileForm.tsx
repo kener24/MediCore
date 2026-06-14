@@ -64,13 +64,13 @@ function buildPayload(form: FormState): PatientProfileUpdatePayload {
 function validate(form: FormState) {
   const email = clean(form.email);
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return 'Ingresa un correo valido.';
+    return 'Ingresa un correo válido.';
   }
   if (form.phone && !/^[0-9+\-\s()]{7,20}$/.test(form.phone)) {
-    return 'Ingresa un telefono valido.';
+    return 'Ingresa un teléfono válido.';
   }
   if (form.emergencyContactPhone && !/^[0-9+\-\s()]{7,20}$/.test(form.emergencyContactPhone)) {
-    return 'Ingresa un telefono de emergencia valido.';
+    return 'Ingresa un teléfono de emergencia válido.';
   }
   return '';
 }
@@ -107,7 +107,7 @@ export function EditableProfileForm({
       <AppInput
         icon="phone-outline"
         keyboardType="phone-pad"
-        label="Telefono"
+        label="Teléfono"
         onChangeText={(value) => updateField('phone', value)}
         value={form.phone}
       />
@@ -121,7 +121,7 @@ export function EditableProfileForm({
       />
       <AppInput
         icon="map-marker-outline"
-        label="Direccion"
+        label="Dirección"
         onChangeText={(value) => updateField('address', value)}
         value={form.address}
       />
@@ -146,7 +146,7 @@ export function EditableProfileForm({
       <AppInput
         icon="phone-alert-outline"
         keyboardType="phone-pad"
-        label="Telefono emergencia"
+        label="Teléfono emergencia"
         onChangeText={(value) => updateField('emergencyContactPhone', value)}
         value={form.emergencyContactPhone}
       />

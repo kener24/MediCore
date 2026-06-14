@@ -43,7 +43,7 @@ export function PatientAppointmentDetailScreen() {
 
   async function submitCancellation() {
     if (!cancelReason.trim()) {
-      Alert.alert('Cancelacion', 'Escribe el motivo de cancelacion.');
+      Alert.alert('Cancelación', 'Escribe el motivo de cancelación.');
       return;
     }
     setSubmitting(true);
@@ -55,7 +55,7 @@ export function PatientAppointmentDetailScreen() {
       setCancelReason('');
       Alert.alert('Cita cancelada', 'La cita fue cancelada correctamente.');
     } catch (err) {
-      Alert.alert('Cancelacion', err instanceof Error ? err.message : 'No se pudo cancelar la cita.');
+      Alert.alert('Cancelación', err instanceof Error ? err.message : 'No se pudo cancelar la cita.');
     } finally {
       setSubmitting(false);
     }
@@ -63,7 +63,7 @@ export function PatientAppointmentDetailScreen() {
 
   if (loading) return <LoadingState label="Cargando cita..." />;
   if (error || !appointment) {
-    return <ErrorState message={error || 'No hay informacion disponible.'} onRetry={load} />;
+    return <ErrorState message={error || 'No hay información disponible.'} onRetry={load} />;
   }
 
   const canCancel =
@@ -86,17 +86,17 @@ export function PatientAppointmentDetailScreen() {
           <Text style={styles.time}>
             {formatTime(appointment.start_time)} - {formatTime(appointment.end_time)}
           </Text>
-          <Text style={styles.doctor}>{appointment.doctor_name || appointment.doctor_nombre || 'Medico'}</Text>
+          <Text style={styles.doctor}>{appointment.doctor_name || appointment.doctor_nombre || 'Médico'}</Text>
           <Text style={styles.meta}>{appointment.doctor_specialty || appointment.specialty_name || appointment.specialty_nombre || 'Especialidad no indicada'}</Text>
         </AppCard>
 
         <AppCard>
-          <Detail label="Clinica" value={appointment.clinic_name || appointment.clinic_nombre} />
+          <Detail label="Clínica" value={appointment.clinic_name || appointment.clinic_nombre} />
           <Detail label="Motivo" value={appointment.reason} />
           <Detail label="Notas permitidas" value={appointment.notes} />
           <Detail label="Instrucciones" value={appointment.instructions} />
           <Detail label="Creada" value={formatDateTime(appointment.created_at || appointment.creado_en)} />
-          <Detail label="Motivo de cancelacion" value={appointment.cancellation_reason} />
+          <Detail label="Motivo de cancelación" value={appointment.cancellation_reason} />
         </AppCard>
 
         {canCancel ? (

@@ -24,7 +24,7 @@ export function NextAppointmentCard({
         <View style={styles.emptyIcon}>
           <MaterialCommunityIcons color={colors.primary} name="calendar-plus" size={28} />
         </View>
-        <Text style={styles.title}>No tienes citas proximas.</Text>
+        <Text style={styles.title}>No tienes citas próximas.</Text>
         <Text style={styles.description}>Puedes solicitar una cita desde tu portal paciente.</Text>
         <AppButton label="Solicitar cita" onPress={onRequestAppointment} />
       </AppCard>

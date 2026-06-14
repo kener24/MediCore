@@ -7,7 +7,7 @@ export function AdminHomeScreen() {
       <RoleHomeScreen
         actions={[
           {
-            description: 'Usuarios, roles y permisos de la clinica.',
+            description: 'Usuarios, roles y permisos de la clínica.',
             icon: 'account-cog-outline',
             title: 'Administracion',
           },
@@ -22,7 +22,7 @@ export function AdminHomeScreen() {
             title: 'Configuracion',
           },
         ]}
-        headline="Control movil de la clinica"
+        headline="Control móvil de la clínica"
         roleLabel="Administrador"
         subtitle="Panel preparado para administracion, permisos, reportes y operacion."
       />

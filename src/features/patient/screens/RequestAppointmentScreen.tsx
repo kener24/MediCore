@@ -1,4 +1,4 @@
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -11,6 +11,8 @@ import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
+import { isPastISODate, toISODate } from '@/core/utils/dateUtils';
+import { AvailabilitySlotSelector } from '@/features/patient/components/AvailabilitySlotSelector';
 import { PatientHeader } from '@/features/patient/components/PatientHeader';
 import {
   getPatientDoctorAvailability,
@@ -23,10 +25,9 @@ import type {
   PatientDoctor,
   PatientSpecialty,
 } from '@/features/patient/types/patientAppointments.types';
-import { formatTime } from '@/features/patient/utils/formatters';
 
 export function RequestAppointmentScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp<ParamListBase>>();
   const [specialties, setSpecialties] = useState<PatientSpecialty[]>([]);
   const [doctors, setDoctors] = useState<PatientDoctor[]>([]);
   const [slots, setSlots] = useState<AppointmentAvailabilitySlot[]>([]);
@@ -37,6 +38,7 @@ export function RequestAppointmentScreen() {
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadingAvailability, setLoadingAvailability] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -59,6 +61,7 @@ export function RequestAppointmentScreen() {
     setDoctor(null);
     setSlot(null);
     setSlots([]);
+    setError('');
     try {
       setDoctors(await getPatientDoctors(nextSpecialty.id));
     } catch (err) {
@@ -67,41 +70,52 @@ export function RequestAppointmentScreen() {
   }
 
   async function loadAvailability() {
-    if (!doctor || !date.trim()) {
-      Alert.alert('Disponibilidad', 'Selecciona medico y fecha.');
+    const validation = validateDate(date);
+    if (!doctor) {
+      Alert.alert('Disponibilidad', 'Selecciona un medico.');
       return;
     }
+    if (validation) {
+      Alert.alert('Disponibilidad', validation);
+      return;
+    }
+    setLoadingAvailability(true);
     try {
       const availability = await getPatientDoctorAvailability(doctor.id, date.trim());
-      setSlots(availability.available_slots ?? []);
+      setSlots((availability.available_slots ?? []).filter((item) => item.available !== false));
       setSlot(null);
       if (availability.allow_online_appointments === false) {
         Alert.alert('Citas en linea', 'La clinica no permite citas en linea.');
       }
     } catch (err) {
       Alert.alert('Disponibilidad', err instanceof Error ? err.message : 'No hay horarios disponibles.');
+    } finally {
+      setLoadingAvailability(false);
     }
   }
 
   async function submit() {
     if (!specialty) return Alert.alert('Solicitud', 'Selecciona una especialidad.');
     if (!doctor) return Alert.alert('Solicitud', 'Selecciona un medico.');
-    if (!date.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(date.trim())) {
-      return Alert.alert('Solicitud', 'Ingresa una fecha valida en formato YYYY-MM-DD.');
-    }
+    const dateValidation = validateDate(date);
+    if (dateValidation) return Alert.alert('Solicitud', dateValidation);
     if (!slot) return Alert.alert('Solicitud', 'Selecciona un horario.');
-    if (!reason.trim()) return Alert.alert('Solicitud', 'Ingresa el motivo de la cita.');
+    if (reason.trim().length < 5) return Alert.alert('Solicitud', 'Escribe el motivo de tu consulta.');
 
     setSubmitting(true);
     try {
-      await requestPatientAppointment({
+      const created = await requestPatientAppointment({
         doctor: doctor.id,
         reason: reason.trim(),
         scheduled_date: date.trim(),
         start_time: slot.start_time,
       });
       Alert.alert('Solicitud enviada', 'Tu solicitud de cita fue enviada correctamente.');
-      navigation.goBack();
+      if (created?.id) {
+        navigation.navigate('PatientAppointmentDetail', { id: created.id });
+      } else {
+        navigation.getParent()?.navigate('PatientAppointmentsTab');
+      }
     } catch (err) {
       Alert.alert('Solicitud', err instanceof Error ? err.message : 'El horario ya fue tomado.');
     } finally {
@@ -164,20 +178,30 @@ export function RequestAppointmentScreen() {
             placeholder="YYYY-MM-DD"
             value={date}
           />
-          <AppButton label="Consultar disponibilidad" onPress={loadAvailability} variant="secondary" />
+          <View style={styles.dateActions}>
+            <AppButton
+              label="Manana"
+              onPress={() => setDate(toISODate(addDays(1)))}
+              style={styles.dateAction}
+              variant="secondary"
+            />
+            <AppButton
+              label="En 7 dias"
+              onPress={() => setDate(toISODate(addDays(7)))}
+              style={styles.dateAction}
+              variant="secondary"
+            />
+          </View>
+          <AppButton
+            label="Consultar disponibilidad"
+            loading={loadingAvailability}
+            onPress={loadAvailability}
+            variant="secondary"
+          />
           {slots.length ? (
-            <View style={styles.options}>
-              {slots.map((item) => (
-                <AppButton
-                  key={`${item.start_time}-${item.end_time}`}
-                  label={`${formatTime(item.start_time)}${item.end_time ? ` - ${formatTime(item.end_time)}` : ''}`}
-                  onPress={() => setSlot(item)}
-                  variant={slot?.start_time === item.start_time ? 'primary' : 'secondary'}
-                />
-              ))}
-            </View>
+            <AvailabilitySlotSelector onSelectSlot={setSlot} selectedSlot={slot} slots={slots} />
           ) : (
-            <Text style={styles.help}>No hay horarios disponibles hasta consultar.</Text>
+            <Text style={styles.help}>No hay horarios disponibles para esta fecha.</Text>
           )}
         </Step>
 
@@ -198,6 +222,22 @@ export function RequestAppointmentScreen() {
   );
 }
 
+function addDays(days: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date;
+}
+
+function validateDate(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return 'Selecciona una fecha.';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return 'Ingresa una fecha valida en formato YYYY-MM-DD.';
+  const parsed = new Date(`${trimmed}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return 'Ingresa una fecha valida.';
+  if (isPastISODate(trimmed)) return 'La fecha no puede ser pasada.';
+  return '';
+}
+
 function Step({ children, title }: { children: ReactNode; title: string }) {
   return (
     <AppCard style={styles.step}>
@@ -212,6 +252,14 @@ const styles = StyleSheet.create({
     gap: 14,
     padding: 22,
     paddingBottom: 34,
+  },
+  dateAction: {
+    flex: 1,
+    height: 44,
+  },
+  dateActions: {
+    flexDirection: 'row',
+    gap: 8,
   },
   help: {
     color: colors.muted,

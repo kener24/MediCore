@@ -1,4 +1,11 @@
-export type PatientAppointmentStatus =
+export type AppointmentStatus =
+  | 'scheduled'
+  | 'confirmed'
+  | 'checked_in'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled'
+  | 'no_show'
   | 'pendiente'
   | 'confirmada'
   | 'cancelada'
@@ -7,37 +14,50 @@ export type PatientAppointmentStatus =
   | 'reprogramada'
   | string;
 
+export type PatientAppointmentStatus = AppointmentStatus;
+
 export type PatientAppointment = {
   id: number;
   clinic?: number;
+  clinic_name?: string;
   clinic_nombre?: string;
   patient?: number;
   patient_name?: string;
   patient_code?: string;
   doctor?: number;
+  doctor_email?: string;
   doctor_name?: string;
   doctor_nombre?: string;
+  doctor_phone?: string;
   doctor_specialty?: string;
+  specialty?: number;
   specialty_name?: string;
+  specialty_nombre?: string;
   scheduled_date?: string;
   start_time?: string;
   end_time?: string;
   reason?: string;
-  notes?: string;
+  notes?: string | null;
   status?: PatientAppointmentStatus;
   status_display?: string;
-  cancellation_reason?: string;
+  cancellation_reason?: string | null;
   can_cancel?: boolean;
+  instructions?: string | null;
   activo?: boolean;
+  created_at?: string;
+  updated_at?: string;
   creado_en?: string;
   actualizado_en?: string;
 };
+
+export type PatientAppointmentDetail = PatientAppointment;
 
 export type PatientAppointmentFilter = 'upcoming' | 'history' | 'all';
 
 export type AppointmentAvailabilitySlot = {
   start_time: string;
   end_time?: string;
+  available?: boolean;
 };
 
 export type AppointmentAvailability = {
@@ -57,6 +77,8 @@ export type PatientSpecialty = {
   descripcion?: string;
 };
 
+export type Specialty = PatientSpecialty;
+
 export type PatientDoctor = {
   id: number;
   user?: number;
@@ -64,15 +86,26 @@ export type PatientDoctor = {
   nombre?: string;
   full_name?: string;
   nombre_completo?: string;
+  user_nombre?: string;
   specialty?: number | string;
   specialty_name?: string;
   especialidad_nombre?: string;
+  specialty_nombre?: string;
 };
 
+export type Doctor = PatientDoctor;
+export type DoctorAvailabilitySlot = AppointmentAvailabilitySlot;
+
 export type PatientAppointmentRequestPayload = {
-  doctor: number | string;
+  doctor: number;
   scheduled_date: string;
   start_time: string;
   reason: string;
   notes?: string;
+};
+
+export type AppointmentRequestPayload = PatientAppointmentRequestPayload;
+
+export type CancelAppointmentPayload = {
+  reason: string;
 };

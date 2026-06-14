@@ -1,6 +1,6 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
@@ -8,10 +8,11 @@ import { AppCard } from '@/components/AppCard';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
-import { StatusPill } from '@/features/patient/components/StatusPill';
+import { formatDate, formatDateTime, formatTime } from '@/core/utils/dateUtils';
+import { AppointmentStatusBadge } from '@/features/patient/components/AppointmentStatusBadge';
+import { CancelAppointmentModal } from '@/features/patient/components/CancelAppointmentModal';
 import { cancelPatientAppointment, getPatientAppointment } from '@/features/patient/services/patientAppointmentsService';
 import type { PatientAppointment } from '@/features/patient/types/patientAppointments.types';
-import { formatDate, formatTime, getAppointmentTone } from '@/features/patient/utils/formatters';
 
 export function PatientAppointmentDetailScreen() {
   const navigation = useNavigation();
@@ -49,6 +50,7 @@ export function PatientAppointmentDetailScreen() {
     try {
       const updated = await cancelPatientAppointment(id, cancelReason.trim());
       setAppointment(updated);
+      await load();
       setCancelVisible(false);
       setCancelReason('');
       Alert.alert('Cita cancelada', 'La cita fue cancelada correctamente.');
@@ -65,29 +67,35 @@ export function PatientAppointmentDetailScreen() {
   }
 
   const canCancel =
-    appointment.can_cancel === true &&
+    (appointment.can_cancel === true || appointment.status === 'scheduled' || appointment.status === 'confirmed' || appointment.status === 'pendiente' || appointment.status === 'confirmada') &&
+    appointment.status !== 'cancelled' &&
     appointment.status !== 'cancelada' &&
+    appointment.status !== 'completed' &&
     appointment.status !== 'atendida' &&
-    appointment.status !== 'no_asistio';
+    appointment.status !== 'no_show' &&
+    appointment.status !== 'no_asistio' &&
+    appointment.status !== 'in_progress';
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <AppButton label="Volver" onPress={() => navigation.goBack()} variant="secondary" />
         <AppCard>
-          <StatusPill label={appointment.status_display || appointment.status} tone={getAppointmentTone(appointment.status)} />
+          <AppointmentStatusBadge status={appointment.status} />
           <Text style={styles.title}>{formatDate(appointment.scheduled_date)}</Text>
           <Text style={styles.time}>
             {formatTime(appointment.start_time)} - {formatTime(appointment.end_time)}
           </Text>
           <Text style={styles.doctor}>{appointment.doctor_name || appointment.doctor_nombre || 'Medico'}</Text>
-          <Text style={styles.meta}>{appointment.doctor_specialty || appointment.specialty_name || 'Especialidad no indicada'}</Text>
+          <Text style={styles.meta}>{appointment.doctor_specialty || appointment.specialty_name || appointment.specialty_nombre || 'Especialidad no indicada'}</Text>
         </AppCard>
 
         <AppCard>
-          <Detail label="Clinica" value={appointment.clinic_nombre} />
+          <Detail label="Clinica" value={appointment.clinic_name || appointment.clinic_nombre} />
           <Detail label="Motivo" value={appointment.reason} />
           <Detail label="Notas permitidas" value={appointment.notes} />
+          <Detail label="Instrucciones" value={appointment.instructions} />
+          <Detail label="Creada" value={formatDateTime(appointment.created_at || appointment.creado_en)} />
           <Detail label="Motivo de cancelacion" value={appointment.cancellation_reason} />
         </AppCard>
 
@@ -96,26 +104,14 @@ export function PatientAppointmentDetailScreen() {
         ) : null}
       </ScrollView>
 
-      <Modal animationType="slide" transparent visible={cancelVisible}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Cancelar cita</Text>
-            <Text style={styles.modalText}>Indica el motivo de cancelacion para enviarlo a la clinica.</Text>
-            <TextInput
-              multiline
-              onChangeText={setCancelReason}
-              placeholder="No podre asistir"
-              placeholderTextColor="#98a2b3"
-              style={styles.reasonInput}
-              value={cancelReason}
-            />
-            <View style={styles.modalActions}>
-              <AppButton label="Cerrar" onPress={() => setCancelVisible(false)} variant="secondary" />
-              <AppButton label="Confirmar" loading={submitting} onPress={submitCancellation} variant="danger" />
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <CancelAppointmentModal
+        loading={submitting}
+        onCancel={() => setCancelVisible(false)}
+        onChangeReason={setCancelReason}
+        onConfirm={submitCancellation}
+        reason={cancelReason}
+        visible={cancelVisible}
+      />
     </SafeAreaView>
   );
 }
@@ -162,42 +158,6 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 14,
     marginTop: 4,
-  },
-  modalActions: {
-    gap: 10,
-  },
-  modalCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 22,
-    gap: 14,
-    padding: 20,
-    width: '100%',
-  },
-  modalOverlay: {
-    backgroundColor: 'rgba(16, 32, 51, 0.42)',
-    flex: 1,
-    justifyContent: 'flex-end',
-    padding: 16,
-  },
-  modalText: {
-    color: colors.muted,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  modalTitle: {
-    color: colors.ink,
-    fontSize: 22,
-    fontWeight: '900',
-  },
-  reasonInput: {
-    backgroundColor: colors.surfaceMuted,
-    borderColor: colors.border,
-    borderRadius: 14,
-    borderWidth: 1,
-    color: colors.ink,
-    minHeight: 110,
-    padding: 14,
-    textAlignVertical: 'top',
   },
   safeArea: {
     backgroundColor: colors.background,

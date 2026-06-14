@@ -3,6 +3,7 @@ import { endpoints } from '@/core/api/endpoints';
 import { normalizeList, type ListResponse } from '@/features/patient/types/pagination.types';
 import type {
   AppointmentAvailability,
+  CancelAppointmentPayload,
   PatientAppointment,
   PatientAppointmentRequestPayload,
   PatientDoctor,
@@ -42,8 +43,8 @@ export async function cancelPatientAppointment(id: number | string, reason: stri
   return data;
 }
 
-export function cancelAppointment(id: number | string, payload: { reason?: string }) {
-  return cancelPatientAppointment(id, payload.reason ?? '');
+export function cancelAppointment(id: number | string, payload: CancelAppointmentPayload) {
+  return cancelPatientAppointment(id, payload.reason);
 }
 
 export async function getPatientSpecialties() {

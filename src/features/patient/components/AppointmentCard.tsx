@@ -2,9 +2,9 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppCard } from '@/components/AppCard';
 import { colors } from '@/core/theme/colors';
-import { StatusPill } from '@/features/patient/components/StatusPill';
+import { formatShortDate, formatTime } from '@/core/utils/dateUtils';
+import { AppointmentStatusBadge } from '@/features/patient/components/AppointmentStatusBadge';
 import type { PatientAppointment } from '@/features/patient/types/patientAppointments.types';
-import { formatDate, formatTime, getAppointmentTone } from '@/features/patient/utils/formatters';
 
 export function AppointmentCard({
   appointment,
@@ -18,21 +18,22 @@ export function AppointmentCard({
       <AppCard>
         <View style={styles.header}>
           <View style={styles.dateBox}>
-            <Text style={styles.day}>{formatDate(appointment.scheduled_date, 'shortDay')}</Text>
+            <Text style={styles.day}>{formatShortDate(appointment.scheduled_date)}</Text>
             <Text style={styles.time}>{formatTime(appointment.start_time)}</Text>
           </View>
-          <StatusPill
-            label={appointment.status_display || appointment.status}
-            tone={getAppointmentTone(appointment.status)}
-          />
+          <AppointmentStatusBadge status={appointment.status} />
         </View>
         <Text style={styles.title}>
           {appointment.doctor_name || appointment.doctor_nombre || 'Medico por asignar'}
         </Text>
         <Text style={styles.meta}>
-          {appointment.doctor_specialty || appointment.specialty_name || 'Especialidad no indicada'}
+          {appointment.doctor_specialty ||
+            appointment.specialty_name ||
+            appointment.specialty_nombre ||
+            'Especialidad no indicada'}
         </Text>
         {appointment.reason ? <Text style={styles.reason}>{appointment.reason}</Text> : null}
+        <Text style={styles.detailText}>Ver detalle</Text>
       </AppCard>
     </Pressable>
   );
@@ -53,6 +54,12 @@ const styles = StyleSheet.create({
     gap: 10,
     justifyContent: 'space-between',
     marginBottom: 12,
+  },
+  detailText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: '900',
+    marginTop: 12,
   },
   meta: {
     color: colors.muted,

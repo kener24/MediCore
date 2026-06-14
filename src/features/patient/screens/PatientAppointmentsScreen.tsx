@@ -8,16 +8,11 @@ import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { AppointmentCard } from '@/features/patient/components/AppointmentCard';
+import { AppointmentFilterTabs } from '@/features/patient/components/AppointmentFilterTabs';
 import { PatientHeader } from '@/features/patient/components/PatientHeader';
 import { getPatientAppointments } from '@/features/patient/services/patientAppointmentsService';
 import type { PatientAppointment, PatientAppointmentFilter } from '@/features/patient/types/patientAppointments.types';
 import { colors } from '@/core/theme/colors';
-
-const filters: { label: string; value: PatientAppointmentFilter }[] = [
-  { label: 'Proximas', value: 'upcoming' },
-  { label: 'Historial', value: 'history' },
-  { label: 'Todas', value: 'all' },
-];
 
 export function PatientAppointmentsScreen() {
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
@@ -54,7 +49,15 @@ export function PatientAppointmentsScreen() {
     return appointments.filter((appointment) => {
       if (filter === 'all') return true;
       const date = appointment.scheduled_date ? new Date(appointment.scheduled_date) : null;
-      const isUpcoming = date ? date >= today : appointment.status === 'pendiente' || appointment.status === 'confirmada';
+      const status = appointment.status;
+      const isHistoricalStatus =
+        status === 'completed' ||
+        status === 'cancelled' ||
+        status === 'no_show' ||
+        status === 'atendida' ||
+        status === 'cancelada' ||
+        status === 'no_asistio';
+      const isUpcoming = date ? date >= today && !isHistoricalStatus : !isHistoricalStatus;
       return filter === 'upcoming' ? isUpcoming : !isUpcoming;
     });
   }, [appointments, filter]);
@@ -69,17 +72,7 @@ export function PatientAppointmentsScreen() {
         showsVerticalScrollIndicator={false}>
         <PatientHeader subtitle="Consulta y administra tus citas autorizadas." title="Mis citas" />
 
-        <View style={styles.filters}>
-          {filters.map((item) => (
-            <AppButton
-              key={item.value}
-              label={item.label}
-              onPress={() => setFilter(item.value)}
-              style={styles.filterButton}
-              variant={filter === item.value ? 'primary' : 'secondary'}
-            />
-          ))}
-        </View>
+        <AppointmentFilterTabs onChangeFilter={setFilter} selectedFilter={filter} />
 
         <AppButton
           label="Solicitar cita"
@@ -117,15 +110,6 @@ const styles = StyleSheet.create({
     gap: 16,
     padding: 22,
     paddingBottom: 34,
-  },
-  filterButton: {
-    flex: 1,
-    height: 44,
-    paddingHorizontal: 8,
-  },
-  filters: {
-    flexDirection: 'row',
-    gap: 8,
   },
   list: {
     gap: 12,

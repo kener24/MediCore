@@ -1,14 +1,27 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors } from '@/core/theme/colors';
 
-export function ErrorState({ message, title = 'Ocurrio un problema' }: { message?: string; title?: string }) {
+export function ErrorState({
+  message,
+  onRetry,
+  title = 'Ocurrio un problema',
+}: {
+  message?: string;
+  onRetry?: () => void;
+  title?: string;
+}) {
   return (
     <View style={styles.container}>
       <MaterialCommunityIcons color={colors.danger} name="alert-circle-outline" size={34} />
       <Text style={styles.title}>{title}</Text>
       {message ? <Text style={styles.message}>{message}</Text> : null}
+      {onRetry ? (
+        <Pressable onPress={onRetry} style={styles.retryButton}>
+          <Text style={styles.retryText}>Reintentar</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -34,5 +47,17 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     marginTop: 4,
     textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: colors.danger,
+    borderRadius: 12,
+    marginTop: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
+  retryText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '900',
   },
 });

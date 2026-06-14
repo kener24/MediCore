@@ -1,35 +1,90 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-import { RolePlaceholderScreen } from '@/features/common/screens/RolePlaceholderScreen';
+import { RoleGuard } from '@/components/RoleGuard';
+import { PatientAppointmentDetailScreen } from '@/features/patient/screens/PatientAppointmentDetailScreen';
+import { PatientAppointmentsScreen } from '@/features/patient/screens/PatientAppointmentsScreen';
 import { PatientDashboardScreen } from '@/features/patient/screens/PatientDashboardScreen';
-import { PatientHomeScreen } from '@/features/patient/screens/PatientHomeScreen';
+import { PatientDocumentDetailScreen } from '@/features/patient/screens/PatientDocumentDetailScreen';
+import { PatientDocumentsScreen } from '@/features/patient/screens/PatientDocumentsScreen';
+import { PatientInvoiceDetailScreen } from '@/features/patient/screens/PatientInvoiceDetailScreen';
+import { PatientInvoicesScreen } from '@/features/patient/screens/PatientInvoicesScreen';
+import { PatientNotificationsScreen } from '@/features/patient/screens/PatientNotificationsScreen';
+import { PatientPrescriptionDetailScreen } from '@/features/patient/screens/PatientPrescriptionDetailScreen';
+import { PatientPrescriptionsScreen } from '@/features/patient/screens/PatientPrescriptionsScreen';
+import { PatientProfileScreen } from '@/features/patient/screens/PatientProfileScreen';
+import { RequestAppointmentScreen } from '@/features/patient/screens/RequestAppointmentScreen';
 import { createTabOptions, tabIcon } from '@/navigation/tabOptions';
 
 const Tab = createBottomTabNavigator();
+const Stack = createNativeStackNavigator();
+
+const stackOptions = { headerShown: false };
+
+function PatientHomeStack() {
+  return (
+    <Stack.Navigator screenOptions={stackOptions}>
+      <Stack.Screen component={PatientDashboardScreen} name="PatientDashboard" />
+      <Stack.Screen component={RequestAppointmentScreen} name="RequestAppointment" />
+      <Stack.Screen component={PatientAppointmentDetailScreen} name="PatientAppointmentDetail" />
+      <Stack.Screen component={PatientPrescriptionsScreen} name="PatientPrescriptions" />
+      <Stack.Screen component={PatientPrescriptionDetailScreen} name="PatientPrescriptionDetail" />
+      <Stack.Screen component={PatientInvoicesScreen} name="PatientInvoices" />
+      <Stack.Screen component={PatientInvoiceDetailScreen} name="PatientInvoiceDetail" />
+      <Stack.Screen component={PatientDocumentDetailScreen} name="PatientDocumentDetail" />
+    </Stack.Navigator>
+  );
+}
+
+function PatientAppointmentsStack() {
+  return (
+    <Stack.Navigator screenOptions={stackOptions}>
+      <Stack.Screen component={PatientAppointmentsScreen} name="PatientAppointments" />
+      <Stack.Screen component={PatientAppointmentDetailScreen} name="PatientAppointmentDetail" />
+      <Stack.Screen component={RequestAppointmentScreen} name="RequestAppointment" />
+    </Stack.Navigator>
+  );
+}
+
+function PatientDocumentsStack() {
+  return (
+    <Stack.Navigator screenOptions={stackOptions}>
+      <Stack.Screen component={PatientDocumentsScreen} name="PatientDocuments" />
+      <Stack.Screen component={PatientDocumentDetailScreen} name="PatientDocumentDetail" />
+    </Stack.Navigator>
+  );
+}
 
 export function PatientTabs() {
   return (
-    <Tab.Navigator screenOptions={createTabOptions()}>
-      <Tab.Screen
-        component={PatientHomeScreen}
-        name="PatientHome"
-        options={{ tabBarIcon: tabIcon('home-heart'), title: 'Inicio' }}
-      />
-      <Tab.Screen
-        component={PatientDashboardScreen}
-        name="PatientDashboard"
-        options={{ tabBarIcon: tabIcon('view-dashboard-outline'), title: 'Resumen' }}
-      />
-      <Tab.Screen
-        name="PatientAppointments"
-        options={{ tabBarIcon: tabIcon('calendar-check-outline'), title: 'Citas' }}>
-        {() => <RolePlaceholderScreen description="Agenda del paciente" title="Mis citas" />}
-      </Tab.Screen>
-      <Tab.Screen
-        name="PatientProfile"
-        options={{ tabBarIcon: tabIcon('account-circle-outline'), title: 'Perfil' }}>
-        {() => <RolePlaceholderScreen description="Informacion personal" title="Mi perfil" />}
-      </Tab.Screen>
-    </Tab.Navigator>
+    <RoleGuard roles={['paciente']}>
+      <Tab.Navigator screenOptions={createTabOptions()}>
+        <Tab.Screen
+          component={PatientHomeStack}
+          name="PatientHomeTab"
+          options={{ tabBarIcon: tabIcon('home-heart'), title: 'Inicio' }}
+        />
+        <Tab.Screen
+          component={PatientAppointmentsStack}
+          name="PatientAppointmentsTab"
+          options={{ tabBarIcon: tabIcon('calendar-check-outline'), title: 'Citas' }}
+        />
+        <Tab.Screen
+          component={PatientDocumentsStack}
+          name="PatientDocumentsTab"
+          options={{ tabBarIcon: tabIcon('file-document-outline'), title: 'Documentos' }}
+        />
+        <Tab.Screen
+          component={PatientNotificationsScreen}
+          name="PatientNotificationsTab"
+          options={{ tabBarIcon: tabIcon('bell-outline'), title: 'Avisos' }}
+        />
+        <Tab.Screen
+          component={PatientProfileScreen}
+          name="PatientProfileTab"
+          options={{ tabBarIcon: tabIcon('account-circle-outline'), title: 'Perfil' }}
+        />
+      </Tab.Navigator>
+    </RoleGuard>
   );
 }

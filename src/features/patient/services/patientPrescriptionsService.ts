@@ -16,3 +16,5 @@ export async function getPatientPrescription(id: number | string) {
   );
   return data;
 }
+
+export const getPrescriptionDetail = getPatientPrescription;

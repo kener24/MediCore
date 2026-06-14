@@ -14,3 +14,5 @@ export async function getPatientInvoice(id: number | string) {
   const { data } = await apiClient.get<PatientInvoice>(endpoints.patientPortal.invoice(id));
   return data;
 }
+
+export const getInvoiceDetail = getPatientInvoice;

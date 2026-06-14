@@ -24,3 +24,5 @@ export async function markPatientNotificationRead(id: number | string) {
   const { data } = await apiClient.patch<PatientNotification>(endpoints.notifications.markRead(id));
   return data;
 }
+
+export const markNotificationAsRead = markPatientNotificationRead;

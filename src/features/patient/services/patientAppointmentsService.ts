@@ -22,6 +22,8 @@ export async function getPatientAppointment(id: number | string) {
   return data;
 }
 
+export const getPatientAppointmentDetail = getPatientAppointment;
+
 export async function requestPatientAppointment(payload: PatientAppointmentRequestPayload) {
   const { data } = await apiClient.post<PatientAppointment>(
     endpoints.patientPortal.requestAppointment,
@@ -29,6 +31,8 @@ export async function requestPatientAppointment(payload: PatientAppointmentReque
   );
   return data;
 }
+
+export const requestAppointment = requestPatientAppointment;
 
 export async function cancelPatientAppointment(id: number | string, reason: string) {
   const { data } = await apiClient.patch<PatientAppointment>(
@@ -38,12 +42,18 @@ export async function cancelPatientAppointment(id: number | string, reason: stri
   return data;
 }
 
+export function cancelAppointment(id: number | string, payload: { reason?: string }) {
+  return cancelPatientAppointment(id, payload.reason ?? '');
+}
+
 export async function getPatientSpecialties() {
   const { data } = await apiClient.get<ListResponse<PatientSpecialty>>(
     endpoints.patientPortal.specialties,
   );
   return normalizeList(data);
 }
+
+export const getSpecialties = getPatientSpecialties;
 
 export async function getPatientDoctors(specialty?: number | string) {
   const { data } = await apiClient.get<ListResponse<PatientDoctor>>(endpoints.patientPortal.doctors, {
@@ -52,6 +62,8 @@ export async function getPatientDoctors(specialty?: number | string) {
   return normalizeList(data);
 }
 
+export const getDoctors = getPatientDoctors;
+
 export async function getPatientDoctorAvailability(doctorId: number | string, date: string) {
   const { data } = await apiClient.get<AppointmentAvailability>(
     endpoints.patientPortal.doctorAvailability(doctorId),
@@ -59,3 +71,5 @@ export async function getPatientDoctorAvailability(doctorId: number | string, da
   );
   return data;
 }
+
+export const getDoctorAvailability = getPatientDoctorAvailability;

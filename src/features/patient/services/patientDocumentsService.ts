@@ -18,6 +18,8 @@ export async function getPatientDocument(id: number | string) {
   return data;
 }
 
+export const getDocumentDetail = getPatientDocument;
+
 export function getPatientDocumentFileUrl(id: number | string, mode: 'download' | 'preview') {
   const path =
     mode === 'download'
@@ -39,4 +41,12 @@ export async function openPatientDocumentUrl(document: PatientDocument, mode: 'd
     throw new Error('No se pudo abrir el documento.');
   }
   await Linking.openURL(url);
+}
+
+export async function previewDocument(id: number | string) {
+  await Linking.openURL(getPatientDocumentFileUrl(id, 'preview'));
+}
+
+export async function downloadDocument(id: number | string) {
+  await Linking.openURL(getPatientDocumentFileUrl(id, 'download'));
 }

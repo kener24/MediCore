@@ -18,9 +18,14 @@ export function RoleGuard({ children, roles }: RoleGuardProps) {
   }
 
   if (!user || !appRole || !roles.includes(appRole)) {
+    const isPatientPortal = roles.length === 1 && roles[0] === 'paciente';
     return (
       <ErrorState
-        message="Tu usuario no tiene permisos para abrir esta seccion."
+        message={
+          isPatientPortal
+            ? 'Tu rol no tiene acceso al portal paciente.'
+            : 'Tu usuario no tiene permisos para abrir esta seccion.'
+        }
         title="Acceso no autorizado"
       />
     );

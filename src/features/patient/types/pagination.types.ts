@@ -1,13 +1,13 @@
-export type PaginatedResponse<T> = {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: T[];
-};
+import {
+  normalizeListResponse,
+  type ApiListResponse,
+  type PaginatedResponse,
+} from '@/features/patient/types/commonPatient.types';
 
-export type ListResponse<T> = T[] | PaginatedResponse<T>;
+export type { ApiListResponse, PaginatedResponse };
+
+export type ListResponse<T> = ApiListResponse<T>;
 
 export function normalizeList<T>(payload: ListResponse<T>): T[] {
-  if (Array.isArray(payload)) return payload;
-  return payload.results ?? [];
+  return normalizeListResponse(payload);
 }

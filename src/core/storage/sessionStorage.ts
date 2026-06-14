@@ -61,6 +61,15 @@ export async function getAccessToken() {
   return SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
 }
 
+export async function getRefreshToken() {
+  return SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+}
+
+export async function getUser() {
+  const userPayload = await SecureStore.getItemAsync(USER_KEY);
+  return userPayload ? (JSON.parse(userPayload) as User) : null;
+}
+
 export async function getUserRole() {
   const { user } = await getSession();
   return resolveRole(user);

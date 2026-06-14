@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Alert } from 'react-native';
 
-import { getMeService, loginService } from '@/features/auth/services/authService';
+import { setSessionExpiredHandler } from '@/core/api/authInterceptor';
+import { getMeService, loginService, logoutService } from '@/features/auth/services/authService';
 import type { AppRole, LoginPayload, RoleName, User } from '@/features/auth/types/auth.types';
 import {
   clearSession,
@@ -33,6 +35,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
+    setSessionExpiredHandler(() => {
+      setUser(null);
+      Alert.alert('Sesion expirada', 'Tu sesion expiro. Inicia sesion nuevamente.');
+    });
+
     let mounted = true;
 
     async function restore() {
@@ -62,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       mounted = false;
+      setSessionExpiredHandler(null);
     };
   }, []);
 
@@ -78,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut() {
+    await logoutService();
     await clearSession();
     setUser(null);
   }

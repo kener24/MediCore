@@ -2,6 +2,9 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { RoleGuard } from '@/components/RoleGuard';
+import { ChangePasswordScreen } from '@/features/patient/screens/ChangePasswordScreen';
+import { ClinicInfoScreen } from '@/features/patient/screens/ClinicInfoScreen';
+import { EditPatientProfileScreen } from '@/features/patient/screens/EditPatientProfileScreen';
 import { PatientAppointmentDetailScreen } from '@/features/patient/screens/PatientAppointmentDetailScreen';
 import { PatientAppointmentsScreen } from '@/features/patient/screens/PatientAppointmentsScreen';
 import { PatientDashboardScreen } from '@/features/patient/screens/PatientDashboardScreen';
@@ -14,6 +17,7 @@ import { PatientPrescriptionDetailScreen } from '@/features/patient/screens/Pati
 import { PatientPrescriptionsScreen } from '@/features/patient/screens/PatientPrescriptionsScreen';
 import { PatientProfileScreen } from '@/features/patient/screens/PatientProfileScreen';
 import { RequestAppointmentScreen } from '@/features/patient/screens/RequestAppointmentScreen';
+import { SettingsScreen } from '@/features/patient/screens/SettingsScreen';
 import { createTabOptions, tabIcon } from '@/navigation/tabOptions';
 
 const Tab = createBottomTabNavigator();
@@ -55,6 +59,27 @@ function PatientDocumentsStack() {
   );
 }
 
+function PatientNotificationsStack() {
+  return (
+    <Stack.Navigator screenOptions={stackOptions}>
+      <Stack.Screen component={PatientNotificationsScreen} name="PatientNotifications" />
+    </Stack.Navigator>
+  );
+}
+
+function PatientProfileStack() {
+  return (
+    <Stack.Navigator screenOptions={stackOptions}>
+      <Stack.Screen component={PatientProfileScreen} name="PatientProfile" />
+      <Stack.Screen component={EditPatientProfileScreen} name="EditPatientProfile" />
+      <Stack.Screen component={SettingsScreen} name="PatientSettings" />
+      <Stack.Screen component={ChangePasswordScreen} name="ChangePassword" />
+      <Stack.Screen component={ClinicInfoScreen} name="ClinicInfo" />
+      <Stack.Screen component={PatientNotificationsScreen} name="PatientNotifications" />
+    </Stack.Navigator>
+  );
+}
+
 export function PatientTabs() {
   return (
     <RoleGuard roles={['paciente']}>
@@ -75,12 +100,12 @@ export function PatientTabs() {
           options={{ tabBarIcon: tabIcon('file-document-outline'), title: 'Documentos' }}
         />
         <Tab.Screen
-          component={PatientNotificationsScreen}
+          component={PatientNotificationsStack}
           name="PatientNotificationsTab"
           options={{ tabBarIcon: tabIcon('bell-outline'), title: 'Avisos' }}
         />
         <Tab.Screen
-          component={PatientProfileScreen}
+          component={PatientProfileStack}
           name="PatientProfileTab"
           options={{ tabBarIcon: tabIcon('account-circle-outline'), title: 'Perfil' }}
         />

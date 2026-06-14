@@ -6,9 +6,10 @@ import type {
   PatientUnreadCount,
 } from '@/features/patient/types/patientNotifications.types';
 
-export async function getPatientNotifications() {
+export async function getPatientNotifications(params?: Record<string, string>) {
   const { data } = await apiClient.get<ListResponse<PatientNotification>>(
     endpoints.patientPortal.notifications,
+    { params },
   );
   return normalizeList(data);
 }
@@ -26,3 +27,4 @@ export async function markPatientNotificationRead(id: number | string) {
 }
 
 export const markNotificationAsRead = markPatientNotificationRead;
+export const getUnreadNotificationsCount = getPatientUnreadNotificationsCount;

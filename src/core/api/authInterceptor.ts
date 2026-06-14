@@ -1,6 +1,16 @@
-import type { AxiosError, AxiosInstance } from 'axios';
+import axios, { type AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
 
-import { clearSession, getSession } from '@/core/storage/sessionStorage';
+import { endpoints } from '@/core/api/endpoints';
+import { appConfig } from '@/core/config/appConfig';
+import { clearSession, getSession, saveSession } from '@/core/storage/sessionStorage';
+
+type RetriableRequestConfig = InternalAxiosRequestConfig & { _retry?: boolean };
+
+let onSessionExpired: (() => void) | null = null;
+
+export function setSessionExpiredHandler(handler: (() => void) | null) {
+  onSessionExpired = handler;
+}
 
 export class ApiClientError extends Error {
   status?: number;
@@ -52,8 +62,39 @@ export function setupAuthInterceptors(apiClient: AxiosInstance) {
   apiClient.interceptors.response.use(
     (response) => response,
     async (error: AxiosError) => {
+      const originalRequest = error.config as RetriableRequestConfig | undefined;
+
+      if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+        const session = await getSession();
+        if (session.refreshToken) {
+          originalRequest._retry = true;
+          try {
+            const { data } = await axios.post<{ access?: string; refresh?: string }>(
+              `${appConfig.API_BASE_URL}${endpoints.auth.refresh}`,
+              { refresh: session.refreshToken },
+              { headers: { Accept: 'application/json', 'Content-Type': 'application/json' } },
+            );
+
+            if (data.access) {
+              await saveSession({
+                accessToken: data.access,
+                refreshToken: data.refresh ?? session.refreshToken,
+                sessionKey: session.sessionKey ?? undefined,
+                user: session.user,
+              });
+              originalRequest.headers.Authorization = `Bearer ${data.access}`;
+              return apiClient(originalRequest);
+            }
+          } catch {
+            await clearSession();
+            onSessionExpired?.();
+          }
+        }
+      }
+
       if (error.response?.status === 401) {
         await clearSession();
+        onSessionExpired?.();
       }
       return Promise.reject(
         new ApiClientError(extractErrorMessage(error), error.response?.status, error.response?.data),

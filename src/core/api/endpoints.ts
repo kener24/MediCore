@@ -1,8 +1,10 @@
 export const endpoints = {
   auth: {
+    changePassword: '/auth/change-password/',
     login: '/auth/login/',
     me: '/auth/me/',
     refresh: '/auth/refresh/',
+    logout: '/auth/logout/',
   },
   patientPortal: {
     dashboard: '/patient-portal/dashboard/',
@@ -25,6 +27,7 @@ export const endpoints = {
     documentPreview: (id: number | string) => `/patient-portal/documents/${id}/preview/`,
     notifications: '/patient-portal/notifications/',
     unreadNotifications: '/patient-portal/notifications/unread-count/',
+    clinicInfo: '/patient-portal/clinic-info/',
     payments: '/patient-portal/payments/',
     medicalOrders: '/patient-portal/medical-orders/',
     medicalOrder: (id: number | string) => `/patient-portal/medical-orders/${id}/`,

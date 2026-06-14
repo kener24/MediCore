@@ -42,6 +42,12 @@ export interface AuthResponse {
   user?: User;
 }
 
+export interface ChangePasswordPayload {
+  current_password: string;
+  new_password: string;
+  confirm_password: string;
+}
+
 export interface SessionData {
   accessToken: string | null;
   refreshToken: string | null;

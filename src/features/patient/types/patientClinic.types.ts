@@ -1,0 +1,20 @@
+export type PatientClinicInfo = {
+  id?: number;
+  name?: string;
+  nombre?: string;
+  logo_url?: string | null;
+  address?: string;
+  direccion?: string;
+  phone?: string;
+  telefono?: string;
+  email?: string;
+  correo?: string;
+  website?: string | null;
+  sitio_web?: string | null;
+  schedule?: string | null;
+  horario?: string | null;
+  primary_color?: string | null;
+  secondary_color?: string | null;
+  policies?: string | null;
+  politicas?: string | null;
+};

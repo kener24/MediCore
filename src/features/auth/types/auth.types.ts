@@ -1,11 +1,6 @@
-export type RoleName =
-  | 'superadmin'
-  | 'admin'
-  | 'medico'
-  | 'enfermera'
-  | 'recepcionista'
-  | 'paciente'
-  | string;
+export type AppRole = 'paciente' | 'medico' | 'recepcionista' | 'enfermera' | 'admin';
+
+export type RoleName = AppRole | 'superadmin' | string;
 
 export interface ClinicSummary {
   id: number;
@@ -45,4 +40,11 @@ export interface AuthResponse {
   refresh: string;
   session_key?: string;
   user?: User;
+}
+
+export interface SessionData {
+  accessToken: string | null;
+  refreshToken: string | null;
+  sessionKey: string | null;
+  user: User | null;
 }

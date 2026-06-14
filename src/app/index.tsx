@@ -1,6 +1,8 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -12,6 +14,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ApiError } from '@/api/client';
+import { useAuth } from '@/context/AuthContext';
+
 const accent = '#0f8f85';
 const ink = '#102033';
 const muted = '#667085';
@@ -19,14 +24,46 @@ const panel = '#ffffff';
 const page = '#eef5f7';
 
 export default function LoginScreen() {
+  const { loading, role, signIn, signOut, user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [securePassword, setSecurePassword] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
-  const canSubmit = email.trim().length > 3 && password.length >= 6;
+  const canSubmit = email.trim().length > 3 && password.length >= 6 && !submitting;
 
-  function handleLogin() {
-    // Tomorrow this will call /api/auth/login/ and store the JWT session.
+  async function handleLogin() {
+    if (!canSubmit) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      await signIn({ email: email.trim().toLowerCase(), password });
+      setPassword('');
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : 'No se pudo iniciar sesion. Revisa tu conexion.';
+      setError(message);
+      Alert.alert('Inicio de sesion', message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.loadingScreen}>
+        <View style={styles.logoMark}>
+          <MaterialCommunityIcons color="#ffffff" name="heart-pulse" size={34} />
+        </View>
+        <ActivityIndicator color={accent} size="large" />
+        <Text style={styles.loadingText}>Preparando MediCore...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (user) {
+    return <RoleHome role={role} signOut={signOut} user={user} />;
   }
 
   return (
@@ -108,9 +145,16 @@ export default function LoginScreen() {
                 !canSubmit && styles.primaryButtonDisabled,
                 pressed && canSubmit && styles.primaryButtonPressed,
               ]}>
-              <Text style={styles.primaryButtonText}>Entrar</Text>
-              <MaterialCommunityIcons color="#ffffff" name="arrow-right" size={20} />
+              {submitting ? (
+                <ActivityIndicator color="#ffffff" />
+              ) : (
+                <>
+                  <Text style={styles.primaryButtonText}>Entrar</Text>
+                  <MaterialCommunityIcons color="#ffffff" name="arrow-right" size={20} />
+                </>
+              )}
             </Pressable>
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
             <View style={styles.dividerRow}>
               <View style={styles.divider} />
@@ -143,7 +187,93 @@ export default function LoginScreen() {
   );
 }
 
+function RoleHome({
+  role,
+  signOut,
+  user,
+}: {
+  role: string | null;
+  signOut: () => Promise<void>;
+  user: {
+    nombre_completo: string;
+    email: string;
+    clinica_nombre?: string;
+  };
+}) {
+  const isPatient = role === 'paciente';
+  const title = isPatient ? 'Mi salud' : 'Panel movil';
+  const description = isPatient
+    ? 'Tu portal de paciente esta listo para conectarse con citas, expediente, facturas y notificaciones.'
+    : 'Esta misma app mostrara funciones diferentes segun tu rol. Primero completaremos paciente y luego activaremos vistas profesionales.';
+
+  const items = isPatient
+    ? [
+        { icon: 'calendar-check-outline', label: 'Mis citas', detail: 'Proximas consultas y solicitudes' },
+        { icon: 'file-document-heart-outline', label: 'Expediente', detail: 'Resumen clinico y documentos' },
+        { icon: 'receipt-text-outline', label: 'Facturacion', detail: 'Facturas, pagos y saldos' },
+        { icon: 'bell-outline', label: 'Notificaciones', detail: 'Avisos de tu clinica' },
+      ]
+    : [
+        { icon: 'account-badge-outline', label: 'Rol detectado', detail: role ?? 'Sin rol' },
+        { icon: 'shield-account-outline', label: 'Acceso por permisos', detail: 'Menus filtrados por rol' },
+        { icon: 'cellphone-cog', label: 'Modulo pendiente', detail: 'Se activara por etapa' },
+      ];
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView contentContainerStyle={styles.homeContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.homeHeader}>
+          <View style={styles.logoMarkSmall}>
+            <MaterialCommunityIcons color="#ffffff" name="heart-pulse" size={26} />
+          </View>
+          <View style={styles.homeHeaderText}>
+            <Text style={styles.homeEyebrow}>MediCore</Text>
+            <Text style={styles.homeName}>{user.nombre_completo}</Text>
+            <Text style={styles.homeMeta}>{user.clinica_nombre || user.email}</Text>
+          </View>
+        </View>
+
+        <View style={styles.homeHero}>
+          <Text style={styles.homeRole}>{role || 'usuario'}</Text>
+          <Text style={styles.homeTitle}>{title}</Text>
+          <Text style={styles.homeDescription}>{description}</Text>
+        </View>
+
+        <View style={styles.homeGrid}>
+          {items.map((item) => (
+            <View key={item.label} style={styles.homeCard}>
+              <View style={styles.homeCardIcon}>
+                <MaterialCommunityIcons color={accent} name={item.icon as never} size={24} />
+              </View>
+              <Text style={styles.homeCardTitle}>{item.label}</Text>
+              <Text style={styles.homeCardText}>{item.detail}</Text>
+            </View>
+          ))}
+        </View>
+
+        <Pressable onPress={signOut} style={styles.signOutButton}>
+          <MaterialCommunityIcons color="#b42318" name="logout" size={20} />
+          <Text style={styles.signOutText}>Cerrar sesion</Text>
+        </Pressable>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
 const styles = StyleSheet.create({
+  loadingScreen: {
+    alignItems: 'center',
+    backgroundColor: page,
+    flex: 1,
+    gap: 18,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  loadingText: {
+    color: muted,
+    fontSize: 15,
+    fontWeight: '700',
+  },
   safeArea: {
     flex: 1,
     backgroundColor: page,
@@ -270,6 +400,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
   },
+  errorText: {
+    color: '#b42318',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 18,
+    marginTop: 10,
+    textAlign: 'center',
+  },
   dividerRow: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -334,5 +472,124 @@ const styles = StyleSheet.create({
     color: accent,
     fontSize: 14,
     fontWeight: '800',
+  },
+  homeContent: {
+    padding: 22,
+    paddingBottom: 34,
+  },
+  homeHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 14,
+    marginBottom: 22,
+  },
+  logoMarkSmall: {
+    alignItems: 'center',
+    backgroundColor: accent,
+    borderRadius: 18,
+    height: 54,
+    justifyContent: 'center',
+    shadowColor: accent,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    width: 54,
+    elevation: 6,
+  },
+  homeHeaderText: {
+    flex: 1,
+  },
+  homeEyebrow: {
+    color: accent,
+    fontSize: 13,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  homeName: {
+    color: ink,
+    fontSize: 20,
+    fontWeight: '900',
+    marginTop: 2,
+  },
+  homeMeta: {
+    color: muted,
+    fontSize: 13,
+    marginTop: 3,
+  },
+  homeHero: {
+    backgroundColor: '#102033',
+    borderRadius: 24,
+    marginBottom: 18,
+    overflow: 'hidden',
+    padding: 22,
+  },
+  homeRole: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#d9f7f3',
+    borderRadius: 999,
+    color: '#0b615b',
+    fontSize: 12,
+    fontWeight: '900',
+    marginBottom: 20,
+    overflow: 'hidden',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    textTransform: 'uppercase',
+  },
+  homeTitle: {
+    color: '#ffffff',
+    fontSize: 31,
+    fontWeight: '900',
+    letterSpacing: 0,
+  },
+  homeDescription: {
+    color: '#cbd5e1',
+    fontSize: 15,
+    lineHeight: 22,
+    marginTop: 10,
+  },
+  homeGrid: {
+    gap: 12,
+  },
+  homeCard: {
+    backgroundColor: panel,
+    borderColor: '#d9e4e8',
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 16,
+  },
+  homeCardIcon: {
+    alignItems: 'center',
+    backgroundColor: '#eefaf8',
+    borderRadius: 14,
+    height: 46,
+    justifyContent: 'center',
+    marginBottom: 12,
+    width: 46,
+  },
+  homeCardTitle: {
+    color: ink,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  homeCardText: {
+    color: muted,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 4,
+  },
+  signOutButton: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 22,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  signOutText: {
+    color: '#b42318',
+    fontSize: 14,
+    fontWeight: '900',
   },
 });

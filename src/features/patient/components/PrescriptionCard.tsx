@@ -1,30 +1,55 @@
 import { Pressable, StyleSheet, Text } from 'react-native';
 
 import { AppCard } from '@/components/AppCard';
+import { StatusBadge } from '@/components/StatusBadge';
 import { colors } from '@/core/theme/colors';
-import { StatusPill } from '@/features/patient/components/StatusPill';
+import { formatDate } from '@/core/utils/dateUtils';
 import type { PatientPrescription } from '@/features/patient/types/patientPrescriptions.types';
-import { formatDate } from '@/features/patient/utils/formatters';
 
-export function PrescriptionCard({ onPress, prescription }: { onPress?: () => void; prescription: PatientPrescription }) {
-  const summary = prescription.items?.map((item) => item.medication_name).filter(Boolean).join(', ');
+export function PrescriptionCard({
+  onPress,
+  prescription,
+}: {
+  onPress?: () => void;
+  prescription: PatientPrescription;
+}) {
+  const itemSummary = prescription.items
+    ?.map((item) => item.medication_name || item.name)
+    .filter(Boolean)
+    .join(', ');
+  const medicationSummary = Array.isArray(prescription.medications)
+    ? prescription.medications
+        .map((item) => (typeof item === 'string' ? item : item.medication_name || item.name))
+        .filter(Boolean)
+        .join(', ')
+    : '';
+  const summary = itemSummary || medicationSummary || prescription.summary;
 
   return (
     <Pressable onPress={onPress} style={({ pressed }) => pressed && styles.pressed}>
       <AppCard>
-        <StatusPill label={prescription.status} tone={prescription.status === 'emitida' ? 'success' : 'neutral'} />
+        <StatusBadge status={prescription.status} />
         <Text style={styles.title}>{prescription.prescription_number || 'Receta medica'}</Text>
         <Text style={styles.meta}>
-          {formatDate(prescription.issue_date || prescription.creado_en)} ·{' '}
+          {formatDate(prescription.issue_date || prescription.date || prescription.created_at || prescription.creado_en)} ·{' '}
           {prescription.doctor_nombre || prescription.doctor_name || 'Medico'}
         </Text>
-        <Text style={styles.text}>{summary || prescription.general_instructions || 'Sin medicamentos registrados'}</Text>
+        <Text style={styles.text}>
+          {summary || prescription.general_instructions || 'Sin medicamentos registrados'}
+        </Text>
+        <Text style={styles.detailText}>Ver detalle</Text>
       </AppCard>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  detailText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: '900',
+    marginTop: 12,
+  },
   meta: {
     color: colors.muted,
     fontSize: 13,

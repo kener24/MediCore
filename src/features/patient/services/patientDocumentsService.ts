@@ -6,9 +6,10 @@ import { appConfig } from '@/core/config/appConfig';
 import { normalizeList, type ListResponse } from '@/features/patient/types/pagination.types';
 import type { PatientDocument } from '@/features/patient/types/patientDocuments.types';
 
-export async function getPatientDocuments() {
+export async function getPatientDocuments(params?: Record<string, string>) {
   const { data } = await apiClient.get<ListResponse<PatientDocument>>(
     endpoints.patientPortal.documents,
+    { params },
   );
   return normalizeList(data);
 }
@@ -35,7 +36,8 @@ function toAbsoluteUrl(url: string) {
 }
 
 export async function openPatientDocumentUrl(document: PatientDocument, mode: 'download' | 'preview') {
-  const url = toAbsoluteUrl(document.file_url || document.file || getPatientDocumentFileUrl(document.id, mode));
+  const explicitUrl = mode === 'preview' ? document.preview_url : document.download_url;
+  const url = toAbsoluteUrl(explicitUrl || document.file_url || document.file || getPatientDocumentFileUrl(document.id, mode));
   const canOpen = await Linking.canOpenURL(url);
   if (!canOpen) {
     throw new Error('No se pudo abrir el documento.');

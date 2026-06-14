@@ -1,6 +1,6 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
@@ -8,11 +8,12 @@ import { AppCard } from '@/components/AppCard';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
+import { StatusBadge } from '@/components/StatusBadge';
 import { colors } from '@/core/theme/colors';
-import { StatusPill } from '@/features/patient/components/StatusPill';
+import { formatDate } from '@/core/utils/dateUtils';
+import { formatCurrency } from '@/core/utils/moneyUtils';
 import { getPatientInvoice } from '@/features/patient/services/patientInvoicesService';
 import type { PatientInvoice } from '@/features/patient/types/patientInvoices.types';
-import { formatCurrency, formatDate, getInvoiceTone } from '@/features/patient/utils/formatters';
 
 export function PatientInvoiceDetailScreen() {
   const navigation = useNavigation();
@@ -39,28 +40,33 @@ export function PatientInvoiceDetailScreen() {
   if (loading) return <LoadingState label="Cargando factura..." />;
   if (error || !invoice) return <ErrorState message={error || 'No hay informacion disponible.'} onRetry={load} />;
 
+  const pdfUrl = invoice.pdf_url || invoice.file_url;
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <AppButton label="Volver" onPress={() => navigation.goBack()} variant="secondary" />
         <AppCard>
-          <StatusPill label={invoice.status} tone={getInvoiceTone(invoice.status)} />
+          <StatusBadge status={invoice.status} />
           <Text style={styles.title}>{invoice.invoice_number || `Factura #${invoice.id}`}</Text>
-          <Text style={styles.meta}>Fecha: {formatDate(invoice.issue_date)}</Text>
+          <Text style={styles.meta}>Fecha: {formatDate(invoice.issue_date || invoice.created_at)}</Text>
+          <Text style={styles.meta}>Clinica: {invoice.clinic_name || 'No indicada'}</Text>
+          <Text style={styles.meta}>Paciente: {invoice.patient_name || 'No indicado'}</Text>
           <Detail label="Subtotal" value={formatCurrency(invoice.subtotal)} />
-          <Detail label="Descuentos" value={formatCurrency(invoice.discount_amount)} />
-          <Detail label="Impuestos" value={formatCurrency(invoice.tax_amount)} />
-          <Detail label="Total" value={formatCurrency(invoice.total_amount)} />
+          <Detail label="Descuentos" value={formatCurrency(invoice.discount_total ?? invoice.discount_amount)} />
+          <Detail label="Impuestos" value={formatCurrency(invoice.tax_total ?? invoice.tax_amount)} />
+          <Detail label="Total" value={formatCurrency(invoice.total_amount ?? invoice.total)} />
           <Detail label="Pagado" value={formatCurrency(invoice.paid_amount)} />
-          <Detail label="Saldo" value={formatCurrency(invoice.balance_due)} />
+          <Detail label="Saldo" value={formatCurrency(invoice.balance_due ?? invoice.balance)} />
+          {invoice.notes ? <Text style={styles.meta}>Notas: {invoice.notes}</Text> : null}
         </AppCard>
 
         <Text style={styles.sectionTitle}>Items</Text>
         {invoice.items?.length ? (
           invoice.items.map((item, index) => (
-            <AppCard key={`${item.id ?? index}-${item.description}`}>
-              <Text style={styles.itemTitle}>{item.description || item.service_name || 'Item'}</Text>
-              <Text style={styles.meta}>Cantidad {item.quantity || '1'} · {formatCurrency(item.line_total)}</Text>
+            <AppCard key={`${item.id ?? index}-${item.description || item.item_name}`}>
+              <Text style={styles.itemTitle}>{item.description || item.item_name || item.service_name || 'Item'}</Text>
+              <Text style={styles.meta}>Cantidad {item.quantity || '1'} · {formatCurrency(item.line_total ?? item.total)}</Text>
             </AppCard>
           ))
         ) : (
@@ -70,8 +76,8 @@ export function PatientInvoiceDetailScreen() {
         <Text style={styles.sectionTitle}>Pagos</Text>
         {invoice.payments?.length ? (
           invoice.payments.map((payment, index) => (
-            <AppCard key={`${payment.id ?? index}-${payment.payment_number}`}>
-              <Text style={styles.itemTitle}>{payment.payment_number || 'Pago'}</Text>
+            <AppCard key={`${payment.id ?? index}-${payment.payment_number || payment.reference}`}>
+              <Text style={styles.itemTitle}>{payment.payment_number || payment.payment_method || payment.method || 'Pago'}</Text>
               <Text style={styles.meta}>{formatDate(payment.payment_date)} · {formatCurrency(payment.amount)}</Text>
             </AppCard>
           ))
@@ -79,7 +85,12 @@ export function PatientInvoiceDetailScreen() {
           <EmptyState description="No hay pagos registrados para esta factura." title="Sin pagos" />
         )}
 
-        <AppButton label="PDF no disponible aun" disabled variant="secondary" />
+        <AppButton
+          disabled={!pdfUrl}
+          label={pdfUrl ? 'Ver PDF' : 'PDF no disponible por el momento'}
+          onPress={() => pdfUrl && Linking.openURL(pdfUrl)}
+          variant="secondary"
+        />
       </ScrollView>
     </SafeAreaView>
   );

@@ -8,11 +8,11 @@ import { AppCard } from '@/components/AppCard';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
+import { StatusBadge } from '@/components/StatusBadge';
 import { colors } from '@/core/theme/colors';
-import { StatusPill } from '@/features/patient/components/StatusPill';
+import { formatDate } from '@/core/utils/dateUtils';
 import { getPatientPrescription } from '@/features/patient/services/patientPrescriptionsService';
-import type { PatientPrescription } from '@/features/patient/types/patientPrescriptions.types';
-import { formatDate } from '@/features/patient/utils/formatters';
+import type { PatientPrescription, PatientPrescriptionItem } from '@/features/patient/types/patientPrescriptions.types';
 
 export function PatientPrescriptionDetailScreen() {
   const navigation = useNavigation();
@@ -39,39 +39,44 @@ export function PatientPrescriptionDetailScreen() {
   if (loading) return <LoadingState label="Cargando receta..." />;
   if (error || !prescription) return <ErrorState message={error || 'No hay informacion disponible.'} onRetry={load} />;
 
+  const medications = normalizeMedications(prescription);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <AppButton label="Volver" onPress={() => navigation.goBack()} variant="secondary" />
         <AppCard>
-          <StatusPill label={prescription.status} tone={prescription.status === 'emitida' ? 'success' : 'neutral'} />
+          <StatusBadge status={prescription.status} />
           <Text style={styles.title}>{prescription.prescription_number || 'Receta medica'}</Text>
-          <Text style={styles.meta}>{formatDate(prescription.issue_date || prescription.creado_en)}</Text>
+          <Text style={styles.meta}>{formatDate(prescription.issue_date || prescription.date || prescription.created_at || prescription.creado_en)}</Text>
           <Text style={styles.meta}>{prescription.doctor_nombre || prescription.doctor_name || 'Medico'}</Text>
+          <Text style={styles.meta}>{prescription.clinic_name || prescription.clinic_nombre || 'Clinica no indicada'}</Text>
           {prescription.diagnosis || prescription.diagnosis_name ? (
             <Text style={styles.text}>Diagnostico: {prescription.diagnosis || prescription.diagnosis_name}</Text>
           ) : null}
         </AppCard>
 
         <Text style={styles.sectionTitle}>Medicamentos</Text>
-        {prescription.items?.length ? (
-          prescription.items.map((item, index) => (
-            <AppCard key={`${item.id ?? index}-${item.medication_name}`}>
-              <Text style={styles.itemTitle}>{item.medication_name || 'Medicamento'}</Text>
+        {medications.length ? (
+          medications.map((item, index) => (
+            <AppCard key={`${item.id ?? index}-${item.medication_name || item.name}`}>
+              <Text style={styles.itemTitle}>{item.medication_name || item.name || 'Medicamento'}</Text>
               <Detail label="Dosis" value={item.dosage} />
               <Detail label="Frecuencia" value={item.frequency} />
               <Detail label="Duracion" value={item.duration} />
+              <Detail label="Cantidad" value={item.quantity} />
               <Detail label="Indicaciones" value={item.instructions} />
             </AppCard>
           ))
         ) : (
-          <EmptyState description="La receta no tiene medicamentos registrados." title="Sin medicamentos" />
+          <EmptyState description="No hay medicamentos registrados en esta receta." title="Sin medicamentos" />
         )}
 
-        {prescription.general_instructions ? (
+        {prescription.general_instructions || prescription.notes ? (
           <AppCard>
             <Text style={styles.itemTitle}>Indicaciones generales</Text>
-            <Text style={styles.text}>{prescription.general_instructions}</Text>
+            {prescription.general_instructions ? <Text style={styles.text}>{prescription.general_instructions}</Text> : null}
+            {prescription.notes ? <Text style={styles.text}>{prescription.notes}</Text> : null}
           </AppCard>
         ) : null}
       </ScrollView>
@@ -79,11 +84,19 @@ export function PatientPrescriptionDetailScreen() {
   );
 }
 
-function Detail({ label, value }: { label: string; value?: string }) {
+function normalizeMedications(prescription: PatientPrescription): PatientPrescriptionItem[] {
+  if (prescription.items?.length) return prescription.items;
+  if (!Array.isArray(prescription.medications)) return [];
+  return prescription.medications.map((item, index) =>
+    typeof item === 'string' ? { id: index, medication_name: item } : item,
+  );
+}
+
+function Detail({ label, value }: { label: string; value?: string | number | null }) {
   return (
     <View style={styles.detail}>
       <Text style={styles.detailLabel}>{label}</Text>
-      <Text style={styles.detailValue}>{value || 'No indicado'}</Text>
+      <Text style={styles.detailValue}>{value ? String(value) : 'No indicado'}</Text>
     </View>
   );
 }

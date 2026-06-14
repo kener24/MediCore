@@ -47,8 +47,13 @@ export function PatientInvoicesScreen() {
     () =>
       invoices.filter((invoice) => {
         if (filter === 'all') return true;
-        if (filter === 'paid') return invoice.status === 'pagada';
-        return invoice.status === 'pendiente' || invoice.status === 'parcialmente_pagada';
+        if (filter === 'paid') return invoice.status === 'pagada' || invoice.status === 'paid';
+        return (
+          invoice.status === 'pendiente' ||
+          invoice.status === 'pending' ||
+          invoice.status === 'parcialmente_pagada' ||
+          invoice.status === 'partially_paid'
+        );
       }),
     [filter, invoices],
   );
@@ -78,13 +83,14 @@ export function PatientInvoicesScreen() {
         ) : visibleInvoices.length ? (
           visibleInvoices.map((invoice) => (
             <InvoiceCard
+              currency="HNL"
               invoice={invoice}
               key={invoice.id}
               onPress={() => navigation.navigate('PatientInvoiceDetail', { id: invoice.id })}
             />
           ))
         ) : (
-          <EmptyState description="No hay facturas para mostrar." title="Sin facturas" />
+          <EmptyState description="No tienes facturas registradas." title="Sin facturas" />
         )}
       </ScrollView>
     </SafeAreaView>

@@ -1,6 +1,6 @@
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
@@ -12,13 +12,14 @@ import { colors } from '@/core/theme/colors';
 import { toISODate } from '@/core/utils/dateUtils';
 import { DoctorAppointmentCard } from '@/features/doctor/components/DoctorAppointmentCard';
 import { DoctorHeader } from '@/features/doctor/components/DoctorHeader';
-import { getDoctorAppointments } from '@/features/doctor/services/doctorScheduleService';
+import { getDoctorAppointmentsByDate } from '@/features/doctor/services/doctorScheduleService';
 import type { DoctorAppointment, DoctorScheduleFilter } from '@/features/doctor/types/doctorSchedule.types';
 
 const filters: { label: string; value: DoctorScheduleFilter }[] = [
   { label: 'Todas', value: 'all' },
   { label: 'Programadas', value: 'scheduled' },
   { label: 'Confirmadas', value: 'confirmed' },
+  { label: 'En espera', value: 'waiting' },
   { label: 'Completadas', value: 'completed' },
   { label: 'Canceladas', value: 'cancelled' },
 ];
@@ -38,8 +39,9 @@ export function DoctorScheduleScreen() {
       const status = (item.status ?? item.estado ?? '').toLowerCase();
       if (filter === 'scheduled') return ['scheduled', 'programada', 'pendiente'].includes(status);
       if (filter === 'confirmed') return ['confirmed', 'confirmada'].includes(status);
+      if (filter === 'waiting') return ['checked_in', 'waiting', 'en_espera', 'in_progress'].includes(status);
       if (filter === 'completed') return ['completed', 'completada', 'atendida'].includes(status);
-      return ['cancelled', 'cancelada'].includes(status);
+      return ['cancelled', 'cancelada', 'no_show'].includes(status);
     });
   }, [appointments, filter]);
 
@@ -48,9 +50,9 @@ export function DoctorScheduleScreen() {
     else setLoading(true);
     setError('');
     try {
-      setAppointments(await getDoctorAppointments(date));
+      setAppointments(await getDoctorAppointmentsByDate(date));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo cargar la agenda.');
+      setError(err instanceof Error ? err.message : 'El módulo de agenda aún no está disponible.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -58,6 +60,32 @@ export function DoctorScheduleScreen() {
   }, [date]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  function viewAppointment(item: DoctorAppointment) {
+    const visitId = item.visit_id ?? item.visita_id;
+    if (!visitId) {
+      Alert.alert('Agenda médica', 'Esta cita aún no tiene admisión registrada.');
+    }
+    navigation.navigate('DoctorPatientDetail', {
+      appointment: item,
+      appointmentId: item.appointment_id ?? item.id,
+      patientId: item.patient_id,
+      visitId,
+    });
+  }
+
+  function attendAppointment(item: DoctorAppointment) {
+    const visitId = item.visit_id ?? item.visita_id;
+    if (!visitId) {
+      Alert.alert('Agenda médica', 'Esta cita aún no tiene admisión registrada.');
+      return;
+    }
+    navigation.navigate('DoctorConsultation', {
+      appointmentId: item.appointment_id ?? item.id,
+      patientId: item.patient_id,
+      visitId,
+    });
+  }
 
   if (loading) return <LoadingState label="Cargando agenda..." />;
 
@@ -67,10 +95,14 @@ export function DoctorScheduleScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl onRefresh={() => load(true)} refreshing={refreshing} />}
         showsVerticalScrollIndicator={false}>
-        <DoctorHeader title="Agenda del día" />
+        <DoctorHeader title="Agenda médica" />
         <View style={styles.controls}>
-          <AppInput icon="calendar" keyboardType="numbers-and-punctuation" label="Fecha" onChangeText={setDate} value={date} />
-          <AppButton label="Hoy" onPress={() => setDate(toISODate(new Date()))} variant="secondary" />
+          <AppInput icon="calendar" keyboardType="numbers-and-punctuation" label="Fecha seleccionada" onChangeText={setDate} value={date} />
+          <View style={styles.dateButtons}>
+            <AppButton label="Día anterior" onPress={() => setDate(shiftDate(date, -1))} style={styles.dateButton} variant="secondary" />
+            <AppButton label="Hoy" onPress={() => setDate(toISODate(new Date()))} style={styles.dateButton} variant="secondary" />
+            <AppButton label="Día siguiente" onPress={() => setDate(shiftDate(date, 1))} style={styles.dateButton} variant="secondary" />
+          </View>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={styles.filters}>
@@ -88,7 +120,8 @@ export function DoctorScheduleScreen() {
             <DoctorAppointmentCard
               appointment={item}
               key={item.id}
-              onPress={() => navigation.navigate('DoctorPatientDetail', { appointment: item, visitId: item.visit_id ?? item.visita_id })}
+              onAttend={() => attendAppointment(item)}
+              onPress={() => viewAppointment(item)}
             />
           ))
         ) : (
@@ -99,9 +132,18 @@ export function DoctorScheduleScreen() {
   );
 }
 
+function shiftDate(value: string, days: number) {
+  const date = value ? new Date(`${value}T00:00:00`) : new Date();
+  if (Number.isNaN(date.getTime())) return toISODate(new Date());
+  date.setDate(date.getDate() + days);
+  return toISODate(date);
+}
+
 const styles = StyleSheet.create({
   content: { gap: 14, padding: 22, paddingBottom: 34 },
   controls: { gap: 10 },
+  dateButton: { flex: 1, height: 44 },
+  dateButtons: { flexDirection: 'row', gap: 8 },
   filter: {
     backgroundColor: colors.white,
     borderColor: colors.border,

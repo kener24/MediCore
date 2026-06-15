@@ -1,5 +1,7 @@
 import type { DoctorPatientSummary, DoctorVitalSigns } from '@/features/doctor/types/doctorConsultation.types';
 
+export type PatientPriority = 'normal' | 'priority' | 'urgent' | 'emergency' | string;
+
 export type WaitingRoomPatient = {
   id: number;
   visit_id?: number;
@@ -23,6 +25,7 @@ export type WaitingRoomPatient = {
   motivo?: string;
   arrived_at?: string;
   llegada_en?: string;
+  waiting_time_minutes?: number;
   triage_completed?: boolean;
   triaje_completado?: boolean;
   vital_signs?: DoctorVitalSigns | null;

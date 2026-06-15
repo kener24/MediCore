@@ -3,8 +3,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { colors } from '@/core/theme/colors';
-import { PriorityBadge } from '@/features/doctor/components/PriorityBadge';
 import { ConsultationStatusBadge } from '@/features/doctor/components/ConsultationStatusBadge';
+import { PriorityBadge } from '@/features/doctor/components/PriorityBadge';
 import type { WaitingRoomPatient } from '@/features/doctor/types/doctorWaitingRoom.types';
 import { formatTime } from '@/features/patient/utils/formatters';
 
@@ -19,6 +19,10 @@ export function WaitingRoomPatientCard({
 }) {
   const name = item.patient_name ?? item.paciente_nombre ?? item.patient?.full_name ?? item.patient?.nombre_completo ?? 'Paciente';
   const visitId = item.visit_id ?? item.visita_id ?? item.id;
+  const demographic = [item.age ?? item.edad ? `${item.age ?? item.edad} años` : null, item.gender ?? item.genero]
+    .filter(Boolean)
+    .join(' · ');
+
   return (
     <Pressable onPress={onView}>
       <AppCard style={styles.card}>
@@ -26,6 +30,7 @@ export function WaitingRoomPatientCard({
           <Text style={styles.title}>{name}</Text>
           <PriorityBadge value={item.priority ?? item.prioridad} />
         </View>
+        {demographic ? <Text style={styles.meta}>{demographic}</Text> : null}
         <Text style={styles.reason}>{item.reason ?? item.motivo ?? 'Motivo no indicado'}</Text>
         <View style={styles.metaRow}>
           <ConsultationStatusBadge status={item.status ?? item.estado} />
@@ -33,11 +38,12 @@ export function WaitingRoomPatientCard({
         </View>
         <Text style={styles.meta}>
           Triaje: {item.triage_completed ?? item.triaje_completado ? 'completado' : 'pendiente'} · Visita #{visitId}
+          {item.waiting_time_minutes ? ` · Espera ${item.waiting_time_minutes} min` : ''}
         </Text>
         {item.vital_signs ? (
           <Text style={styles.vitals}>
-            PA {item.vital_signs.blood_pressure || '-'} · FC {item.vital_signs.heart_rate || '-'} · Temp{' '}
-            {item.vital_signs.temperature || '-'}
+            Temp {item.vital_signs.temperature || '-'} · PA {item.vital_signs.blood_pressure || '-'} · FC{' '}
+            {item.vital_signs.heart_rate || '-'} · Sat {item.vital_signs.oxygen_saturation || '-'}%
           </Text>
         ) : null}
         <View style={styles.actions}>

@@ -4,11 +4,21 @@ import { colors } from '@/core/theme/colors';
 
 export function PriorityBadge({ value }: { value?: string | null }) {
   const normalized = value?.toLowerCase() ?? 'normal';
-  const danger = ['alta', 'high', 'urgent', 'urgente', 'critical'].includes(normalized);
-  const warning = ['media', 'medium', 'prioritaria'].includes(normalized);
+  const emergency = ['emergency', 'emergencia', 'critical'].includes(normalized);
+  const danger = ['urgent', 'urgente', 'alta', 'high'].includes(normalized);
+  const warning = ['priority', 'prioridad', 'media', 'medium', 'prioritaria'].includes(normalized);
+  const labelMap: Record<string, string> = {
+    emergency: 'Emergencia',
+    emergencia: 'Emergencia',
+    normal: 'Normal',
+    priority: 'Prioridad',
+    prioridad: 'Prioridad',
+    urgent: 'Urgente',
+    urgente: 'Urgente',
+  };
   return (
-    <Text style={[styles.badge, danger && styles.danger, warning && styles.warning]}>
-      {value || 'Normal'}
+    <Text style={[styles.badge, emergency && styles.emergency, danger && styles.danger, warning && styles.warning]}>
+      {labelMap[normalized] ?? value ?? 'Normal'}
     </Text>
   );
 }
@@ -27,6 +37,10 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   danger: {
+    backgroundColor: '#FFEDD5',
+    color: '#C2410C',
+  },
+  emergency: {
     backgroundColor: '#FEF2F2',
     color: colors.danger,
   },

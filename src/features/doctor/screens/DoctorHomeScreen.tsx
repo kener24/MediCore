@@ -3,7 +3,7 @@ import { RoleHomeScreen } from '@/features/common/screens/RoleHomeScreen';
 
 export function DoctorHomeScreen() {
   return (
-    <RoleGuard roles={['medico']}>
+    <RoleGuard roles={['medico', 'doctor']}>
       <RoleHomeScreen
         actions={[
           {
@@ -22,8 +22,8 @@ export function DoctorHomeScreen() {
             title: 'Atenciones',
           },
         ]}
-        headline="Operacion medica lista"
-        roleLabel="Medico"
+        headline="Operación médica lista"
+        roleLabel="Médico"
         subtitle="Panel profesional con base para agenda, expediente y atenciones."
       />
     </RoleGuard>

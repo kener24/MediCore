@@ -20,10 +20,11 @@ interface AuthContextValue {
   signOut: () => Promise<void>;
 }
 
-const enabledRoles: AppRole[] = ['paciente', 'medico', 'recepcionista', 'enfermera', 'admin'];
+const enabledRoles: AppRole[] = ['paciente', 'medico', 'doctor', 'recepcionista', 'enfermera', 'admin'];
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 function resolveAppRole(role: RoleName | null): AppRole | null {
+  if (role === 'doctor') return 'medico';
   if (role && enabledRoles.includes(role as AppRole)) {
     return role as AppRole;
   }

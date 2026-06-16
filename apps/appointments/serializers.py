@@ -37,6 +37,7 @@ class AppointmentListSerializer(serializers.ModelSerializer):
             "scheduled_date",
             "start_time",
             "end_time",
+            "modality",
             "reason",
             "status",
             "activo",
@@ -63,7 +64,7 @@ class AppointmentDetailSerializer(AppointmentListSerializer):
 class AppointmentCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Appointment
-        fields = ["id", "patient", "doctor", "scheduled_date", "start_time", "end_time", "reason", "notes", "status"]
+        fields = ["id", "patient", "doctor", "scheduled_date", "start_time", "end_time", "modality", "reason", "notes", "status"]
         read_only_fields = ["id"]
         extra_kwargs = {"end_time": {"required": False}}
 
@@ -101,7 +102,7 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
 class AppointmentUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Appointment
-        fields = ["patient", "doctor", "scheduled_date", "start_time", "end_time", "reason", "notes", "status"]
+        fields = ["patient", "doctor", "scheduled_date", "start_time", "end_time", "modality", "reason", "notes", "status"]
         extra_kwargs = {"end_time": {"required": False}}
 
     def validate(self, attrs):
@@ -124,6 +125,7 @@ class AppointmentUpdateSerializer(serializers.ModelSerializer):
             reason=attrs.get("reason", self.instance.reason),
             notes=attrs.get("notes", self.instance.notes),
             status=attrs.get("status", self.instance.status),
+            modality=attrs.get("modality", self.instance.modality),
             activo=self.instance.activo,
         )
         try:

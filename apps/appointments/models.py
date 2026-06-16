@@ -18,6 +18,10 @@ class Appointment(TimeStampedModel):
         NO_ASISTIO = "no_asistio", "No asistio"
         REPROGRAMADA = "reprogramada", "Reprogramada"
 
+    class Modality(models.TextChoices):
+        PRESENCIAL = "presencial", "Presencial"
+        ONLINE = "online", "En línea"
+
     clinic = models.ForeignKey("clinics.Clinic", on_delete=models.PROTECT, related_name="appointments")
     patient = models.ForeignKey("patients.Patient", on_delete=models.PROTECT, related_name="appointments")
     doctor = models.ForeignKey("doctors.DoctorProfile", on_delete=models.PROTECT, related_name="appointments")
@@ -25,6 +29,7 @@ class Appointment(TimeStampedModel):
     scheduled_date = models.DateField()
     start_time = models.TimeField()
     end_time = models.TimeField()
+    modality = models.CharField(max_length=20, choices=Modality.choices, default=Modality.PRESENCIAL, db_index=True)
     reason = models.CharField(max_length=250)
     notes = models.TextField(blank=True)
     status = models.CharField(max_length=30, choices=Status.choices, default=Status.PENDIENTE)

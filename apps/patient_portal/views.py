@@ -59,7 +59,7 @@ class PatientPortalBaseView(APIView):
             "can_view_medical_record": self.clinic_settings.allow_patient_medical_record_view,
             "can_view_prescriptions": self.clinic_settings.allow_patient_prescription_view,
             "can_view_invoices": self.clinic_settings.allow_patient_invoice_view,
-            "can_request_appointments": self.clinic_settings.allow_online_appointments,
+            "can_request_appointments": True,
             "can_cancel_appointments": self.clinic_settings.allow_patient_cancellations,
         }
 
@@ -144,10 +144,14 @@ class PatientPortalAppointmentRequestView(PatientPortalBaseView):
     serializer_class = PatientAppointmentRequestSerializer
 
     def post(self, request):
-        if not self.clinic_settings.allow_online_appointments:
-            return portal_denied("Las citas en linea no estan habilitadas para tu clinica.")
         serializer = PatientAppointmentRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        modality = serializer.validated_data.get("modality", Appointment.Modality.PRESENCIAL)
+        if modality == Appointment.Modality.ONLINE and not self.clinic_settings.allow_online_appointments:
+            return Response(
+                {"modality": ["Esta clínica no tiene habilitadas las citas en línea. Puedes solicitar una cita presencial."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         doctor = serializer.validated_data["doctor"]
         if doctor.clinic_id != self.patient.clinic_id:
             return Response({"detail": "El medico no pertenece a tu clinica."}, status=status.HTTP_400_BAD_REQUEST)
@@ -164,6 +168,7 @@ class PatientPortalAppointmentRequestView(PatientPortalBaseView):
             scheduled_date=scheduled_date,
             start_time=start_time,
             end_time=datetime.strptime(slot["end_time"], "%H:%M").time(),
+            modality=modality,
             reason=serializer.validated_data["reason"],
             notes=serializer.validated_data.get("notes", ""),
             status=Appointment.Status.PENDIENTE,
@@ -221,7 +226,24 @@ class PatientPortalDoctorAvailabilityView(PatientPortalBaseView):
         date_value = request.query_params.get("date")
         if not date_value:
             return Response({"detail": "date es obligatorio."}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(build_availability(doctor, datetime.fromisoformat(date_value).date()))
+        modality = request.query_params.get("modality") or Appointment.Modality.PRESENCIAL
+        if modality not in Appointment.Modality.values:
+            return Response({"modality": ["Selecciona una modalidad válida."]}, status=status.HTTP_400_BAD_REQUEST)
+        if modality == Appointment.Modality.ONLINE and not self.clinic_settings.allow_online_appointments:
+            return Response(
+                {
+                    "doctor": doctor.id,
+                    "date": date_value,
+                    "available_slots": [],
+                    "booked_slots": [],
+                    "allow_online_appointments": False,
+                    "message": "Esta clínica no tiene habilitadas las citas en línea. Puedes solicitar una cita presencial.",
+                }
+            )
+        availability = build_availability(doctor, datetime.fromisoformat(date_value).date())
+        availability["allow_online_appointments"] = self.clinic_settings.allow_online_appointments
+        availability["modality"] = modality
+        return Response(availability)
 
 
 class PatientPortalSpecialtiesView(PatientPortalBaseView):

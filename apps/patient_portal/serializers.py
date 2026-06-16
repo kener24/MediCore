@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from apps.appointments.serializers import AppointmentDetailSerializer, AppointmentListSerializer
+from apps.appointments.models import Appointment
 from apps.billing.serializers import InvoiceDetailSerializer, InvoiceListSerializer, PaymentListSerializer
 from apps.core.validators import validate_phone
 from apps.doctors.models import DoctorProfile, MedicalSpecialty
@@ -54,6 +55,11 @@ class PatientAppointmentRequestSerializer(serializers.Serializer):
     doctor = serializers.PrimaryKeyRelatedField(queryset=DoctorProfile.objects.filter(activo=True))
     scheduled_date = serializers.DateField()
     start_time = serializers.TimeField()
+    modality = serializers.ChoiceField(
+        choices=Appointment.Modality.choices,
+        default=Appointment.Modality.PRESENCIAL,
+        error_messages={"invalid_choice": "Selecciona una modalidad válida."},
+    )
     reason = serializers.CharField(max_length=250)
     notes = serializers.CharField(required=False, allow_blank=True)
 

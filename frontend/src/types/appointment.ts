@@ -1,4 +1,5 @@
 export type AppointmentStatus = "pendiente" | "confirmada" | "cancelada" | "atendida" | "no_asistio" | "reprogramada";
+export type AppointmentModality = "presencial" | "online";
 
 export interface Appointment {
   id: number;
@@ -15,6 +16,7 @@ export interface Appointment {
   scheduled_date: string;
   start_time: string;
   end_time: string;
+  modality?: AppointmentModality;
   reason: string;
   notes: string;
   status: AppointmentStatus;
@@ -49,6 +51,7 @@ export interface AppointmentPayload {
   scheduled_date: string;
   start_time: string;
   end_time?: string;
+  modality?: AppointmentModality;
   reason: string;
   notes?: string;
   status?: AppointmentStatus;
@@ -75,4 +78,7 @@ export interface AppointmentAvailability {
   date: string;
   available_slots: AvailabilitySlot[];
   booked_slots: AvailabilitySlot[];
+  allow_online_appointments?: boolean;
+  modality?: AppointmentModality;
+  message?: string;
 }

@@ -1,4 +1,5 @@
 import type { Appointment } from "./appointment";
+import type { AppointmentModality } from "./appointment";
 import type { Invoice, Payment } from "./billing";
 import type { MedicalOrder, Prescription } from "./prescription";
 
@@ -63,6 +64,7 @@ export interface PatientAppointmentRequestPayload {
   scheduled_date: string;
   start_time: string;
   reason: string;
+  modality: AppointmentModality;
   notes?: string;
 }
 
@@ -82,4 +84,3 @@ export interface PatientMedicalRecordSummary {
 
 export type PatientPortalInvoice = Invoice;
 export type PatientPortalPayment = Payment;
-

@@ -13,7 +13,7 @@ export async function requestPatientAppointment(payload: PatientAppointmentReque
 export async function cancelPatientAppointment(id: number | string, reason: string) { const { data } = await api.patch<Appointment>(`/patient-portal/appointments/${id}/cancel/`, { reason }); return data; }
 export async function getPatientPortalDoctors(filters?: Record<string, string>) { const { data } = await api.get<Array<Record<string, unknown>>>("/patient-portal/doctors/", { params: filters }); return data; }
 export async function getPatientPortalSpecialties() { const { data } = await api.get<Array<Record<string, unknown>>>("/patient-portal/specialties/"); return data; }
-export async function getPatientDoctorAvailability(doctorId: number | string, date: string) { const { data } = await api.get<AppointmentAvailability>(`/patient-portal/doctors/${doctorId}/availability/`, { params: { date } }); return data; }
+export async function getPatientDoctorAvailability(doctorId: number | string, date: string, modality = "presencial") { const { data } = await api.get<AppointmentAvailability>(`/patient-portal/doctors/${doctorId}/availability/`, { params: { date, modality } }); return data; }
 export async function getPatientPortalPrescriptions() { const { data } = await api.get<Prescription[]>("/patient-portal/prescriptions/"); return data; }
 export async function getPatientPortalPrescription(id: number | string) { const { data } = await api.get<Prescription>(`/patient-portal/prescriptions/${id}/`); return data; }
 export async function getPatientPortalMedicalOrders() { const { data } = await api.get<MedicalOrder[]>("/patient-portal/medical-orders/"); return data; }
@@ -25,4 +25,3 @@ export async function getPatientMedicalRecordSummary() { const { data } = await 
 export async function getPatientPortalNotifications() { const { data } = await api.get<Array<Record<string, unknown>>>("/patient-portal/notifications/"); return data; }
 export async function getPatientPortalUnreadCount() { const { data } = await api.get<{ unread_count: number }>("/patient-portal/notifications/unread-count/"); return data; }
 export async function getPatientPortalClinicInfo() { const { data } = await api.get<PatientClinicInfo>("/patient-portal/clinic-info/"); return data; }
-

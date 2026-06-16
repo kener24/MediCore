@@ -1,4 +1,5 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RolePlaceholderScreen } from '@/features/common/screens/RolePlaceholderScreen';
 import { NurseDashboardScreen } from '@/features/nurse/screens/NurseDashboardScreen';
@@ -8,8 +9,9 @@ import { createTabOptions, tabIcon } from '@/navigation/tabOptions';
 const Tab = createBottomTabNavigator();
 
 export function NurseTabs() {
+  const insets = useSafeAreaInsets();
   return (
-    <Tab.Navigator screenOptions={createTabOptions()}>
+    <Tab.Navigator screenOptions={createTabOptions(insets)}>
       <Tab.Screen
         component={NurseHomeScreen}
         name="NurseHome"

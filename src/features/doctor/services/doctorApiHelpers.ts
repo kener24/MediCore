@@ -1,5 +1,5 @@
-import { ApiClientError } from '@/core/api/authInterceptor';
 import { apiClient } from '@/core/api/apiClient';
+import { ApiClientError } from '@/core/api/authInterceptor';
 
 export async function getFirstAvailable<T>(
   urls: string[],
@@ -17,9 +17,7 @@ export async function getFirstAvailable<T>(
       }
     }
   }
-  throw lastError instanceof Error
-    ? lastError
-    : new Error('Este módulo aún no está disponible.');
+  throw lastError instanceof Error ? lastError : new Error('Este modulo aun no esta disponible.');
 }
 
 export async function postFirstAvailable<T>(urls: string[], payload?: unknown) {
@@ -35,9 +33,7 @@ export async function postFirstAvailable<T>(urls: string[], payload?: unknown) {
       }
     }
   }
-  throw lastError instanceof Error
-    ? lastError
-    : new Error('Este módulo aún no está disponible.');
+  throw lastError instanceof Error ? lastError : new Error('Este modulo aun no esta disponible.');
 }
 
 export async function patchFirstAvailable<T>(urls: string[], payload?: unknown) {
@@ -53,7 +49,5 @@ export async function patchFirstAvailable<T>(urls: string[], payload?: unknown) 
       }
     }
   }
-  throw lastError instanceof Error
-    ? lastError
-    : new Error('Este módulo aún no está disponible.');
+  throw lastError instanceof Error ? lastError : new Error('Este modulo aun no esta disponible.');
 }

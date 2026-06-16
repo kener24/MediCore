@@ -1,69 +1,76 @@
-import { StyleSheet } from 'react-native';
+import type { ComponentProps } from 'react';
+import { StyleSheet, Text } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { AppInput } from '@/components/AppInput';
-import type { ConsultationPayload } from '@/features/doctor/types/doctorConsultation.types';
+import { colors } from '@/core/theme/colors';
+import type { ConsultationFormValues } from '@/features/doctor/types/doctorConsultation.types';
+
+type FieldName = keyof ConsultationFormValues;
+
+const fields: {
+  icon: ComponentProps<typeof AppInput>['icon'];
+  key: FieldName;
+  label: string;
+  minHeight?: number;
+  required?: boolean;
+}[] = [
+  { icon: 'comment-text-outline', key: 'chief_complaint', label: 'Motivo principal', required: true },
+  { icon: 'history', key: 'history_present_illness', label: 'Historia de enfermedad actual', minHeight: 96 },
+  { icon: 'stethoscope', key: 'physical_examination', label: 'Examen físico', minHeight: 96 },
+  { icon: 'clipboard-pulse-outline', key: 'assessment', label: 'Evaluación clínica', minHeight: 88 },
+  { icon: 'clipboard-text-outline', key: 'diagnosis_text', label: 'Diagnóstico', minHeight: 88, required: true },
+  { icon: 'clipboard-list-outline', key: 'plan', label: 'Plan de tratamiento', minHeight: 88 },
+  { icon: 'hand-heart-outline', key: 'recommendations', label: 'Recomendaciones', minHeight: 88 },
+  { icon: 'note-text-outline', key: 'notes', label: 'Notas adicionales', minHeight: 88 },
+];
 
 export function ConsultationForm({
-  form,
+  disabled,
+  initialValues,
+  loading,
   onChange,
-  onSave,
-  saving,
+  onSaveDraft,
+  onSubmit,
 }: {
-  form: ConsultationPayload;
-  onChange: (field: keyof ConsultationPayload, value: string) => void;
-  onSave: () => void;
-  saving?: boolean;
+  disabled?: boolean;
+  initialValues: ConsultationFormValues;
+  loading?: boolean;
+  onChange: (field: FieldName, value: string) => void;
+  onSaveDraft: () => void;
+  onSubmit: () => void;
 }) {
   return (
     <AppCard style={styles.form}>
-      <AppInput
-        icon="comment-text-outline"
-        label="Motivo principal"
-        onChangeText={(value) => onChange('chief_complaint', value)}
-        value={form.chief_complaint ?? ''}
+      <Text style={styles.title}>Formulario clínico</Text>
+      {fields.map((field) => (
+        <AppInput
+          editable={!disabled}
+          icon={field.icon}
+          key={field.key}
+          label={`${field.label}${field.required ? ' *' : ''}`}
+          multiline
+          onChangeText={(value) => onChange(field.key, value)}
+          scrollEnabled={false}
+          style={[styles.input, field.minHeight ? { minHeight: field.minHeight, textAlignVertical: 'top' } : null]}
+          value={initialValues[field.key]}
+        />
+      ))}
+      <AppButton
+        disabled={disabled}
+        label="Guardar borrador"
+        loading={loading}
+        onPress={onSaveDraft}
+        variant="secondary"
       />
-      <AppInput
-        icon="history"
-        label="Historia de enfermedad actual"
-        multiline
-        onChangeText={(value) => onChange('history_present_illness', value)}
-        value={form.history_present_illness ?? ''}
-      />
-      <AppInput
-        icon="stethoscope"
-        label="Examen físico"
-        multiline
-        onChangeText={(value) => onChange('physical_examination', value)}
-        value={form.physical_examination ?? ''}
-      />
-      <AppInput
-        icon="clipboard-pulse-outline"
-        label="Diagnóstico / evaluación"
-        multiline
-        onChangeText={(value) => onChange('diagnosis_text', value)}
-        value={form.diagnosis_text ?? ''}
-      />
-      <AppInput
-        icon="clipboard-list-outline"
-        label="Plan"
-        multiline
-        onChangeText={(value) => onChange('plan', value)}
-        value={form.plan ?? ''}
-      />
-      <AppInput
-        icon="hand-heart-outline"
-        label="Recomendaciones"
-        multiline
-        onChangeText={(value) => onChange('recommendations', value)}
-        value={form.recommendations ?? ''}
-      />
-      <AppButton label="Guardar borrador" loading={saving} onPress={onSave} />
+      <AppButton disabled={disabled} label="Guardar cambios" loading={loading} onPress={onSubmit} />
     </AppCard>
   );
 }
 
 const styles = StyleSheet.create({
   form: { gap: 14 },
+  input: { lineHeight: 22 },
+  title: { color: colors.ink, fontSize: 17, fontWeight: '900' },
 });

@@ -1,4 +1,5 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AdminDashboardScreen } from '@/features/admin/screens/AdminDashboardScreen';
 import { AdminHomeScreen } from '@/features/admin/screens/AdminHomeScreen';
@@ -8,8 +9,9 @@ import { createTabOptions, tabIcon } from '@/navigation/tabOptions';
 const Tab = createBottomTabNavigator();
 
 export function AdminTabs() {
+  const insets = useSafeAreaInsets();
   return (
-    <Tab.Navigator screenOptions={createTabOptions()}>
+    <Tab.Navigator screenOptions={createTabOptions(insets)}>
       <Tab.Screen
         component={AdminHomeScreen}
         name="AdminHome"

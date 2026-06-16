@@ -1,5 +1,6 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RoleGuard } from '@/components/RoleGuard';
 import { DoctorClinicalConsumptionScreen } from '@/features/doctor/screens/DoctorClinicalConsumptionScreen';
@@ -80,9 +81,10 @@ function DoctorProfileStack() {
 }
 
 export function DoctorTabs() {
+  const insets = useSafeAreaInsets();
   return (
     <RoleGuard roles={['medico', 'doctor']}>
-      <Tab.Navigator screenOptions={createTabOptions()}>
+      <Tab.Navigator screenOptions={createTabOptions(insets)}>
         <Tab.Screen
           component={DoctorHomeStack}
           name="DoctorHomeTab"

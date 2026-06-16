@@ -12,6 +12,9 @@ export type DoctorAppointmentStatus =
 export type DoctorAppointment = {
   id: number;
   appointment_id?: number;
+  patient?: number;
+  patient_nombre?: string;
+  patient_codigo?: string;
   patient_id?: number;
   patient_name?: string;
   paciente_nombre?: string;

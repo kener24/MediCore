@@ -103,7 +103,7 @@ export function DoctorDashboardScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { gap: 16, padding: 22, paddingBottom: 34 },
+  content: { gap: 16, padding: 22, paddingBottom: 118 },
   safeArea: { backgroundColor: colors.background, flex: 1 },
   section: { gap: 10 },
 });

@@ -2,13 +2,13 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { AppCard } from '@/components/AppCard';
 import { colors } from '@/core/theme/colors';
-import type { DoctorPatientSummary } from '@/features/doctor/types/doctorConsultation.types';
+import type { DoctorPatientBasicInfo } from '@/features/doctor/types/doctorPatient.types';
 
 function valueOf(value?: string | number | null) {
   return value || 'No indicado';
 }
 
-export function PatientSummaryCard({ patient }: { patient?: DoctorPatientSummary | null }) {
+export function PatientSummaryCard({ patient }: { patient?: DoctorPatientBasicInfo | null }) {
   const name = patient?.full_name ?? patient?.nombre_completo ?? 'Paciente no indicado';
   return (
     <AppCard style={styles.card}>
@@ -19,8 +19,8 @@ export function PatientSummaryCard({ patient }: { patient?: DoctorPatientSummary
       </View>
       <Info label="Teléfono" value={patient?.phone ?? patient?.telefono} />
       <Info label="Expediente" value={patient?.medical_record_number ?? patient?.expediente} />
-      <Info label="Alergias" value={patient?.allergies ?? patient?.alergias} />
-      <Info label="Enfermedades crónicas" value={patient?.chronic_diseases ?? patient?.enfermedades_cronicas} />
+      <Info label="Código paciente" value={patient?.patient_code ?? patient?.codigo_paciente} />
+      <Info label="Identidad" value={patient?.identity_number ?? patient?.identidad} />
       <Info label="Tipo de sangre" value={patient?.blood_type} />
     </AppCard>
   );

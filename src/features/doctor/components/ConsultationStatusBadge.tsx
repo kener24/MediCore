@@ -2,15 +2,23 @@ import { StyleSheet, Text } from 'react-native';
 
 import { colors } from '@/core/theme/colors';
 
+const labels: Record<string, string> = {
+  cancelled: 'Cancelada',
+  completed: 'Finalizada',
+  draft: 'Borrador',
+  in_consultation: 'En consulta',
+  in_progress: 'En progreso',
+  pending: 'Pendiente',
+};
+
 export function ConsultationStatusBadge({ status }: { status?: string | null }) {
-  const value = status || 'Pendiente';
-  const normalized = value.toLowerCase();
+  const normalized = status?.toLowerCase() ?? 'pending';
   const success = ['completed', 'complete', 'finalizada', 'atendida'].includes(normalized);
   const danger = ['cancelled', 'cancelada', 'no_show', 'no asistió'].includes(normalized);
-  const warning = ['pending', 'pendiente', 'in_progress', 'en curso'].includes(normalized);
+  const warning = ['draft', 'pending', 'pendiente'].includes(normalized);
   return (
     <Text style={[styles.badge, success && styles.success, warning && styles.warning, danger && styles.danger]}>
-      {value}
+      {labels[normalized] ?? status ?? 'Pendiente'}
     </Text>
   );
 }
@@ -18,9 +26,9 @@ export function ConsultationStatusBadge({ status }: { status?: string | null }) 
 const styles = StyleSheet.create({
   badge: {
     alignSelf: 'flex-start',
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: colors.palePrimary,
     borderRadius: 999,
-    color: colors.muted,
+    color: colors.primaryDark,
     fontSize: 11,
     fontWeight: '900',
     overflow: 'hidden',

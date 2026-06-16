@@ -52,7 +52,7 @@ export function DoctorScheduleScreen() {
     try {
       setAppointments(await getDoctorAppointmentsByDate(date));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'El módulo de agenda aún no está disponible.');
+      setError(err instanceof Error ? err.message : 'El modulo de agenda aun no esta disponible.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -63,26 +63,33 @@ export function DoctorScheduleScreen() {
 
   function viewAppointment(item: DoctorAppointment) {
     const visitId = item.visit_id ?? item.visita_id;
+    const patientId = item.patient_id ?? item.patient;
     if (!visitId) {
-      Alert.alert('Agenda médica', 'Esta cita aún no tiene admisión registrada.');
+      Alert.alert('Agenda medica', 'Esta cita aun no tiene admision registrada.');
     }
     navigation.navigate('DoctorPatientDetail', {
       appointment: item,
       appointmentId: item.appointment_id ?? item.id,
-      patientId: item.patient_id,
+      patient: {
+        full_name: item.patient_name ?? item.patient_nombre ?? item.paciente_nombre,
+        id: patientId,
+        patient_code: item.patient_codigo,
+      },
+      patientId,
       visitId,
     });
   }
 
   function attendAppointment(item: DoctorAppointment) {
     const visitId = item.visit_id ?? item.visita_id;
+    const patientId = item.patient_id ?? item.patient;
     if (!visitId) {
-      Alert.alert('Agenda médica', 'Esta cita aún no tiene admisión registrada.');
+      Alert.alert('Agenda medica', 'Esta cita aun no tiene admision registrada.');
       return;
     }
     navigation.navigate('DoctorConsultation', {
       appointmentId: item.appointment_id ?? item.id,
-      patientId: item.patient_id,
+      patientId,
       visitId,
     });
   }
@@ -95,13 +102,13 @@ export function DoctorScheduleScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl onRefresh={() => load(true)} refreshing={refreshing} />}
         showsVerticalScrollIndicator={false}>
-        <DoctorHeader title="Agenda médica" />
+        <DoctorHeader title="Agenda medica" />
         <View style={styles.controls}>
           <AppInput icon="calendar" keyboardType="numbers-and-punctuation" label="Fecha seleccionada" onChangeText={setDate} value={date} />
           <View style={styles.dateButtons}>
-            <AppButton label="Día anterior" onPress={() => setDate(shiftDate(date, -1))} style={styles.dateButton} variant="secondary" />
+            <AppButton label="Dia anterior" onPress={() => setDate(shiftDate(date, -1))} style={styles.dateButton} variant="secondary" />
             <AppButton label="Hoy" onPress={() => setDate(toISODate(new Date()))} style={styles.dateButton} variant="secondary" />
-            <AppButton label="Día siguiente" onPress={() => setDate(shiftDate(date, 1))} style={styles.dateButton} variant="secondary" />
+            <AppButton label="Dia siguiente" onPress={() => setDate(shiftDate(date, 1))} style={styles.dateButton} variant="secondary" />
           </View>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -125,7 +132,7 @@ export function DoctorScheduleScreen() {
             />
           ))
         ) : (
-          <EmptyState description="No tienes citas para este día." title="Agenda vacía" />
+          <EmptyState description="No tienes citas para este dia." title="Agenda vacia" />
         )}
       </ScrollView>
     </SafeAreaView>
@@ -140,7 +147,7 @@ function shiftDate(value: string, days: number) {
 }
 
 const styles = StyleSheet.create({
-  content: { gap: 14, padding: 22, paddingBottom: 34 },
+  content: { gap: 14, padding: 22, paddingBottom: 118 },
   controls: { gap: 10 },
   dateButton: { flex: 1, height: 44 },
   dateButtons: { flexDirection: 'row', gap: 8 },

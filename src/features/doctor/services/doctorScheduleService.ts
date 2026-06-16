@@ -4,16 +4,23 @@ import { normalizeListResponse, type ApiListResponse } from '@/features/doctor/t
 import type { DoctorAppointment } from '@/features/doctor/types/doctorSchedule.types';
 
 export async function getDoctorAppointments(date?: string) {
-  const data = await getFirstAvailable<ApiListResponse<DoctorAppointment>>(
-    [
-      endpoints.doctor.appointments,
-      endpoints.doctor.scheduleToday,
-      endpoints.doctor.appointmentsDoctorAlt,
-      endpoints.doctor.appointmentsAlt,
-    ],
-    { params: date ? { date, doctor: 'current' } : { doctor: 'current' } },
-  );
-  return normalizeListResponse(data);
+  try {
+    const data = await getFirstAvailable<ApiListResponse<DoctorAppointment>>(
+      [
+        endpoints.doctor.appointments,
+        endpoints.doctor.scheduleToday,
+        endpoints.doctor.appointmentsDoctorAlt,
+      ],
+      { params: date ? { date } : undefined },
+    );
+    return filterAppointmentsByDate(normalizeListResponse(data), date);
+  } catch {
+    const data = await getFirstAvailable<ApiListResponse<DoctorAppointment>>(
+      [endpoints.doctor.appointmentsAlt],
+      { params: date ? { date } : undefined },
+    );
+    return filterAppointmentsByDate(normalizeListResponse(data), date);
+  }
 }
 
 export async function getDoctorAppointmentsByDate(date: string) {
@@ -30,4 +37,9 @@ export async function getDoctorAppointmentDetail(id: number | string) {
     `${endpoints.doctor.appointments}${id}/`,
     `${endpoints.doctor.appointmentsAlt}${id}/`,
   ]);
+}
+
+function filterAppointmentsByDate(items: DoctorAppointment[], date?: string) {
+  if (!date) return items;
+  return items.filter((item) => (item.scheduled_date ?? item.fecha) === date);
 }

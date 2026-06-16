@@ -72,6 +72,6 @@ export function DoctorProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { gap: 14, padding: 22, paddingBottom: 34 },
+  content: { gap: 14, padding: 22, paddingBottom: 118 },
   safeArea: { backgroundColor: colors.background, flex: 1 },
 });

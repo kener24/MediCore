@@ -52,8 +52,10 @@ export const endpoints = {
     patientSummary: (id: number | string) => `/doctor/patients/${id}/summary/`,
     patientSummaryAlt: (id: number | string) => `/medical-records/patients/${id}/summary/`,
     visit: (id: number | string) => `/admissions/visits/${id}/`,
+    visitAlt: (id: number | string) => `/doctor/visits/${id}/`,
     vitalSigns: (visitId: number | string) => `/admissions/visits/${visitId}/vital-signs/`,
     vitalSignsAlt: '/medical/vital-signs/',
+    triage: (visitId: number | string) => `/admissions/visits/${visitId}/triage/`,
     startConsultation: (visitId: number | string) =>
       `/admissions/visits/${visitId}/start-consultation/`,
     completeConsultation: (visitId: number | string) =>

@@ -123,7 +123,7 @@ export function DoctorWaitingRoomScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { gap: 14, padding: 22, paddingBottom: 34 },
+  content: { gap: 14, padding: 22, paddingBottom: 118 },
   counterCard: { alignItems: 'center', flexDirection: 'row', gap: 10 },
   counterLabel: { color: colors.muted, fontSize: 13, fontWeight: '800' },
   counterValue: { color: colors.primary, fontSize: 26, fontWeight: '900' },

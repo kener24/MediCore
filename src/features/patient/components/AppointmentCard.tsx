@@ -13,6 +13,7 @@ export function AppointmentCard({
   appointment: PatientAppointment;
   onPress?: () => void;
 }) {
+  const modalityLabel = appointment.modality === 'online' ? 'En línea' : 'Presencial';
   return (
     <Pressable onPress={onPress} style={({ pressed }) => pressed && styles.pressed}>
       <AppCard>
@@ -21,10 +22,13 @@ export function AppointmentCard({
             <Text style={styles.day}>{formatShortDate(appointment.scheduled_date)}</Text>
             <Text style={styles.time}>{formatTime(appointment.start_time)}</Text>
           </View>
-          <AppointmentStatusBadge status={appointment.status} />
+          <View style={styles.badges}>
+            <Text style={styles.modalityBadge}>{modalityLabel}</Text>
+            <AppointmentStatusBadge status={appointment.status} />
+          </View>
         </View>
         <Text style={styles.title}>
-          {appointment.doctor_name || appointment.doctor_nombre || 'Medico por asignar'}
+          {appointment.doctor_name || appointment.doctor_nombre || 'Médico por asignar'}
         </Text>
         <Text style={styles.meta}>
           {appointment.doctor_specialty ||
@@ -42,6 +46,10 @@ export function AppointmentCard({
 const styles = StyleSheet.create({
   dateBox: {
     flex: 1,
+  },
+  badges: {
+    alignItems: 'flex-end',
+    gap: 6,
   },
   day: {
     color: colors.primary,
@@ -65,6 +73,17 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 13,
     marginTop: 3,
+  },
+  modalityBadge: {
+    backgroundColor: colors.palePrimary,
+    borderRadius: 999,
+    color: colors.primaryDark,
+    fontSize: 11,
+    fontWeight: '900',
+    overflow: 'hidden',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    textTransform: 'uppercase',
   },
   pressed: {
     opacity: 0.85,

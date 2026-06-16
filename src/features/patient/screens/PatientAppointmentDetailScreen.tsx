@@ -67,7 +67,11 @@ export function PatientAppointmentDetailScreen() {
   }
 
   const canCancel =
-    (appointment.can_cancel === true || appointment.status === 'scheduled' || appointment.status === 'confirmed' || appointment.status === 'pendiente' || appointment.status === 'confirmada') &&
+    (appointment.can_cancel === true ||
+      appointment.status === 'scheduled' ||
+      appointment.status === 'confirmed' ||
+      appointment.status === 'pendiente' ||
+      appointment.status === 'confirmada') &&
     appointment.status !== 'cancelled' &&
     appointment.status !== 'cancelada' &&
     appointment.status !== 'completed' &&
@@ -92,6 +96,7 @@ export function PatientAppointmentDetailScreen() {
 
         <AppCard>
           <Detail label="Clínica" value={appointment.clinic_name || appointment.clinic_nombre} />
+          <Detail label="Modalidad" value={appointment.modality === 'online' ? 'En línea' : 'Presencial'} />
           <Detail label="Motivo" value={appointment.reason} />
           <Detail label="Notas permitidas" value={appointment.notes} />
           <Detail label="Instrucciones" value={appointment.instructions} />
@@ -99,9 +104,7 @@ export function PatientAppointmentDetailScreen() {
           <Detail label="Motivo de cancelación" value={appointment.cancellation_reason} />
         </AppCard>
 
-        {canCancel ? (
-          <AppButton label="Cancelar cita" onPress={() => setCancelVisible(true)} variant="danger" />
-        ) : null}
+        {canCancel ? <AppButton label="Cancelar cita" onPress={() => setCancelVisible(true)} variant="danger" /> : null}
       </ScrollView>
 
       <CancelAppointmentModal
@@ -126,53 +129,13 @@ function Detail({ label, value }: { label: string; value?: string | null }) {
 }
 
 const styles = StyleSheet.create({
-  content: {
-    gap: 14,
-    padding: 22,
-    paddingBottom: 34,
-  },
-  detailLabel: {
-    color: colors.muted,
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  detailRow: {
-    borderBottomColor: colors.border,
-    borderBottomWidth: 1,
-    gap: 4,
-    paddingVertical: 10,
-  },
-  detailValue: {
-    color: colors.ink,
-    fontSize: 15,
-    lineHeight: 21,
-  },
-  doctor: {
-    color: colors.ink,
-    fontSize: 17,
-    fontWeight: '900',
-    marginTop: 12,
-  },
-  meta: {
-    color: colors.muted,
-    fontSize: 14,
-    marginTop: 4,
-  },
-  safeArea: {
-    backgroundColor: colors.background,
-    flex: 1,
-  },
-  time: {
-    color: colors.primary,
-    fontSize: 18,
-    fontWeight: '900',
-    marginTop: 6,
-  },
-  title: {
-    color: colors.ink,
-    fontSize: 24,
-    fontWeight: '900',
-    marginTop: 12,
-  },
+  content: { gap: 14, padding: 22, paddingBottom: 118 },
+  detailLabel: { color: colors.muted, fontSize: 12, fontWeight: '900', textTransform: 'uppercase' },
+  detailRow: { borderBottomColor: colors.border, borderBottomWidth: 1, gap: 4, paddingVertical: 10 },
+  detailValue: { color: colors.ink, fontSize: 15, lineHeight: 21 },
+  doctor: { color: colors.ink, fontSize: 17, fontWeight: '900', marginTop: 12 },
+  meta: { color: colors.muted, fontSize: 14, marginTop: 4 },
+  safeArea: { backgroundColor: colors.background, flex: 1 },
+  time: { color: colors.primary, fontSize: 18, fontWeight: '900', marginTop: 6 },
+  title: { color: colors.ink, fontSize: 24, fontWeight: '900', marginTop: 12 },
 });

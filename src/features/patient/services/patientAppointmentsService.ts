@@ -65,10 +65,10 @@ export async function getPatientDoctors(specialty?: number | string) {
 
 export const getDoctors = getPatientDoctors;
 
-export async function getPatientDoctorAvailability(doctorId: number | string, date: string) {
+export async function getPatientDoctorAvailability(doctorId: number | string, date: string, modality = 'presencial') {
   const { data } = await apiClient.get<AppointmentAvailability>(
     endpoints.patientPortal.doctorAvailability(doctorId),
-    { params: { date } },
+    { params: { date, modality } },
   );
   return data;
 }

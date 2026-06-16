@@ -12,6 +12,7 @@ import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
 import { isPastISODate, toISODate } from '@/core/utils/dateUtils';
+import { AppointmentModalitySelector } from '@/features/patient/components/AppointmentModalitySelector';
 import { AvailabilitySlotSelector } from '@/features/patient/components/AvailabilitySlotSelector';
 import { PatientHeader } from '@/features/patient/components/PatientHeader';
 import {
@@ -22,9 +23,12 @@ import {
 } from '@/features/patient/services/patientAppointmentsService';
 import type {
   AppointmentAvailabilitySlot,
+  AppointmentModality,
   PatientDoctor,
   PatientSpecialty,
 } from '@/features/patient/types/patientAppointments.types';
+
+const onlineDisabledMessage = 'Esta clínica no tiene habilitadas las citas en línea. Puedes solicitar una cita presencial.';
 
 export function RequestAppointmentScreen() {
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
@@ -34,6 +38,7 @@ export function RequestAppointmentScreen() {
   const [specialty, setSpecialty] = useState<PatientSpecialty | null>(null);
   const [doctor, setDoctor] = useState<PatientDoctor | null>(null);
   const [date, setDate] = useState('');
+  const [modality, setModality] = useState<AppointmentModality>('presencial');
   const [slot, setSlot] = useState<AppointmentAvailabilitySlot | null>(null);
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
@@ -81,11 +86,11 @@ export function RequestAppointmentScreen() {
     }
     setLoadingAvailability(true);
     try {
-      const availability = await getPatientDoctorAvailability(doctor.id, date.trim());
+      const availability = await getPatientDoctorAvailability(doctor.id, date.trim(), modality);
       setSlots((availability.available_slots ?? []).filter((item) => item.available !== false));
       setSlot(null);
-      if (availability.allow_online_appointments === false) {
-        Alert.alert('Citas en línea', 'La clínica no permite citas en línea.');
+      if (modality === 'online' && availability.allow_online_appointments === false) {
+        Alert.alert('Citas en línea', availability.message || onlineDisabledMessage);
       }
     } catch (err) {
       Alert.alert('Disponibilidad', err instanceof Error ? err.message : 'No hay horarios disponibles.');
@@ -97,6 +102,7 @@ export function RequestAppointmentScreen() {
   async function submit() {
     if (!specialty) return Alert.alert('Solicitud', 'Selecciona una especialidad.');
     if (!doctor) return Alert.alert('Solicitud', 'Selecciona un médico.');
+    if (!modality) return Alert.alert('Solicitud', 'Selecciona una modalidad válida.');
     const dateValidation = validateDate(date);
     if (dateValidation) return Alert.alert('Solicitud', dateValidation);
     if (!slot) return Alert.alert('Solicitud', 'Selecciona un horario.');
@@ -106,11 +112,12 @@ export function RequestAppointmentScreen() {
     try {
       const created = await requestPatientAppointment({
         doctor: doctor.id,
+        modality,
         reason: reason.trim(),
         scheduled_date: date.trim(),
         start_time: slot.start_time,
       });
-      Alert.alert('Solicitud enviada', 'Tu solicitud de cita fue enviada correctamente.');
+      Alert.alert('Solicitud enviada', 'Solicitud de cita enviada correctamente.');
       if (created?.id) {
         navigation.navigate('PatientAppointmentDetail', { id: created.id });
       } else {
@@ -154,7 +161,7 @@ export function RequestAppointmentScreen() {
               {doctors.map((item) => (
                 <AppButton
                   key={item.id}
-                  label={item.nombre_completo || item.full_name || item.nombre || item.name || `Médico ${item.id}`}
+                  label={item.nombre_completo || item.full_name || item.user_nombre || item.nombre || item.name || `Médico ${item.id}`}
                   onPress={() => {
                     setDoctor(item);
                     setSlot(null);
@@ -169,43 +176,46 @@ export function RequestAppointmentScreen() {
           )}
         </Step>
 
-        <Step title="3. Fecha y disponibilidad">
+        <Step title="3. Fecha">
           <AppInput
             icon="calendar"
             keyboardType="numbers-and-punctuation"
             label="Fecha"
-            onChangeText={setDate}
+            onChangeText={(value) => {
+              setDate(value);
+              setSlot(null);
+              setSlots([]);
+            }}
             placeholder="YYYY-MM-DD"
             value={date}
           />
           <View style={styles.dateActions}>
-            <AppButton
-              label="Mañana"
-              onPress={() => setDate(toISODate(addDays(1)))}
-              style={styles.dateAction}
-              variant="secondary"
-            />
-            <AppButton
-              label="En 7 días"
-              onPress={() => setDate(toISODate(addDays(7)))}
-              style={styles.dateAction}
-              variant="secondary"
-            />
+            <AppButton label="Mañana" onPress={() => setDate(toISODate(addDays(1)))} style={styles.dateAction} variant="secondary" />
+            <AppButton label="En 7 días" onPress={() => setDate(toISODate(addDays(7)))} style={styles.dateAction} variant="secondary" />
           </View>
-          <AppButton
-            label="Consultar disponibilidad"
-            loading={loadingAvailability}
-            onPress={loadAvailability}
-            variant="secondary"
+        </Step>
+
+        <Step title="4. Modalidad">
+          <AppointmentModalitySelector
+            onChange={(value) => {
+              setModality(value);
+              setSlot(null);
+              setSlots([]);
+            }}
+            value={modality}
           />
+        </Step>
+
+        <Step title="5. Disponibilidad">
+          <AppButton label="Consultar disponibilidad" loading={loadingAvailability} onPress={loadAvailability} variant="secondary" />
           {slots.length ? (
             <AvailabilitySlotSelector onSelectSlot={setSlot} selectedSlot={slot} slots={slots} />
           ) : (
-            <Text style={styles.help}>No hay horarios disponibles para esta fecha.</Text>
+            <Text style={styles.help}>No hay horarios disponibles para esta fecha y modalidad.</Text>
           )}
         </Step>
 
-        <Step title="4. Motivo">
+        <Step title="6. Motivo">
           <TextInput
             multiline
             onChangeText={setReason}
@@ -251,7 +261,7 @@ const styles = StyleSheet.create({
   content: {
     gap: 14,
     padding: 22,
-    paddingBottom: 34,
+    paddingBottom: 118,
   },
   dateAction: {
     flex: 1,

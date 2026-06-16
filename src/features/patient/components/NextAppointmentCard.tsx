@@ -35,13 +35,10 @@ export function NextAppointmentCard({
     <AppCard style={styles.card}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.eyebrow}>Proxima cita</Text>
+          <Text style={styles.eyebrow}>Próxima cita</Text>
           <Text style={styles.date}>{formatDate(appointment.scheduled_date)}</Text>
         </View>
-        <StatusPill
-          label={appointment.status_display || appointment.status}
-          tone={getAppointmentTone(appointment.status)}
-        />
+        <StatusPill label={appointment.status_display || appointment.status} tone={getAppointmentTone(appointment.status)} />
       </View>
       <View style={styles.timeRow}>
         <MaterialCommunityIcons color={colors.primary} name="clock-outline" size={20} />
@@ -49,12 +46,9 @@ export function NextAppointmentCard({
           {formatTime(appointment.start_time)} - {formatTime(appointment.end_time)}
         </Text>
       </View>
-      <Text style={styles.doctor}>
-        {appointment.doctor_name || appointment.doctor_nombre || 'Medico por asignar'}
-      </Text>
-      <Text style={styles.specialty}>
-        {appointment.specialty_name || appointment.doctor_specialty || 'Especialidad no indicada'}
-      </Text>
+      <Text style={styles.doctor}>{appointment.doctor_name || appointment.doctor_nombre || 'Médico por asignar'}</Text>
+      <Text style={styles.specialty}>{appointment.specialty_name || appointment.doctor_specialty || 'Especialidad no indicada'}</Text>
+      <Text style={styles.modality}>{appointment.modality === 'online' ? 'En línea' : 'Presencial'}</Text>
       {appointment.reason ? <Text style={styles.reason}>{appointment.reason}</Text> : null}
       <AppButton label="Ver detalle" onPress={onViewDetail} variant="secondary" />
     </AppCard>
@@ -62,30 +56,11 @@ export function NextAppointmentCard({
 }
 
 const styles = StyleSheet.create({
-  card: {
-    gap: 12,
-  },
-  date: {
-    color: colors.ink,
-    fontSize: 21,
-    fontWeight: '900',
-    marginTop: 3,
-  },
-  description: {
-    color: colors.muted,
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: 'center',
-  },
-  doctor: {
-    color: colors.ink,
-    fontSize: 17,
-    fontWeight: '900',
-  },
-  emptyCard: {
-    alignItems: 'center',
-    gap: 12,
-  },
+  card: { gap: 12 },
+  date: { color: colors.ink, fontSize: 21, fontWeight: '900', marginTop: 3 },
+  description: { color: colors.muted, fontSize: 14, lineHeight: 20, textAlign: 'center' },
+  doctor: { color: colors.ink, fontSize: 17, fontWeight: '900' },
+  emptyCard: { alignItems: 'center', gap: 12 },
   emptyIcon: {
     alignItems: 'center',
     backgroundColor: colors.palePrimary,
@@ -94,41 +69,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 58,
   },
-  eyebrow: {
-    color: colors.primary,
-    fontSize: 12,
+  eyebrow: { color: colors.primary, fontSize: 12, fontWeight: '900', textTransform: 'uppercase' },
+  header: { alignItems: 'flex-start', flexDirection: 'row', gap: 10, justifyContent: 'space-between' },
+  modality: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.palePrimary,
+    borderRadius: 999,
+    color: colors.primaryDark,
+    fontSize: 11,
     fontWeight: '900',
+    overflow: 'hidden',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
     textTransform: 'uppercase',
   },
-  header: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    gap: 10,
-    justifyContent: 'space-between',
-  },
-  reason: {
-    color: colors.ink,
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  specialty: {
-    color: colors.muted,
-    fontSize: 14,
-  },
-  time: {
-    color: colors.primaryDark,
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  timeRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
-  },
-  title: {
-    color: colors.ink,
-    fontSize: 19,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
+  reason: { color: colors.ink, fontSize: 13, lineHeight: 19 },
+  specialty: { color: colors.muted, fontSize: 14 },
+  time: { color: colors.primaryDark, fontSize: 15, fontWeight: '900' },
+  timeRow: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+  title: { color: colors.ink, fontSize: 19, fontWeight: '900', textAlign: 'center' },
 });

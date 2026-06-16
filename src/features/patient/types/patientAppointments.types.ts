@@ -15,6 +15,7 @@ export type AppointmentStatus =
   | string;
 
 export type PatientAppointmentStatus = AppointmentStatus;
+export type AppointmentModality = 'presencial' | 'online';
 
 export type PatientAppointment = {
   id: number;
@@ -36,6 +37,7 @@ export type PatientAppointment = {
   scheduled_date?: string;
   start_time?: string;
   end_time?: string;
+  modality?: AppointmentModality | string;
   reason?: string;
   notes?: string | null;
   status?: PatientAppointmentStatus;
@@ -66,6 +68,7 @@ export type AppointmentAvailability = {
   available_slots?: AppointmentAvailabilitySlot[];
   booked_slots?: AppointmentAvailabilitySlot[];
   allow_online_appointments?: boolean;
+  modality?: AppointmentModality | string;
   message?: string;
 };
 
@@ -101,6 +104,7 @@ export type PatientAppointmentRequestPayload = {
   scheduled_date: string;
   start_time: string;
   reason: string;
+  modality: AppointmentModality;
   notes?: string;
 };
 

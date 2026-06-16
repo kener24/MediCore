@@ -5,15 +5,23 @@ import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { AppInput } from '@/components/AppInput';
 import { colors } from '@/core/theme/colors';
-import type { ClinicalConsumptionPayload } from '@/features/doctor/types/doctorClinicalConsumption.types';
+import { InventoryItemSelector } from '@/features/doctor/components/InventoryItemSelector';
+import type { ClinicalConsumptionPayload, InventoryItem } from '@/features/doctor/types/doctorClinicalConsumption.types';
 
 export function ClinicalConsumptionForm({
+  inventoryItems = [],
+  onChangeSearch,
   onSubmit,
+  search = '',
   submitting,
 }: {
+  inventoryItems?: InventoryItem[];
+  onChangeSearch?: (value: string) => void;
   onSubmit: (payload: ClinicalConsumptionPayload) => Promise<void>;
+  search?: string;
   submitting?: boolean;
 }) {
+  const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [itemName, setItemName] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [notes, setNotes] = useState('');
@@ -21,13 +29,14 @@ export function ClinicalConsumptionForm({
 
   async function submit() {
     const numericQuantity = Number(quantity);
-    if (!itemName.trim() || !Number.isFinite(numericQuantity) || numericQuantity <= 0) {
-      Alert.alert('Consumo clínico', 'Insumo y cantidad válida son requeridos.');
-      return;
-    }
+    const stock = selectedItem?.stock === undefined ? undefined : Number(selectedItem.stock);
+    if (!selectedItem && !itemName.trim()) return Alert.alert('Consumo clínico', 'Selecciona un insumo.');
+    if (!Number.isFinite(numericQuantity) || numericQuantity <= 0) return Alert.alert('Consumo clínico', 'La cantidad debe ser mayor que cero.');
+    if (stock !== undefined && Number.isFinite(stock) && numericQuantity > stock) return Alert.alert('Consumo clínico', 'No hay stock suficiente.');
     await onSubmit({
       billable,
-      item_name: itemName.trim(),
+      item_id: selectedItem?.id,
+      item_name: selectedItem ? selectedItem.name ?? selectedItem.nombre : itemName.trim(),
       notes: notes.trim(),
       quantity: numericQuantity,
     });
@@ -35,7 +44,10 @@ export function ClinicalConsumptionForm({
 
   return (
     <AppCard style={styles.form}>
-      <AppInput label="Insumo o producto" onChangeText={setItemName} value={itemName} />
+      {onChangeSearch ? (
+        <InventoryItemSelector items={inventoryItems} onChangeSearch={onChangeSearch} onSelect={setSelectedItem} search={search} selected={selectedItem} />
+      ) : null}
+      {!selectedItem ? <AppInput label="Insumo o producto" onChangeText={setItemName} value={itemName} /> : null}
       <AppInput keyboardType="numeric" label="Cantidad" onChangeText={setQuantity} value={quantity} />
       <AppInput label="Notas" multiline onChangeText={setNotes} value={notes} />
       <View style={styles.row}>
@@ -44,7 +56,7 @@ export function ClinicalConsumptionForm({
           <Text style={[styles.toggleText, billable && styles.toggleTextActive]}>{billable ? 'Sí' : 'No'}</Text>
         </Pressable>
       </View>
-      <AppButton label="Registrar consumo" loading={submitting} onPress={submit} />
+      <AppButton label="Registrar consumo clínico" loading={submitting} onPress={submit} />
     </AppCard>
   );
 }

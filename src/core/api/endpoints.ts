@@ -69,6 +69,7 @@ export const endpoints = {
     medicalOrders: '/medical-orders/',
     consultationConsumptions: (id: number | string) => `/consultations/${id}/consumptions/`,
     clinicalConsumptions: '/clinical-consumptions/',
+    inventoryItems: '/inventory/items/',
     profile: '/doctor/profile/',
   },
 } as const;

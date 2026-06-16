@@ -277,6 +277,7 @@ export function DoctorConsultationScreen() {
             onClinicalConsumption={() => navigateAction('DoctorClinicalConsumption')}
             onMedicalOrder={() => navigateAction('DoctorMedicalOrder')}
             onPrescription={() => navigateAction('DoctorPrescription')}
+            onSummary={() => navigateAction('DoctorConsultationSummary')}
           />
           <AppButton label="Volver" onPress={() => navigation.goBack()} variant="secondary" />
         </ScrollView>

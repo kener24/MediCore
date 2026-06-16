@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { AppInput } from '@/components/AppInput';
-import { colors } from '@/core/theme/colors';
+import { MedicationFormItem } from '@/features/doctor/components/MedicationFormItem';
 import type {
   CreatePrescriptionPayload,
   PrescriptionMedicationPayload,
@@ -16,6 +16,7 @@ const emptyMedication: PrescriptionMedicationPayload = {
   frequency: '',
   instructions: '',
   medication_name: '',
+  quantity: '',
 };
 
 export function PrescriptionForm({
@@ -26,6 +27,7 @@ export function PrescriptionForm({
   submitting?: boolean;
 }) {
   const [generalInstructions, setGeneralInstructions] = useState('');
+  const [notes, setNotes] = useState('');
   const [medications, setMedications] = useState<PrescriptionMedicationPayload[]>([{ ...emptyMedication }]);
 
   function updateMedication(index: number, field: keyof PrescriptionMedicationPayload, value: string) {
@@ -34,22 +36,28 @@ export function PrescriptionForm({
     );
   }
 
+  function removeMedication(index: number) {
+    setMedications((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  }
+
   async function submit() {
-    const invalid = medications.some(
-      (item) => !item.medication_name.trim() || !item.dosage.trim() || !item.frequency.trim() || !item.duration.trim(),
-    );
-    if (invalid) {
-      Alert.alert('Receta médica', 'Medicamento, dosis, frecuencia y duración son requeridos.');
-      return;
+    if (!medications.length) return Alert.alert('Receta médica', 'Agrega al menos un medicamento.');
+    for (const item of medications) {
+      if (!item.medication_name.trim()) return Alert.alert('Receta médica', 'Escribe el nombre del medicamento.');
+      if (!item.dosage.trim()) return Alert.alert('Receta médica', 'Escribe la dosis.');
+      if (!item.frequency.trim()) return Alert.alert('Receta médica', 'Escribe la frecuencia.');
+      if (!item.duration.trim()) return Alert.alert('Receta médica', 'Escribe la duración.');
     }
     await onSubmit({
       general_instructions: generalInstructions.trim(),
+      notes: notes.trim(),
       medications: medications.map((item) => ({
         dosage: item.dosage.trim(),
         duration: item.duration.trim(),
         frequency: item.frequency.trim(),
         instructions: item.instructions?.trim(),
         medication_name: item.medication_name.trim(),
+        quantity: item.quantity ? String(item.quantity).trim() : undefined,
       })),
     });
   }
@@ -57,21 +65,18 @@ export function PrescriptionForm({
   return (
     <AppCard style={styles.form}>
       {medications.map((item, index) => (
-        <View key={index} style={styles.medication}>
-          <Text style={styles.subtitle}>Medicamento {index + 1}</Text>
-          <AppInput label="Medicamento" onChangeText={(value) => updateMedication(index, 'medication_name', value)} value={item.medication_name} />
-          <AppInput label="Dosis" onChangeText={(value) => updateMedication(index, 'dosage', value)} value={item.dosage} />
-          <AppInput label="Frecuencia" onChangeText={(value) => updateMedication(index, 'frequency', value)} value={item.frequency} />
-          <AppInput label="Duración" onChangeText={(value) => updateMedication(index, 'duration', value)} value={item.duration} />
-          <AppInput label="Indicaciones" multiline onChangeText={(value) => updateMedication(index, 'instructions', value)} value={item.instructions ?? ''} />
-        </View>
+        <MedicationFormItem
+          index={index}
+          item={item}
+          key={index}
+          onRemove={() => removeMedication(index)}
+          onUpdate={(field, value) => updateMedication(index, field, value)}
+          removable={medications.length > 1}
+        />
       ))}
-      <AppButton
-        label="Agregar medicamento"
-        onPress={() => setMedications((current) => [...current, { ...emptyMedication }])}
-        variant="secondary"
-      />
+      <AppButton label="Agregar medicamento" onPress={() => setMedications((current) => [...current, { ...emptyMedication }])} variant="secondary" />
       <AppInput label="Instrucciones generales" multiline onChangeText={setGeneralInstructions} value={generalInstructions} />
+      <AppInput label="Notas" multiline onChangeText={setNotes} value={notes} />
       <AppButton label="Guardar receta" loading={submitting} onPress={submit} />
     </AppCard>
   );
@@ -79,6 +84,4 @@ export function PrescriptionForm({
 
 const styles = StyleSheet.create({
   form: { gap: 14 },
-  medication: { borderBottomColor: colors.border, borderBottomWidth: 1, gap: 10, paddingBottom: 14 },
-  subtitle: { color: colors.ink, fontSize: 15, fontWeight: '900' },
 });

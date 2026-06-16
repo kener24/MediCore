@@ -135,6 +135,17 @@ export async function completeConsultation(visitId: number | string, payload?: C
   );
 }
 
+export async function completeConsultationById(consultationId: number | string, payload?: ConsultationPayload) {
+  try {
+    return await postFirstAvailable<DoctorConsultation>(
+      [`${endpoints.doctor.consultation(consultationId)}complete/`],
+      payload ? sanitizePayload(payload) : undefined,
+    );
+  } catch {
+    return updateConsultation(consultationId, { ...(payload ?? {}), status: 'completed' });
+  }
+}
+
 export function sanitizePayload(payload: ConsultationPayload) {
   return Object.fromEntries(
     Object.entries(payload).filter(([, value]) => value !== undefined && value !== null),

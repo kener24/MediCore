@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RoleGuard } from '@/components/RoleGuard';
 import { DoctorClinicalConsumptionScreen } from '@/features/doctor/screens/DoctorClinicalConsumptionScreen';
 import { DoctorConsultationScreen } from '@/features/doctor/screens/DoctorConsultationScreen';
+import { DoctorConsultationSummaryScreen } from '@/features/doctor/screens/DoctorConsultationSummaryScreen';
 import { DoctorDashboardScreen } from '@/features/doctor/screens/DoctorDashboardScreen';
 import { DoctorMedicalOrderScreen } from '@/features/doctor/screens/DoctorMedicalOrderScreen';
 import { DoctorNotificationsScreen } from '@/features/doctor/screens/DoctorNotificationsScreen';
@@ -31,6 +32,8 @@ function DoctorHomeStack() {
       <Stack.Screen component={DoctorPrescriptionScreen} name="DoctorPrescription" />
       <Stack.Screen component={DoctorMedicalOrderScreen} name="DoctorMedicalOrder" />
       <Stack.Screen component={DoctorClinicalConsumptionScreen} name="DoctorClinicalConsumption" />
+      <Stack.Screen component={DoctorConsultationSummaryScreen} name="DoctorConsultationSummary" />
+      <Stack.Screen component={DoctorConsultationSummaryScreen} name="DoctorCompleteConsultation" />
     </Stack.Navigator>
   );
 }
@@ -41,6 +44,8 @@ function DoctorScheduleStack() {
       <Stack.Screen component={DoctorScheduleScreen} name="DoctorSchedule" />
       <Stack.Screen component={DoctorPatientDetailScreen} name="DoctorPatientDetail" />
       <Stack.Screen component={DoctorConsultationScreen} name="DoctorConsultation" />
+      <Stack.Screen component={DoctorConsultationSummaryScreen} name="DoctorConsultationSummary" />
+      <Stack.Screen component={DoctorConsultationSummaryScreen} name="DoctorCompleteConsultation" />
       <Stack.Screen component={DoctorTriageDetailScreen} name="DoctorTriageDetail" />
     </Stack.Navigator>
   );
@@ -56,6 +61,8 @@ function DoctorWaitingRoomStack() {
       <Stack.Screen component={DoctorPrescriptionScreen} name="DoctorPrescription" />
       <Stack.Screen component={DoctorMedicalOrderScreen} name="DoctorMedicalOrder" />
       <Stack.Screen component={DoctorClinicalConsumptionScreen} name="DoctorClinicalConsumption" />
+      <Stack.Screen component={DoctorConsultationSummaryScreen} name="DoctorConsultationSummary" />
+      <Stack.Screen component={DoctorConsultationSummaryScreen} name="DoctorCompleteConsultation" />
     </Stack.Navigator>
   );
 }
@@ -67,6 +74,8 @@ function DoctorConsultationsStack() {
       <Stack.Screen component={DoctorPrescriptionScreen} name="DoctorPrescription" />
       <Stack.Screen component={DoctorMedicalOrderScreen} name="DoctorMedicalOrder" />
       <Stack.Screen component={DoctorClinicalConsumptionScreen} name="DoctorClinicalConsumption" />
+      <Stack.Screen component={DoctorConsultationSummaryScreen} name="DoctorConsultationSummary" />
+      <Stack.Screen component={DoctorConsultationSummaryScreen} name="DoctorCompleteConsultation" />
     </Stack.Navigator>
   );
 }

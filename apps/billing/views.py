@@ -75,6 +75,16 @@ def can_issue_fiscal(user):
     return get_role_name(user) in FISCAL_ISSUE_ROLES
 
 
+def fiscal_profile_defaults(clinic):
+    return {
+        "legal_name": getattr(clinic, "nombre", "") or "Pendiente de configurar",
+        "rtn": getattr(clinic, "rtn", "") or "",
+        "address": getattr(clinic, "direccion", "") or "",
+        "phone": getattr(clinic, "telefono", "") or "",
+        "email": getattr(clinic, "correo", "") or "",
+    }
+
+
 class ClinicFiscalProfileViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
@@ -92,7 +102,7 @@ class ClinicFiscalProfileViewSet(viewsets.ViewSet):
         clinic = self._clinic(request)
         if not clinic:
             return Response({"detail": "No hay clinica disponible."}, status=status.HTTP_404_NOT_FOUND)
-        profile, _ = ClinicFiscalProfile.objects.get_or_create(clinic=clinic, defaults={"legal_name": clinic.nombre, "rtn": getattr(clinic, "rtn", "") or "", "address": getattr(clinic, "direccion", "") or ""})
+        profile, _ = ClinicFiscalProfile.objects.get_or_create(clinic=clinic, defaults=fiscal_profile_defaults(clinic))
         return Response(ClinicFiscalProfileSerializer(profile).data)
 
     def partial_update(self, request):
@@ -101,7 +111,7 @@ class ClinicFiscalProfileViewSet(viewsets.ViewSet):
         clinic = self._clinic(request)
         if not clinic:
             return Response({"detail": "No hay clinica disponible."}, status=status.HTTP_404_NOT_FOUND)
-        profile, created = ClinicFiscalProfile.objects.get_or_create(clinic=clinic, defaults={"legal_name": clinic.nombre, "rtn": getattr(clinic, "rtn", "") or "", "address": getattr(clinic, "direccion", "") or ""})
+        profile, created = ClinicFiscalProfile.objects.get_or_create(clinic=clinic, defaults=fiscal_profile_defaults(clinic))
         serializer = ClinicFiscalProfileSerializer(profile, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         profile = serializer.save()

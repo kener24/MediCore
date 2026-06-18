@@ -91,7 +91,10 @@ api.interceptors.response.use(
 export function getErrorMessage(error: unknown) {
   if (axios.isAxiosError(error)) {
     const data = error.response?.data;
-    if (typeof data === "string") return data;
+    if (typeof data === "string") {
+      if (data.trim().startsWith("<")) return "El servidor devolvio un error interno. Revisa la configuracion o intenta nuevamente.";
+      return data;
+    }
     if (data && typeof data === "object") {
       const firstValue = Object.values(data)[0];
       if (Array.isArray(firstValue)) return String(firstValue[0]);

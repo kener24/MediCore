@@ -62,6 +62,8 @@ export const endpoints = {
       `/admissions/visits/${visitId}/complete-consultation/`,
     consultations: '/consultations/',
     consultation: (id: number | string) => `/consultations/${id}/`,
+    patientConsultations: (patientId: number | string) => `/medical-records/patients/${patientId}/consultations/`,
+    patientConsultationsAlt: (patientId: number | string) => `/patients/${patientId}/consultations/`,
     consultationDiagnoses: (id: number | string) => `/consultations/${id}/diagnoses/`,
     consultationPrescriptions: (id: number | string) => `/consultations/${id}/prescriptions/`,
     prescriptions: '/prescriptions/',

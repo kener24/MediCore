@@ -92,44 +92,46 @@ export function DoctorConsultationScreen() {
   const completed = isConsultationFinalized(consultation?.status);
 
   const load = useCallback(async () => {
-    if (!params.visitId) {
+    if (!params.visitId && !params.consultationId) {
       setLoading(false);
-      setError('No se encontró la visita para iniciar la consulta.');
+      setError('No se encontró la consulta médica.');
       return;
     }
 
     setLoading(true);
     setError('');
     try {
-      const [visitData, vitalsData, triageData] = await Promise.all([
-        getVisitDetail(params.visitId).catch(() => null),
-        getVisitVitalSigns(params.visitId).catch(() => null),
-        getVisitTriage(params.visitId).catch(() => null),
-      ]);
-
       let consultationData: DoctorConsultation | null = null;
       if (params.consultationId) {
         consultationData = await getConsultationDetail(params.consultationId).catch(() => null);
       }
-      if (!consultationData) {
-        consultationData = await getConsultationByVisit(params.visitId).catch(() => null);
+
+      const initialVisitId = params.visitId ?? consultationData?.visit_id ?? consultationData?.patient_visit ?? undefined;
+      const [visitData, vitalsData, triageData] = await Promise.all([
+        initialVisitId ? getVisitDetail(initialVisitId).catch(() => null) : Promise.resolve(null),
+        initialVisitId ? getVisitVitalSigns(initialVisitId).catch(() => null) : Promise.resolve(null),
+        initialVisitId ? getVisitTriage(initialVisitId).catch(() => null) : Promise.resolve(null),
+      ]);
+
+      if (!consultationData && initialVisitId) {
+        consultationData = await getConsultationByVisit(initialVisitId).catch(() => null);
       }
-      if (!consultationData) {
-        const started = await startConsultation(params.visitId).catch(() => null);
+      if (!consultationData && initialVisitId) {
+        const started = await startConsultation(initialVisitId).catch(() => null);
         const newConsultationId = started?.consultation_id ?? started?.id;
         if (newConsultationId) {
           consultationData = await getConsultationDetail(newConsultationId).catch(() => ({
             consultation_id: newConsultationId,
             id: newConsultationId,
             status: started?.status ?? 'in_progress',
-            visit_id: params.visitId,
+            visit_id: initialVisitId,
           }));
         } else if (started) {
           consultationData = {
             id: started.id,
             consultation_id: started.consultation_id,
             status: started.status ?? 'in_progress',
-            visit_id: started.visit_id ?? params.visitId,
+            visit_id: started.visit_id ?? initialVisitId,
           };
         }
       }
@@ -138,7 +140,7 @@ export function DoctorConsultationScreen() {
         params.patientId ??
         visitData?.patient_id ??
         visitData?.paciente_id ??
-        visitData?.patient?.id ??
+        (typeof visitData?.patient === 'object' ? visitData.patient?.id : undefined) ??
         consultationData?.patient_id ??
         (typeof consultationData?.patient === 'number' ? consultationData.patient : undefined);
 
@@ -153,7 +155,7 @@ export function DoctorConsultationScreen() {
       setMedicalSummary(medicalData);
       setConsultation(consultationData);
       setPatient(
-        mergePatient(patientData, visitData?.patient, params.patient as DoctorPatientBasicInfo | undefined, {
+        mergePatient(patientData, typeof visitData?.patient === 'object' ? visitData.patient : undefined, params.patient as DoctorPatientBasicInfo | undefined, {
           full_name: consultationData?.patient_name ?? consultationData?.patient_nombre,
           id: nextPatientId,
           patient_code: consultationData?.patient_codigo,
@@ -177,36 +179,24 @@ export function DoctorConsultationScreen() {
 
   async function handleSaveDraft() {
     const validation = validateDraft(form);
-    if (validation) {
-      Alert.alert('Consulta médica', validation);
-      return;
-    }
+    if (validation) return Alert.alert('Consulta médica', validation);
     await persist('draft');
   }
 
   async function handleSave() {
     const validation = validateFormalSave(form);
-    if (validation) {
-      Alert.alert('Consulta médica', validation);
-      return;
-    }
+    if (validation) return Alert.alert('Consulta médica', validation);
     await persist('in_progress');
   }
 
   async function persist(status: 'draft' | 'in_progress') {
-    if (completed) {
-      Alert.alert('Consulta médica', 'Esta consulta ya fue finalizada.');
-      return;
-    }
-    if (!params.visitId) {
-      Alert.alert('Consulta médica', 'No se encontró la visita para iniciar la consulta.');
-      return;
-    }
+    if (completed) return Alert.alert('Consulta médica', 'Esta consulta ya fue finalizada.');
+    if (!visitId && !consultationId) return Alert.alert('Consulta médica', 'No se encontró la visita o consulta.');
 
     const setBusy = status === 'draft' ? setSavingDraft : setSaving;
     setBusy(true);
     try {
-      const payload = buildPayload(form, status, params.visitId, resolvedPatientId);
+      const payload = buildPayload(form, status, visitId, resolvedPatientId);
       let saved: DoctorConsultation;
       if (consultationId) {
         saved =
@@ -218,12 +208,9 @@ export function DoctorConsultationScreen() {
       }
       setConsultation(saved);
       setForm(toFormValues(saved));
-      Alert.alert(
-        'Consulta médica',
-        status === 'draft' ? 'Borrador guardado correctamente.' : 'Consulta guardada correctamente.',
-      );
+      Alert.alert('Consulta médica', status === 'draft' ? 'Borrador guardado correctamente.' : 'Consulta guardada correctamente.');
     } catch (err) {
-      Alert.alert('Consulta médica', err instanceof Error ? err.message : 'Revisa los campos ingresados.');
+      Alert.alert('Consulta médica', err instanceof Error ? err.message : 'No se pudo guardar la consulta.');
     } finally {
       setBusy(false);
     }
@@ -231,14 +218,10 @@ export function DoctorConsultationScreen() {
 
   function navigateAction(routeName: string) {
     if (!consultationId) {
-      Alert.alert('Consulta médica', 'Guarda la consulta antes de continuar con este módulo.');
+      Alert.alert('Consulta médica', 'Primero debes guardar la consulta médica para continuar.');
       return;
     }
-    navigation.navigate(routeName, {
-      consultationId,
-      patientId: resolvedPatientId,
-      visitId,
-    });
+    navigation.navigate(routeName, { consultationId, patientId: resolvedPatientId, visitId });
   }
 
   if (loading) return <LoadingState label="Cargando consulta médica..." />;
@@ -259,9 +242,7 @@ export function DoctorConsultationScreen() {
             <Text style={styles.subtitle}>{subtitle}</Text>
             <ConsultationStatusBadge status={consultation?.status ?? 'in_progress'} />
           </View>
-          {completed ? (
-            <EmptyState description="Esta consulta ya fue finalizada." title="Consulta en modo lectura" />
-          ) : null}
+          {completed ? <EmptyState description="No puedes editarla desde la app." title="Consulta en modo lectura" /> : null}
           <PatientSummaryCard patient={patient} />
           <VisitInfoCard visit={visit} />
           <ClinicalSummaryCard medicalSummary={medicalSummary} triage={triage} visit={visit} vitalSigns={vitalSigns} />
@@ -280,6 +261,9 @@ export function DoctorConsultationScreen() {
             onPrescription={() => navigateAction('DoctorPrescription')}
             onSummary={() => navigateAction('DoctorConsultationSummary')}
           />
+          {resolvedPatientId ? (
+            <AppButton label="Historial del paciente" onPress={() => navigation.navigate('DoctorConsultationHistory', { patientId: resolvedPatientId })} variant="secondary" />
+          ) : null}
           <AppButton label="Volver" onPress={() => navigation.goBack()} variant="secondary" />
         </ScrollView>
       </KeyboardAvoidingView>
@@ -309,13 +293,13 @@ function buildPayload(
   return {
     assessment: form.assessment.trim(),
     chief_complaint: form.chief_complaint.trim(),
+    clinical_assessment: form.assessment.trim(),
     diagnosis_text: form.diagnosis_text.trim(),
     history_present_illness: form.history_present_illness.trim(),
     notes: form.notes.trim(),
     patient: patientId,
-    clinical_assessment: form.assessment.trim(),
-    physical_examination: form.physical_examination.trim(),
     physical_exam: form.physical_examination.trim(),
+    physical_examination: form.physical_examination.trim(),
     plan: form.plan.trim(),
     preliminary_diagnosis: form.diagnosis_text.trim(),
     private_notes: form.notes.trim(),
@@ -328,8 +312,7 @@ function buildPayload(
 }
 
 function validateDraft(form: ConsultationFormValues) {
-  const hasContent = Object.values(form).some((value) => value.trim().length > 0);
-  return hasContent ? '' : 'No hay información para guardar.';
+  return Object.values(form).some((value) => value.trim().length > 0) ? '' : 'No hay información para guardar.';
 }
 
 function validateFormalSave(form: ConsultationFormValues) {
@@ -340,9 +323,7 @@ function validateFormalSave(form: ConsultationFormValues) {
   return '';
 }
 
-function mergePatient(
-  ...values: (DoctorPatientBasicInfo | null | undefined)[]
-): DoctorPatientBasicInfo | null {
+function mergePatient(...values: (DoctorPatientBasicInfo | null | undefined)[]): DoctorPatientBasicInfo | null {
   const filled = values.filter(Boolean) as DoctorPatientBasicInfo[];
   if (!filled.length) return null;
   return filled.reduce((acc, item) => ({ ...acc, ...item }), {});

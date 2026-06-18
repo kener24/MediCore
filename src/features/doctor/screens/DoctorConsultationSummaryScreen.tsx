@@ -13,10 +13,7 @@ import { ConsultationStatusBadge } from '@/features/doctor/components/Consultati
 import { DoctorHeader } from '@/features/doctor/components/DoctorHeader';
 import { MedicalOrderPreviewCard } from '@/features/doctor/components/MedicalOrderPreviewCard';
 import { PrescriptionPreviewCard } from '@/features/doctor/components/PrescriptionPreviewCard';
-import {
-  completeConsultation,
-  completeConsultationById,
-} from '@/features/doctor/services/doctorConsultationService';
+import { completeConsultation, completeConsultationById } from '@/features/doctor/services/doctorConsultationService';
 import { resolveRequiredConsultation } from '@/features/doctor/services/doctorConsultationContextService';
 import { getConsultationConsumptions } from '@/features/doctor/services/doctorClinicalConsumptionService';
 import { getConsultationMedicalOrders } from '@/features/doctor/services/doctorMedicalOrderService';
@@ -71,14 +68,14 @@ export function DoctorConsultationSummaryScreen() {
   }, [load]);
 
   function confirmFinish() {
-    if (isConsultationFinalized(consultation?.status)) return Alert.alert('Finalizar atención', 'Esta consulta ya fue finalizada.');
-    if (!consultationId) return Alert.alert('Finalizar atención', 'No se encontró la consulta.');
-    if (!visitId) return Alert.alert('Finalizar atención', 'No se encontró la visita.');
-    if (!consultation?.chief_complaint?.trim()) return Alert.alert('Finalizar atención', 'Escribe el motivo principal antes de finalizar.');
+    if (isConsultationFinalized(consultation?.status)) return Alert.alert('Finalizar consulta', 'Esta consulta ya fue finalizada.');
+    if (!consultationId) return Alert.alert('Finalizar consulta', 'No se encontró la consulta.');
+    if (!visitId) return Alert.alert('Finalizar consulta', 'No se encontró la visita.');
+    if (!consultation?.chief_complaint?.trim()) return Alert.alert('Finalizar consulta', 'Escribe el motivo principal antes de finalizar.');
     if (!consultation.diagnosis_text?.trim() && !consultation.assessment?.trim() && !consultation.preliminary_diagnosis?.trim() && !consultation.clinical_assessment?.trim()) {
-      return Alert.alert('Finalizar atención', 'Agrega un diagnóstico o evaluación antes de finalizar.');
+      return Alert.alert('Finalizar consulta', 'Agrega un diagnóstico o evaluación clínica antes de finalizar.');
     }
-    Alert.alert('Finalizar atención', '¿Deseas finalizar esta consulta? Después de finalizar, no podrás editarla desde la app.', [
+    Alert.alert('Finalizar consulta', '¿Deseas finalizar esta consulta? Después de finalizar no podrás editarla desde la app.', [
       { style: 'cancel', text: 'Cancelar' },
       { onPress: finish, text: 'Finalizar' },
     ]);
@@ -89,10 +86,10 @@ export function DoctorConsultationSummaryScreen() {
     setFinishing(true);
     try {
       await completeConsultation(visitId, { status: 'completed' }).catch(() => completeConsultationById(consultationId, { status: 'completed' }));
-      Alert.alert('Consulta finalizada', 'Consulta finalizada correctamente. El paciente fue enviado a facturación.');
+      Alert.alert('Consulta finalizada', 'Consulta finalizada correctamente.');
       navigation.getParent()?.navigate('DoctorWaitingRoomTab');
     } catch (err) {
-      Alert.alert('Finalizar atención', err instanceof Error ? err.message : 'Ocurrió un error en el servidor.');
+      Alert.alert('Finalizar consulta', err instanceof Error ? err.message : 'Ocurrió un error en el servidor.');
     } finally {
       setFinishing(false);
     }
@@ -129,7 +126,7 @@ export function DoctorConsultationSummaryScreen() {
         <AppButton disabled={completed} label="Agregar orden médica" onPress={() => navigation.navigate('DoctorMedicalOrder', { consultationId, patientId: params.patientId, visitId })} variant="secondary" />
         <AppButton disabled={completed} label="Agregar consumo clínico" onPress={() => navigation.navigate('DoctorClinicalConsumption', { consultationId, patientId: params.patientId, visitId })} variant="secondary" />
         <AppButton label="Volver a editar consulta" onPress={() => navigation.goBack()} variant="secondary" />
-        <AppButton disabled={completed} label={completed ? 'Consulta finalizada' : 'Finalizar atención'} loading={finishing} onPress={confirmFinish} />
+        <AppButton disabled={completed} label={completed ? 'Consulta finalizada' : 'Finalizar consulta'} loading={finishing} onPress={confirmFinish} />
       </ScrollView>
     </SafeAreaView>
   );

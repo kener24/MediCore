@@ -4,11 +4,15 @@ import { colors } from '@/core/theme/colors';
 
 const labels: Record<string, string> = {
   cancelled: 'Cancelada',
+  cancelada: 'Cancelada',
   completed: 'Finalizada',
+  complete: 'Finalizada',
   draft: 'Borrador',
+  finalizada: 'Finalizada',
   in_consultation: 'En consulta',
   in_progress: 'En progreso',
   pending: 'Pendiente',
+  pendiente: 'Pendiente',
 };
 
 export function ConsultationStatusBadge({ status }: { status?: string | null }) {

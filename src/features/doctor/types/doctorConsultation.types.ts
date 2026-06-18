@@ -1,4 +1,4 @@
-export type ConsultationStatus = 'draft' | 'in_progress' | 'completed' | 'cancelled' | string;
+export type ConsultationStatus = 'draft' | 'in_progress' | 'completed' | 'cancelled' | 'pending' | string;
 
 export type DoctorVitalSigns = {
   id?: number;
@@ -64,9 +64,15 @@ export type ConsultationFormValues = {
   notes: string;
 };
 
+export type ConsultationFiltersState = {
+  date?: string;
+  search?: string;
+  status?: string;
+};
+
 export type ConsultationPayload = {
   visit?: number | string;
-  patient?: number | string;
+  patient?: number | string | DoctorPatientSummary;
   chief_complaint?: string;
   history_present_illness?: string;
   physical_examination?: string;
@@ -87,6 +93,8 @@ export type ConsultationPayload = {
 export type DoctorConsultation = ConsultationPayload & {
   id?: number;
   consultation_id?: number;
+  appointment_id?: number | null;
+  appointment?: number | null;
   visit_id?: number;
   patient_visit?: number | null;
   patient_id?: number;
@@ -97,10 +105,20 @@ export type DoctorConsultation = ConsultationPayload & {
   doctor_name?: string;
   doctor_nombre?: string;
   status?: ConsultationStatus;
+  priority?: string;
+  reason?: string;
   patient?: DoctorPatientSummary | number | string;
+  vital_signs?: unknown;
+  triage?: unknown;
+  prescriptions?: unknown[];
+  medical_orders?: unknown[];
+  consumptions?: unknown[];
   started_at?: string;
   completed_at?: string | null;
   created_at?: string;
+  consultation_date?: string;
+  creado_en?: string;
+  actualizado_en?: string;
   updated_at?: string;
 };
 

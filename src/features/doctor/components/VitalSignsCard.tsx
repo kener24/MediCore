@@ -5,10 +5,10 @@ import { colors } from '@/core/theme/colors';
 import type { DoctorVitalSigns } from '@/features/doctor/types/doctorPatient.types';
 
 const rows: { key: keyof DoctorVitalSigns; label: string; suffix?: string }[] = [
-  { key: 'temperature', label: 'Temperatura', suffix: 'C' },
-  { key: 'heart_rate', label: 'Frecuencia cardiaca', suffix: 'lpm' },
+  { key: 'temperature', label: 'Temperatura', suffix: '°C' },
+  { key: 'heart_rate', label: 'Frecuencia cardíaca', suffix: 'lpm' },
   { key: 'respiratory_rate', label: 'Frecuencia respiratoria', suffix: 'rpm' },
-  { key: 'oxygen_saturation', label: 'Saturacion de oxigeno', suffix: '%' },
+  { key: 'oxygen_saturation', label: 'Saturación de oxígeno', suffix: '%' },
   { key: 'weight', label: 'Peso', suffix: 'kg' },
   { key: 'height', label: 'Talla', suffix: 'cm' },
   { key: 'bmi', label: 'IMC' },
@@ -27,7 +27,7 @@ export function VitalSignsCard({ vitalSigns }: { vitalSigns?: DoctorVitalSigns |
       <Text style={styles.title}>Signos vitales</Text>
       {vitalSigns ? (
         <View style={styles.grid}>
-          <VitalItem label="Presion arterial" value={bloodPressure} />
+          <VitalItem label="Presión arterial" value={bloodPressure} />
           {rows.map((row) => (
             <VitalItem
               key={row.key}

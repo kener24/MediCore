@@ -4,6 +4,7 @@ import { endpoints } from '@/core/api/endpoints';
 import { getFirstAvailable, patchFirstAvailable, postFirstAvailable } from '@/features/doctor/services/doctorApiHelpers';
 import { normalizeListResponse, type ApiListResponse } from '@/features/doctor/types/commonDoctor.types';
 import type {
+  ConsultationFiltersState,
   ConsultationPayload,
   DoctorConsultation,
   DoctorPatientSummary,
@@ -11,7 +12,65 @@ import type {
   StartConsultationResponse,
 } from '@/features/doctor/types/doctorConsultation.types';
 
-const unavailableMessage = 'El módulo de consulta aún no está disponible.';
+const unavailableMessage = 'El módulo de consultas aún no está disponible completamente.';
+
+export async function getDoctorConsultations(params?: ConsultationFiltersState & Record<string, string | number | undefined>) {
+  try {
+    const data = await getFirstAvailable<ApiListResponse<DoctorConsultation>>(
+      [endpoints.doctor.consultations],
+      { params: normalizeConsultationParams(params) },
+    );
+    return normalizeListResponse(data);
+  } catch (err) {
+    throw normalizeConsultationError(err);
+  }
+}
+
+export function getTodayConsultations() {
+  return getDoctorConsultations({ date: todayString() });
+}
+
+export function getConsultationsInProgress() {
+  return getDoctorConsultations({ status: 'in_progress' });
+}
+
+export function getCompletedConsultations(params?: ConsultationFiltersState) {
+  return getDoctorConsultations({ ...params, status: 'completed' });
+}
+
+export async function getPatientConsultationHistory(patientId: number | string) {
+  try {
+    const data = await getFirstAvailable<ApiListResponse<DoctorConsultation>>(
+      [
+        endpoints.doctor.patientConsultations(patientId),
+        endpoints.doctor.patientConsultationsAlt(patientId),
+        endpoints.doctor.consultations,
+      ],
+      { params: { patient: patientId } },
+    );
+    return normalizeListResponse(data);
+  } catch (err) {
+    throw normalizeConsultationError(err);
+  }
+}
+
+export async function getConsultationRelatedData(consultationId: number | string) {
+  const [prescriptions, medicalOrders, consumptions] = await Promise.all([
+    getFirstAvailable<ApiListResponse<unknown>>(
+      [endpoints.doctor.consultationPrescriptions(consultationId), endpoints.doctor.prescriptions],
+      { params: { consultation: consultationId } },
+    ).then(normalizeListResponse).catch(() => []),
+    getFirstAvailable<ApiListResponse<unknown>>(
+      [endpoints.doctor.consultationMedicalOrders(consultationId), endpoints.doctor.medicalOrders],
+      { params: { consultation: consultationId } },
+    ).then(normalizeListResponse).catch(() => []),
+    getFirstAvailable<ApiListResponse<unknown>>(
+      [endpoints.doctor.consultationConsumptions(consultationId), endpoints.doctor.clinicalConsumptions],
+      { params: { consultation: consultationId } },
+    ).then(normalizeListResponse).catch(() => []),
+  ]);
+  return { consumptions, medical_orders: medicalOrders, prescriptions };
+}
 
 export async function getVisitDetail(visitId: number | string) {
   return getFirstAvailable<Record<string, unknown>>([
@@ -41,7 +100,11 @@ export async function startConsultation(visitId: number | string) {
 }
 
 export async function getConsultationDetail(consultationId: number | string) {
-  return getFirstAvailable<DoctorConsultation>([endpoints.doctor.consultation(consultationId)]);
+  try {
+    return await getFirstAvailable<DoctorConsultation>([endpoints.doctor.consultation(consultationId)]);
+  } catch (err) {
+    throw normalizeConsultationError(err);
+  }
 }
 
 export async function getConsultation(id: number | string) {
@@ -58,7 +121,7 @@ export async function getConsultationByVisit(visitId: number | string) {
     return list[0] ?? (isConsultationObject(data) ? data : null);
   } catch (err) {
     if (err instanceof ApiClientError && err.status === 404) return null;
-    throw err;
+    throw normalizeConsultationError(err);
   }
 }
 
@@ -128,6 +191,8 @@ export async function saveConsultationDraft(consultationId: number | string, pay
   }
 }
 
+export const saveDraft = saveConsultationDraft;
+
 export async function completeConsultation(visitId: number | string, payload?: ConsultationPayload) {
   return postFirstAvailable<DoctorConsultation>(
     [endpoints.doctor.completeConsultation(visitId)],
@@ -159,7 +224,7 @@ function isConsultationObject(value: unknown): value is DoctorConsultation {
 function normalizeConsultationError(err: unknown) {
   if (err instanceof ApiClientError) {
     if (err.status === 403) return new Error('No tienes permiso para ver esta consulta.');
-    if (err.status === 404) return new Error('No se encontró la consulta.');
+    if (err.status === 404) return new Error(unavailableMessage);
     if (err.status && err.status >= 500) return new Error('Ocurrió un error en el servidor.');
     return err;
   }
@@ -168,4 +233,16 @@ function normalizeConsultationError(err: unknown) {
 
 function shouldRetryWithoutStatus(err: unknown, payload: ConsultationPayload) {
   return Boolean(payload.status && err instanceof ApiClientError && err.status === 400);
+}
+
+function normalizeConsultationParams(params?: ConsultationFiltersState & Record<string, string | number | undefined>) {
+  const normalized = { ...(params ?? {}) };
+  if (normalized.status === 'all') delete normalized.status;
+  if (!normalized.search) delete normalized.search;
+  if (!normalized.date) delete normalized.date;
+  return normalized;
+}
+
+function todayString() {
+  return new Date().toISOString().slice(0, 10);
 }

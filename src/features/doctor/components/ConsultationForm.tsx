@@ -57,14 +57,8 @@ export function ConsultationForm({
           value={initialValues[field.key]}
         />
       ))}
-      <AppButton
-        disabled={disabled}
-        label="Guardar borrador"
-        loading={loading}
-        onPress={onSaveDraft}
-        variant="secondary"
-      />
-      <AppButton disabled={disabled} label="Guardar cambios" loading={loading} onPress={onSubmit} />
+      <AppButton disabled={disabled} label="Guardar borrador" loading={loading} onPress={onSaveDraft} variant="secondary" />
+      <AppButton disabled={disabled} label="Guardar consulta" loading={loading} onPress={onSubmit} />
     </AppCard>
   );
 }

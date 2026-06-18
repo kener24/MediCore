@@ -25,14 +25,16 @@ export function DoctorHeader({
         <Text style={styles.title}>{doctorName ? `${title}, ${doctorName}` : title}</Text>
         <Text style={styles.subtitle}>{specialty || clinicName || 'Atención clínica móvil'}</Text>
       </View>
-      <Pressable onPress={onNotificationsPress} style={styles.button}>
-        <MaterialCommunityIcons color={colors.primary} name="bell-outline" size={23} />
-        {unreadCount > 0 ? (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
-          </View>
-        ) : null}
-      </Pressable>
+      {onNotificationsPress || unreadCount > 0 ? (
+        <Pressable onPress={onNotificationsPress} style={styles.button}>
+          <MaterialCommunityIcons color={colors.primary} name="bell-outline" size={23} />
+          {unreadCount > 0 ? (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+            </View>
+          ) : null}
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -67,7 +69,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   copy: { flex: 1 },
-  eyebrow: { color: colors.primary, fontSize: 12, fontWeight: '900', textTransform: 'uppercase' },
+  eyebrow: { color: colors.primary, fontSize: 12, fontWeight: '900', letterSpacing: 0, textTransform: 'uppercase' },
   subtitle: { color: colors.muted, fontSize: 14, lineHeight: 20, marginTop: 4 },
   title: { color: colors.ink, fontSize: 24, fontWeight: '900', letterSpacing: 0 },
 });

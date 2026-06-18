@@ -1,21 +1,38 @@
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import { Alert, RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppButton } from '@/components/AppButton';
+import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import { DoctorHeader } from '@/features/doctor/components/DoctorHeader';
-import { getDoctorProfile } from '@/features/doctor/services/doctorProfileService';
-import type { DoctorProfile } from '@/features/doctor/types/doctorProfile.types';
-import { ProfileInfoCard } from '@/features/patient/components/ProfileInfoCard';
+import {
+  DoctorActivitySummaryCard,
+  DoctorClinicInfoCard,
+  DoctorInfoCard,
+  DoctorProfessionalInfoCard,
+  DoctorProfileHeader,
+  DoctorProfileMenu,
+  DoctorScheduleCard,
+  LogoutButton,
+  doctorName,
+} from '@/features/doctor/components/DoctorProfileCards';
+import {
+  getDoctorActivitySummary,
+  getDoctorProfile,
+  getDoctorSchedule,
+} from '@/features/doctor/services/doctorProfileService';
+import type { DoctorActivitySummary, DoctorProfile, DoctorScheduleItem } from '@/features/doctor/types/doctorProfile.types';
 
 export function DoctorProfileScreen() {
+  const navigation = useNavigation<any>();
   const { signOut } = useAuth();
   const [profile, setProfile] = useState<DoctorProfile | null>(null);
+  const [schedules, setSchedules] = useState<DoctorScheduleItem[]>([]);
+  const [activity, setActivity] = useState<DoctorActivitySummary | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -25,7 +42,14 @@ export function DoctorProfileScreen() {
     else setLoading(true);
     setError('');
     try {
-      setProfile(await getDoctorProfile());
+      const [nextProfile, nextSchedules, nextActivity] = await Promise.all([
+        getDoctorProfile(),
+        getDoctorSchedule(),
+        getDoctorActivitySummary(),
+      ]);
+      setProfile(nextProfile);
+      setSchedules(nextSchedules.length ? nextSchedules : nextProfile.schedules ?? []);
+      setActivity(nextActivity);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar el perfil médico.');
     } finally {
@@ -36,10 +60,12 @@ export function DoctorProfileScreen() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  if (loading) return <LoadingState label="Cargando perfil médico..." />;
+  async function confirmLogout() {
+    await signOut();
+    Alert.alert('Sesión cerrada', 'Sesión cerrada correctamente.');
+  }
 
-  const name = profile?.full_name ?? profile?.nombre_completo;
-  const role = typeof profile?.role === 'object' ? profile.role.nombre : profile?.role_nombre ?? 'Médico';
+  if (loading) return <LoadingState label="Cargando perfil médico..." />;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -47,24 +73,31 @@ export function DoctorProfileScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl onRefresh={() => load(true)} refreshing={refreshing} />}
         showsVerticalScrollIndicator={false}>
-        <DoctorHeader doctorName={name} specialty={profile?.specialty_name ?? profile?.especialidad_nombre} title="Perfil médico" />
+        <DoctorHeader doctorName={profile ? doctorName(profile) : undefined} title="Perfil médico" />
         {error ? (
           <ErrorState message={error} onRetry={() => load()} title="No se pudo cargar el perfil" />
-        ) : (
+        ) : profile ? (
           <>
-            <ProfileInfoCard
-              items={[
-                { label: 'Nombre', value: name },
-                { label: 'Correo', value: profile?.email },
-                { label: 'Teléfono', value: profile?.phone ?? profile?.telefono },
-                { label: 'Especialidad', value: profile?.specialty_name ?? profile?.especialidad_nombre },
-                { label: 'Clínica', value: profile?.clinic_name ?? profile?.clinica_nombre },
-                { label: 'Rol', value: role },
-              ]}
-              title="Información profesional"
+            <DoctorProfileHeader profile={profile} />
+            <DoctorInfoCard profile={profile} />
+            <DoctorProfessionalInfoCard professional={profile.professional} profile={profile} />
+            <DoctorClinicInfoCard clinic={typeof profile.clinic === 'object' ? profile.clinic : null} profile={profile} />
+            <DoctorScheduleCard schedules={schedules} />
+            <DoctorActivitySummaryCard summary={activity} />
+            <DoctorProfileMenu
+              onChangePassword={() => navigation.navigate('DoctorChangePassword')}
+              onEdit={() => navigation.navigate('DoctorEditProfile', { profile })}
+              onLogout={() => Alert.alert('Cerrar sesión', '¿Deseas cerrar sesión?', [
+                { style: 'cancel', text: 'Cancelar' },
+                { onPress: confirmLogout, style: 'destructive', text: 'Cerrar sesión' },
+              ])}
+              onSchedule={() => navigation.navigate('DoctorScheduleProfile', { schedules })}
+              onSecurity={() => navigation.navigate('DoctorSecurity', { profile })}
             />
-            <AppButton label="Cerrar sesión" onPress={signOut} variant="danger" />
+            <LogoutButton onConfirm={confirmLogout} />
           </>
+        ) : (
+          <EmptyState title="Perfil no disponible" description="Esta información no está disponible por el momento." />
         )}
       </ScrollView>
     </SafeAreaView>
@@ -72,6 +105,6 @@ export function DoctorProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { gap: 14, padding: 22, paddingBottom: 118 },
+  content: { gap: 14, padding: 22, paddingBottom: 128 },
   safeArea: { backgroundColor: colors.background, flex: 1 },
 });

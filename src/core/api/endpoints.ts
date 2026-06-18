@@ -73,5 +73,9 @@ export const endpoints = {
     clinicalConsumptions: '/clinical-consumptions/',
     inventoryItems: '/inventory/items/',
     profile: '/doctor/profile/',
+    profileAlt: '/doctors/me/',
+    schedules: '/doctor/schedules/',
+    schedulesAlt: '/doctors/me/schedules/',
+    activitySummary: '/doctor/activity-summary/',
   },
 } as const;

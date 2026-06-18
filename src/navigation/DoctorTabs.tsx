@@ -10,6 +10,8 @@ import { DoctorConsultationScreen } from '@/features/doctor/screens/DoctorConsul
 import { DoctorConsultationSummaryScreen } from '@/features/doctor/screens/DoctorConsultationSummaryScreen';
 import { DoctorConsultationsScreen } from '@/features/doctor/screens/DoctorConsultationsScreen';
 import { DoctorDashboardScreen } from '@/features/doctor/screens/DoctorDashboardScreen';
+import { DoctorChangePasswordScreen } from '@/features/doctor/screens/DoctorChangePasswordScreen';
+import { DoctorEditProfileScreen } from '@/features/doctor/screens/DoctorEditProfileScreen';
 import { DoctorMedicalOrderDetailScreen } from '@/features/doctor/screens/DoctorMedicalOrderDetailScreen';
 import { DoctorMedicalOrderScreen } from '@/features/doctor/screens/DoctorMedicalOrderScreen';
 import { DoctorNotificationsScreen } from '@/features/doctor/screens/DoctorNotificationsScreen';
@@ -18,6 +20,8 @@ import { DoctorPrescriptionDetailScreen } from '@/features/doctor/screens/Doctor
 import { DoctorPrescriptionScreen } from '@/features/doctor/screens/DoctorPrescriptionScreen';
 import { DoctorProfileScreen } from '@/features/doctor/screens/DoctorProfileScreen';
 import { DoctorScheduleScreen } from '@/features/doctor/screens/DoctorScheduleScreen';
+import { DoctorScheduleProfileScreen } from '@/features/doctor/screens/DoctorScheduleProfileScreen';
+import { DoctorSecurityScreen } from '@/features/doctor/screens/DoctorSecurityScreen';
 import { DoctorTriageDetailScreen } from '@/features/doctor/screens/DoctorTriageDetailScreen';
 import { DoctorWaitingRoomScreen } from '@/features/doctor/screens/DoctorWaitingRoomScreen';
 import { createTabOptions, tabIcon } from '@/navigation/tabOptions';
@@ -104,6 +108,10 @@ function DoctorProfileStack() {
   return (
     <Stack.Navigator screenOptions={stackOptions}>
       <Stack.Screen component={DoctorProfileScreen} name="DoctorProfile" />
+      <Stack.Screen component={DoctorEditProfileScreen} name="DoctorEditProfile" />
+      <Stack.Screen component={DoctorChangePasswordScreen} name="DoctorChangePassword" />
+      <Stack.Screen component={DoctorSecurityScreen} name="DoctorSecurity" />
+      <Stack.Screen component={DoctorScheduleProfileScreen} name="DoctorScheduleProfile" />
       <Stack.Screen component={DoctorNotificationsScreen} name="DoctorNotifications" />
     </Stack.Navigator>
   );

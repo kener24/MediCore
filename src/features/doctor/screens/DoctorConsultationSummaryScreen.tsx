@@ -122,9 +122,9 @@ export function DoctorConsultationSummaryScreen() {
           onPressItem={(item) => navigation.navigate('DoctorMedicalOrderDetail', { order: item, orderId: item.id })}
         />
         <ClinicalConsumptionCard items={consumptions} />
-        <AppButton disabled={completed} label="Agregar receta" onPress={() => navigation.navigate('DoctorPrescription', { consultationId, patientId: params.patientId, visitId })} variant="secondary" />
-        <AppButton disabled={completed} label="Agregar orden médica" onPress={() => navigation.navigate('DoctorMedicalOrder', { consultationId, patientId: params.patientId, visitId })} variant="secondary" />
-        <AppButton disabled={completed} label="Agregar consumo clínico" onPress={() => navigation.navigate('DoctorClinicalConsumption', { consultationId, patientId: params.patientId, visitId })} variant="secondary" />
+        <AppButton label={completed ? 'Ver recetas' : 'Agregar receta'} onPress={() => navigation.navigate('DoctorPrescription', { consultationId, patientId: params.patientId, visitId })} variant="secondary" />
+        <AppButton label={completed ? 'Ver órdenes médicas' : 'Agregar orden médica'} onPress={() => navigation.navigate('DoctorMedicalOrder', { consultationId, patientId: params.patientId, visitId })} variant="secondary" />
+        <AppButton label={completed ? 'Ver consumos clínicos' : 'Agregar consumo clínico'} onPress={() => navigation.navigate('DoctorClinicalConsumption', { consultationId, patientId: params.patientId, visitId })} variant="secondary" />
         <AppButton label="Volver a editar consulta" onPress={() => navigation.goBack()} variant="secondary" />
         <AppButton disabled={completed} label={completed ? 'Consulta finalizada' : 'Finalizar consulta'} loading={finishing} onPress={confirmFinish} />
       </ScrollView>

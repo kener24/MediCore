@@ -1,36 +1,39 @@
 # MediCore Mobile
 
-Aplicación móvil Expo/React Native para MediCore. La app usa navegación por rol y consume las API publicadas del backend.
+Aplicación móvil de MediCore construida con Expo, React Native y TypeScript.
 
-## Requisitos
+## Stack
 
-- Node.js LTS.
-- npm.
-- Expo Go compatible con SDK 54, o un development build generado con EAS.
-- Backend disponible en `https://kp-software.tech/api`.
+- Expo SDK 54.
+- React Native.
+- TypeScript.
+- React Navigation.
+- Axios.
+- Expo SecureStore para sesión JWT.
 
-## Comandos locales
+## Instalación
 
 ```bash
 npm install
+```
+
+## Ejecutar en desarrollo
+
+```bash
+npx expo start
+```
+
+Para Expo Go en un teléfono físico:
+
+```bash
 npx expo start --lan
 ```
 
-Para validar TypeScript:
-
-```bash
-npx tsc --noEmit
-```
-
-Para revisar compatibilidad Expo:
-
-```bash
-npx expo-doctor
-```
+El teléfono y la computadora deben estar en la misma red Wi-Fi. Abre Expo Go y escanea el QR.
 
 ## API
 
-La URL base está configurada en:
+La URL base está en:
 
 ```text
 src/core/config/appConfig.ts
@@ -42,40 +45,78 @@ Valor actual:
 https://kp-software.tech/api
 ```
 
-No guardes tokens ni credenciales reales en el repositorio. El token JWT se maneja desde almacenamiento seguro y se envía como `Authorization: Bearer`.
+Si el certificado HTTPS no está disponible temporalmente, se puede cambiar a:
 
-## Módulo médico
+```text
+http://kp-software.tech/api
+```
 
-El módulo de médico incluye:
+No subas secretos, tokens, credenciales reales, archivos `.env`, builds ni llaves al repositorio.
 
+## Roles soportados
+
+- Paciente.
+- Médico / doctor.
+- Recepción, enfermería y administración quedan como shells móviles o pantallas no disponibles según avance.
+
+## Estado actual
+
+- Módulo paciente MVP.
+- Módulo médico avanzado.
 - Dashboard médico.
 - Agenda.
 - Sala de espera.
-- Detalle de paciente y triaje.
-- Consulta médica.
-- Recetas médicas.
+- Detalle de paciente.
+- Triaje y signos vitales.
+- Consultas.
+- Recetas.
 - Órdenes médicas.
-- Consumo clínico.
+- Consumos clínicos.
 - Resumen y finalización de consulta.
+- Perfil médico.
+- Seguridad, cambio de contraseña y cierre de sesión.
 
-Las recetas, órdenes y consumos quedan en modo lectura cuando la consulta ya está finalizada.
+Pendiente:
 
-## Acceso de prueba
+- Enfermería móvil.
+- Recepción/caja móvil.
+- Pruebas reales completas con usuarios productivos.
+- Estabilización final para APK productivo.
 
-Usuario médico demo:
+## Validaciones locales
+
+```bash
+npx tsc --noEmit
+npx expo-doctor
+```
+
+## APK preview con EAS
+
+El archivo `eas.json` incluye un perfil `preview` para APK.
+
+Comando futuro:
+
+```bash
+eas build -p android --profile preview
+```
+
+No ejecutes builds si TypeScript o Expo Doctor fallan.
+
+## Acceso demo médico
 
 ```text
 doctor@medicore.com
 Doctor12345*
 ```
 
-Estos accesos dependen de los seeds/datos del backend activo.
+Estos accesos dependen de los datos seed del backend activo.
 
-## Expo Go
+## GitHub
 
-1. Ejecuta `npx expo start --lan`.
-2. Abre Expo Go en el teléfono.
-3. Escanea el QR que muestra la terminal.
-4. El teléfono y la computadora deben estar en la misma red.
+Si el proyecto móvil aún no tiene remoto:
 
-Si Expo Go indica incompatibilidad de versión, instala un Expo Go compatible con SDK 54 o usa EAS Development Build.
+```bash
+git remote add origin URL_DEL_REPO
+git branch -M main
+git push -u origin main
+```

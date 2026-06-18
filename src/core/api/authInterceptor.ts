@@ -26,25 +26,36 @@ export class ApiClientError extends Error {
 
 function extractErrorMessage(error: AxiosError) {
   if (!error.response) {
-    return 'No hay conexión con el servidor. Revisa tu internet e intenta nuevamente.';
+    return 'No se pudo conectar con el servidor. Revisa tu conexión.';
   }
 
   const status = error.response.status;
   const payload = error.response.data;
 
+  if (status === 400) return extractValidationMessage(payload);
   if (status === 401) return 'Tu sesión expiró. Inicia sesión nuevamente.';
-  if (status === 403) return 'No tienes permisos para realizar esta acción.';
-  if (status >= 500) return 'El servidor no pudo responder. Intenta más tarde.';
+  if (status === 403) return 'No tienes permiso para realizar esta acción.';
+  if (status === 404) return 'No se encontró la información solicitada.';
+  if (status >= 500) return 'Ocurrió un error en el servidor.';
 
-  if (payload && typeof payload === 'object') {
-    const data = payload as Record<string, unknown>;
-    const firstValue = Object.values(data)[0];
-    if (typeof data.detail === 'string') return data.detail;
-    if (Array.isArray(firstValue)) return String(firstValue[0]);
-    if (typeof firstValue === 'string') return firstValue;
-  }
+  return extractPayloadMessage(payload) || 'No se pudo completar la solicitud.';
+}
 
-  return 'No se pudo completar la solicitud.';
+function extractValidationMessage(payload: unknown) {
+  const message = extractPayloadMessage(payload);
+  return message || 'Revisa los campos ingresados.';
+}
+
+function extractPayloadMessage(payload: unknown): string {
+  if (!payload || typeof payload !== 'object') return '';
+  const data = payload as Record<string, unknown>;
+  if (typeof data.detail === 'string') return data.detail;
+  if (typeof data.message === 'string') return data.message;
+
+  const firstValue = Object.values(data)[0];
+  if (Array.isArray(firstValue) && typeof firstValue[0] === 'string') return firstValue[0];
+  if (typeof firstValue === 'string') return firstValue;
+  return '';
 }
 
 export function setupAuthInterceptors(apiClient: AxiosInstance) {

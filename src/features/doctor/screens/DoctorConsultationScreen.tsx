@@ -255,11 +255,12 @@ export function DoctorConsultationScreen() {
             onSubmit={handleSave}
           />
           <ConsultationActionBar
-            disabled={completed}
+            disabled={false}
             onClinicalConsumption={() => navigateAction('DoctorClinicalConsumption')}
             onMedicalOrder={() => navigateAction('DoctorMedicalOrder')}
             onPrescription={() => navigateAction('DoctorPrescription')}
             onSummary={() => navigateAction('DoctorConsultationSummary')}
+            readOnly={completed}
           />
           {resolvedPatientId ? (
             <AppButton label="Historial del paciente" onPress={() => navigation.navigate('DoctorConsultationHistory', { patientId: resolvedPatientId })} variant="secondary" />

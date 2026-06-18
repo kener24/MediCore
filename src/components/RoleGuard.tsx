@@ -19,12 +19,15 @@ export function RoleGuard({ children, roles }: RoleGuardProps) {
 
   if (!user || !appRole || !roles.includes(appRole)) {
     const isPatientPortal = roles.length === 1 && roles[0] === 'paciente';
+    const isDoctorModule = roles.includes('medico') || roles.includes('doctor');
     return (
       <ErrorState
         message={
           isPatientPortal
             ? 'Tu rol no tiene acceso al portal paciente.'
-            : 'Tu usuario no tiene permisos para abrir esta sección.'
+            : isDoctorModule
+              ? 'No tienes acceso al módulo médico.'
+              : 'Tu usuario no tiene permisos para abrir esta sección.'
         }
         title="Acceso no autorizado"
       />

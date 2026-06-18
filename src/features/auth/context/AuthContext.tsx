@@ -2,14 +2,14 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { Alert } from 'react-native';
 
 import { setSessionExpiredHandler } from '@/core/api/authInterceptor';
-import { getMeService, loginService, logoutService } from '@/features/auth/services/authService';
-import type { AppRole, LoginPayload, RoleName, User } from '@/features/auth/types/auth.types';
 import {
   clearSession,
   getSession,
   resolveRole,
   saveSession,
 } from '@/core/storage/sessionStorage';
+import { getMeService, loginService, logoutService } from '@/features/auth/services/authService';
+import type { AppRole, LoginPayload, RoleName, User } from '@/features/auth/types/auth.types';
 
 interface AuthContextValue {
   loading: boolean;

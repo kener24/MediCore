@@ -117,10 +117,14 @@ export function DoctorConsultationDetailScreen() {
 
         <AppButton disabled={completed} label="Continuar edición" onPress={() => navigation.navigate('DoctorConsultation', { consultationId, patientId, visitId })} />
         <AppButton label="Ver resumen" onPress={() => navigation.navigate('DoctorConsultationSummary', { consultationId, patientId, visitId })} variant="secondary" />
-        <AppButton label="Historial del paciente" onPress={() => navigation.navigate('DoctorConsultationHistory', { patientId })} variant="secondary" />
-        <AppButton disabled={completed} label="Agregar receta" onPress={() => navigation.navigate('DoctorPrescription', { consultationId, patientId, visitId })} variant="secondary" />
-        <AppButton disabled={completed} label="Agregar orden médica" onPress={() => navigation.navigate('DoctorMedicalOrder', { consultationId, patientId, visitId })} variant="secondary" />
-        <AppButton disabled={completed} label="Agregar consumo clínico" onPress={() => navigation.navigate('DoctorClinicalConsumption', { consultationId, patientId, visitId })} variant="secondary" />
+        <AppButton
+          label="Historial del paciente"
+          onPress={() => patientId ? navigation.navigate('DoctorConsultationHistory', { patientId }) : Alert.alert('Historial', 'No se encontró el paciente.')}
+          variant="secondary"
+        />
+        <AppButton label={completed ? 'Ver recetas' : 'Agregar receta'} onPress={() => navigation.navigate('DoctorPrescription', { consultationId, patientId, visitId })} variant="secondary" />
+        <AppButton label={completed ? 'Ver órdenes médicas' : 'Agregar orden médica'} onPress={() => navigation.navigate('DoctorMedicalOrder', { consultationId, patientId, visitId })} variant="secondary" />
+        <AppButton label={completed ? 'Ver consumos clínicos' : 'Agregar consumo clínico'} onPress={() => navigation.navigate('DoctorClinicalConsumption', { consultationId, patientId, visitId })} variant="secondary" />
         <AppButton disabled={completed} label={completed ? 'Consulta finalizada' : 'Finalizar consulta'} loading={finishing} onPress={confirmFinish} />
         <AppButton label="Volver" onPress={() => navigation.goBack()} variant="secondary" />
       </ScrollView>

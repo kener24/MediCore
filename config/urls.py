@@ -22,7 +22,7 @@ from apps.patients.views import PatientViewSet
 from apps.appointments.views import AppointmentViewSet
 from apps.medical_records.views import ClinicalConsultationViewSet, ClinicalSupplyUsageViewSet, MedicalRecordViewSet
 from apps.prescriptions.views import DiagnosisViewSet, MedicalOrderViewSet, PrescriptionViewSet
-from apps.billing.views import BillableServiceViewSet, BillingStatsViewSet, CashSessionViewSet, InvoiceViewSet, PaymentViewSet
+from apps.billing.views import BillableServiceViewSet, BillingStatsViewSet, CashSessionViewSet, ClinicFiscalProfileViewSet, FiscalDocumentRangeViewSet, InvoiceViewSet, PaymentViewSet
 from apps.inventory.views import InventoryAlertViewSet, InventoryCategoryViewSet, InventoryItemViewSet, InventoryLotViewSet, InventoryMovementViewSet, InventoryStatsViewSet
 from apps.purchases.views import PurchaseItemHistoryViewSet, PurchaseOrderViewSet, PurchaseReceiptViewSet, PurchaseStatsViewSet, SupplierViewSet
 from apps.reports.views import (
@@ -111,6 +111,7 @@ router.register("diagnoses", DiagnosisViewSet, basename="diagnoses")
 router.register("prescriptions", PrescriptionViewSet, basename="prescriptions")
 router.register("medical-orders", MedicalOrderViewSet, basename="medical-orders")
 router.register("billing/services", BillableServiceViewSet, basename="billing-services")
+router.register("billing/fiscal-ranges", FiscalDocumentRangeViewSet, basename="billing-fiscal-ranges")
 router.register("billing/invoices", InvoiceViewSet, basename="billing-invoices")
 router.register("billing/payments", PaymentViewSet, basename="billing-payments")
 router.register("billing/cash-sessions", CashSessionViewSet, basename="billing-cash-sessions")
@@ -166,6 +167,7 @@ urlpatterns = [
     path("api/admissions/doctor-waiting-room/", PatientVisitViewSet.as_view({"get": "doctor_waiting_room"}), name="admissions-doctor-waiting-room"),
     path("api/admissions/stats/today/", PatientVisitViewSet.as_view({"get": "stats_today"}), name="admissions-stats-today"),
     path("api/billing/pending-visits/", PatientVisitViewSet.as_view({"get": "pending_billing"}), name="billing-pending-visits"),
+    path("api/billing/fiscal-profile/", ClinicFiscalProfileViewSet.as_view({"get": "list", "patch": "partial_update"}), name="billing-fiscal-profile"),
     path("api/billing/visits/<int:pk>/generate-invoice/", PatientVisitViewSet.as_view({"post": "generate_invoice"}), name="billing-generate-invoice-from-visit"),
     path("api/billing/pending-consumptions/", InvoiceViewSet.as_view({"get": "pending_consumptions"}), name="billing-pending-consumptions"),
     path("api/inventory/alerts/expiring-soon/", InventoryAlertViewSet.as_view({"get": "expiring_soon"}), name="inventory-expiring-soon"),

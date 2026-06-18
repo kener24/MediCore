@@ -6,7 +6,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from apps.accounts.permissions import get_role_name
-from apps.billing.models import BillableService, CashMovement, CashSession, Invoice, InvoiceItem, Payment
+from apps.billing.models import BillableService, CashMovement, CashSession, ClinicFiscalProfile, FiscalDocumentRange, Invoice, InvoiceItem, Payment, clean_rtn
 from apps.inventory.models import InventoryItem, InventoryLot, InventoryMovement
 from apps.medical_records.models import ClinicalSupplyUsage
 
@@ -47,8 +47,8 @@ class InvoiceItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = InvoiceItem
-        fields = ["id", "invoice", "item_type", "service", "service_name", "inventory_item", "inventory_item_name", "inventory_lot", "inventory_lot_number", "related_consultation", "related_consumption", "consumption", "description", "quantity", "unit_price", "discount_amount", "tax_rate", "tax_amount", "line_total", "active", "creado_en", "actualizado_en"]
-        read_only_fields = ["id", "invoice", "tax_amount", "line_total", "creado_en", "actualizado_en"]
+        fields = ["id", "invoice", "item_type", "service", "service_name", "inventory_item", "inventory_item_name", "inventory_lot", "inventory_lot_number", "related_consultation", "related_consumption", "consumption", "description", "quantity", "unit_price", "discount_amount", "discount", "tax_type", "tax_rate", "subtotal", "tax_amount", "total", "line_total", "active", "creado_en", "actualizado_en"]
+        read_only_fields = ["id", "invoice", "subtotal", "tax_amount", "total", "line_total", "creado_en", "actualizado_en"]
         extra_kwargs = {"description": {"required": False, "allow_blank": True}, "service": {"required": False, "allow_null": True}, "inventory_item": {"required": False, "allow_null": True}, "inventory_lot": {"required": False, "allow_null": True}, "related_consumption": {"required": False, "allow_null": True}}
 
     def validate(self, attrs):
@@ -62,6 +62,8 @@ class InvoiceItemSerializer(serializers.ModelSerializer):
         unit_price = attrs.get("unit_price", getattr(self.instance, "unit_price", Decimal("0.00")))
         discount = attrs.get("discount_amount", getattr(self.instance, "discount_amount", Decimal("0.00")))
         tax_rate = attrs.get("tax_rate", getattr(self.instance, "tax_rate", Decimal("0.00")))
+        if invoice and invoice.fiscal_status == Invoice.FiscalStatus.ISSUED:
+            raise serializers.ValidationError("No puedes modificar items de una factura fiscal emitida.")
         if item_type == InvoiceItem.Type.SERVICE and not service:
             raise serializers.ValidationError({"service": "Selecciona el servicio."})
         if item_type in [InvoiceItem.Type.INVENTORY_ITEM, InvoiceItem.Type.MEDICATION, InvoiceItem.Type.SUPPLY] and not inventory_item:
@@ -99,7 +101,7 @@ class InvoiceListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Invoice
-        fields = ["id", "clinic", "clinic_nombre", "patient", "patient_nombre", "patient_identidad", "appointment", "consultation", "invoice_number", "issue_date", "due_date", "status", "subtotal", "discount_amount", "tax_amount", "total_amount", "paid_amount", "balance_due", "active", "creado_en", "actualizado_en"]
+        fields = ["id", "clinic", "clinic_nombre", "patient", "patient_nombre", "patient_identidad", "appointment", "consultation", "invoice_number", "issue_date", "due_date", "status", "is_fiscal", "fiscal_status", "fiscal_number", "cai", "fiscal_expiration_date", "subtotal", "discount_amount", "tax_amount", "total_amount", "subtotal_exempt", "subtotal_exonerated", "subtotal_taxed_15", "subtotal_taxed_18", "isv_15", "isv_18", "paid_amount", "balance_due", "active", "creado_en", "actualizado_en"]
 
 
 class PaymentListSerializer(serializers.ModelSerializer):
@@ -118,7 +120,7 @@ class InvoiceDetailSerializer(InvoiceListSerializer):
     created_by_nombre = serializers.CharField(source="created_by.nombre_completo", read_only=True)
 
     class Meta(InvoiceListSerializer.Meta):
-        fields = InvoiceListSerializer.Meta.fields + ["notes", "created_by", "created_by_nombre", "cancelled_by", "cancelled_at", "cancellation_reason", "items", "payments"]
+        fields = InvoiceListSerializer.Meta.fields + ["notes", "created_by", "created_by_nombre", "cancelled_by", "cancelled_at", "cancellation_reason", "fiscal_range_start", "fiscal_range_end", "emitter_rtn", "emitter_legal_name", "emitter_commercial_name", "emitter_address", "customer_name", "customer_rtn", "customer_address", "issue_datetime", "total", "amount_in_words", "items", "payments"]
 
 
 class InvoiceCreateSerializer(serializers.ModelSerializer):
@@ -209,6 +211,8 @@ class InvoiceUpdateSerializer(serializers.ModelSerializer):
         fields = ["issue_date", "due_date", "notes", "status", "active"]
 
     def validate(self, attrs):
+        if self.instance.fiscal_status == Invoice.FiscalStatus.ISSUED:
+            raise serializers.ValidationError("No puedes editar una factura fiscal emitida.")
         if self.instance.status in [Invoice.Status.PAGADA, Invoice.Status.ANULADA]:
             raise serializers.ValidationError("No puedes editar una factura pagada o anulada.")
         issue_date = attrs.get("issue_date", self.instance.issue_date)
@@ -355,3 +359,59 @@ class BillingStatsSerializer(serializers.Serializer):
     cash_today = serializers.DecimalField(max_digits=14, decimal_places=2)
     card_today = serializers.DecimalField(max_digits=14, decimal_places=2)
     transfer_today = serializers.DecimalField(max_digits=14, decimal_places=2)
+
+
+class ClinicFiscalProfileSerializer(serializers.ModelSerializer):
+    clinic_nombre = serializers.CharField(source="clinic.nombre", read_only=True)
+
+    class Meta:
+        model = ClinicFiscalProfile
+        fields = ["id", "clinic", "clinic_nombre", "legal_name", "commercial_name", "rtn", "address", "municipality", "department", "phone", "email", "economic_activity", "is_fiscal_billing_enabled", "default_isv_rate", "secondary_isv_rate", "require_customer_rtn", "fiscal_legend", "creado_en", "actualizado_en"]
+        read_only_fields = ["id", "clinic", "creado_en", "actualizado_en"]
+
+    def validate_rtn(self, value):
+        rtn = clean_rtn(value)
+        if value and len(rtn) != 14:
+            raise serializers.ValidationError("El RTN debe contener 14 digitos.")
+        return rtn
+
+    def validate(self, attrs):
+        enabled = attrs.get("is_fiscal_billing_enabled", getattr(self.instance, "is_fiscal_billing_enabled", False))
+        if enabled:
+            legal_name = attrs.get("legal_name", getattr(self.instance, "legal_name", ""))
+            rtn = attrs.get("rtn", getattr(self.instance, "rtn", ""))
+            address = attrs.get("address", getattr(self.instance, "address", ""))
+            if not legal_name:
+                raise serializers.ValidationError({"legal_name": "La razon social es obligatoria."})
+            if len(clean_rtn(rtn)) != 14:
+                raise serializers.ValidationError({"rtn": "El RTN debe contener 14 digitos."})
+            if not address:
+                raise serializers.ValidationError({"address": "La direccion fiscal es obligatoria."})
+        return attrs
+
+
+class FiscalDocumentRangeSerializer(serializers.ModelSerializer):
+    clinic_nombre = serializers.CharField(source="clinic.nombre", read_only=True)
+    full_start_number = serializers.CharField(read_only=True)
+    full_end_number = serializers.CharField(read_only=True)
+    available_numbers = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = FiscalDocumentRange
+        fields = ["id", "clinic", "clinic_nombre", "document_type", "cai", "establishment_code", "emission_point_code", "document_type_code", "start_number", "end_number", "current_number", "start_date", "expiration_date", "is_active", "is_exhausted", "full_start_number", "full_end_number", "available_numbers", "creado_en", "actualizado_en"]
+        read_only_fields = ["id", "clinic", "is_exhausted", "full_start_number", "full_end_number", "available_numbers", "creado_en", "actualizado_en"]
+
+    def validate(self, attrs):
+        for field in ["establishment_code", "emission_point_code", "document_type_code"]:
+            value = attrs.get(field, getattr(self.instance, field, ""))
+            if not str(value).isdigit():
+                raise serializers.ValidationError({field: "Debe ser numerico."})
+        return attrs
+
+
+class FiscalIssueSerializer(serializers.Serializer):
+    confirm = serializers.BooleanField(default=True)
+
+
+class FiscalCancelSerializer(serializers.Serializer):
+    reason = serializers.CharField(required=True, allow_blank=False)

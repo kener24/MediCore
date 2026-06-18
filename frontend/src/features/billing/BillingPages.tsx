@@ -3,7 +3,7 @@ import { ArrowLeft, DollarSign, Plus, Printer, Trash2 } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
-import { addConsumptionToInvoice, addInventoryItemToInvoice, createBillableService, createCashMovement, createInvoice, createPayment, getBillableServices, getBillingStats, getCashSessions, getCurrentCashSession, getInvoice, getInvoicePayments, getInvoicePrintData, getInvoices, getMyInvoices, getMyPayments, getPayments, getPendingConsumptions, getTodayInvoiceSummary, getTodayInvoices, openCashSession, closeCashSession, voidInvoice } from "../../api/billingApi";
+import { addConsumptionToInvoice, addInventoryItemToInvoice, cancelFiscalInvoice, createBillableService, createCashMovement, createFiscalRange, createInvoice, createPayment, downloadBlob, getBillableServices, getBillingStats, getCashSessions, getCurrentCashSession, getFiscalInvoicePdf, getFiscalProfile, getFiscalRanges, getInvoice, getInvoicePayments, getInvoicePrintData, getInvoices, getMyInvoices, getMyPayments, getPayments, getPendingConsumptions, getTodayInvoiceSummary, getTodayInvoices, issueFiscalInvoice, openCashSession, closeCashSession, updateFiscalProfile, updateFiscalRange, voidInvoice } from "../../api/billingApi";
 import { getInventoryItems } from "../../api/inventoryApi";
 import { getErrorMessage } from "../../api/axios";
 import { getPatients } from "../../api/patientsApi";
@@ -16,7 +16,7 @@ import { Modal, ModalCloseButton } from "../../components/ui/Modal";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { StatCard } from "../../components/ui/StatCard";
 import { Table } from "../../components/ui/Table";
-import type { BillableService, BillingStats, CashSession, Invoice, InvoicePrintData, Payment, TodayInvoiceSummary } from "../../types/billing";
+import type { BillableService, BillingStats, CashSession, ClinicFiscalProfile, FiscalDocumentRange, Invoice, InvoicePrintData, Payment, TodayInvoiceSummary } from "../../types/billing";
 import type { Patient } from "../../types/patient";
 import type { InventoryItem } from "../../types/inventory";
 import type { ClinicalSupplyUsage } from "../../types/medicalRecord";
@@ -170,6 +170,113 @@ export function BillableServicesPage() {
   useEffect(() => { load(); }, []);
   async function submit(e: FormEvent) { e.preventDefault(); if (Number(form.price) < 0) { toast.error("El precio no puede ser negativo."); return; } try { await createBillableService(form); toast.success("Servicio creado correctamente."); setForm({ name: "", code: "", price: "" }); await load(); } catch (err) { toast.error(getErrorMessage(err)); } }
   return <div className="space-y-6"><PageHeader title="Servicios" description="Catalogo de servicios facturables." /><Card><form className="mb-4 grid gap-2 md:grid-cols-[1fr_140px_140px_auto]" onSubmit={submit}><input className="h-10 rounded-md border px-3 text-sm" placeholder="Nombre" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /><input className="h-10 rounded-md border px-3 text-sm" placeholder="Codigo" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} /><input className="h-10 rounded-md border px-3 text-sm" inputMode="decimal" min="0" placeholder="Precio" required step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: cleanDecimal(e.target.value) })} /><button className="h-10 rounded-md bg-brand-600 px-4 text-sm font-semibold text-white">Crear</button></form><Table data={items} columns={[{ key: "code", header: "Codigo", render: (i) => i.code || "-" }, { key: "name", header: "Nombre", render: (i) => i.name }, { key: "price", header: "Precio", render: (i) => money(i.price) }, { key: "tax", header: "Impuesto", render: (i) => i.taxable ? `${i.tax_rate}%` : "No" }, { key: "state", header: "Estado", render: (i) => i.active ? "Activo" : "Inactivo" }]} /></Card></div>;
+}
+
+export function FiscalSettingsPage() {
+  const [profile, setProfile] = useState<ClinicFiscalProfile | null>(null);
+  const [ranges, setRanges] = useState<FiscalDocumentRange[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [rangeForm, setRangeForm] = useState({ document_type: "invoice", cai: "", establishment_code: "000", emission_point_code: "001", document_type_code: "01", start_number: "1", end_number: "100", current_number: "1", start_date: today(), expiration_date: addDays(365), is_active: true });
+
+  async function loadFiscal() {
+    const [profileData, rangeData] = await Promise.all([getFiscalProfile(), getFiscalRanges()]);
+    setProfile(profileData);
+    setRanges(rangeData);
+  }
+
+  useEffect(() => { loadFiscal().catch((e) => toast.error(getErrorMessage(e))); }, []);
+
+  function patchProfile(data: Partial<ClinicFiscalProfile>) {
+    if (profile) setProfile({ ...profile, ...data });
+  }
+
+  async function saveProfile(e: FormEvent) {
+    e.preventDefault();
+    if (!profile) return;
+    setSaving(true);
+    try {
+      const saved = await updateFiscalProfile(profile);
+      setProfile(saved);
+      toast.success("Perfil fiscal guardado.");
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveRange(e: FormEvent) {
+    e.preventDefault();
+    try {
+      await createFiscalRange({ ...rangeForm, start_number: Number(rangeForm.start_number), end_number: Number(rangeForm.end_number), current_number: Number(rangeForm.current_number) } as Partial<FiscalDocumentRange>);
+      toast.success("Rango CAI creado.");
+      setRangeForm({ document_type: "invoice", cai: "", establishment_code: "000", emission_point_code: "001", document_type_code: "01", start_number: "1", end_number: "100", current_number: "1", start_date: today(), expiration_date: addDays(365), is_active: true });
+      await loadFiscal();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
+  }
+
+  async function toggleRange(range: FiscalDocumentRange) {
+    try {
+      await updateFiscalRange(range.id, { is_active: !range.is_active });
+      await loadFiscal();
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+    }
+  }
+
+  if (!profile) return <Loader label="Cargando configuracion fiscal..." />;
+
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Configuracion fiscal" description="Perfil fiscal, CAI y rangos autorizados por clinica." />
+      <Card title="Perfil fiscal">
+        <form className="grid gap-4 md:grid-cols-2" onSubmit={saveProfile}>
+          <label className="flex items-center gap-2 rounded-md border p-3 text-sm md:col-span-2"><input checked={profile.is_fiscal_billing_enabled} type="checkbox" onChange={(e) => patchProfile({ is_fiscal_billing_enabled: e.target.checked })} />Habilitar facturacion fiscal</label>
+          <FiscalInput label="Razon social" value={profile.legal_name} onChange={(v) => patchProfile({ legal_name: v })} />
+          <FiscalInput label="Nombre comercial" value={profile.commercial_name} onChange={(v) => patchProfile({ commercial_name: v })} />
+          <FiscalInput label="RTN" value={profile.rtn} onChange={(v) => patchProfile({ rtn: v.replace(/\D/g, "").slice(0, 14) })} />
+          <FiscalInput label="Telefono" value={profile.phone} onChange={(v) => patchProfile({ phone: v })} />
+          <FiscalInput label="Correo" value={profile.email} type="email" onChange={(v) => patchProfile({ email: v })} />
+          <FiscalInput label="Municipio" value={profile.municipality} onChange={(v) => patchProfile({ municipality: v })} />
+          <FiscalInput label="Departamento" value={profile.department} onChange={(v) => patchProfile({ department: v })} />
+          <FiscalInput label="ISV por defecto" value={profile.default_isv_rate} type="number" onChange={(v) => patchProfile({ default_isv_rate: v })} />
+          <label className="block space-y-1.5 md:col-span-2"><span className="text-sm font-medium text-slate-700">Direccion fiscal</span><textarea className="min-h-24 w-full rounded-md border px-3 py-2 text-sm" value={profile.address} onChange={(e) => patchProfile({ address: e.target.value })} /></label>
+          <label className="block space-y-1.5 md:col-span-2"><span className="text-sm font-medium text-slate-700">Leyenda fiscal</span><textarea className="min-h-20 w-full rounded-md border px-3 py-2 text-sm" value={profile.fiscal_legend} onChange={(e) => patchProfile({ fiscal_legend: e.target.value })} /></label>
+          <div className="md:col-span-2"><Button isLoading={saving}>Guardar perfil fiscal</Button></div>
+        </form>
+      </Card>
+      <Card title="Crear rango CAI">
+        <form className="grid gap-3 md:grid-cols-4" onSubmit={saveRange}>
+          <FiscalInput label="CAI" value={rangeForm.cai} onChange={(v) => setRangeForm({ ...rangeForm, cai: v })} />
+          <FiscalInput label="Establecimiento" value={rangeForm.establishment_code} onChange={(v) => setRangeForm({ ...rangeForm, establishment_code: v.replace(/\D/g, "").slice(0, 3) })} />
+          <FiscalInput label="Punto emision" value={rangeForm.emission_point_code} onChange={(v) => setRangeForm({ ...rangeForm, emission_point_code: v.replace(/\D/g, "").slice(0, 3) })} />
+          <FiscalInput label="Tipo doc." value={rangeForm.document_type_code} onChange={(v) => setRangeForm({ ...rangeForm, document_type_code: v.replace(/\D/g, "").slice(0, 2) })} />
+          <FiscalInput label="Inicio" value={rangeForm.start_number} type="number" onChange={(v) => setRangeForm({ ...rangeForm, start_number: v })} />
+          <FiscalInput label="Fin" value={rangeForm.end_number} type="number" onChange={(v) => setRangeForm({ ...rangeForm, end_number: v })} />
+          <FiscalInput label="Actual" value={rangeForm.current_number} type="number" onChange={(v) => setRangeForm({ ...rangeForm, current_number: v })} />
+          <FiscalInput label="Fecha limite" value={rangeForm.expiration_date} type="date" onChange={(v) => setRangeForm({ ...rangeForm, expiration_date: v })} />
+          <div className="md:col-span-4"><Button>Crear rango</Button></div>
+        </form>
+      </Card>
+      <Card title="Rangos autorizados">
+        <Table data={ranges} columns={[
+          { key: "cai", header: "CAI", render: (i) => i.cai },
+          { key: "range", header: "Rango", render: (i) => `${i.full_start_number} a ${i.full_end_number}` },
+          { key: "current", header: "Actual", render: (i) => i.current_number },
+          { key: "available", header: "Disponibles", render: (i) => i.available_numbers },
+          { key: "expiration", header: "Vence", render: (i) => i.expiration_date },
+          { key: "status", header: "Estado", render: (i) => i.is_exhausted ? "Agotado" : i.is_active ? "Activo" : "Inactivo" },
+          { key: "actions", header: "Acciones", render: (i) => <Button variant="outline" onClick={() => toggleRange(i)}>{i.is_active ? "Desactivar" : "Activar"}</Button> },
+        ]} />
+      </Card>
+    </div>
+  );
+}
+
+function FiscalInput({ label, value, onChange, type = "text" }: { label: string; value: string | number | null | undefined; onChange: (value: string) => void; type?: string }) {
+  return <label className="block space-y-1.5"><span className="text-sm font-medium text-slate-700">{label}</span><input className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm" type={type} value={value ?? ""} onChange={(e) => onChange(e.target.value)} /></label>;
 }
 
 export function InvoicesPage({ patientOnly = false }: { patientOnly?: boolean }) {
@@ -577,7 +684,8 @@ export function InvoicePrintPage({ patientPortal = false }: { patientPortal?: bo
           <p className="self-start text-right">{data.invoice.status === "pagada" ? "PAGADA" : data.invoice.status.toUpperCase()}</p>
         </div>
 
-        <p className="mt-3 text-center text-base font-bold">Factura # {data.invoice.number}</p>
+        <p className="mt-3 text-center text-base font-bold">{data.invoice.fiscal_status === "issued" ? "FACTURA FISCAL" : "BORRADOR / NO FISCAL"}</p>
+        <p className="text-center text-base font-bold">Factura # {data.invoice.fiscal_number || data.invoice.number}</p>
         <p className="mt-3 break-words">{patientCode} - {data.patient.full_name}</p>
 
         <table className="mt-6">
@@ -601,16 +709,17 @@ export function InvoicePrintPage({ patientPortal = false }: { patientPortal?: bo
 
         <div className="mt-1 text-sm">
           <div className="amount-row"><span className="text-right font-bold">Descuento/Rebaja:</span><span className="font-bold">{currency}</span><span className="text-right">{formatPlainMoney(data.invoice.discount)}</span></div>
-          <div className="amount-row"><span className="text-right font-bold">Importe Gravado:</span><span className="font-bold">{currency}</span><span className="text-right">{formatPlainMoney(taxableAmount)}</span></div>
-          <div className="amount-row"><span className="text-right font-bold">Importe Exento/ISV:</span><span className="font-bold">{currency}</span><span className="text-right">{Number(data.invoice.tax) > 0 ? "0.00" : formatPlainMoney(taxableAmount)}</span></div>
-          <div className="amount-row"><span className="text-right font-bold">Importe Exonerado:</span><span className="font-bold">{currency}</span><span className="text-right">0.00</span></div>
-          <div className="amount-row"><span className="text-right font-bold">Impuesto 15%:</span><span className="font-bold">{currency}</span><span className="text-right">{formatPlainMoney(data.invoice.tax)}</span></div>
-          <div className="amount-row"><span className="text-right font-bold">Impuesto 18%:</span><span className="font-bold">{currency}</span><span className="text-right">0.00</span></div>
+          <div className="amount-row"><span className="text-right font-bold">Importe Gravado 15%:</span><span className="font-bold">{currency}</span><span className="text-right">{formatPlainMoney(data.invoice.subtotal_taxed_15 ?? taxableAmount)}</span></div>
+          <div className="amount-row"><span className="text-right font-bold">Importe Gravado 18%:</span><span className="font-bold">{currency}</span><span className="text-right">{formatPlainMoney(data.invoice.subtotal_taxed_18 ?? "0.00")}</span></div>
+          <div className="amount-row"><span className="text-right font-bold">Importe Exento/ISV:</span><span className="font-bold">{currency}</span><span className="text-right">{formatPlainMoney(data.invoice.subtotal_exempt ?? (Number(data.invoice.tax) > 0 ? "0.00" : taxableAmount))}</span></div>
+          <div className="amount-row"><span className="text-right font-bold">Importe Exonerado:</span><span className="font-bold">{currency}</span><span className="text-right">{formatPlainMoney(data.invoice.subtotal_exonerated ?? "0.00")}</span></div>
+          <div className="amount-row"><span className="text-right font-bold">Impuesto 15%:</span><span className="font-bold">{currency}</span><span className="text-right">{formatPlainMoney(data.invoice.isv_15 ?? data.invoice.tax)}</span></div>
+          <div className="amount-row"><span className="text-right font-bold">Impuesto 18%:</span><span className="font-bold">{currency}</span><span className="text-right">{formatPlainMoney(data.invoice.isv_18 ?? "0.00")}</span></div>
           <div className="amount-row"><span className="text-right font-bold">Recargo:</span><span className="font-bold">{currency}</span><span className="text-right">0.00</span></div>
           <div className="amount-row"><span className="text-right font-bold">Total:</span><span className="font-bold">{currency}</span><span className="text-right">{formatPlainMoney(data.invoice.total)}</span></div>
         </div>
 
-        <p className="mt-3 text-center text-sm">{amountToLempiras(data.invoice.total)}</p>
+        <p className="mt-3 text-center text-sm">{data.invoice.amount_in_words || amountToLempiras(data.invoice.total)}</p>
 
         <div className="mt-6 space-y-2 text-sm">
           <p>No. correlativo de la orden de compra exenta</p>
@@ -620,10 +729,10 @@ export function InvoicePrintPage({ patientPortal = false }: { patientPortal?: bo
         </div>
 
         <div className="mt-8 text-[11px] leading-tight">
-          <p>CAI: Pendiente de configurar</p>
-          <p>Fecha Limite de Emision: Pendiente</p>
+          <p>CAI: {data.invoice.cai || "NO FISCAL"}</p>
+          <p>Fecha Limite de Emision: {data.invoice.fiscal_expiration_date || "NO FISCAL"}</p>
           <p>Rango Autorizado:</p>
-          <p>Pendiente</p>
+          <p>{data.invoice.fiscal_range_start && data.invoice.fiscal_range_end ? `${data.invoice.fiscal_range_start} a ${data.invoice.fiscal_range_end}` : "NO FISCAL"}</p>
           <p>Refer.Sis.: {data.invoice.number}; Fecha Impresion: {invoiceDate} {invoiceTime}</p>
           <p className="mt-3">Tipo de Pago:</p>
           <p>{mainPayment ? `${mainPayment.method.toUpperCase()}${mainPayment.reference ? ` RefNo.${mainPayment.reference}` : ""}` : "PENDIENTE DE PAGO"}</p>
@@ -694,18 +803,63 @@ export function InvoiceDetailPage() {
     }
   }
 
+  async function issueFiscal() {
+    if (!invoice) return;
+    if (!window.confirm("Despues de emitir la factura fiscal no podras modificarla. Deseas continuar?")) return;
+    try {
+      const updated = await issueFiscalInvoice(invoice.id);
+      setInvoice(updated);
+      toast.success("Factura fiscal emitida correctamente.");
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+    }
+  }
+
+  async function cancelFiscal() {
+    if (!invoice) return;
+    const reason = window.prompt("Motivo de anulacion fiscal");
+    if (!reason) return;
+    try {
+      const updated = await cancelFiscalInvoice(invoice.id, reason);
+      setInvoice(updated);
+      toast.success("Factura fiscal anulada correctamente.");
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+    }
+  }
+
+  async function fiscalPdf() {
+    if (!invoice) return;
+    try {
+      const blob = await getFiscalInvoicePdf(invoice.id);
+      downloadBlob(blob, `factura-fiscal-${invoice.fiscal_number || invoice.invoice_number}.pdf`);
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+    }
+  }
+
   if (error) return <EmptyState title="No se pudo cargar la factura." description={error} />;
   if (!invoice) return <Loader label="Cargando factura..." />;
 
   return (
     <div className="space-y-6">
-      <PageHeader title={`Factura ${invoice.invoice_number}`} description={invoice.patient_nombre || "Detalle de factura"} actions={<div className="flex gap-2"><Link className="inline-flex h-10 items-center rounded-md border px-4 text-sm font-semibold text-slate-700" to="/clinic/billing/invoices">Volver</Link><Link className="inline-flex h-10 items-center rounded-md border px-4 text-sm font-semibold text-slate-700" to={`/clinic/billing/invoices/${invoice.id}/print`}>Imprimir</Link>{Number(invoice.balance_due) > 0 && invoice.status !== "anulada" ? <Button onClick={() => { setPaying(true); setPayment({ amount: invoice.balance_due, method: "efectivo", reference: "", notes: "" }); }}>Registrar pago</Button> : null}</div>} />
+      <PageHeader title={`Factura ${invoice.invoice_number}`} description={invoice.patient_nombre || "Detalle de factura"} actions={<div className="flex flex-wrap gap-2"><Link className="inline-flex h-10 items-center rounded-md border px-4 text-sm font-semibold text-slate-700" to="/clinic/billing/invoices">Volver</Link><Link className="inline-flex h-10 items-center rounded-md border px-4 text-sm font-semibold text-slate-700" to={`/clinic/billing/invoices/${invoice.id}/print`}>Imprimir</Link>{invoice.fiscal_status === "issued" ? <Button variant="outline" onClick={fiscalPdf}>PDF fiscal</Button> : null}{invoice.fiscal_status === "draft" ? <Button onClick={issueFiscal}>Emitir fiscal</Button> : null}{invoice.fiscal_status === "issued" ? <Button variant="danger" onClick={cancelFiscal}>Anular fiscal</Button> : null}{Number(invoice.balance_due) > 0 && invoice.status !== "anulada" ? <Button onClick={() => { setPaying(true); setPayment({ amount: invoice.balance_due, method: "efectivo", reference: "", notes: "" }); }}>Registrar pago</Button> : null}</div>} />
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard label="Total" value={money(invoice.total_amount)} icon={<DollarSign className="h-5 w-5" />} />
         <StatCard label="Pagado" value={money(invoice.paid_amount)} icon={<DollarSign className="h-5 w-5" />} />
         <StatCard label="Saldo" value={money(invoice.balance_due)} icon={<DollarSign className="h-5 w-5" />} />
         <StatCard label="Estado" value={invoice.status} icon={<DollarSign className="h-5 w-5" />} />
       </div>
+      <Card title="Estado fiscal">
+        <div className="grid gap-3 text-sm md:grid-cols-3">
+          <p><b>Fiscal:</b> {invoice.is_fiscal ? "Si" : "No"}</p>
+          <p><b>Estado fiscal:</b> {invoice.fiscal_status}</p>
+          <p><b>Numero fiscal:</b> {invoice.fiscal_number || "-"}</p>
+          <p><b>CAI:</b> {invoice.cai || "-"}</p>
+          <p><b>Rango:</b> {invoice.fiscal_range_start ? `${invoice.fiscal_range_start} a ${invoice.fiscal_range_end}` : "-"}</p>
+          <p><b>Fecha limite:</b> {invoice.fiscal_expiration_date || "-"}</p>
+        </div>
+      </Card>
       <Card title="Datos de factura" actions={invoice.status !== "anulada" && Number(invoice.paid_amount) <= 0 ? <Button variant="danger" onClick={cancelInvoice}>Anular</Button> : null}>
         <div className="grid gap-3 text-sm md:grid-cols-3">
           <p><b>Paciente:</b> {invoice.patient_nombre}</p>

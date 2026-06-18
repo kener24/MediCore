@@ -1,7 +1,10 @@
+from datetime import timedelta
 from decimal import Decimal
+from io import BytesIO
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Q, Sum
+from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -9,17 +12,22 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.accounts.permissions import get_role_name
-from apps.billing.models import BillableService, CashMovement, CashSession, Invoice, InvoiceItem, Payment
+from apps.billing.fiscal_services import cancel_fiscal_invoice, issue_fiscal_invoice
+from apps.billing.models import BillableService, CashMovement, CashSession, ClinicFiscalProfile, FiscalDocumentRange, Invoice, InvoiceItem, Payment
 from apps.billing.serializers import (
     BillableServiceSerializer,
     AddConsumptionToInvoiceSerializer,
     AddInventoryItemToInvoiceSerializer,
     BillingStatsSerializer,
+    ClinicFiscalProfileSerializer,
     CashMovementSerializer,
     CashSessionCloseSerializer,
     CashSessionDetailSerializer,
     CashSessionListSerializer,
     CashSessionOpenSerializer,
+    FiscalCancelSerializer,
+    FiscalDocumentRangeSerializer,
+    FiscalIssueSerializer,
     InvoiceCreateSerializer,
     InvoiceDetailSerializer,
     InvoiceItemSerializer,
@@ -40,6 +48,8 @@ from apps.notifications.services import create_notification
 
 
 MANAGE_ROLES = ["superadmin", "admin", "recepcionista"]
+FISCAL_CONFIG_ROLES = ["superadmin", "admin"]
+FISCAL_ISSUE_ROLES = ["admin", "recepcionista"]
 
 
 def scope(request, queryset):
@@ -56,6 +66,84 @@ def scope(request, queryset):
 
 def can_manage_billing(user):
     return get_role_name(user) in MANAGE_ROLES
+
+
+def can_config_fiscal(user):
+    return bool(user.is_superuser or get_role_name(user) in FISCAL_CONFIG_ROLES)
+
+
+def can_issue_fiscal(user):
+    return get_role_name(user) in FISCAL_ISSUE_ROLES
+
+
+class ClinicFiscalProfileViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
+
+    def _clinic(self, request):
+        if get_role_name(request.user) == "superadmin" or request.user.is_superuser:
+            clinic_id = request.query_params.get("clinic")
+            if clinic_id:
+                from apps.clinics.models import Clinic
+                return Clinic.objects.filter(id=clinic_id).first()
+        return getattr(request.user, "clinica", None)
+
+    def list(self, request):
+        if not can_config_fiscal(request.user):
+            return Response({"detail": "No tienes permiso para configurar facturacion fiscal."}, status=status.HTTP_403_FORBIDDEN)
+        clinic = self._clinic(request)
+        if not clinic:
+            return Response({"detail": "No hay clinica disponible."}, status=status.HTTP_404_NOT_FOUND)
+        profile, _ = ClinicFiscalProfile.objects.get_or_create(clinic=clinic, defaults={"legal_name": clinic.nombre, "rtn": getattr(clinic, "rtn", "") or "", "address": getattr(clinic, "direccion", "") or ""})
+        return Response(ClinicFiscalProfileSerializer(profile).data)
+
+    def partial_update(self, request):
+        if not can_config_fiscal(request.user):
+            return Response({"detail": "No tienes permiso para configurar facturacion fiscal."}, status=status.HTTP_403_FORBIDDEN)
+        clinic = self._clinic(request)
+        if not clinic:
+            return Response({"detail": "No hay clinica disponible."}, status=status.HTTP_404_NOT_FOUND)
+        profile, created = ClinicFiscalProfile.objects.get_or_create(clinic=clinic, defaults={"legal_name": clinic.nombre, "rtn": getattr(clinic, "rtn", "") or "", "address": getattr(clinic, "direccion", "") or ""})
+        serializer = ClinicFiscalProfileSerializer(profile, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        profile = serializer.save()
+        log_audit_event(request=request, clinic=clinic, action=AuditLog.Action.CREATE if created else AuditLog.Action.SETTINGS_CHANGE, module=AuditLog.Module.BILLING, model_name="ClinicFiscalProfile", object_id=profile.id, object_repr=profile.legal_name, description="Perfil fiscal de clinica actualizado.", new_values=serializer.validated_data)
+        return Response(ClinicFiscalProfileSerializer(profile).data)
+
+
+class FiscalDocumentRangeViewSet(viewsets.ModelViewSet):
+    serializer_class = FiscalDocumentRangeSerializer
+    permission_classes = [IsAuthenticated]
+    queryset = FiscalDocumentRange.objects.select_related("clinic")
+
+    def get_queryset(self):
+        queryset = scope(self.request, super().get_queryset())
+        p = self.request.query_params
+        if p.get("document_type"):
+            queryset = queryset.filter(document_type=p["document_type"])
+        if p.get("is_active") is not None:
+            queryset = queryset.filter(is_active=p["is_active"].lower() in ["1", "true", "yes", "si"])
+        return queryset
+
+    def create(self, request, *args, **kwargs):
+        if not can_config_fiscal(request.user):
+            return Response({"detail": "No tienes permiso para crear rangos CAI."}, status=status.HTTP_403_FORBIDDEN)
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        clinic = request.user.clinica
+        if get_role_name(request.user) == "superadmin" and request.data.get("clinic"):
+            from apps.clinics.models import Clinic
+            clinic = Clinic.objects.filter(id=request.data["clinic"]).first()
+        fiscal_range = serializer.save(clinic=clinic)
+        log_audit_event(request=request, clinic=clinic, action=AuditLog.Action.CREATE, module=AuditLog.Module.BILLING, model_name="FiscalDocumentRange", object_id=fiscal_range.id, object_repr=fiscal_range.full_start_number, description="Rango fiscal CAI creado.", new_values=serializer.validated_data)
+        return Response(FiscalDocumentRangeSerializer(fiscal_range).data, status=status.HTTP_201_CREATED)
+
+    def partial_update(self, request, *args, **kwargs):
+        if not can_config_fiscal(request.user):
+            return Response({"detail": "No tienes permiso para editar rangos CAI."}, status=status.HTTP_403_FORBIDDEN)
+        fiscal_range = self.get_object()
+        response = super().partial_update(request, *args, **kwargs)
+        log_audit_event(request=request, clinic=fiscal_range.clinic, action=AuditLog.Action.UPDATE, module=AuditLog.Module.BILLING, model_name="FiscalDocumentRange", object_id=fiscal_range.id, object_repr=fiscal_range.full_start_number, description="Rango fiscal CAI actualizado.", new_values=request.data)
+        return response
 
 
 class BillableServiceViewSet(viewsets.ModelViewSet):
@@ -119,6 +207,12 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(patient_id=p["patient"])
         if p.get("status"):
             queryset = queryset.filter(status=p["status"])
+        if p.get("fiscal_status"):
+            queryset = queryset.filter(fiscal_status=p["fiscal_status"])
+        if p.get("is_fiscal") is not None:
+            queryset = queryset.filter(is_fiscal=p["is_fiscal"].lower() in ["1", "true", "yes", "si"])
+        if p.get("fiscal_number"):
+            queryset = queryset.filter(fiscal_number__icontains=p["fiscal_number"])
         if p.get("invoice_number"):
             queryset = queryset.filter(invoice_number__icontains=p["invoice_number"])
         if p.get("created_by"):
@@ -161,6 +255,9 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         return Response(InvoiceDetailSerializer(invoice).data, status=status.HTTP_201_CREATED)
 
     def destroy(self, request, *args, **kwargs):
+        invoice = self.get_object()
+        if invoice.fiscal_status == Invoice.FiscalStatus.ISSUED:
+            return Response({"detail": "No puedes borrar una factura fiscal emitida. Debes anularla fiscalmente."}, status=status.HTTP_400_BAD_REQUEST)
         return self.void(request, *args, **kwargs)
 
     def update(self, request, *args, **kwargs):
@@ -180,6 +277,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         serializer = PaymentVoidSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         invoice = self.get_object()
+        if invoice.fiscal_status == Invoice.FiscalStatus.ISSUED:
+            return Response({"detail": "No puedes anular por esta via una factura fiscal emitida. Usa cancel-fiscal."}, status=status.HTTP_400_BAD_REQUEST)
         if invoice.status == Invoice.Status.ANULADA:
             return Response({"detail": "La factura ya esta anulada."}, status=status.HTTP_400_BAD_REQUEST)
         if invoice.paid_amount > 0:
@@ -198,6 +297,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         if not can_manage_billing(request.user):
             return Response({"detail": "No tienes permiso para recalcular facturas."}, status=status.HTTP_403_FORBIDDEN)
         invoice = self.get_object()
+        if invoice.fiscal_status == Invoice.FiscalStatus.ISSUED:
+            return Response({"detail": "No puedes recalcular una factura fiscal emitida."}, status=status.HTTP_400_BAD_REQUEST)
         invoice.recalculate()
         return Response(InvoiceDetailSerializer(invoice).data)
 
@@ -206,6 +307,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         invoice = self.get_object()
         if request.method == "GET":
             return Response(InvoiceItemSerializer(invoice.items.filter(active=True), many=True).data)
+        if invoice.fiscal_status == Invoice.FiscalStatus.ISSUED:
+            return Response({"detail": "No puedes agregar items a una factura fiscal emitida."}, status=status.HTTP_400_BAD_REQUEST)
         if not can_manage_billing(request.user):
             return Response({"detail": "No tienes permiso para agregar items."}, status=status.HTTP_403_FORBIDDEN)
         serializer = InvoiceItemSerializer(data=request.data)
@@ -216,6 +319,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get"], url_path="payments")
     def payments(self, request, pk=None):
         invoice = self.get_object()
+        if invoice.fiscal_status == Invoice.FiscalStatus.ISSUED:
+            return Response({"detail": "No puedes modificar una factura fiscal emitida."}, status=status.HTTP_400_BAD_REQUEST)
         queryset = invoice.payments.filter(active=True)
         return Response(PaymentListSerializer(queryset, many=True).data)
 
@@ -224,6 +329,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         if not can_manage_billing(request.user):
             return Response({"detail": "No tienes permiso para agregar consumos a facturas."}, status=status.HTTP_403_FORBIDDEN)
         invoice = self.get_object()
+        if invoice.fiscal_status == Invoice.FiscalStatus.ISSUED:
+            return Response({"detail": "No puedes modificar una factura fiscal emitida."}, status=status.HTTP_400_BAD_REQUEST)
         if invoice.status in [Invoice.Status.PAGADA, Invoice.Status.ANULADA]:
             return Response({"detail": "No puedes modificar una factura pagada o anulada."}, status=status.HTTP_400_BAD_REQUEST)
         serializer = AddConsumptionToInvoiceSerializer(data=request.data)
@@ -296,6 +403,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         invoice = self.get_object()
         if not can_manage_billing(request.user):
             return Response({"detail": "No tienes permiso para modificar items."}, status=status.HTTP_403_FORBIDDEN)
+        if invoice.fiscal_status == Invoice.FiscalStatus.ISSUED:
+            return Response({"detail": "No puedes modificar items de una factura fiscal emitida."}, status=status.HTTP_400_BAD_REQUEST)
         item = invoice.items.filter(id=item_id).first()
         if not item:
             return Response({"detail": "Item no encontrado."}, status=status.HTTP_404_NOT_FOUND)
@@ -378,6 +487,20 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 "paid": invoice.paid_amount,
                 "balance": invoice.balance_due,
                 "notes": invoice.notes,
+                "is_fiscal": invoice.is_fiscal,
+                "fiscal_status": invoice.fiscal_status,
+                "fiscal_number": invoice.fiscal_number,
+                "cai": invoice.cai,
+                "fiscal_range_start": invoice.fiscal_range_start,
+                "fiscal_range_end": invoice.fiscal_range_end,
+                "fiscal_expiration_date": invoice.fiscal_expiration_date,
+                "subtotal_exempt": invoice.subtotal_exempt,
+                "subtotal_exonerated": invoice.subtotal_exonerated,
+                "subtotal_taxed_15": invoice.subtotal_taxed_15,
+                "subtotal_taxed_18": invoice.subtotal_taxed_18,
+                "isv_15": invoice.isv_15,
+                "isv_18": invoice.isv_18,
+                "amount_in_words": invoice.amount_in_words,
             },
             "patient": {
                 "id": patient.id,
@@ -393,6 +516,106 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         }
         log_audit_event(request=request, clinic=invoice.clinic, action=AuditLog.Action.PRINT, module=AuditLog.Module.BILLING, model_name="Invoice", object_id=invoice.id, object_repr=invoice.invoice_number, description="Datos de impresion de factura consultados.")
         return Response(data)
+
+    @action(detail=True, methods=["post"], url_path="issue-fiscal")
+    def issue_fiscal(self, request, pk=None):
+        if not can_issue_fiscal(request.user):
+            return Response({"detail": "No tienes permiso para emitir facturas fiscales."}, status=status.HTTP_403_FORBIDDEN)
+        serializer = FiscalIssueSerializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+        invoice = self.get_object()
+        try:
+            invoice = issue_fiscal_invoice(invoice, request.user)
+        except DjangoValidationError as exc:
+            message = exc.messages[0]
+            severity = AuditLog.Severity.WARNING
+            log_audit_event(request=request, clinic=invoice.clinic, action=AuditLog.Action.INVOICE, module=AuditLog.Module.BILLING, model_name="Invoice", object_id=invoice.id, object_repr=invoice.invoice_number, description=f"Error al emitir factura fiscal: {message}", status=AuditLog.Status.FAILED, severity=severity)
+            return Response({"detail": message}, status=status.HTTP_400_BAD_REQUEST)
+        log_audit_event(request=request, clinic=invoice.clinic, action=AuditLog.Action.INVOICE, module=AuditLog.Module.BILLING, model_name="Invoice", object_id=invoice.id, object_repr=invoice.fiscal_number, description="Factura fiscal emitida.", new_values={"fiscal_number": invoice.fiscal_number, "cai": invoice.cai, "total": str(invoice.total_amount)})
+        return Response(InvoiceDetailSerializer(invoice).data)
+
+    @action(detail=True, methods=["post"], url_path="cancel-fiscal")
+    def cancel_fiscal(self, request, pk=None):
+        if not can_issue_fiscal(request.user):
+            return Response({"detail": "No tienes permiso para anular facturas fiscales."}, status=status.HTTP_403_FORBIDDEN)
+        serializer = FiscalCancelSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        invoice = self.get_object()
+        try:
+            invoice = cancel_fiscal_invoice(invoice, request.user, serializer.validated_data["reason"])
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+        log_audit_event(request=request, clinic=invoice.clinic, action=AuditLog.Action.CANCEL, module=AuditLog.Module.BILLING, model_name="Invoice", object_id=invoice.id, object_repr=invoice.fiscal_number, description="Factura fiscal anulada.", new_values={"reason": invoice.cancellation_reason})
+        return Response(InvoiceDetailSerializer(invoice).data)
+
+    @action(detail=True, methods=["get"], url_path="fiscal-print-data")
+    def fiscal_print_data(self, request, pk=None):
+        invoice = self.get_object()
+        if invoice.fiscal_status != Invoice.FiscalStatus.ISSUED and invoice.fiscal_status != Invoice.FiscalStatus.CANCELLED:
+            return Response({"detail": "La factura no esta emitida fiscalmente."}, status=status.HTTP_400_BAD_REQUEST)
+        response = self.print_data(request, pk)
+        response.data["fiscal"] = {
+            "number": invoice.fiscal_number,
+            "cai": invoice.cai,
+            "range_start": invoice.fiscal_range_start,
+            "range_end": invoice.fiscal_range_end,
+            "expiration_date": invoice.fiscal_expiration_date,
+            "emitter_rtn": invoice.emitter_rtn,
+            "emitter_legal_name": invoice.emitter_legal_name,
+            "emitter_commercial_name": invoice.emitter_commercial_name,
+            "emitter_address": invoice.emitter_address,
+            "customer_name": invoice.customer_name,
+            "customer_rtn": invoice.customer_rtn,
+            "customer_address": invoice.customer_address,
+        }
+        return response
+
+    @action(detail=True, methods=["get"], url_path="fiscal-pdf")
+    def fiscal_pdf(self, request, pk=None):
+        invoice = self.get_object()
+        if invoice.fiscal_status != Invoice.FiscalStatus.ISSUED and invoice.fiscal_status != Invoice.FiscalStatus.CANCELLED:
+            return Response({"detail": "No se puede generar PDF fiscal de una factura no emitida."}, status=status.HTTP_400_BAD_REQUEST)
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table as PdfTable
+
+        stream = BytesIO()
+        doc = SimpleDocTemplate(stream, pagesize=letter, rightMargin=32, leftMargin=32, topMargin=32, bottomMargin=32)
+        styles = getSampleStyleSheet()
+        story = [
+            Paragraph(invoice.emitter_legal_name, styles["Title"]),
+            Paragraph(f"RTN: {invoice.emitter_rtn}", styles["Normal"]),
+            Paragraph(invoice.emitter_address, styles["Normal"]),
+            Spacer(1, 8),
+            Paragraph(f"FACTURA FISCAL: {invoice.fiscal_number}", styles["Heading2"]),
+            Paragraph(f"CAI: {invoice.cai}", styles["Normal"]),
+            Paragraph(f"Rango autorizado: {invoice.fiscal_range_start} a {invoice.fiscal_range_end}", styles["Normal"]),
+            Paragraph(f"Fecha limite de emision: {invoice.fiscal_expiration_date}", styles["Normal"]),
+            Spacer(1, 8),
+            Paragraph(f"Cliente: {invoice.customer_name}", styles["Normal"]),
+            Paragraph(f"RTN cliente: {invoice.customer_rtn or '-'}", styles["Normal"]),
+        ]
+        rows = [["Cant.", "Descripcion", "Precio", "Desc.", "ISV", "Total"]]
+        for item in invoice.items.filter(active=True):
+            rows.append([str(item.quantity), item.description, str(item.unit_price), str(item.discount_amount), str(item.tax_amount), str(item.line_total)])
+        story.extend([Spacer(1, 10), PdfTable(rows), Spacer(1, 10)])
+        totals = [
+            ["Importe exento", invoice.subtotal_exempt],
+            ["Importe exonerado", invoice.subtotal_exonerated],
+            ["Importe gravado 15%", invoice.subtotal_taxed_15],
+            ["Importe gravado 18%", invoice.subtotal_taxed_18],
+            ["ISV 15%", invoice.isv_15],
+            ["ISV 18%", invoice.isv_18],
+            ["Total", invoice.total_amount],
+        ]
+        story.append(PdfTable([[label, f"L {value}"] for label, value in totals]))
+        story.append(Spacer(1, 8))
+        story.append(Paragraph(invoice.amount_in_words or "", styles["Normal"]))
+        doc.build(story)
+        log_audit_event(request=request, clinic=invoice.clinic, action=AuditLog.Action.DOWNLOAD, module=AuditLog.Module.BILLING, model_name="Invoice", object_id=invoice.id, object_repr=invoice.fiscal_number, description="PDF fiscal de factura descargado.")
+        response = HttpResponse(stream.getvalue(), content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="factura-fiscal-{invoice.fiscal_number}.pdf"'
+        return response
 
     @action(detail=True, methods=["get"], url_path="pdf")
     def pdf(self, request, pk=None):
@@ -548,3 +771,34 @@ class BillingStatsViewSet(viewsets.ViewSet):
             "transfer_today": payments.filter(payment_date=today, method=Payment.Method.TRANSFERENCIA).aggregate(v=Sum("amount"))["v"] or Decimal("0.00"),
         }
         return Response(BillingStatsSerializer(data).data)
+
+    @action(detail=False, methods=["get"], url_path="fiscal-summary")
+    def fiscal_summary(self, request):
+        invoices = scope(request, Invoice.objects.filter(is_fiscal=True))
+        ranges = scope(request, FiscalDocumentRange.objects.all())
+        p = request.query_params
+        if p.get("date_from"):
+            invoices = invoices.filter(issue_datetime__date__gte=p["date_from"])
+        if p.get("date_to"):
+            invoices = invoices.filter(issue_datetime__date__lte=p["date_to"])
+        if p.get("fiscal_status"):
+            invoices = invoices.filter(fiscal_status=p["fiscal_status"])
+        today = timezone.localdate()
+        return Response(
+            {
+                "issued_invoices": invoices.filter(fiscal_status=Invoice.FiscalStatus.ISSUED).count(),
+                "cancelled_invoices": invoices.filter(fiscal_status=Invoice.FiscalStatus.CANCELLED).count(),
+                "subtotal_taxed_15": invoices.aggregate(v=Sum("subtotal_taxed_15"))["v"] or Decimal("0.00"),
+                "subtotal_taxed_18": invoices.aggregate(v=Sum("subtotal_taxed_18"))["v"] or Decimal("0.00"),
+                "subtotal_exempt": invoices.aggregate(v=Sum("subtotal_exempt"))["v"] or Decimal("0.00"),
+                "subtotal_exonerated": invoices.aggregate(v=Sum("subtotal_exonerated"))["v"] or Decimal("0.00"),
+                "isv_15": invoices.aggregate(v=Sum("isv_15"))["v"] or Decimal("0.00"),
+                "isv_18": invoices.aggregate(v=Sum("isv_18"))["v"] or Decimal("0.00"),
+                "total_fiscal": invoices.aggregate(v=Sum("total_amount"))["v"] or Decimal("0.00"),
+                "active_ranges": FiscalDocumentRangeSerializer(ranges.filter(is_active=True), many=True).data,
+                "ranges_expiring_soon": FiscalDocumentRangeSerializer(ranges.filter(is_active=True, expiration_date__gte=today, expiration_date__lte=today + timedelta(days=30)), many=True).data,
+            }
+        )
+    FiscalCancelSerializer,
+    FiscalDocumentRangeSerializer,
+    FiscalIssueSerializer,

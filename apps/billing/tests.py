@@ -6,7 +6,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import Role, User
-from apps.billing.models import BillableService, CashSession, Invoice, InvoiceItem, Payment
+from apps.billing.models import BillableService, CashSession, ClinicFiscalProfile, FiscalDocumentRange, Invoice, InvoiceItem, Payment
 from apps.clinics.models import Clinic
 from apps.inventory.models import InventoryCategory, InventoryItem, InventoryMovement
 from apps.medical_records.models import ClinicalSupplyUsage
@@ -34,6 +34,32 @@ class BillingModuleTests(APITestCase):
         inv = Invoice.objects.create(patient=self.patient, created_by=self.admin)
         InvoiceItem.objects.create(invoice=inv, description="Consulta", quantity=1, unit_price=Decimal("500.00"))
         return inv
+
+    def fiscal_profile(self):
+        return ClinicFiscalProfile.objects.create(
+            clinic=self.clinic,
+            legal_name="Clinica Demo SA",
+            commercial_name="Clinica Demo",
+            rtn="08011999123456",
+            address="Barrio Centro",
+            is_fiscal_billing_enabled=True,
+        )
+
+    def fiscal_range(self, start=1, end=10, current=1, expiration=None):
+        return FiscalDocumentRange.objects.create(
+            clinic=self.clinic,
+            document_type=FiscalDocumentRange.DocumentType.INVOICE,
+            cai="DEMO-CAI-NO-VALIDO",
+            establishment_code="000",
+            emission_point_code="001",
+            document_type_code="01",
+            start_number=start,
+            end_number=end,
+            current_number=current,
+            start_date=(expiration - timedelta(days=30)) if expiration else timezone.localdate(),
+            expiration_date=expiration or timezone.localdate() + timedelta(days=30),
+            is_active=True,
+        )
 
     def test_admin_crea_servicio(self):
         self.auth(self.admin)
@@ -225,6 +251,74 @@ class BillingModuleTests(APITestCase):
         self.auth(self.patient_user)
         res = self.client.patch(f"/api/billing/invoices/{inv.id}/void/", {"reason": "x"}, format="json")
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_emitir_factura_fiscal_asigna_cai_y_correlativo(self):
+        self.fiscal_profile()
+        fiscal_range = self.fiscal_range()
+        inv = self.invoice()
+        self.auth(self.rec)
+        res = self.client.post(f"/api/billing/invoices/{inv.id}/issue-fiscal/", {}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["fiscal_number"], "000-001-01-00000001")
+        self.assertEqual(res.data["cai"], fiscal_range.cai)
+        inv.refresh_from_db()
+        fiscal_range.refresh_from_db()
+        self.assertTrue(inv.is_fiscal)
+        self.assertEqual(inv.fiscal_status, Invoice.FiscalStatus.ISSUED)
+        self.assertEqual(fiscal_range.current_number, 2)
+
+    def test_no_emitir_factura_fiscal_dos_veces(self):
+        self.fiscal_profile()
+        self.fiscal_range()
+        inv = self.invoice()
+        self.auth(self.rec)
+        self.assertEqual(self.client.post(f"/api/billing/invoices/{inv.id}/issue-fiscal/", {}, format="json").status_code, status.HTTP_200_OK)
+        again = self.client.post(f"/api/billing/invoices/{inv.id}/issue-fiscal/", {}, format="json")
+        self.assertEqual(again.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(again.data["detail"], "La factura fiscal ya fue emitida.")
+
+    def test_factura_fiscal_emitida_no_se_edita_ni_borra(self):
+        self.fiscal_profile()
+        self.fiscal_range()
+        inv = self.invoice()
+        self.auth(self.rec)
+        self.client.post(f"/api/billing/invoices/{inv.id}/issue-fiscal/", {}, format="json")
+        patch = self.client.patch(f"/api/billing/invoices/{inv.id}/", {"notes": "x"}, format="json")
+        delete = self.client.delete(f"/api/billing/invoices/{inv.id}/", format="json")
+        item = inv.items.first()
+        item_patch = self.client.patch(f"/api/billing/invoices/{inv.id}/items/{item.id}/", {"description": "Nueva"}, format="json")
+        self.assertEqual(patch.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(delete.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(item_patch.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_no_emitir_sin_perfil_o_con_rango_vencido_o_agotado(self):
+        inv = self.invoice()
+        self.auth(self.rec)
+        res = self.client.post(f"/api/billing/invoices/{inv.id}/issue-fiscal/", {}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.fiscal_profile()
+        self.fiscal_range(expiration=timezone.localdate() - timedelta(days=1))
+        res = self.client.post(f"/api/billing/invoices/{inv.id}/issue-fiscal/", {}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        FiscalDocumentRange.objects.all().delete()
+        self.fiscal_range(start=1, end=1, current=1)
+        one = self.client.post(f"/api/billing/invoices/{inv.id}/issue-fiscal/", {}, format="json")
+        self.assertEqual(one.status_code, status.HTTP_200_OK)
+        second = self.invoice()
+        exhausted = self.client.post(f"/api/billing/invoices/{second.id}/issue-fiscal/", {}, format="json")
+        self.assertEqual(exhausted.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_anular_factura_fiscal_no_reutiliza_numero(self):
+        self.fiscal_profile()
+        self.fiscal_range()
+        inv = self.invoice()
+        self.auth(self.rec)
+        self.client.post(f"/api/billing/invoices/{inv.id}/issue-fiscal/", {}, format="json")
+        cancel = self.client.post(f"/api/billing/invoices/{inv.id}/cancel-fiscal/", {"reason": "Error en cliente"}, format="json")
+        self.assertEqual(cancel.status_code, status.HTTP_200_OK)
+        new_inv = self.invoice()
+        issue = self.client.post(f"/api/billing/invoices/{new_inv.id}/issue-fiscal/", {}, format="json")
+        self.assertEqual(issue.data["fiscal_number"], "000-001-01-00000002")
 
     def test_caja_abrir_doble_y_cerrar(self):
         self.auth(self.rec)

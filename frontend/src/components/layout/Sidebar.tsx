@@ -86,6 +86,7 @@ const adminGroups: NavGroup[] = [
       { label: "Pagos", path: "/clinic/billing/payments" },
       { label: "Caja", path: "/clinic/billing/cash" },
       { label: "Servicios", path: "/clinic/billing/services" },
+      { label: "Fiscal / CAI", path: "/clinic/settings/fiscal" },
     ],
   },
   {
@@ -242,6 +243,7 @@ const receptionistGroups: NavGroup[] = [
       { label: "Facturas", path: "/clinic/billing/invoices" },
       { label: "Pagos", path: "/clinic/billing/payments" },
       { label: "Caja", path: "/clinic/billing/cash" },
+      { label: "Fiscal / CAI", path: "/clinic/settings/fiscal" },
     ],
   },
   {

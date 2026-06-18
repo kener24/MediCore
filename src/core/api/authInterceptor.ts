@@ -34,7 +34,7 @@ function extractErrorMessage(error: AxiosError) {
 
   if (status === 401) return 'Tu sesión expiró. Inicia sesión nuevamente.';
   if (status === 403) return 'No tienes permisos para realizar esta acción.';
-  if (status >= 500) return 'El servidor no pudo responder. Intenta mas tarde.';
+  if (status >= 500) return 'El servidor no pudo responder. Intenta más tarde.';
 
   if (payload && typeof payload === 'object') {
     const data = payload as Record<string, unknown>;

@@ -7,9 +7,11 @@ import { DoctorClinicalConsumptionScreen } from '@/features/doctor/screens/Docto
 import { DoctorConsultationScreen } from '@/features/doctor/screens/DoctorConsultationScreen';
 import { DoctorConsultationSummaryScreen } from '@/features/doctor/screens/DoctorConsultationSummaryScreen';
 import { DoctorDashboardScreen } from '@/features/doctor/screens/DoctorDashboardScreen';
+import { DoctorMedicalOrderDetailScreen } from '@/features/doctor/screens/DoctorMedicalOrderDetailScreen';
 import { DoctorMedicalOrderScreen } from '@/features/doctor/screens/DoctorMedicalOrderScreen';
 import { DoctorNotificationsScreen } from '@/features/doctor/screens/DoctorNotificationsScreen';
 import { DoctorPatientDetailScreen } from '@/features/doctor/screens/DoctorPatientDetailScreen';
+import { DoctorPrescriptionDetailScreen } from '@/features/doctor/screens/DoctorPrescriptionDetailScreen';
 import { DoctorPrescriptionScreen } from '@/features/doctor/screens/DoctorPrescriptionScreen';
 import { DoctorProfileScreen } from '@/features/doctor/screens/DoctorProfileScreen';
 import { DoctorScheduleScreen } from '@/features/doctor/screens/DoctorScheduleScreen';
@@ -30,7 +32,9 @@ function DoctorHomeStack() {
       <Stack.Screen component={DoctorTriageDetailScreen} name="DoctorTriageDetail" />
       <Stack.Screen component={DoctorConsultationScreen} name="DoctorConsultation" />
       <Stack.Screen component={DoctorPrescriptionScreen} name="DoctorPrescription" />
+      <Stack.Screen component={DoctorPrescriptionDetailScreen} name="DoctorPrescriptionDetail" />
       <Stack.Screen component={DoctorMedicalOrderScreen} name="DoctorMedicalOrder" />
+      <Stack.Screen component={DoctorMedicalOrderDetailScreen} name="DoctorMedicalOrderDetail" />
       <Stack.Screen component={DoctorClinicalConsumptionScreen} name="DoctorClinicalConsumption" />
       <Stack.Screen component={DoctorConsultationSummaryScreen} name="DoctorConsultationSummary" />
       <Stack.Screen component={DoctorConsultationSummaryScreen} name="DoctorCompleteConsultation" />
@@ -59,7 +63,9 @@ function DoctorWaitingRoomStack() {
       <Stack.Screen component={DoctorTriageDetailScreen} name="DoctorTriageDetail" />
       <Stack.Screen component={DoctorConsultationScreen} name="DoctorConsultation" />
       <Stack.Screen component={DoctorPrescriptionScreen} name="DoctorPrescription" />
+      <Stack.Screen component={DoctorPrescriptionDetailScreen} name="DoctorPrescriptionDetail" />
       <Stack.Screen component={DoctorMedicalOrderScreen} name="DoctorMedicalOrder" />
+      <Stack.Screen component={DoctorMedicalOrderDetailScreen} name="DoctorMedicalOrderDetail" />
       <Stack.Screen component={DoctorClinicalConsumptionScreen} name="DoctorClinicalConsumption" />
       <Stack.Screen component={DoctorConsultationSummaryScreen} name="DoctorConsultationSummary" />
       <Stack.Screen component={DoctorConsultationSummaryScreen} name="DoctorCompleteConsultation" />
@@ -72,7 +78,9 @@ function DoctorConsultationsStack() {
     <Stack.Navigator screenOptions={stackOptions}>
       <Stack.Screen component={DoctorConsultationScreen} name="DoctorConsultation" />
       <Stack.Screen component={DoctorPrescriptionScreen} name="DoctorPrescription" />
+      <Stack.Screen component={DoctorPrescriptionDetailScreen} name="DoctorPrescriptionDetail" />
       <Stack.Screen component={DoctorMedicalOrderScreen} name="DoctorMedicalOrder" />
+      <Stack.Screen component={DoctorMedicalOrderDetailScreen} name="DoctorMedicalOrderDetail" />
       <Stack.Screen component={DoctorClinicalConsumptionScreen} name="DoctorClinicalConsumption" />
       <Stack.Screen component={DoctorConsultationSummaryScreen} name="DoctorConsultationSummary" />
       <Stack.Screen component={DoctorConsultationSummaryScreen} name="DoctorCompleteConsultation" />

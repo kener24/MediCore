@@ -20,9 +20,11 @@ const emptyMedication: PrescriptionMedicationPayload = {
 };
 
 export function PrescriptionForm({
+  disabled,
   onSubmit,
   submitting,
 }: {
+  disabled?: boolean;
   onSubmit: (payload: CreatePrescriptionPayload) => Promise<void>;
   submitting?: boolean;
 }) {
@@ -41,6 +43,7 @@ export function PrescriptionForm({
   }
 
   async function submit() {
+    if (disabled) return;
     if (!medications.length) return Alert.alert('Receta médica', 'Agrega al menos un medicamento.');
     for (const item of medications) {
       if (!item.medication_name.trim()) return Alert.alert('Receta médica', 'Escribe el nombre del medicamento.');
@@ -66,6 +69,7 @@ export function PrescriptionForm({
     <AppCard style={styles.form}>
       {medications.map((item, index) => (
         <MedicationFormItem
+          disabled={disabled}
           index={index}
           item={item}
           key={index}
@@ -74,10 +78,10 @@ export function PrescriptionForm({
           removable={medications.length > 1}
         />
       ))}
-      <AppButton label="Agregar medicamento" onPress={() => setMedications((current) => [...current, { ...emptyMedication }])} variant="secondary" />
-      <AppInput label="Instrucciones generales" multiline onChangeText={setGeneralInstructions} value={generalInstructions} />
-      <AppInput label="Notas" multiline onChangeText={setNotes} value={notes} />
-      <AppButton label="Guardar receta" loading={submitting} onPress={submit} />
+      <AppButton disabled={disabled} label="Agregar medicamento" onPress={() => setMedications((current) => [...current, { ...emptyMedication }])} variant="secondary" />
+      <AppInput editable={!disabled} label="Instrucciones generales" multiline onChangeText={setGeneralInstructions} value={generalInstructions} />
+      <AppInput editable={!disabled} label="Notas" multiline onChangeText={setNotes} value={notes} />
+      <AppButton disabled={disabled} label="Guardar receta" loading={submitting} onPress={submit} />
     </AppCard>
   );
 }

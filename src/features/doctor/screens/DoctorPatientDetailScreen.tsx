@@ -116,7 +116,7 @@ export function DoctorPatientDetailScreen() {
       setTriage(triageData);
       setMedicalSummary(medicalData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo cargar la informacion del paciente.');
+      setError(err instanceof Error ? err.message : 'No se pudo cargar la información del paciente.');
     } finally {
       setLoading(false);
     }
@@ -187,7 +187,7 @@ export function DoctorPatientDetailScreen() {
         <ScrollView contentContainerStyle={styles.content}>
           <DoctorHeader title="Detalle del paciente" />
           <EmptyState
-            description="No se encontro informacion suficiente para abrir este paciente."
+            description="No se encontró información suficiente para abrir este paciente."
             title="Paciente no disponible"
           />
           <AppButton label="Volver" onPress={() => navigation.goBack()} variant="secondary" />

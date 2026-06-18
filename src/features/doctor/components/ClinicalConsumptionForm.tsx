@@ -9,12 +9,14 @@ import { InventoryItemSelector } from '@/features/doctor/components/InventoryIte
 import type { ClinicalConsumptionPayload, InventoryItem } from '@/features/doctor/types/doctorClinicalConsumption.types';
 
 export function ClinicalConsumptionForm({
+  disabled,
   inventoryItems = [],
   onChangeSearch,
   onSubmit,
   search = '',
   submitting,
 }: {
+  disabled?: boolean;
   inventoryItems?: InventoryItem[];
   onChangeSearch?: (value: string) => void;
   onSubmit: (payload: ClinicalConsumptionPayload) => Promise<void>;
@@ -28,6 +30,7 @@ export function ClinicalConsumptionForm({
   const [billable, setBillable] = useState(true);
 
   async function submit() {
+    if (disabled) return;
     const numericQuantity = Number(quantity);
     const stock = selectedItem?.stock === undefined ? undefined : Number(selectedItem.stock);
     if (!selectedItem && !itemName.trim()) return Alert.alert('Consumo clínico', 'Selecciona un insumo.');
@@ -47,21 +50,22 @@ export function ClinicalConsumptionForm({
       {onChangeSearch ? (
         <InventoryItemSelector items={inventoryItems} onChangeSearch={onChangeSearch} onSelect={setSelectedItem} search={search} selected={selectedItem} />
       ) : null}
-      {!selectedItem ? <AppInput label="Insumo o producto" onChangeText={setItemName} value={itemName} /> : null}
-      <AppInput keyboardType="numeric" label="Cantidad" onChangeText={setQuantity} value={quantity} />
-      <AppInput label="Notas" multiline onChangeText={setNotes} value={notes} />
+      {!selectedItem ? <AppInput editable={!disabled} label="Insumo o producto" onChangeText={setItemName} value={itemName} /> : null}
+      <AppInput editable={!disabled} keyboardType="numeric" label="Cantidad" onChangeText={(value) => setQuantity(value.replace(/[^0-9.]/g, ''))} value={quantity} />
+      <AppInput editable={!disabled} label="Notas" multiline onChangeText={setNotes} value={notes} />
       <View style={styles.row}>
         <Text style={styles.label}>Facturable</Text>
-        <Pressable onPress={() => setBillable((value) => !value)} style={[styles.toggle, billable && styles.toggleActive]}>
+        <Pressable disabled={disabled} onPress={() => setBillable((value) => !value)} style={[styles.toggle, billable && styles.toggleActive, disabled && styles.disabled]}>
           <Text style={[styles.toggleText, billable && styles.toggleTextActive]}>{billable ? 'Sí' : 'No'}</Text>
         </Pressable>
       </View>
-      <AppButton label="Registrar consumo clínico" loading={submitting} onPress={submit} />
+      <AppButton disabled={disabled} label="Registrar consumo clínico" loading={submitting} onPress={submit} />
     </AppCard>
   );
 }
 
 const styles = StyleSheet.create({
+  disabled: { opacity: 0.55 },
   form: { gap: 14 },
   label: { color: colors.ink, fontSize: 14, fontWeight: '900' },
   row: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },

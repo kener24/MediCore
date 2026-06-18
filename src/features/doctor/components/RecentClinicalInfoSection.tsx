@@ -14,13 +14,13 @@ export function RecentClinicalInfoSection({
     <AppCard style={styles.card}>
       <Text style={styles.title}>Informacion clinica reciente</Text>
       <Group
-        empty="No hay diagnosticos recientes."
+        empty="No hay diagnósticos recientes."
         items={(medicalSummary?.last_diagnoses ?? []).slice(0, 3).map((item) => ({
           id: item.id,
           subtitle: [formatDate(item.date ?? item.fecha), item.doctor_name].filter(Boolean).join(' - '),
-          title: item.diagnosis ?? item.diagnostico ?? 'Diagnostico no indicado',
+          title: item.diagnosis ?? item.diagnostico ?? 'Diagnóstico no indicado',
         }))}
-        title="Ultimos diagnosticos"
+        title="Últimos diagnósticos"
       />
       <Group
         empty="No hay recetas recientes."

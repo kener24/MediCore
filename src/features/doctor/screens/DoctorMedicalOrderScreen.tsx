@@ -4,6 +4,7 @@ import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'r
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
+import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
@@ -12,6 +13,7 @@ import { MedicalOrderForm } from '@/features/doctor/components/MedicalOrderForm'
 import { MedicalOrderPreviewCard } from '@/features/doctor/components/MedicalOrderPreviewCard';
 import { resolveRequiredConsultation } from '@/features/doctor/services/doctorConsultationContextService';
 import { createMedicalOrder, getConsultationMedicalOrders } from '@/features/doctor/services/doctorMedicalOrderService';
+import { isConsultationFinalized } from '@/features/doctor/types/commonDoctor.types';
 import type { CreateMedicalOrderPayload, DoctorMedicalOrder } from '@/features/doctor/types/doctorMedicalOrder.types';
 
 export function DoctorMedicalOrderScreen() {
@@ -22,6 +24,7 @@ export function DoctorMedicalOrderScreen() {
   const [items, setItems] = useState<DoctorMedicalOrder[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [readOnly, setReadOnly] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const load = useCallback(async () => {
@@ -30,6 +33,7 @@ export function DoctorMedicalOrderScreen() {
     try {
       const context = await resolveRequiredConsultation(params);
       setConsultationId(context.consultationId);
+      setReadOnly(isConsultationFinalized(context.consultation?.status));
       if (context.consultationId) setItems(await getConsultationMedicalOrders(context.consultationId).catch(() => []));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'El módulo de órdenes médicas aún no está disponible.');
@@ -43,6 +47,7 @@ export function DoctorMedicalOrderScreen() {
   }, [load]);
 
   async function submit(payload: CreateMedicalOrderPayload) {
+    if (readOnly) return Alert.alert('Orden médica', 'Esta consulta ya fue finalizada.');
     if (!consultationId) return Alert.alert('Orden médica', 'Primero debes iniciar o guardar la consulta médica.');
     setSubmitting(true);
     try {
@@ -64,8 +69,12 @@ export function DoctorMedicalOrderScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboard}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <DoctorHeader title="Orden médica" />
-          <MedicalOrderPreviewCard items={items} />
-          <MedicalOrderForm onSubmit={submit} submitting={submitting} />
+          {readOnly ? <EmptyState description="Puedes consultar órdenes existentes, pero no crear nuevas." title="Consulta finalizada" /> : null}
+          <MedicalOrderPreviewCard
+            items={items}
+            onPressItem={(item) => navigation.navigate('DoctorMedicalOrderDetail', { order: item, orderId: item.id })}
+          />
+          <MedicalOrderForm disabled={readOnly} onSubmit={submit} submitting={submitting} />
           <AppButton label="Volver" onPress={() => navigation.goBack()} variant="secondary" />
         </ScrollView>
       </KeyboardAvoidingView>

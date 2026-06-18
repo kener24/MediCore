@@ -22,9 +22,11 @@ const priorities: { label: string; value: MedicalOrderPriority }[] = [
 ];
 
 export function MedicalOrderForm({
+  disabled,
   onSubmit,
   submitting,
 }: {
+  disabled?: boolean;
   onSubmit: (payload: CreateMedicalOrderPayload) => Promise<void>;
   submitting?: boolean;
 }) {
@@ -35,6 +37,7 @@ export function MedicalOrderForm({
   const [notes, setNotes] = useState('');
 
   async function submit() {
+    if (disabled) return;
     if (!orderType) return Alert.alert('Orden médica', 'Selecciona el tipo de orden.');
     if (description.trim().length < 5) return Alert.alert('Orden médica', 'Escribe la descripción de la orden.');
     await onSubmit({
@@ -50,10 +53,10 @@ export function MedicalOrderForm({
     <AppCard style={styles.form}>
       <MedicalOrderTypeSelector label="Tipo de orden" onChange={setOrderType} options={orderTypes} value={orderType} />
       <MedicalOrderTypeSelector label="Prioridad" onChange={setPriority} options={priorities} value={priority} />
-      <AppInput label="Descripción" multiline onChangeText={setDescription} value={description} />
-      <AppInput label="Instrucciones" multiline onChangeText={setInstructions} value={instructions} />
-      <AppInput label="Notas" multiline onChangeText={setNotes} value={notes} />
-      <AppButton label="Guardar orden médica" loading={submitting} onPress={submit} />
+      <AppInput editable={!disabled} label="Descripción" multiline onChangeText={setDescription} value={description} />
+      <AppInput editable={!disabled} label="Instrucciones" multiline onChangeText={setInstructions} value={instructions} />
+      <AppInput editable={!disabled} label="Notas" multiline onChangeText={setNotes} value={notes} />
+      <AppButton disabled={disabled} label="Guardar orden médica" loading={submitting} onPress={submit} />
     </AppCard>
   );
 }

@@ -20,3 +20,9 @@ export type DoctorApiFallback<T> = {
   data: T;
   unavailable?: boolean;
 };
+
+const finalizedStatuses = ['completed', 'complete', 'completada', 'finalizada', 'atendida', 'closed', 'cerrada'];
+
+export function isConsultationFinalized(status?: string | null) {
+  return finalizedStatuses.includes((status ?? '').trim().toLowerCase());
+}

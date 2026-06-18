@@ -30,6 +30,7 @@ import {
   getVisitTriage,
   getVisitVitalSigns,
 } from '@/features/doctor/services/doctorPatientService';
+import { isConsultationFinalized } from '@/features/doctor/types/commonDoctor.types';
 import type {
   ConsultationFormValues,
   ConsultationPayload,
@@ -88,7 +89,7 @@ export function DoctorConsultationScreen() {
     (typeof consultation?.patient === 'number' ? consultation.patient : undefined) ??
     visit?.patient_id ??
     visit?.paciente_id;
-  const completed = ['completed', 'completada', 'finalizada', 'atendida'].includes((consultation?.status ?? '').toLowerCase());
+  const completed = isConsultationFinalized(consultation?.status);
 
   const load = useCallback(async () => {
     if (!params.visitId) {

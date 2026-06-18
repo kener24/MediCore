@@ -24,9 +24,14 @@ const enabledRoles: AppRole[] = ['paciente', 'medico', 'doctor', 'recepcionista'
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 function resolveAppRole(role: RoleName | null): AppRole | null {
-  if (role === 'doctor') return 'medico';
-  if (role && enabledRoles.includes(role as AppRole)) {
-    return role as AppRole;
+  const normalized = role
+    ?.toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+  if (normalized === 'doctor') return 'medico';
+  if (normalized && enabledRoles.includes(normalized as AppRole)) {
+    return normalized as AppRole;
   }
   return null;
 }

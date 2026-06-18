@@ -6,7 +6,7 @@ import { colors } from '@/core/theme/colors';
 export function ErrorState({
   message,
   onRetry,
-  title = 'Ocurrio un problema',
+  title = 'Ocurrió un problema',
 }: {
   message?: string;
   onRetry?: () => void;

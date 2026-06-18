@@ -17,6 +17,7 @@ import {
   getAvailableInventoryItems,
   getConsultationConsumptions,
 } from '@/features/doctor/services/doctorClinicalConsumptionService';
+import { isConsultationFinalized } from '@/features/doctor/types/commonDoctor.types';
 import type {
   ClinicalConsumptionPayload,
   DoctorClinicalConsumption,
@@ -34,6 +35,7 @@ export function DoctorClinicalConsumptionScreen() {
   const [error, setError] = useState('');
   const [inventoryUnavailable, setInventoryUnavailable] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [readOnly, setReadOnly] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const load = useCallback(async () => {
@@ -42,6 +44,7 @@ export function DoctorClinicalConsumptionScreen() {
     try {
       const context = await resolveRequiredConsultation(params);
       setConsultationId(context.consultationId);
+      setReadOnly(isConsultationFinalized(context.consultation?.status));
       if (context.consultationId) setItems(await getConsultationConsumptions(context.consultationId).catch(() => []));
       const inventory = await getAvailableInventoryItems().catch(() => null);
       if (inventory) setInventoryItems(inventory);
@@ -64,6 +67,7 @@ export function DoctorClinicalConsumptionScreen() {
   }
 
   async function submit(payload: ClinicalConsumptionPayload) {
+    if (readOnly) return Alert.alert('Consumo clínico', 'Esta consulta ya fue finalizada.');
     if (!consultationId) return Alert.alert('Consumo clínico', 'Primero debes iniciar o guardar la consulta médica.');
     setSubmitting(true);
     try {
@@ -85,13 +89,15 @@ export function DoctorClinicalConsumptionScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboard}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <DoctorHeader title="Consumo clínico" />
+          {readOnly ? <EmptyState description="Puedes consultar consumos existentes, pero no crear nuevos." title="Consulta finalizada" /> : null}
           {inventoryUnavailable ? (
             <EmptyState description="Puedes registrar el insumo manualmente si el backend lo permite." title="Inventario no conectado" />
           ) : null}
           <ClinicalConsumptionCard items={items} />
           <ClinicalConsumptionForm
+            disabled={readOnly}
             inventoryItems={inventoryItems}
-            onChangeSearch={inventoryUnavailable ? undefined : changeSearch}
+            onChangeSearch={inventoryUnavailable || readOnly ? undefined : changeSearch}
             onSubmit={submit}
             search={search}
             submitting={submitting}

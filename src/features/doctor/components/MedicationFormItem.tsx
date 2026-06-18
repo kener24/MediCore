@@ -6,12 +6,14 @@ import { colors } from '@/core/theme/colors';
 import type { PrescriptionMedicationPayload } from '@/features/doctor/types/doctorPrescription.types';
 
 export function MedicationFormItem({
+  disabled,
   index,
   item,
   onRemove,
   onUpdate,
   removable,
 }: {
+  disabled?: boolean;
   index: number;
   item: PrescriptionMedicationPayload;
   onRemove: () => void;
@@ -22,14 +24,22 @@ export function MedicationFormItem({
     <View style={styles.medication}>
       <View style={styles.header}>
         <Text style={styles.subtitle}>Medicamento {index + 1}</Text>
-        {removable ? <AppButton label="Eliminar" onPress={onRemove} style={styles.removeButton} variant="danger" /> : null}
+        {removable ? (
+          <AppButton disabled={disabled} label="Eliminar" onPress={onRemove} style={styles.removeButton} variant="danger" />
+        ) : null}
       </View>
-      <AppInput label="Medicamento" onChangeText={(value) => onUpdate('medication_name', value)} value={item.medication_name} />
-      <AppInput label="Dosis" onChangeText={(value) => onUpdate('dosage', value)} value={item.dosage} />
-      <AppInput label="Frecuencia" onChangeText={(value) => onUpdate('frequency', value)} value={item.frequency} />
-      <AppInput label="Duración" onChangeText={(value) => onUpdate('duration', value)} value={item.duration} />
-      <AppInput keyboardType="numeric" label="Cantidad" onChangeText={(value) => onUpdate('quantity', value)} value={String(item.quantity ?? '')} />
-      <AppInput label="Indicaciones" multiline onChangeText={(value) => onUpdate('instructions', value)} value={item.instructions ?? ''} />
+      <AppInput editable={!disabled} label="Medicamento" onChangeText={(value) => onUpdate('medication_name', value)} value={item.medication_name} />
+      <AppInput editable={!disabled} label="Dosis" onChangeText={(value) => onUpdate('dosage', value)} value={item.dosage} />
+      <AppInput editable={!disabled} label="Frecuencia" onChangeText={(value) => onUpdate('frequency', value)} value={item.frequency} />
+      <AppInput editable={!disabled} label="Duración" onChangeText={(value) => onUpdate('duration', value)} value={item.duration} />
+      <AppInput
+        editable={!disabled}
+        keyboardType="numeric"
+        label="Cantidad"
+        onChangeText={(value) => onUpdate('quantity', value.replace(/[^0-9.]/g, ''))}
+        value={String(item.quantity ?? '')}
+      />
+      <AppInput editable={!disabled} label="Indicaciones" multiline onChangeText={(value) => onUpdate('instructions', value)} value={item.instructions ?? ''} />
     </View>
   );
 }

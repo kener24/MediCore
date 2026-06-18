@@ -17,7 +17,7 @@ export async function getFirstAvailable<T>(
       }
     }
   }
-  throw lastError instanceof Error ? lastError : new Error('Este modulo aun no esta disponible.');
+  throw lastError instanceof Error ? lastError : new Error('Este módulo aún no está disponible.');
 }
 
 export async function postFirstAvailable<T>(urls: string[], payload?: unknown) {
@@ -33,7 +33,7 @@ export async function postFirstAvailable<T>(urls: string[], payload?: unknown) {
       }
     }
   }
-  throw lastError instanceof Error ? lastError : new Error('Este modulo aun no esta disponible.');
+  throw lastError instanceof Error ? lastError : new Error('Este módulo aún no está disponible.');
 }
 
 export async function patchFirstAvailable<T>(urls: string[], payload?: unknown) {
@@ -49,5 +49,5 @@ export async function patchFirstAvailable<T>(urls: string[], payload?: unknown) 
       }
     }
   }
-  throw lastError instanceof Error ? lastError : new Error('Este modulo aun no esta disponible.');
+  throw lastError instanceof Error ? lastError : new Error('Este módulo aún no está disponible.');
 }

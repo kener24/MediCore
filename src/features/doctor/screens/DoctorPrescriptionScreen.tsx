@@ -4,6 +4,7 @@ import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'r
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
+import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
@@ -12,6 +13,7 @@ import { PrescriptionForm } from '@/features/doctor/components/PrescriptionForm'
 import { PrescriptionPreviewCard } from '@/features/doctor/components/PrescriptionPreviewCard';
 import { resolveRequiredConsultation } from '@/features/doctor/services/doctorConsultationContextService';
 import { createPrescription, getConsultationPrescriptions } from '@/features/doctor/services/doctorPrescriptionService';
+import { isConsultationFinalized } from '@/features/doctor/types/commonDoctor.types';
 import type { CreatePrescriptionPayload, DoctorPrescription } from '@/features/doctor/types/doctorPrescription.types';
 
 export function DoctorPrescriptionScreen() {
@@ -22,6 +24,7 @@ export function DoctorPrescriptionScreen() {
   const [items, setItems] = useState<DoctorPrescription[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [readOnly, setReadOnly] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const load = useCallback(async () => {
@@ -30,6 +33,7 @@ export function DoctorPrescriptionScreen() {
     try {
       const context = await resolveRequiredConsultation(params);
       setConsultationId(context.consultationId);
+      setReadOnly(isConsultationFinalized(context.consultation?.status));
       if (context.consultationId) setItems(await getConsultationPrescriptions(context.consultationId).catch(() => []));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'El módulo de recetas aún no está disponible.');
@@ -43,6 +47,7 @@ export function DoctorPrescriptionScreen() {
   }, [load]);
 
   async function submit(payload: CreatePrescriptionPayload) {
+    if (readOnly) return Alert.alert('Receta médica', 'Esta consulta ya fue finalizada.');
     if (!consultationId) return Alert.alert('Receta médica', 'Primero debes iniciar o guardar la consulta médica.');
     setSubmitting(true);
     try {
@@ -64,8 +69,12 @@ export function DoctorPrescriptionScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboard}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <DoctorHeader title="Receta médica" />
-          <PrescriptionPreviewCard items={items} />
-          <PrescriptionForm onSubmit={submit} submitting={submitting} />
+          {readOnly ? <EmptyState description="Puedes consultar recetas existentes, pero no crear nuevas." title="Consulta finalizada" /> : null}
+          <PrescriptionPreviewCard
+            items={items}
+            onPressItem={(item) => navigation.navigate('DoctorPrescriptionDetail', { prescription: item, prescriptionId: item.id })}
+          />
+          <PrescriptionForm disabled={readOnly} onSubmit={submit} submitting={submitting} />
           <AppButton label="Volver" onPress={() => navigation.goBack()} variant="secondary" />
         </ScrollView>
       </KeyboardAvoidingView>

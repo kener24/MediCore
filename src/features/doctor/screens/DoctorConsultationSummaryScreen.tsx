@@ -21,6 +21,7 @@ import { resolveRequiredConsultation } from '@/features/doctor/services/doctorCo
 import { getConsultationConsumptions } from '@/features/doctor/services/doctorClinicalConsumptionService';
 import { getConsultationMedicalOrders } from '@/features/doctor/services/doctorMedicalOrderService';
 import { getConsultationPrescriptions } from '@/features/doctor/services/doctorPrescriptionService';
+import { isConsultationFinalized } from '@/features/doctor/types/commonDoctor.types';
 import type { DoctorConsultation } from '@/features/doctor/types/doctorConsultation.types';
 import type { DoctorClinicalConsumption } from '@/features/doctor/types/doctorClinicalConsumption.types';
 import type { DoctorMedicalOrder } from '@/features/doctor/types/doctorMedicalOrder.types';
@@ -70,6 +71,7 @@ export function DoctorConsultationSummaryScreen() {
   }, [load]);
 
   function confirmFinish() {
+    if (isConsultationFinalized(consultation?.status)) return Alert.alert('Finalizar atención', 'Esta consulta ya fue finalizada.');
     if (!consultationId) return Alert.alert('Finalizar atención', 'No se encontró la consulta.');
     if (!visitId) return Alert.alert('Finalizar atención', 'No se encontró la visita.');
     if (!consultation?.chief_complaint?.trim()) return Alert.alert('Finalizar atención', 'Escribe el motivo principal antes de finalizar.');
@@ -98,6 +100,7 @@ export function DoctorConsultationSummaryScreen() {
 
   if (loading) return <LoadingState label="Cargando resumen de consulta..." />;
   if (error) return <ErrorState message={error} onRetry={load} title="No se pudo cargar el resumen" />;
+  const completed = isConsultationFinalized(consultation?.status);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -113,14 +116,20 @@ export function DoctorConsultationSummaryScreen() {
           <Info label="Plan" value={consultation?.plan ?? consultation?.treatment_plan} />
           <Info label="Recomendaciones" value={consultation?.recommendations} />
         </AppCard>
-        <PrescriptionPreviewCard items={prescriptions} />
-        <MedicalOrderPreviewCard items={orders} />
+        <PrescriptionPreviewCard
+          items={prescriptions}
+          onPressItem={(item) => navigation.navigate('DoctorPrescriptionDetail', { prescription: item, prescriptionId: item.id })}
+        />
+        <MedicalOrderPreviewCard
+          items={orders}
+          onPressItem={(item) => navigation.navigate('DoctorMedicalOrderDetail', { order: item, orderId: item.id })}
+        />
         <ClinicalConsumptionCard items={consumptions} />
-        <AppButton label="Agregar receta" onPress={() => navigation.navigate('DoctorPrescription', { consultationId, patientId: params.patientId, visitId })} variant="secondary" />
-        <AppButton label="Agregar orden médica" onPress={() => navigation.navigate('DoctorMedicalOrder', { consultationId, patientId: params.patientId, visitId })} variant="secondary" />
-        <AppButton label="Agregar consumo clínico" onPress={() => navigation.navigate('DoctorClinicalConsumption', { consultationId, patientId: params.patientId, visitId })} variant="secondary" />
+        <AppButton disabled={completed} label="Agregar receta" onPress={() => navigation.navigate('DoctorPrescription', { consultationId, patientId: params.patientId, visitId })} variant="secondary" />
+        <AppButton disabled={completed} label="Agregar orden médica" onPress={() => navigation.navigate('DoctorMedicalOrder', { consultationId, patientId: params.patientId, visitId })} variant="secondary" />
+        <AppButton disabled={completed} label="Agregar consumo clínico" onPress={() => navigation.navigate('DoctorClinicalConsumption', { consultationId, patientId: params.patientId, visitId })} variant="secondary" />
         <AppButton label="Volver a editar consulta" onPress={() => navigation.goBack()} variant="secondary" />
-        <AppButton label="Finalizar atención" loading={finishing} onPress={confirmFinish} />
+        <AppButton disabled={completed} label={completed ? 'Consulta finalizada' : 'Finalizar atención'} loading={finishing} onPress={confirmFinish} />
       </ScrollView>
     </SafeAreaView>
   );

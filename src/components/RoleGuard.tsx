@@ -24,7 +24,7 @@ export function RoleGuard({ children, roles }: RoleGuardProps) {
         message={
           isPatientPortal
             ? 'Tu rol no tiene acceso al portal paciente.'
-            : 'Tu usuario no tiene permisos para abrir esta seccion.'
+            : 'Tu usuario no tiene permisos para abrir esta sección.'
         }
         title="Acceso no autorizado"
       />

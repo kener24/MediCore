@@ -20,7 +20,7 @@ export function TriageSummaryCard({
         <Text style={styles.empty}>
           {visit?.triage_completed ?? visit?.triaje_completado
             ? 'El triaje esta marcado como completado, pero el backend no devolvio el detalle.'
-            : 'El triaje aun no esta registrado.'}
+            : 'El triaje aún no está registrado.'}
         </Text>
       </AppCard>
     );
@@ -30,7 +30,7 @@ export function TriageSummaryCard({
     <AppCard style={styles.card}>
       <Text style={styles.title}>Triaje</Text>
       <Info label="Queja principal" value={triage.chief_complaint ?? triage.motivo_consulta} />
-      <Info label="Evaluacion inicial" value={triage.initial_assessment ?? triage.evaluacion_inicial} />
+      <Info label="Evaluación inicial" value={triage.initial_assessment ?? triage.evaluacion_inicial} />
       <PriorityBadge value={triage.priority ?? triage.prioridad} />
       <Info label="Notas de enfermeria" value={triage.notes ?? triage.notas} />
       <Info label="Enfermera" value={triage.nurse_name ?? triage.enfermera_nombre} />

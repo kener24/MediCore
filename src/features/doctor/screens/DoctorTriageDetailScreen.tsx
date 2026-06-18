@@ -90,7 +90,7 @@ export function DoctorTriageDetailScreen() {
           </>
         ) : (
           <EmptyState
-            description="El detalle de triaje aun no esta disponible para esta visita."
+            description="El detalle de triaje aún no está disponible para esta visita."
             title="Sin datos de triaje"
           />
         )}

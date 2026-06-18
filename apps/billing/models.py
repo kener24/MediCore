@@ -112,9 +112,6 @@ class FiscalDocumentRange(TimeStampedModel):
             models.Index(fields=["clinic", "document_type", "is_active"]),
             models.Index(fields=["clinic", "expiration_date"]),
         ]
-        constraints = [
-            models.UniqueConstraint(fields=["clinic", "document_type"], condition=models.Q(is_active=True, is_exhausted=False), name="unique_active_fiscal_range_per_clinic_type"),
-        ]
 
     @property
     def full_start_number(self):
@@ -228,7 +225,7 @@ class Invoice(TimeStampedModel):
         ordering = ["-issue_date", "-creado_en"]
         constraints = [
             models.UniqueConstraint(fields=["clinic", "invoice_number"], name="unique_invoice_number_per_clinic"),
-            models.UniqueConstraint(fields=["clinic", "fiscal_number"], condition=~models.Q(fiscal_number=None), name="unique_fiscal_number_per_clinic"),
+            models.UniqueConstraint(fields=["clinic", "fiscal_number"], name="unique_fiscal_number_per_clinic"),
         ]
 
     @classmethod

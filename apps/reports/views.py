@@ -23,6 +23,7 @@ from apps.patients.models import Patient
 from apps.prescriptions.models import Diagnosis
 from apps.purchases.models import PurchaseOrder, PurchaseOrderItem, Supplier
 from apps.audit.models import AuditLog
+from apps.audit.services import log_audit_event
 from apps.reports.serializers import ReportDateFiltersSerializer
 
 
@@ -396,6 +397,7 @@ class ReportExcelExportView(APIView):
         stream.seek(0)
         response = HttpResponse(stream.getvalue(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         response["Content-Disposition"] = f'attachment; filename="{report_filename(report, "xlsx")}"'
+        log_audit_event(request=request, action=AuditLog.Action.EXPORT, module=AuditLog.Module.REPORTS, model_name="Report", object_id=report, object_repr=report, description="Reporte exportado a Excel.", new_values={"report": report, "format": "xlsx"})
         return response
 
 
@@ -431,6 +433,7 @@ class ReportPdfExportView(APIView):
         doc.build(story)
         response = HttpResponse(stream.getvalue(), content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="{report_filename(report, "pdf")}"'
+        log_audit_event(request=request, action=AuditLog.Action.EXPORT, module=AuditLog.Module.REPORTS, model_name="Report", object_id=report, object_repr=report, description="Reporte exportado a PDF.", new_values={"report": report, "format": "pdf"})
         return response
 
 

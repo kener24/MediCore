@@ -226,6 +226,7 @@ urlpatterns = [
     path("api/appointments/<int:appointment_id>/documents/", AppointmentDocumentsView.as_view(), name="appointment-documents"),
     path("api/medical-orders/<int:order_id>/documents/", MedicalOrderDocumentsView.as_view(), name="medical-order-documents"),
     path("api/audit/my-activity/", AuditLogViewSet.as_view({"get": "my_activity"}), name="audit-my-activity"),
+    path("api/audit/summary/", AuditStatsViewSet.as_view({"get": "list"}), name="audit-summary"),
     path("api/notifications/preferences/", NotificationPreferenceView.as_view(), name="notification-preferences"),
     path("api/notifications/stats/", NotificationStatsView.as_view(), name="notification-stats"),
     path("api/notifications/generate-inventory-alerts/", GenerateInventoryAlertsView.as_view(), name="notification-generate-inventory-alerts"),

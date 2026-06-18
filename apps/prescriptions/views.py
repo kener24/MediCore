@@ -6,6 +6,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.accounts.permissions import get_role_name
+from apps.audit.models import AuditLog
+from apps.audit.services import log_audit_event
 from apps.medical_records.models import ClinicalConsultation
 from apps.prescriptions.models import Diagnosis, MedicalOrder, Prescription, PrescriptionItem
 from apps.prescriptions.serializers import (
@@ -136,7 +138,11 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         if get_role_name(request.user) != "medico":
             return Response({"detail": "Solo medicos pueden crear recetas."}, status=status.HTTP_403_FORBIDDEN)
-        return super().create(request, *args, **kwargs)
+        response = super().create(request, *args, **kwargs)
+        if response.status_code == status.HTTP_201_CREATED:
+            prescription = Prescription.objects.select_related("clinic").filter(id=response.data.get("id")).first()
+            log_audit_event(request=request, clinic=getattr(prescription, "clinic", None), action=AuditLog.Action.CREATE, module=AuditLog.Module.PRESCRIPTIONS, model_name="Prescription", object_id=response.data.get("id"), object_repr=response.data.get("prescription_number", ""), description="Receta creada.", new_values=request.data)
+        return response
 
     def destroy(self, request, *args, **kwargs):
         prescription = self.get_object()
@@ -144,6 +150,7 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
         prescription.activo = False
         prescription.void_reason = "Anulada desde DELETE."
         prescription.save(update_fields=["status", "activo", "void_reason"])
+        log_audit_event(request=request, clinic=prescription.clinic, action=AuditLog.Action.CANCEL, module=AuditLog.Module.PRESCRIPTIONS, model_name="Prescription", object_id=prescription.id, object_repr=prescription.prescription_number, description="Receta anulada.", new_values={"status": prescription.status, "void_reason": prescription.void_reason})
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["patch"])
@@ -157,6 +164,7 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
             return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
         if prescription.patient.user:
             create_notification(prescription.patient.user, "Receta emitida", "Tienes una nueva receta disponible.", clinic=prescription.clinic, notification_type=Notification.Type.INFO, module=Notification.Module.PRESCRIPTIONS, priority=Notification.Priority.NORMAL, related_model="Prescription", related_object_id=prescription.id, action_url="/patient/prescriptions")
+        log_audit_event(request=request, clinic=prescription.clinic, action=AuditLog.Action.ISSUE, module=AuditLog.Module.PRESCRIPTIONS, model_name="Prescription", object_id=prescription.id, object_repr=prescription.prescription_number, description="Receta emitida.", new_values={"status": prescription.status})
         return Response(PrescriptionDetailSerializer(prescription).data)
 
     @action(detail=True, methods=["patch"])
@@ -166,6 +174,7 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
         prescription.activo = False
         prescription.void_reason = request.data.get("reason", "")
         prescription.save(update_fields=["status", "activo", "void_reason"])
+        log_audit_event(request=request, clinic=prescription.clinic, action=AuditLog.Action.CANCEL, module=AuditLog.Module.PRESCRIPTIONS, model_name="Prescription", object_id=prescription.id, object_repr=prescription.prescription_number, description="Receta anulada.", new_values={"status": prescription.status, "reason": prescription.void_reason})
         return Response(PrescriptionDetailSerializer(prescription).data)
 
     @action(detail=True, methods=["get", "post"], url_path="items")
@@ -256,6 +265,7 @@ class MedicalOrderViewSet(viewsets.ModelViewSet):
         response = super().create(request, *args, **kwargs)
         if response.status_code == status.HTTP_201_CREATED:
             order = MedicalOrder.objects.select_related("clinic", "patient__user").filter(id=response.data.get("id")).first()
+            log_audit_event(request=request, clinic=getattr(order, "clinic", None), action=AuditLog.Action.CREATE, module=AuditLog.Module.MEDICAL_ORDERS, model_name="MedicalOrder", object_id=response.data.get("id"), object_repr=response.data.get("order_number", ""), description="Orden medica creada.", new_values=request.data)
             if order and order.patient.user:
                 create_notification(order.patient.user, "Orden medica creada", "Tienes una nueva orden medica disponible.", clinic=order.clinic, notification_type=Notification.Type.INFO, module=Notification.Module.PRESCRIPTIONS, priority=Notification.Priority.NORMAL, related_model="MedicalOrder", related_object_id=order.id, action_url="/patient/medical-orders")
         return response
@@ -265,6 +275,7 @@ class MedicalOrderViewSet(viewsets.ModelViewSet):
         order.status = MedicalOrder.Status.CANCELADA
         order.activo = False
         order.save(update_fields=["status", "activo"])
+        log_audit_event(request=request, clinic=order.clinic, action=AuditLog.Action.CANCEL, module=AuditLog.Module.MEDICAL_ORDERS, model_name="MedicalOrder", object_id=order.id, object_repr=order.order_number, description="Orden medica cancelada.", new_values={"status": order.status})
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["patch"])
@@ -276,6 +287,7 @@ class MedicalOrderViewSet(viewsets.ModelViewSet):
         order.save(update_fields=["status"])
         if order.patient.user:
             create_notification(order.patient.user, "Orden medica completada", f"La orden {order.order_number} fue completada.", clinic=order.clinic, notification_type=Notification.Type.SUCCESS, module=Notification.Module.PRESCRIPTIONS, priority=Notification.Priority.NORMAL, related_model="MedicalOrder", related_object_id=order.id, action_url="/patient/medical-orders")
+        log_audit_event(request=request, clinic=order.clinic, action=AuditLog.Action.COMPLETE, module=AuditLog.Module.MEDICAL_ORDERS, model_name="MedicalOrder", object_id=order.id, object_repr=order.order_number, description="Orden medica completada.", new_values={"status": order.status})
         return Response(MedicalOrderDetailSerializer(order).data)
 
     @action(detail=True, methods=["patch"])
@@ -286,6 +298,7 @@ class MedicalOrderViewSet(viewsets.ModelViewSet):
         order.status = MedicalOrder.Status.CANCELADA
         order.activo = False
         order.save(update_fields=["status", "activo"])
+        log_audit_event(request=request, clinic=order.clinic, action=AuditLog.Action.CANCEL, module=AuditLog.Module.MEDICAL_ORDERS, model_name="MedicalOrder", object_id=order.id, object_repr=order.order_number, description="Orden medica cancelada.", new_values={"status": order.status})
         return Response(MedicalOrderDetailSerializer(order).data)
 
     @action(detail=False, methods=["get"], url_path="my-orders")

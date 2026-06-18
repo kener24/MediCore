@@ -86,6 +86,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         if response.status_code == status.HTTP_201_CREATED:
             appointment = Appointment.objects.select_related("clinic", "doctor__user", "patient__user").filter(id=response.data.get("id")).first()
             if appointment:
+                log_audit_event(request=request, clinic=appointment.clinic, action=AuditLog.Action.CREATE, module=AuditLog.Module.APPOINTMENTS, model_name="Appointment", object_id=appointment.id, object_repr=str(appointment), description="Cita creada.", new_values=request.data)
                 message = f"Cita programada el {appointment.scheduled_date} a las {appointment.start_time}."
                 for user in [appointment.doctor.user, appointment.patient.user]:
                     if user:
@@ -196,6 +197,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["patch"])
     def reschedule(self, request, pk=None):
         appointment = self.get_object()
+        old_values = {"scheduled_date": appointment.scheduled_date, "start_time": appointment.start_time, "end_time": appointment.end_time, "doctor": appointment.doctor_id, "status": appointment.status}
         if appointment.status == Appointment.Status.ATENDIDA:
             return Response({"detail": "No puedes reprogramar una cita atendida."}, status=status.HTTP_400_BAD_REQUEST)
         serializer = AppointmentRescheduleSerializer(data=request.data)
@@ -203,6 +205,8 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         update = AppointmentUpdateSerializer(appointment, data={**serializer.validated_data, "status": Appointment.Status.REPROGRAMADA}, partial=True, context={"request": request})
         update.is_valid(raise_exception=True)
         update.save(status=Appointment.Status.REPROGRAMADA)
+        appointment.refresh_from_db()
+        log_audit_event(request=request, clinic=appointment.clinic, action=AuditLog.Action.UPDATE, module=AuditLog.Module.APPOINTMENTS, model_name="Appointment", object_id=appointment.id, object_repr=str(appointment), description="Cita reprogramada.", old_values=old_values, new_values={"scheduled_date": appointment.scheduled_date, "start_time": appointment.start_time, "end_time": appointment.end_time, "doctor": appointment.doctor_id, "status": appointment.status})
         message = f"Cita reprogramada para {appointment.scheduled_date} a las {appointment.start_time}."
         for user in [appointment.doctor.user, appointment.patient.user]:
             if user:

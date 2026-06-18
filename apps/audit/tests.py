@@ -44,6 +44,7 @@ class AuditTests(APITestCase):
         log = log_audit_event(user=self.admin, clinic=self.clinic, action="update", module="users", new_values={"password": "secret", "name": "Admin"})
         self.assertIsNotNone(log)
         self.assertEqual(log.new_values["password"], "********")
+        self.assertNotIn("password", log.after_data)
         self.assertEqual(mask_sensitive({"token": "abc", "nested": {"cvv": "123"}})["nested"]["cvv"], "********")
 
     def test_login_success_and_failed_generate_logs(self):
@@ -110,7 +111,7 @@ class AuditTests(APITestCase):
         self.assertEqual(self.client.get(f"/api/audit/logs/{log.id}/").status_code, 200)
         self.assertEqual(self.client.patch(f"/api/audit/logs/{log.id}/", {"description": "x"}, format="json").status_code, 405)
         stats = self.client.get("/api/audit/stats/").json()
-        self.assertEqual(stats["total_logs"], 1)
+        self.assertEqual(stats["total_logs"], 2)
         self.assertEqual(stats["errors"], 1)
 
     def test_unauthenticated_cannot_access(self):

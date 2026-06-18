@@ -24,7 +24,7 @@ from apps.accounts.serializers import (
 )
 from apps.clinics.models import Clinic
 from apps.audit.models import AuditLog
-from apps.audit.services import log_audit_event
+from apps.audit.services import get_object_audit_data, log_audit_event
 from apps.security.services import active_lock, create_user_session, record_login_attempt, register_failed_login, revoke_all_user_sessions
 
 
@@ -63,7 +63,7 @@ class LoginView(TokenObtainPairView):
         user = User.objects.filter(email__iexact=email).select_related("clinica").first()
         record_login_attempt(email, request, False, user=user, failure_reason=str(exc)[:180])
         register_failed_login(user, request)
-        log_audit_event(request=request, action=AuditLog.Action.LOGIN_FAILED, module=AuditLog.Module.AUTH, object_repr=email, description="Intento fallido de login.", severity=AuditLog.Severity.WARNING, metadata={"email": email})
+        log_audit_event(request=request, user=user, clinic=getattr(user, "clinica", None), action=AuditLog.Action.LOGIN_FAILED, module=AuditLog.Module.AUTH, object_repr=email, description="Intento fallido de login.", status=AuditLog.Status.FAILED, severity=AuditLog.Severity.WARNING, metadata={"email": email})
         return super().handle_exception(exc)
 
 
@@ -201,7 +201,25 @@ class UserViewSet(viewsets.ModelViewSet):
             )
         user.is_active = False
         user.save(update_fields=["is_active"])
+        log_audit_event(request=request, clinic=getattr(user, "clinica", None), action=AuditLog.Action.DEACTIVATE, module=AuditLog.Module.USERS, model_name="User", object_id=user.id, object_repr=user.email, description="Usuario desactivado.", new_values={"is_active": False})
         return Response(UserDetailSerializer(user).data)
+
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+        if response.status_code == status.HTTP_201_CREATED:
+            created = User.objects.filter(id=response.data.get("id")).select_related("role", "clinica").first()
+            log_audit_event(request=request, clinic=getattr(created, "clinica", None), action=AuditLog.Action.CREATE, module=AuditLog.Module.USERS, model_name="User", object_id=response.data.get("id"), object_repr=response.data.get("email", ""), description="Usuario creado.", new_values=request.data)
+        return response
+
+    def update(self, request, *args, **kwargs):
+        target = self.get_object()
+        old_values = get_object_audit_data(target)
+        response = super().update(request, *args, **kwargs)
+        if response.status_code == status.HTTP_200_OK:
+            target.refresh_from_db()
+            action = AuditLog.Action.PERMISSION_CHANGE if "role" in request.data or "permissions" in request.data else AuditLog.Action.UPDATE
+            log_audit_event(request=request, clinic=getattr(target, "clinica", None), action=action, module=AuditLog.Module.USERS, model_name="User", object_id=target.id, object_repr=target.email, description="Usuario actualizado.", old_values=old_values, new_values=request.data)
+        return response
 
     def destroy(self, request, *args, **kwargs):
         response = self._deactivate_user(request, self.get_object())
@@ -214,6 +232,7 @@ class UserViewSet(viewsets.ModelViewSet):
         user = self.get_object()
         user.is_active = True
         user.save(update_fields=["is_active"])
+        log_audit_event(request=request, clinic=getattr(user, "clinica", None), action=AuditLog.Action.ACTIVATE, module=AuditLog.Module.USERS, model_name="User", object_id=user.id, object_repr=user.email, description="Usuario activado.", new_values={"is_active": True})
         return Response(UserDetailSerializer(user).data)
 
     @action(detail=True, methods=["patch"])
@@ -347,13 +366,31 @@ class ClinicAdminUserViewSet(viewsets.ModelViewSet):
             )
         user.is_active = False
         user.save(update_fields=["is_active"])
+        log_audit_event(request=self.request, clinic=getattr(user, "clinica", None), action=AuditLog.Action.DEACTIVATE, module=AuditLog.Module.USERS, model_name="User", object_id=user.id, object_repr=user.email, description="Usuario de clinica desactivado.", new_values={"is_active": False})
         return Response(UserDetailSerializer(user).data)
+
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+        if response.status_code == status.HTTP_201_CREATED:
+            created = User.objects.filter(id=response.data.get("id")).select_related("role", "clinica").first()
+            log_audit_event(request=request, clinic=getattr(created, "clinica", None), action=AuditLog.Action.CREATE, module=AuditLog.Module.USERS, model_name="User", object_id=response.data.get("id"), object_repr=response.data.get("email", ""), description="Usuario de clinica creado.", new_values=request.data)
+        return response
+
+    def update(self, request, *args, **kwargs):
+        target = self.get_object()
+        old_values = get_object_audit_data(target)
+        response = super().update(request, *args, **kwargs)
+        if response.status_code == status.HTTP_200_OK:
+            action = AuditLog.Action.PERMISSION_CHANGE if "role" in request.data else AuditLog.Action.UPDATE
+            log_audit_event(request=request, clinic=getattr(target, "clinica", None), action=action, module=AuditLog.Module.USERS, model_name="User", object_id=target.id, object_repr=target.email, description="Usuario de clinica actualizado.", old_values=old_values, new_values=request.data)
+        return response
 
     @action(detail=True, methods=["patch"])
     def activate(self, request, pk=None):
         user = self.get_object()
         user.is_active = True
         user.save(update_fields=["is_active"])
+        log_audit_event(request=request, clinic=getattr(user, "clinica", None), action=AuditLog.Action.ACTIVATE, module=AuditLog.Module.USERS, model_name="User", object_id=user.id, object_repr=user.email, description="Usuario de clinica activado.", new_values={"is_active": True})
         return Response(UserDetailSerializer(user).data)
 
     @action(detail=True, methods=["patch"])

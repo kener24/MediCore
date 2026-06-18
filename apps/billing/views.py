@@ -391,13 +391,13 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             "footer_text": settings.footer_invoice_text,
             "terms": settings.terms_and_conditions,
         }
-        log_audit_event(request=request, clinic=invoice.clinic, action=AuditLog.Action.VIEW, module=AuditLog.Module.BILLING, model_name="Invoice", object_id=invoice.id, object_repr=invoice.invoice_number, description="Datos de impresion de factura consultados.")
+        log_audit_event(request=request, clinic=invoice.clinic, action=AuditLog.Action.PRINT, module=AuditLog.Module.BILLING, model_name="Invoice", object_id=invoice.id, object_repr=invoice.invoice_number, description="Datos de impresion de factura consultados.")
         return Response(data)
 
     @action(detail=True, methods=["get"], url_path="pdf")
     def pdf(self, request, pk=None):
         invoice = self.get_object()
-        log_audit_event(request=request, clinic=invoice.clinic, action=AuditLog.Action.VIEW, module=AuditLog.Module.BILLING, model_name="Invoice", object_id=invoice.id, object_repr=invoice.invoice_number, description="PDF de factura solicitado.")
+        log_audit_event(request=request, clinic=invoice.clinic, action=AuditLog.Action.DOWNLOAD, module=AuditLog.Module.BILLING, model_name="Invoice", object_id=invoice.id, object_repr=invoice.invoice_number, description="PDF de factura solicitado.")
         return Response({"detail": "La descarga PDF de factura aun no esta configurada."}, status=status.HTTP_501_NOT_IMPLEMENTED)
 
 

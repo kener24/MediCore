@@ -24,13 +24,14 @@ import {
   getDoctorActivitySummary,
   getDoctorProfile,
   getDoctorSchedule,
+  mapDoctorProfileResponse,
 } from '@/features/doctor/services/doctorProfileService';
 import type { DoctorActivitySummary, DoctorProfile, DoctorScheduleItem } from '@/features/doctor/types/doctorProfile.types';
 
 export function DoctorProfileScreen() {
   const navigation = useNavigation<any>();
-  const { signOut } = useAuth();
-  const [profile, setProfile] = useState<DoctorProfile | null>(null);
+  const { signOut, user } = useAuth();
+  const [profile, setProfile] = useState<DoctorProfile | null>(() => user ? mapDoctorProfileResponse(user) : null);
   const [schedules, setSchedules] = useState<DoctorScheduleItem[]>([]);
   const [activity, setActivity] = useState<DoctorActivitySummary | null>(null);
   const [error, setError] = useState('');
@@ -51,12 +52,17 @@ export function DoctorProfileScreen() {
       setSchedules(nextSchedules.length ? nextSchedules : nextProfile.schedules ?? []);
       setActivity(nextActivity);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo cargar el perfil médico.');
+      if (user) {
+        setProfile(mapDoctorProfileResponse(user));
+        setError('');
+      } else {
+        setError(err instanceof Error ? err.message : 'No se pudo cargar el perfil médico.');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [user]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 

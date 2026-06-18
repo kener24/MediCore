@@ -43,7 +43,7 @@ export function DoctorInfoCard({ profile }: { profile: DoctorProfile }) {
         ['Nombre', doctorName(profile)],
         ['Correo', profile.email],
         ['Teléfono', profile.phone ?? profile.telefono],
-        ['Rol', 'Médico'],
+        ['Rol', profile.role_nombre ?? roleLabel(profile.role) ?? 'Médico'],
         ['Último inicio de sesión', formatDateTime(profile.last_login)],
       ]}
       title="Información personal"
@@ -55,6 +55,7 @@ export function DoctorProfessionalInfoCard({ professional, profile }: { professi
   const consultationDuration = professional?.consultation_duration_minutes ?? professional?.duracion_consulta;
   return (
     <InfoCard
+      emptyMessage="Información profesional no disponible."
       icon="stethoscope"
       items={[
         ['Especialidad', professional?.specialty ?? professional?.especialidad ?? profile.specialty_name ?? profile.especialidad_nombre],
@@ -73,6 +74,7 @@ export function DoctorClinicInfoCard({ clinic, profile }: { clinic?: DoctorClini
   const normalized = normalizeClinic(clinic ?? profile.clinic ?? profile.clinica);
   return (
     <InfoCard
+      emptyMessage="No hay clínica asignada."
       icon="hospital-building"
       items={[
         ['Clínica', normalized?.name ?? normalized?.nombre ?? profile.clinic_name ?? profile.clinica_nombre],
@@ -188,11 +190,14 @@ export function LogoutButton({ onConfirm }: { onConfirm: () => void }) {
   );
 }
 
-function InfoCard({ icon, items, title }: { icon: keyof typeof MaterialCommunityIcons.glyphMap; items: [string, unknown][]; title: string }) {
+function InfoCard({ emptyMessage, icon, items, title }: { emptyMessage?: string; icon: keyof typeof MaterialCommunityIcons.glyphMap; items: [string, unknown][]; title: string }) {
+  const hasData = items.some(([, value]) => hasValue(value));
   return (
     <AppCard style={styles.card}>
       <SectionTitle icon={icon} title={title} />
-      {items.map(([label, value]) => <Info key={label} label={label} value={value} />)}
+      {hasData ? items.map(([label, value]) => <Info key={label} label={label} value={value} />) : (
+        <Text style={styles.emptyText}>{emptyMessage ?? 'Información no disponible.'}</Text>
+      )}
     </AppCard>
   );
 }
@@ -235,7 +240,7 @@ function Stat({ label, value }: { label: string; value: number | string }) {
 }
 
 export function doctorName(profile?: DoctorProfile | null) {
-  return profile?.full_name || profile?.nombre_completo || [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || 'Médico';
+  return profile?.full_name || profile?.nombre_completo || [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || profile?.email || 'Médico';
 }
 
 function initials(name: string) {
@@ -246,9 +251,19 @@ function normalizeClinic(value?: DoctorProfile['clinic'] | DoctorProfile['clinic
   return value && typeof value === 'object' ? value : null;
 }
 
+function roleLabel(value: DoctorProfile['role']) {
+  if (typeof value === 'string') return value;
+  if (value && typeof value === 'object') return value.nombre;
+  return undefined;
+}
+
 function formatValue(value: unknown) {
-  if (value === null || value === undefined || value === '') return 'No disponible';
+  if (!hasValue(value)) return 'No disponible';
   return String(value);
+}
+
+function hasValue(value: unknown) {
+  return value !== null && value !== undefined && value !== '';
 }
 
 function formatDateTime(value?: string | null) {

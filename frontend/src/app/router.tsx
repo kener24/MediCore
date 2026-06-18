@@ -53,7 +53,7 @@ import { PurchaseOrderDetailsPage, PurchaseOrderFormPage, PurchaseOrdersPage, Pu
 import { AppointmentsReportPage, CashReportPage, ClinicDashboardAnalyticsPage, ConsultationsReportPage, DoctorDashboardAnalyticsPage, DoctorsReportPage, FinancialReportPage, InventoryReportPage, PatientsReportPage, PurchasesReportPage, ReceptionDashboardPage, ReportsHomePage, SuperAdminReportsPage } from "../features/reports/ReportsPages";
 import { AuditDashboardPage, AuditLogDetailsPage, AuditLogsPage } from "../features/audit/AuditPages";
 import { NotificationDetailsPage, NotificationPreferencesPage, NotificationsAdminPage, NotificationsPage } from "../features/notifications/NotificationPages";
-import { ClinicSettingsPage, ClinicSettingsSummaryPage, SuperAdminClinicSettingsPage } from "../features/clinicSettings/ClinicSettingsPages";
+import { ClinicSettingsPage, ClinicSettingsSummaryPage, ClinicWorkflowSettingsPage, SuperAdminClinicSettingsPage } from "../features/clinicSettings/ClinicSettingsPages";
 import { ClinicSubscriptionDetailsPage, ClinicSubscriptionsPage, MySubscriptionPage, SubscriptionPlansPage } from "../features/subscriptions/SubscriptionPages";
 import { PatientClinicInfoPage, PatientMedicalRecordSummaryPage, PatientPortalAppointmentDetailsPage, PatientPortalAppointmentsPage, PatientPortalDashboardPage, PatientPortalInvoiceDetailsPage, PatientPortalInvoicesPage, PatientPortalMedicalOrderDetailsPage, PatientPortalMedicalOrdersPage, PatientPortalPaymentsPage, PatientPortalPrescriptionDetailsPage, PatientPortalPrescriptionsPage, PatientPortalProfilePage, PatientRequestAppointmentPage } from "../features/patientPortal/PatientPortalPages";
 import { ClinicalDocumentsPage, DocumentCategoriesPage, DocumentDetailsPage, DocumentUploadPage, PatientDocumentsPage, PatientPortalDocumentDetailsPage, PatientPortalDocumentsPage } from "../features/documents/DocumentsPages";
@@ -110,12 +110,8 @@ export const router = createBrowserRouter([
               { path: "/superadmin/clinics/:id/edit", element: <SuperAdminClinicFormPage /> },
               { path: "/superadmin/users", element: <SuperAdminUsersPage /> },
               { path: "/superadmin/users/new", element: <UserCreatePage /> },
-              { path: "/superadmin/patients", element: <PatientsPage /> },
-              { path: "/superadmin/appointments", element: <AppointmentsPage mode="superadmin" /> },
-              { path: "/superadmin/appointments/:id", element: <AppointmentDetailsPage /> },
               { path: "/superadmin/reports", element: <SuperAdminReportsPage /> },
               { path: "/superadmin/reports/clinics", element: <SuperAdminReportsPage /> },
-              { path: "/superadmin/reports/financial", element: <FinancialReportPage /> },
               { path: "/superadmin/reports/usage", element: <SuperAdminReportsPage /> },
               { path: "/superadmin/audit", element: <AuditDashboardPage basePath="/superadmin/audit" /> },
               { path: "/superadmin/audit/logs", element: <AuditLogsPage basePath="/superadmin/audit" /> },
@@ -130,7 +126,7 @@ export const router = createBrowserRouter([
             ],
           },
           {
-            element: <RoleProtectedRoute allowedRoles={["admin", "superadmin"]} />,
+            element: <RoleProtectedRoute allowedRoles={["admin"]} />,
             children: [
               { path: "/clinic/dashboard", element: <ClinicDashboardPage /> },
               { path: "/clinic/my-clinic", element: <MyClinicPage /> },
@@ -148,6 +144,7 @@ export const router = createBrowserRouter([
               { path: "/clinic/settings/branding", element: <ClinicSettingsPage /> },
               { path: "/clinic/settings/billing", element: <ClinicSettingsPage /> },
               { path: "/clinic/settings/fiscal", element: <FiscalSettingsPage /> },
+              { path: "/clinic/settings/workflow", element: <ClinicWorkflowSettingsPage /> },
               { path: "/clinic/settings/appointments", element: <ClinicSettingsPage /> },
               { path: "/clinic/settings/patient-portal", element: <ClinicSettingsPage /> },
               { path: "/clinic/subscription", element: <MySubscriptionPage /> },
@@ -160,7 +157,7 @@ export const router = createBrowserRouter([
             ],
           },
           {
-            element: <RoleProtectedRoute allowedRoles={["admin", "superadmin", "medico", "enfermera", "recepcionista"]} />,
+            element: <RoleProtectedRoute allowedRoles={["admin", "medico", "enfermera", "recepcionista", "cajero", "recepcionista_caja"]} />,
             children: [
               { path: "/clinic/patients", element: <PatientsPage /> },
               { path: "/clinic/admissions", element: <AdmissionsDashboardPage /> },

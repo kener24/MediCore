@@ -21,6 +21,7 @@ from apps.appointments.models import Appointment
 from apps.audit.models import AuditLog
 from apps.audit.services import log_audit_event
 from apps.billing.models import Invoice, InvoiceItem
+from apps.clinic_flow import services as flow
 from apps.billing.serializers import InvoiceDetailSerializer
 from apps.medical_records.models import ClinicalConsultation, MedicalRecord, VitalSigns
 from apps.medical_records.serializers import VitalSignsSerializer
@@ -28,18 +29,17 @@ from apps.notifications.models import Notification
 from apps.notifications.services import notify_role_users
 
 
-VIEW_ROLES = ["superadmin", "admin", "recepcionista", "enfermera", "medico"]
-RECEPTION_ROLES = ["superadmin", "admin", "recepcionista"]
-TRIAGE_ROLES = ["superadmin", "admin", "enfermera"]
-DOCTOR_ROLES = ["superadmin", "admin", "medico"]
-BILLING_ROLES = ["superadmin", "admin", "recepcionista"]
+VIEW_ROLES = ["admin", "recepcionista", "enfermera", "medico", "cajero", "recepcionista_caja"]
+RECEPTION_ROLES = ["admin", "recepcionista"]
+TRIAGE_ROLES = ["admin", "enfermera"]
+DOCTOR_ROLES = ["medico"]
+BILLING_ROLES = ["admin", "recepcionista", "cajero", "recepcionista_caja"]
 
 
 def scope(request, queryset):
     role = get_role_name(request.user)
     if role == "superadmin" or request.user.is_superuser:
-        clinic = request.query_params.get("clinic")
-        return queryset.filter(clinic_id=clinic) if clinic else queryset
+        return queryset.none()
     if role in VIEW_ROLES and request.user.clinica_id:
         queryset = queryset.filter(clinic_id=request.user.clinica_id)
         if role == "medico":
@@ -105,27 +105,22 @@ class PatientVisitViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["post"], url_path="check-in-appointment")
     def check_in_appointment(self, request):
-        serializer = AppointmentCheckInSerializer(data=request.data, context={"request": request})
+        data = request.data.copy()
+        if "appointment" not in data and "pk" in self.kwargs:
+            data["appointment"] = self.kwargs["pk"]
+        serializer = AppointmentCheckInSerializer(data=data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         appointment = serializer.validated_data["appointment"]
-        visit = PatientVisit.objects.create(
-            clinic=appointment.clinic,
-            patient=appointment.patient,
-            appointment=appointment,
-            medical_record=MedicalRecord.objects.get_or_create(patient=appointment.patient, defaults={"clinic": appointment.clinic})[0],
-            visit_type=PatientVisit.VisitType.APPOINTMENT,
-            priority=serializer.validated_data["priority"],
-            reason=appointment.reason,
-            symptoms=serializer.validated_data.get("symptoms", ""),
-            assigned_doctor=appointment.doctor,
-            created_by=request.user,
-            checked_in_by=request.user,
-            status=PatientVisit.Status.WAITING_TRIAGE,
-        )
-        appointment.status = Appointment.Status.CONFIRMADA
-        appointment.confirmed_at = appointment.confirmed_at or timezone.now()
-        appointment.save(update_fields=["status", "confirmed_at"])
-        log_audit_event(request=request, clinic=visit.clinic, action=AuditLog.Action.CREATE, module=AuditLog.Module.APPOINTMENTS, model_name="PatientVisit", object_id=visit.id, object_repr=visit.visit_number, description="Check-in de cita registrado.", new_values={"appointment": appointment.id})
+        try:
+            visit = flow.check_in_appointment(
+                appointment=appointment,
+                user=request.user,
+                request=request,
+                priority=serializer.validated_data["priority"],
+                symptoms=serializer.validated_data.get("symptoms", ""),
+            )
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
         return Response(PatientVisitSerializer(visit).data, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=["get"], url_path="triage-queue")
@@ -138,10 +133,10 @@ class PatientVisitViewSet(viewsets.ModelViewSet):
         if get_role_name(request.user) not in TRIAGE_ROLES:
             return Response({"detail": "No tienes permiso para iniciar triaje."}, status=status.HTTP_403_FORBIDDEN)
         visit = self.get_object()
-        if visit.status not in [PatientVisit.Status.REGISTERED, PatientVisit.Status.WAITING_TRIAGE]:
-            return Response({"detail": "La visita no esta esperando triaje."}, status=status.HTTP_400_BAD_REQUEST)
-        visit.touch_status(PatientVisit.Status.IN_TRIAGE, user=request.user)
-        log_audit_event(request=request, clinic=visit.clinic, action=AuditLog.Action.UPDATE, module=AuditLog.Module.APPOINTMENTS, model_name="PatientVisit", object_id=visit.id, object_repr=visit.visit_number, description="Triaje iniciado.")
+        try:
+            flow.start_triage(visit, user=request.user, request=request)
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
         return Response(PatientVisitSerializer(visit).data)
 
     @action(detail=True, methods=["patch"], url_path="complete-triage")
@@ -149,11 +144,11 @@ class PatientVisitViewSet(viewsets.ModelViewSet):
         if get_role_name(request.user) not in TRIAGE_ROLES:
             return Response({"detail": "No tienes permiso para finalizar triaje."}, status=status.HTTP_403_FORBIDDEN)
         visit = self.get_object()
-        if not visit.vital_signs.exists():
-            return Response({"detail": "Registra signos vitales antes de finalizar triaje."}, status=status.HTTP_400_BAD_REQUEST)
-        visit.touch_status(PatientVisit.Status.WAITING_DOCTOR, user=request.user)
+        try:
+            flow.complete_triage(visit, user=request.user, request=request)
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
         notify_role_users(visit.clinic, ["medico"], "Paciente esperando consulta", f"{visit.patient.nombre_completo} esta listo para consulta.", module=Notification.Module.APPOINTMENTS, priority=Notification.Priority.NORMAL, notification_type=Notification.Type.INFO, related_model="PatientVisit", related_object_id=visit.id, action_url="/doctor/waiting-room")
-        log_audit_event(request=request, clinic=visit.clinic, action=AuditLog.Action.FINALIZE, module=AuditLog.Module.APPOINTMENTS, model_name="PatientVisit", object_id=visit.id, object_repr=visit.visit_number, description="Triaje finalizado.")
         return Response(PatientVisitSerializer(visit).data)
 
     @action(detail=True, methods=["get", "post"], url_path="vital-signs")
@@ -183,42 +178,19 @@ class PatientVisitViewSet(viewsets.ModelViewSet):
         if get_role_name(request.user) not in DOCTOR_ROLES:
             return Response({"detail": "No tienes permiso para iniciar consulta."}, status=status.HTTP_403_FORBIDDEN)
         visit = self.get_object()
-        if visit.status not in [PatientVisit.Status.WAITING_DOCTOR, PatientVisit.Status.IN_CONSULTATION]:
-            return Response({"detail": "La visita no esta esperando doctor."}, status=status.HTTP_400_BAD_REQUEST)
-        if get_role_name(request.user) == "medico" and visit.assigned_doctor_id and visit.assigned_doctor.user_id != request.user.id:
-            return Response({"detail": "Esta visita esta asignada a otro medico."}, status=status.HTTP_403_FORBIDDEN)
-        doctor = visit.assigned_doctor or getattr(request.user, "doctor_profile", None)
-        if not doctor:
-            return Response({"detail": "No hay medico asignado."}, status=status.HTTP_400_BAD_REQUEST)
-        consultation = visit.consultation
-        if not consultation:
-            consultation = ClinicalConsultation.objects.create(
-                clinic=visit.clinic,
-                medical_record=visit.medical_record,
-                patient=visit.patient,
-                doctor=doctor,
-                appointment=visit.appointment,
-                patient_visit=visit,
-                consultation_date=visit.visit_date,
-                chief_complaint=visit.reason,
-                symptoms=visit.symptoms,
-                created_by=request.user,
-            )
-            visit.consultation = consultation
-        visit.assigned_doctor = doctor
-        visit.touch_status(PatientVisit.Status.IN_CONSULTATION, user=request.user)
-        visit.save(update_fields=["assigned_doctor", "consultation", "status", "consultation_started_at", "actualizado_en"])
-        log_audit_event(request=request, clinic=visit.clinic, action=AuditLog.Action.CREATE, module=AuditLog.Module.CONSULTATIONS, model_name="ClinicalConsultation", object_id=consultation.id, object_repr=str(consultation), description="Consulta iniciada desde visita.")
+        try:
+            visit, consultation = flow.start_consultation(visit, user=request.user, request=request)
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
         return Response({"visit": PatientVisitSerializer(visit).data, "consultation": consultation.id})
 
     @action(detail=True, methods=["patch"], url_path="complete-consultation")
     def complete_consultation(self, request, pk=None):
         visit = self.get_object()
-        if not visit.consultation_id:
-            return Response({"detail": "La visita no tiene consulta iniciada."}, status=status.HTTP_400_BAD_REQUEST)
-        if visit.consultation.status != ClinicalConsultation.Status.FINALIZADA:
-            return Response({"detail": "La consulta debe estar finalizada antes de pasar a caja."}, status=status.HTTP_400_BAD_REQUEST)
-        visit.touch_status(PatientVisit.Status.WAITING_BILLING, user=request.user)
+        try:
+            flow.complete_consultation(visit, user=request.user, request=request)
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
         notify_role_users(visit.clinic, ["recepcionista", "admin"], "Paciente pendiente de cobro", f"{visit.patient.nombre_completo} esta listo para facturacion.", module=Notification.Module.BILLING, priority=Notification.Priority.NORMAL, notification_type=Notification.Type.INFO, related_model="PatientVisit", related_object_id=visit.id, action_url="/clinic/billing/pending")
         return Response(PatientVisitSerializer(visit).data)
 

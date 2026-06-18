@@ -96,11 +96,8 @@ class PatientCreateSerializer(serializers.ModelSerializer):
     def _resolve_clinic(self, attrs):
         request = self.context["request"]
         role = get_role_name(request.user)
-        if role == "superadmin":
-            clinic = attrs.get("clinic")
-            if not clinic:
-                raise serializers.ValidationError({"clinic": "La clinica es obligatoria para superadmin."})
-            return clinic
+        if role == "superadmin" or request.user.is_superuser:
+            raise serializers.ValidationError({"clinic": "Superadmin no puede crear pacientes clinicos."})
         if not request.user.clinica_id:
             raise serializers.ValidationError({"clinic": "El usuario autenticado no tiene clinica asignada."})
         return request.user.clinica
@@ -131,8 +128,8 @@ class PatientUpdateSerializer(PatientCreateSerializer):
     def validate(self, attrs):
         clinic = self.instance.clinic
         request = self.context["request"]
-        if get_role_name(request.user) == "superadmin" and attrs.get("clinic"):
-            clinic = attrs["clinic"]
+        if get_role_name(request.user) == "superadmin" or request.user.is_superuser:
+            raise serializers.ValidationError({"clinic": "Superadmin no puede editar pacientes clinicos."})
         attrs["clinic"] = clinic
         identidad = attrs.get("identidad")
         codigo = attrs.get("codigo_paciente")

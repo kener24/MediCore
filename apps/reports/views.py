@@ -27,8 +27,8 @@ from apps.audit.services import log_audit_event
 from apps.reports.serializers import ReportDateFiltersSerializer
 
 
-ADMIN_REPORT_ROLES = ["superadmin", "admin", "recepcionista", "enfermera"]
-FINANCIAL_ROLES = ["superadmin", "admin", "recepcionista"]
+ADMIN_REPORT_ROLES = ["admin", "recepcionista", "enfermera"]
+FINANCIAL_ROLES = ["admin", "recepcionista", "cajero", "recepcionista_caja"]
 
 
 def zero():
@@ -58,7 +58,7 @@ def validate_filters(request):
 def clinic_id_for_request(request, filters):
     user = request.user
     if role(user) == "superadmin" or user.is_superuser:
-        return filters.get("clinic")
+        return None
     return user.clinica_id
 
 
@@ -192,7 +192,7 @@ def export_payload(request, report):
         return {"title": title, "summary": summary, "headers": headers, "rows": rows}, None
 
     if report == "reception-dashboard":
-        if role(request.user) not in ["superadmin", "admin", "recepcionista"]:
+        if role(request.user) not in ["admin", "recepcionista"]:
             return None, forbidden()
         today = timezone.localdate()
         appointments_today = clinic_scope(request, Appointment.objects.filter(scheduled_date=today), filters)
@@ -335,7 +335,7 @@ def export_payload(request, report):
         return {"title": title, "summary": summary, "headers": headers, "rows": rows}, None
 
     if report == "purchases":
-        if role(request.user) not in ["superadmin", "admin"]:
+        if role(request.user) != "admin":
             return None, forbidden()
         qs = date_scope(clinic_scope(request, PurchaseOrder.objects.select_related("supplier").prefetch_related("items"), filters), filters, "order_date")
         if request.query_params.get("supplier"):
@@ -699,7 +699,7 @@ class PurchasesReportView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        if role(request.user) not in ["superadmin", "admin"]:
+        if role(request.user) != "admin":
             return forbidden()
         filters = validate_filters(request)
         orders = date_scope(clinic_scope(request, PurchaseOrder.objects.all(), filters), filters, "order_date")
@@ -750,7 +750,7 @@ class ReceptionDashboardReportView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        if role(request.user) not in ["superadmin", "admin", "recepcionista"]:
+        if role(request.user) not in ["admin", "recepcionista"]:
             return forbidden()
         filters = validate_filters(request)
         today = timezone.localdate()

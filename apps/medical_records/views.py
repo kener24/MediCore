@@ -33,11 +33,11 @@ from apps.audit.models import AuditLog
 from apps.audit.services import log_audit_event
 
 
-RECORD_VIEW_ROLES = ["superadmin", "admin", "medico", "enfermera"]
-RECORD_WRITE_ROLES = ["superadmin", "admin", "medico", "enfermera"]
+RECORD_VIEW_ROLES = ["admin", "medico", "enfermera"]
+RECORD_WRITE_ROLES = ["admin", "medico", "enfermera"]
 VITAL_WRITE_ROLES = ["medico", "enfermera"]
-CONSUMPTION_VIEW_ROLES = ["superadmin", "admin", "medico", "enfermera", "recepcionista"]
-CONSUMPTION_WRITE_ROLES = ["superadmin", "admin", "medico", "enfermera"]
+CONSUMPTION_VIEW_ROLES = ["admin", "medico", "enfermera", "recepcionista"]
+CONSUMPTION_WRITE_ROLES = ["admin", "medico", "enfermera"]
 
 
 class MedicalRecordViewSet(viewsets.ModelViewSet):
@@ -58,9 +58,7 @@ class MedicalRecordViewSet(viewsets.ModelViewSet):
         role = get_role_name(user)
         queryset = super().get_queryset()
         if role == "superadmin" or user.is_superuser:
-            clinic = self.request.query_params.get("clinic")
-            if clinic:
-                queryset = queryset.filter(clinic_id=clinic)
+            queryset = queryset.none()
         elif role in ["admin", "medico", "enfermera"] and user.clinica_id:
             queryset = queryset.filter(clinic_id=user.clinica_id)
         elif role == "paciente":
@@ -104,7 +102,7 @@ class MedicalRecordViewSet(viewsets.ModelViewSet):
         return super().update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
-        if get_role_name(request.user) not in ["superadmin", "admin"]:
+        if get_role_name(request.user) not in ["admin"]:
             return Response({"detail": "No tienes permiso para desactivar expedientes."}, status=status.HTTP_403_FORBIDDEN)
         record = self.get_object()
         record.activo = False
@@ -168,9 +166,7 @@ class ClinicalConsultationViewSet(viewsets.ModelViewSet):
         role = get_role_name(user)
         queryset = super().get_queryset()
         if role == "superadmin" or user.is_superuser:
-            clinic = self.request.query_params.get("clinic")
-            if clinic:
-                queryset = queryset.filter(clinic_id=clinic)
+            queryset = queryset.none()
         elif role in ["admin", "enfermera"] and user.clinica_id:
             queryset = queryset.filter(clinic_id=user.clinica_id)
         elif role == "medico":
@@ -258,7 +254,7 @@ class ClinicalConsultationViewSet(viewsets.ModelViewSet):
             if not signs:
                 return Response({"detail": "Esta consulta no tiene signos vitales registrados."}, status=status.HTTP_404_NOT_FOUND)
             return Response(VitalSignsSerializer(signs).data)
-        if consultation.status == ClinicalConsultation.Status.FINALIZADA and not request.user.is_superuser:
+        if consultation.status == ClinicalConsultation.Status.FINALIZADA:
             return Response({"detail": "No puedes modificar signos vitales de consulta finalizada."}, status=status.HTTP_400_BAD_REQUEST)
         signs = getattr(consultation, "vital_signs", None)
         serializer = VitalSignsSerializer(signs, data=request.data, partial=request.method == "PATCH")
@@ -351,9 +347,7 @@ class ClinicalSupplyUsageViewSet(viewsets.ModelViewSet):
         role = get_role_name(user)
         queryset = super().get_queryset()
         if role == "superadmin" or user.is_superuser:
-            clinic = self.request.query_params.get("clinic")
-            if clinic:
-                queryset = queryset.filter(clinic_id=clinic)
+            queryset = queryset.none()
         elif role in CONSUMPTION_VIEW_ROLES and user.clinica_id:
             queryset = queryset.filter(clinic_id=user.clinica_id)
             if role == "medico":
@@ -445,7 +439,9 @@ def patient_medical_record_response(request, patient):
         return Response({"detail": "No tienes permiso para ver expediente clinico completo."}, status=status.HTTP_403_FORBIDDEN)
     if role not in RECORD_VIEW_ROLES and not (role == "paciente" and patient.user_id == request.user.id):
         return Response({"detail": "No tienes permiso para ver este expediente."}, status=status.HTTP_403_FORBIDDEN)
-    if role not in ["superadmin", "paciente"] and patient.clinic_id != request.user.clinica_id:
+    if role == "superadmin" or request.user.is_superuser:
+        return Response({"detail": "Superadmin no puede ver expedientes clinicos de pacientes."}, status=status.HTTP_403_FORBIDDEN)
+    if role != "paciente" and patient.clinic_id != request.user.clinica_id:
         return Response({"detail": "No tienes permiso sobre esta clinica."}, status=status.HTTP_403_FORBIDDEN)
     record, _ = MedicalRecord.objects.get_or_create(patient=patient, defaults={"clinic": patient.clinic})
     serializer = MedicalRecordMeSerializer(record) if role == "paciente" else MedicalRecordDetailSerializer(record)
@@ -458,7 +454,9 @@ def patient_clinical_history_response(request, patient):
         return Response({"detail": "No tienes permiso para ver historial clinico."}, status=status.HTTP_403_FORBIDDEN)
     if role not in RECORD_VIEW_ROLES and not (role == "paciente" and patient.user_id == request.user.id):
         return Response({"detail": "No tienes permiso para ver historial clinico."}, status=status.HTTP_403_FORBIDDEN)
-    if role not in ["superadmin", "paciente"] and patient.clinic_id != request.user.clinica_id:
+    if role == "superadmin" or request.user.is_superuser:
+        return Response({"detail": "Superadmin no puede ver historial clinico de pacientes."}, status=status.HTTP_403_FORBIDDEN)
+    if role != "paciente" and patient.clinic_id != request.user.clinica_id:
         return Response({"detail": "No tienes permiso sobre esta clinica."}, status=status.HTTP_403_FORBIDDEN)
     record = MedicalRecord.objects.filter(patient=patient).first()
     consultations = ClinicalConsultation.objects.filter(patient=patient).select_related("clinic", "medical_record", "doctor__user", "doctor__specialty")

@@ -16,7 +16,7 @@ from apps.patients.models import Patient
 def user_can_access_clinic(user, clinic_id):
     role = get_role_name(user)
     if role == "superadmin" or user.is_superuser:
-        return True
+        return False
     return bool(user.clinica_id and user.clinica_id == clinic_id)
 
 
@@ -279,7 +279,7 @@ class ClinicalConsultationUpdateSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         request = self.context["request"]
-        if self.instance.status == ClinicalConsultation.Status.FINALIZADA and not request.user.is_superuser:
+        if self.instance.status == ClinicalConsultation.Status.FINALIZADA:
             raise serializers.ValidationError("No se puede editar una consulta finalizada.")
         if get_role_name(request.user) == "medico" and self.instance.doctor.user_id != request.user.id:
             raise serializers.ValidationError("No puedes editar consultas de otro medico.")
@@ -381,12 +381,12 @@ class ClinicalSupplyUsageCreateSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         request = self.context["request"]
         role = get_role_name(request.user)
-        if role not in ["superadmin", "admin", "medico", "enfermera"]:
+        if role not in ["admin", "medico", "enfermera"]:
             raise serializers.ValidationError("No tienes permiso para registrar consumos clinicos.")
         item = attrs["inventory_item"]
         if not item.active:
             raise serializers.ValidationError({"inventory_item": "El producto esta inactivo."})
-        if role != "superadmin" and item.clinic_id != request.user.clinica_id:
+        if item.clinic_id != request.user.clinica_id:
             raise serializers.ValidationError("No tienes permiso sobre este producto.")
         consultation = attrs.get("consultation")
         patient = attrs.get("patient")
@@ -395,11 +395,11 @@ class ClinicalSupplyUsageCreateSerializer(serializers.ModelSerializer):
             attrs["patient"] = patient
             attrs["appointment"] = attrs.get("appointment") or consultation.appointment
             attrs["doctor"] = consultation.doctor
-            if consultation.status == ClinicalConsultation.Status.FINALIZADA and not request.user.is_superuser:
+            if consultation.status == ClinicalConsultation.Status.FINALIZADA:
                 raise serializers.ValidationError({"consultation": "No puedes registrar consumos en una consulta finalizada."})
         if not patient:
             raise serializers.ValidationError({"patient": "El paciente es obligatorio."})
-        if role != "superadmin" and patient.clinic_id != request.user.clinica_id:
+        if patient.clinic_id != request.user.clinica_id:
             raise serializers.ValidationError("No tienes permiso sobre este paciente.")
         if patient.clinic_id != item.clinic_id:
             raise serializers.ValidationError("Paciente y producto deben pertenecer a la misma clinica.")

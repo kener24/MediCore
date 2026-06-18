@@ -133,8 +133,7 @@ class ClinicalDocumentViewSet(viewsets.ModelViewSet):
         role = get_role_name(user)
         qs = super().get_queryset()
         if is_superadmin(user):
-            if self.request.query_params.get("clinic"):
-                qs = qs.filter(clinic_id=self.request.query_params["clinic"])
+            qs = qs.none()
         elif role in ["admin", "medico", "enfermera", "recepcionista"] and user.clinica_id:
             qs = qs.filter(clinic_id=user.clinica_id)
             if role == "recepcionista":

@@ -136,7 +136,9 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
         request = self.context["request"]
         patient = attrs["patient"]
         role = get_role_name(request.user)
-        if role != "superadmin" and patient.clinic_id != request.user.clinica_id:
+        if role == "superadmin" or request.user.is_superuser:
+            raise serializers.ValidationError("Superadmin no puede crear facturas detalladas de pacientes.")
+        if patient.clinic_id != request.user.clinica_id:
             raise serializers.ValidationError("No puedes facturar pacientes de otra clinica.")
         issue_date = attrs.get("issue_date")
         due_date = attrs.get("due_date")
@@ -232,7 +234,9 @@ class PaymentCreateSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         request = self.context["request"]
         invoice = attrs["invoice"]
-        if get_role_name(request.user) != "superadmin" and invoice.clinic_id != request.user.clinica_id:
+        if get_role_name(request.user) == "superadmin" or request.user.is_superuser:
+            raise serializers.ValidationError("Superadmin no puede registrar pagos de pacientes.")
+        if invoice.clinic_id != request.user.clinica_id:
             raise serializers.ValidationError("No tienes permiso sobre esta factura.")
         if invoice.status == Invoice.Status.ANULADA:
             raise serializers.ValidationError({"invoice": "No se puede pagar una factura anulada."})

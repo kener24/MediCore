@@ -1,9 +1,9 @@
 from apps.accounts.permissions import get_role_name
 
 
-CLINICAL_ROLES = {"superadmin", "admin", "medico", "enfermera"}
-UPLOAD_ROLES = {"superadmin", "admin", "medico", "enfermera", "recepcionista"}
-MANAGE_ROLES = {"superadmin", "admin", "medico", "enfermera"}
+CLINICAL_ROLES = {"admin", "medico", "enfermera"}
+UPLOAD_ROLES = {"admin", "medico", "enfermera", "recepcionista"}
+MANAGE_ROLES = {"admin", "medico", "enfermera"}
 ADMIN_DOC_TYPES = {"administrative", "identity", "consent", "billing", "other"}
 
 
@@ -33,7 +33,7 @@ def can_access_document(user, document, for_download=False):
     if not user or not user.is_authenticated or document.status == "deleted" or not document.active:
         return False
     if is_superadmin(user):
-        return True
+        return False
     if role == "paciente":
         return document.patient.user_id == user.id and document.visible_to_patient and document.status == "active"
     if getattr(user, "clinica_id", None) != document.clinic_id:
@@ -50,7 +50,7 @@ def can_upload_for_patient(user, patient, document_type=None, is_sensitive=False
     if not can_upload_documents(user):
         return False
     if is_superadmin(user):
-        return True
+        return False
     if getattr(user, "clinica_id", None) != patient.clinic_id:
         return False
     if role == "recepcionista":

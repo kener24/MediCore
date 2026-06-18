@@ -22,7 +22,7 @@ def validate_doctor_can_manage(user, consultation):
 def can_view_clinical_data(user, clinic_id, patient_user_id=None):
     role = get_role_name(user)
     if user.is_superuser or role == "superadmin":
-        return True
+        return False
     if role in ["admin", "medico", "enfermera"] and user.clinica_id == clinic_id:
         return True
     return role == "paciente" and patient_user_id == user.id

@@ -43,7 +43,7 @@ from apps.reports.views import (
 )
 from apps.audit.views import AuditLogViewSet, AuditStatsViewSet
 from apps.notifications.views import GenerateAppointmentRemindersView, GenerateBillingAlertsView, GenerateInventoryAlertsView, NotificationPreferenceView, NotificationStatsView, NotificationViewSet
-from apps.clinic_settings.views import ClinicSettingsByClinicView, ClinicSettingsSummaryView, MyClinicSettingsView, PublicClinicSettingsView
+from apps.clinic_settings.views import ClinicSettingsByClinicView, ClinicSettingsSummaryView, ClinicWorkflowSettingsByClinicView, MyClinicSettingsView, MyClinicWorkflowSettingsView, PublicClinicSettingsView
 from apps.subscriptions.views import ClinicPlanUsageView, ClinicSubscriptionActionView, ClinicSubscriptionDetailView, ClinicSubscriptionsView, MyPlanUsageView, MySubscriptionView, SubscriptionFeaturesView, SubscriptionPlanViewSet
 from apps.documents.views import (
     AppointmentDocumentsView,
@@ -167,6 +167,19 @@ urlpatterns = [
     path("api/admissions/doctor-waiting-room/", PatientVisitViewSet.as_view({"get": "doctor_waiting_room"}), name="admissions-doctor-waiting-room"),
     path("api/admissions/stats/today/", PatientVisitViewSet.as_view({"get": "stats_today"}), name="admissions-stats-today"),
     path("api/billing/pending-visits/", PatientVisitViewSet.as_view({"get": "pending_billing"}), name="billing-pending-visits"),
+    path("api/reception/patients/search/", PatientViewSet.as_view({"get": "list"}), name="reception-patient-search"),
+    path("api/reception/patients/minimal/", PatientViewSet.as_view({"post": "create"}), name="reception-patient-minimal"),
+    path("api/reception/visits/walk-in/", PatientVisitViewSet.as_view({"post": "register_walk_in"}), name="reception-walk-in"),
+    path("api/reception/appointments/<int:pk>/check-in/", PatientVisitViewSet.as_view({"post": "check_in_appointment"}), name="reception-appointment-check-in"),
+    path("api/reception/waiting-room/", PatientVisitViewSet.as_view({"get": "doctor_waiting_room"}), name="reception-waiting-room"),
+    path("api/nursing/triage-queue/", PatientVisitViewSet.as_view({"get": "triage_queue"}), name="nursing-triage-queue"),
+    path("api/nursing/visits/<int:pk>/start-triage/", PatientVisitViewSet.as_view({"patch": "start_triage", "post": "start_triage"}), name="nursing-start-triage"),
+    path("api/nursing/visits/<int:pk>/vital-signs/", PatientVisitViewSet.as_view({"get": "vital_signs", "post": "vital_signs"}), name="nursing-vital-signs"),
+    path("api/nursing/visits/<int:pk>/complete-triage/", PatientVisitViewSet.as_view({"patch": "complete_triage", "post": "complete_triage"}), name="nursing-complete-triage"),
+    path("api/doctor/waiting-room/", PatientVisitViewSet.as_view({"get": "doctor_waiting_room"}), name="doctor-waiting-room"),
+    path("api/doctor/visits/<int:pk>/start-consultation/", PatientVisitViewSet.as_view({"patch": "start_consultation", "post": "start_consultation"}), name="doctor-start-consultation"),
+    path("api/cashier/pending-billing/", PatientVisitViewSet.as_view({"get": "pending_billing"}), name="cashier-pending-billing"),
+    path("api/cashier/visits/<int:pk>/generate-invoice/", PatientVisitViewSet.as_view({"post": "generate_invoice"}), name="cashier-generate-invoice-from-visit"),
     path("api/billing/fiscal-profile/", ClinicFiscalProfileViewSet.as_view({"get": "list", "patch": "partial_update"}), name="billing-fiscal-profile"),
     path("api/billing/visits/<int:pk>/generate-invoice/", PatientVisitViewSet.as_view({"post": "generate_invoice"}), name="billing-generate-invoice-from-visit"),
     path("api/billing/pending-consumptions/", InvoiceViewSet.as_view({"get": "pending_consumptions"}), name="billing-pending-consumptions"),
@@ -188,7 +201,9 @@ urlpatterns = [
     path("api/reports/<str:report>/export-excel/", ReportExcelExportView.as_view(), name="reports-export-excel"),
     path("api/reports/<str:report>/export-pdf/", ReportPdfExportView.as_view(), name="reports-export-pdf"),
     path("api/clinic-settings/my-settings/", MyClinicSettingsView.as_view(), name="clinic-settings-my"),
+    path("api/clinic/workflow-settings/", MyClinicWorkflowSettingsView.as_view(), name="clinic-workflow-settings"),
     path("api/clinic-settings/clinics/<int:clinic_id>/", ClinicSettingsByClinicView.as_view(), name="clinic-settings-clinic"),
+    path("api/clinic-settings/clinics/<int:clinic_id>/workflow/", ClinicWorkflowSettingsByClinicView.as_view(), name="clinic-workflow-settings-clinic"),
     path("api/clinic-settings/public/<int:clinic_id>/", PublicClinicSettingsView.as_view(), name="clinic-settings-public"),
     path("api/clinic-settings/summary/", ClinicSettingsSummaryView.as_view(), name="clinic-settings-summary"),
     path("api/subscriptions/my-subscription/", MySubscriptionView.as_view(), name="subscriptions-my"),

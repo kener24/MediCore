@@ -44,6 +44,7 @@ const adminGroups: NavGroup[] = [
     items: [
       { label: "Mi Clinica", path: "/clinic/my-clinic" },
       { label: "Configuracion", path: "/clinic/settings" },
+      { label: "Flujo clinico", path: "/clinic/settings/workflow" },
       { label: "Seguridad", path: "/security/settings" },
       { label: "Bloqueos", path: "/security/admin/account-locks" },
       { label: "Suscripcion", path: "/clinic/subscription" },
@@ -294,8 +295,6 @@ const superAdminGroups: NavGroup[] = [
       { label: "Clinicas", path: "/superadmin/clinics" },
       { label: "Usuarios", path: "/superadmin/users" },
       { label: "Roles", path: "/roles" },
-      { label: "Pacientes globales", path: "/superadmin/patients" },
-      { label: "Citas globales", path: "/superadmin/appointments" },
       { label: "Reportes globales", path: "/superadmin/reports" },
       { label: "Bitacora global", path: "/superadmin/audit" },
       { label: "Notificaciones", path: "/superadmin/notifications" },

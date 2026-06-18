@@ -30,14 +30,13 @@ from apps.notifications.models import Notification
 from apps.notifications.services import create_notification
 
 
-VIEW_ROLES = ["superadmin", "admin", "medico", "enfermera", "paciente"]
+VIEW_ROLES = ["admin", "medico", "enfermera", "paciente"]
 
 
 def scoped_queryset(request, queryset):
     role = get_role_name(request.user)
     if role == "superadmin" or request.user.is_superuser:
-        clinic = request.query_params.get("clinic")
-        return queryset.filter(clinic_id=clinic) if clinic else queryset
+        return queryset.none()
     if role in ["admin", "enfermera"] and request.user.clinica_id:
         return queryset.filter(clinic_id=request.user.clinica_id)
     if role == "medico":

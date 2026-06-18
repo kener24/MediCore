@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from apps.clinic_settings.models import ClinicSettings
+from apps.clinic_settings.models import ClinicSettings, ClinicWorkflowSettings
 from apps.clinics.models import Clinic
 from apps.core.validators import validate_digits_identifier, validate_phone
 
@@ -63,3 +63,12 @@ class ClinicSettingsSummarySerializer(serializers.Serializer):
     missing_settings = serializers.IntegerField()
     patient_portal_enabled = serializers.IntegerField()
     online_appointments_enabled = serializers.IntegerField()
+
+
+class ClinicWorkflowSettingsSerializer(serializers.ModelSerializer):
+    clinic_nombre = serializers.CharField(source="clinic.nombre", read_only=True)
+
+    class Meta:
+        model = ClinicWorkflowSettings
+        fields = "__all__"
+        read_only_fields = ["id", "clinic", "clinic_nombre", "creado_en", "actualizado_en"]

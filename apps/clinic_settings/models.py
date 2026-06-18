@@ -78,6 +78,48 @@ class ClinicSettings(TimeStampedModel):
         return f"Configuracion {self.clinic}"
 
 
+class ClinicWorkflowSettings(TimeStampedModel):
+    clinic = models.OneToOneField("clinics.Clinic", on_delete=models.CASCADE, related_name="workflow_settings")
+    allow_walk_in_patients = models.BooleanField(default=True)
+    allow_appointments = models.BooleanField(default=True)
+    allow_online_appointments = models.BooleanField(default=False)
+    allow_in_person_appointments = models.BooleanField(default=True)
+    reception_can_create_minimal_patient = models.BooleanField(default=True)
+    reception_handles_cashier = models.BooleanField(default=True)
+    walk_in_requires_triage = models.BooleanField(default=True)
+    appointment_requires_triage = models.BooleanField(default=False)
+    appointment_direct_to_doctor = models.BooleanField(default=True)
+    billing_before_consultation = models.BooleanField(default=False)
+    billing_after_consultation = models.BooleanField(default=True)
+    require_payment_before_consultation = models.BooleanField(default=False)
+    allow_consultation_without_payment = models.BooleanField(default=True)
+    require_identity_for_patient = models.BooleanField(default=False)
+    require_phone_for_patient = models.BooleanField(default=False)
+    allow_doctor_to_create_patient = models.BooleanField(default=False)
+    allow_nurse_to_edit_patient_basic_data = models.BooleanField(default=False)
+    auto_send_to_billing_after_consultation = models.BooleanField(default=True)
+    auto_complete_visit_after_payment = models.BooleanField(default=True)
+    active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name_plural = "Clinic workflow settings"
+
+    def clean(self):
+        if self.billing_before_consultation and self.billing_after_consultation:
+            raise ValidationError({"billing_after_consultation": "El cobro no puede ser antes y despues de consulta a la vez."})
+        if self.require_payment_before_consultation and self.allow_consultation_without_payment:
+            raise ValidationError({"allow_consultation_without_payment": "No se puede requerir pago previo y permitir consulta sin pago."})
+        if self.appointment_requires_triage and self.appointment_direct_to_doctor:
+            raise ValidationError({"appointment_direct_to_doctor": "Una cita no puede requerir triaje y pasar directo al medico a la vez."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Flujo clinico {self.clinic}"
+
+
 def get_or_create_clinic_settings(clinic):
     settings, _ = ClinicSettings.objects.get_or_create(
         clinic=clinic,
@@ -90,3 +132,13 @@ def get_or_create_clinic_settings(clinic):
         },
     )
     return settings
+
+
+def get_or_create_workflow_settings(clinic):
+    workflow, _ = ClinicWorkflowSettings.objects.get_or_create(
+        clinic=clinic,
+        defaults={
+            "allow_online_appointments": getattr(getattr(clinic, "settings", None), "allow_online_appointments", False),
+        },
+    )
+    return workflow

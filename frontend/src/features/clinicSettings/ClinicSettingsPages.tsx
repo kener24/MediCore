@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useParams } from "react-router-dom";
 import { toast } from "sonner";
 
-import { getClinicSettingsByClinicId, getClinicSettingsSummary, getMyClinicSettings, updateClinicSettingsByClinicId, updateMyClinicSettings } from "../../api/clinicSettingsApi";
+import { getClinicSettingsByClinicId, getClinicSettingsSummary, getMyClinicSettings, updateClinicSettingsByClinicId, updateMyClinicSettings, getClinicWorkflowSettings, updateClinicWorkflowSettings } from "../../api/clinicSettingsApi";
 import { getErrorMessage } from "../../api/axios";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -10,7 +10,7 @@ import { EmptyState } from "../../components/ui/EmptyState";
 import { Loader } from "../../components/ui/Loader";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { StatCard } from "../../components/ui/StatCard";
-import type { ClinicSettings } from "../../types/clinicSettings";
+import type { ClinicSettings, ClinicWorkflowSettings } from "../../types/clinicSettings";
 import { Building2 } from "lucide-react";
 
 const days = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"];
@@ -131,4 +131,79 @@ export function ClinicSettingsSummaryPage() {
   if (error) return <EmptyState title="No se pudo cargar el resumen." description={error} />;
   if (!summary) return <Loader />;
   return <div className="space-y-6"><PageHeader title="Configuracion de clinicas" description="Resumen global de personalizacion." /><div className="grid gap-4 md:grid-cols-5"><StatCard label="Clinicas" value={summary.total_clinics} icon={<Building2 className="h-5 w-5" />} /><StatCard label="Configuradas" value={summary.configured_clinics} icon={<Building2 className="h-5 w-5" />} /><StatCard label="Pendientes" value={summary.missing_settings} icon={<Building2 className="h-5 w-5" />} /><StatCard label="Portal activo" value={summary.patient_portal_enabled} icon={<Building2 className="h-5 w-5" />} /><StatCard label="Citas online" value={summary.online_appointments_enabled} icon={<Building2 className="h-5 w-5" />} /></div></div>;
+}
+
+export function ClinicWorkflowSettingsPage() {
+  const [settings, setSettings] = useState<ClinicWorkflowSettings | null>(null);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    getClinicWorkflowSettings().then(setSettings).catch((e) => {
+      const message = getErrorMessage(e);
+      setError(message);
+      toast.error(message);
+    });
+  }, []);
+
+  if (error) return <EmptyState title="No se pudo cargar el flujo clinico." description={error} />;
+  if (!settings) return <Loader />;
+
+  const currentSettings = settings;
+  const patch = (data: Partial<ClinicWorkflowSettings>) => setSettings((prev) => prev ? { ...prev, ...data } : prev);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const saved = await updateClinicWorkflowSettings(currentSettings);
+      setSettings(saved);
+      toast.success("Flujo clinico guardado.");
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return <form className="space-y-6" onSubmit={submit}>
+    <PageHeader title="Flujo clinico" description="Define como pasan los pacientes por recepcion, triaje, medico y caja." actions={<Button isLoading={saving}>Guardar flujo</Button>} />
+    <div className="grid gap-4 xl:grid-cols-2">
+      <Card title="Entrada de pacientes">
+        <div className="grid gap-3">
+          {toggle("Permitir pacientes sin cita", currentSettings.allow_walk_in_patients, (v) => patch({ allow_walk_in_patients: v }))}
+          {toggle("Permitir citas", currentSettings.allow_appointments, (v) => patch({ allow_appointments: v }))}
+          {toggle("Permitir citas en linea", currentSettings.allow_online_appointments, (v) => patch({ allow_online_appointments: v }))}
+          {toggle("Permitir citas presenciales", currentSettings.allow_in_person_appointments, (v) => patch({ allow_in_person_appointments: v }))}
+          {toggle("Recepcion puede crear paciente basico", currentSettings.reception_can_create_minimal_patient, (v) => patch({ reception_can_create_minimal_patient: v }))}
+        </div>
+      </Card>
+      <Card title="Triaje y consulta">
+        <div className="grid gap-3">
+          {toggle("Paciente sin cita pasa por triaje", currentSettings.walk_in_requires_triage, (v) => patch({ walk_in_requires_triage: v }))}
+          {toggle("Paciente con cita pasa por triaje", currentSettings.appointment_requires_triage, (v) => patch({ appointment_requires_triage: v, appointment_direct_to_doctor: v ? false : currentSettings.appointment_direct_to_doctor }))}
+          {toggle("Paciente con cita va directo al medico", currentSettings.appointment_direct_to_doctor, (v) => patch({ appointment_direct_to_doctor: v, appointment_requires_triage: v ? false : currentSettings.appointment_requires_triage }))}
+          {toggle("Medico puede crear paciente", currentSettings.allow_doctor_to_create_patient, (v) => patch({ allow_doctor_to_create_patient: v }))}
+          {toggle("Enfermeria edita datos basicos", currentSettings.allow_nurse_to_edit_patient_basic_data, (v) => patch({ allow_nurse_to_edit_patient_basic_data: v }))}
+        </div>
+      </Card>
+      <Card title="Caja y facturacion">
+        <div className="grid gap-3">
+          {toggle("Recepcion tambien funciona como caja", currentSettings.reception_handles_cashier, (v) => patch({ reception_handles_cashier: v }))}
+          {toggle("Cobro antes de consulta", currentSettings.billing_before_consultation, (v) => patch({ billing_before_consultation: v, billing_after_consultation: v ? false : currentSettings.billing_after_consultation }))}
+          {toggle("Cobro despues de consulta", currentSettings.billing_after_consultation, (v) => patch({ billing_after_consultation: v, billing_before_consultation: v ? false : currentSettings.billing_before_consultation }))}
+          {toggle("Requerir pago antes de consulta", currentSettings.require_payment_before_consultation, (v) => patch({ require_payment_before_consultation: v, allow_consultation_without_payment: v ? false : currentSettings.allow_consultation_without_payment }))}
+          {toggle("Permitir consulta sin pago previo", currentSettings.allow_consultation_without_payment, (v) => patch({ allow_consultation_without_payment: v, require_payment_before_consultation: v ? false : currentSettings.require_payment_before_consultation }))}
+          {toggle("Enviar a caja al finalizar consulta", currentSettings.auto_send_to_billing_after_consultation, (v) => patch({ auto_send_to_billing_after_consultation: v }))}
+          {toggle("Completar visita despues del pago", currentSettings.auto_complete_visit_after_payment, (v) => patch({ auto_complete_visit_after_payment: v }))}
+        </div>
+      </Card>
+      <Card title="Datos minimos">
+        <div className="grid gap-3">
+          {toggle("Requerir identidad del paciente", currentSettings.require_identity_for_patient, (v) => patch({ require_identity_for_patient: v }))}
+          {toggle("Requerir telefono del paciente", currentSettings.require_phone_for_patient, (v) => patch({ require_phone_for_patient: v }))}
+        </div>
+      </Card>
+    </div>
+  </form>;
 }

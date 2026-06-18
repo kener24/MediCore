@@ -47,7 +47,7 @@ from apps.notifications.models import Notification
 from apps.notifications.services import create_notification
 
 
-MANAGE_ROLES = ["superadmin", "admin", "recepcionista"]
+MANAGE_ROLES = ["admin", "recepcionista", "cajero", "recepcionista_caja"]
 FISCAL_CONFIG_ROLES = ["superadmin", "admin"]
 FISCAL_ISSUE_ROLES = ["admin", "recepcionista"]
 
@@ -55,9 +55,8 @@ FISCAL_ISSUE_ROLES = ["admin", "recepcionista"]
 def scope(request, queryset):
     role = get_role_name(request.user)
     if role == "superadmin" or request.user.is_superuser:
-        clinic = request.query_params.get("clinic")
-        return queryset.filter(clinic_id=clinic) if clinic else queryset
-    if role in ["admin", "recepcionista", "medico", "enfermera"] and request.user.clinica_id:
+        return queryset.none()
+    if role in ["admin", "recepcionista", "cajero", "recepcionista_caja", "medico", "enfermera"] and request.user.clinica_id:
         return queryset.filter(clinic_id=request.user.clinica_id)
     if role == "paciente":
         return queryset.filter(patient__user=request.user)
@@ -116,7 +115,11 @@ class FiscalDocumentRangeViewSet(viewsets.ModelViewSet):
     queryset = FiscalDocumentRange.objects.select_related("clinic")
 
     def get_queryset(self):
-        queryset = scope(self.request, super().get_queryset())
+        if get_role_name(self.request.user) == "superadmin" or self.request.user.is_superuser:
+            clinic = self.request.query_params.get("clinic")
+            queryset = super().get_queryset().filter(clinic_id=clinic) if clinic else super().get_queryset()
+        else:
+            queryset = scope(self.request, super().get_queryset())
         p = self.request.query_params
         if p.get("document_type"):
             queryset = queryset.filter(document_type=p["document_type"])

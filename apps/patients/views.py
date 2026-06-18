@@ -20,9 +20,9 @@ from apps.audit.models import AuditLog
 from apps.audit.services import log_audit_event
 
 
-CLINIC_VIEW_ROLES = ["superadmin", "admin", "medico", "enfermera", "recepcionista"]
-PATIENT_WRITE_ROLES = ["superadmin", "admin", "enfermera", "recepcionista"]
-PATIENT_DEACTIVATE_ROLES = ["superadmin", "admin"]
+CLINIC_VIEW_ROLES = ["admin", "medico", "enfermera", "recepcionista"]
+PATIENT_WRITE_ROLES = ["admin", "enfermera", "recepcionista"]
+PATIENT_DEACTIVATE_ROLES = ["admin"]
 
 
 class PatientViewSet(viewsets.ModelViewSet):
@@ -43,9 +43,7 @@ class PatientViewSet(viewsets.ModelViewSet):
         role = get_role_name(user)
         queryset = super().get_queryset()
         if role == "superadmin" or user.is_superuser:
-            clinic = self.request.query_params.get("clinic")
-            if clinic:
-                queryset = queryset.filter(clinic_id=clinic)
+            queryset = queryset.none()
         elif role in ["admin", "medico", "enfermera", "recepcionista"] and user.clinica_id:
             queryset = queryset.filter(clinic_id=user.clinica_id)
         elif role == "paciente":

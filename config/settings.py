@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     "apps.patients",
     "apps.appointments",
     "apps.admissions",
+    "apps.hospitalization",
     "apps.medical_records",
     "apps.prescriptions",
     "apps.billing",

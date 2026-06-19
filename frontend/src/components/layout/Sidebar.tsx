@@ -1,4 +1,4 @@
-import { BarChart3, Bell, Building2, CalendarClock, ChevronDown, FileText, Gauge, KeyRound, LogOut, Menu, Package, ScrollText, ShieldCheck, Stethoscope, UserCircle, Users, Wallet, X } from "lucide-react";
+import { BarChart3, Bed, Bell, Building2, CalendarClock, ChevronDown, FileText, Gauge, KeyRound, LogOut, Menu, Package, ScrollText, ShieldCheck, Stethoscope, UserCircle, Users, Wallet, X } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import clsx from "clsx";
 
@@ -61,6 +61,9 @@ const adminGroups: NavGroup[] = [
       { label: "Admisiones", path: "/clinic/admissions" },
       { label: "Nueva atencion", path: "/clinic/admissions/new" },
       { label: "Triaje", path: "/clinic/triage" },
+      { label: "Hospitalizacion", path: "/clinic/hospitalization", icon: Bed },
+      { label: "Internados", path: "/clinic/hospitalization/admissions" },
+      { label: "Habitaciones y camas", path: "/clinic/hospitalization/rooms-beds" },
       { label: "Citas", path: "/clinic/appointments" },
       { label: "Calendario", path: "/clinic/calendar" },
     ],
@@ -152,6 +155,7 @@ const doctorGroups: NavGroup[] = [
     items: [
       { label: "Mi Perfil Medico", path: "/doctor/profile" },
       { label: "Sala de espera", path: "/doctor/waiting-room" },
+      { label: "Hospitalizacion", path: "/clinic/hospitalization" },
       { label: "Pacientes", path: "/clinic/patients" },
       { label: "Expedientes", path: "/clinic/medical-records" },
       { label: "Mis Consultas", path: "/doctor/consultations" },
@@ -186,6 +190,8 @@ const nurseGroups: NavGroup[] = [
     items: [
       { label: "Pacientes", path: "/clinic/patients" },
       { label: "Triaje", path: "/clinic/triage" },
+      { label: "Hospitalizacion", path: "/clinic/hospitalization" },
+      { label: "Internados", path: "/clinic/hospitalization/admissions" },
       { label: "Citas", path: "/clinic/appointments" },
       { label: "Calendario", path: "/clinic/calendar" },
     ],
@@ -230,6 +236,7 @@ const receptionistGroups: NavGroup[] = [
       { label: "Pacientes", path: "/clinic/patients" },
       { label: "Admisiones", path: "/clinic/admissions" },
       { label: "Nueva atencion", path: "/clinic/admissions/new" },
+      { label: "Hospitalizacion", path: "/clinic/hospitalization" },
       { label: "Citas", path: "/clinic/appointments" },
       { label: "Calendario", path: "/clinic/calendar" },
       { label: "Documentos", path: "/clinic/documents" },

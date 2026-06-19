@@ -59,6 +59,7 @@ import { PatientClinicInfoPage, PatientMedicalRecordSummaryPage, PatientPortalAp
 import { ClinicalDocumentsPage, DocumentCategoriesPage, DocumentDetailsPage, DocumentUploadPage, PatientDocumentsPage, PatientPortalDocumentDetailsPage, PatientPortalDocumentsPage } from "../features/documents/DocumentsPages";
 import { AccountLocksAdminPage, ActiveSessionsPage, AdminSessionsPage, EmailVerificationPage, ForgotPasswordPage, PasswordSecurityPage, ResetPasswordPage, SecurityActivityPage, SecurityCenterPage, SecuritySettingsPage, VerifyEmailPage } from "../features/security/SecurityPages";
 import { AdmissionVisitDetailsPage, AdmissionsDashboardPage, DoctorWaitingRoomPage, NewWalkInVisitPage, PendingBillingVisitsPage, TriageQueuePage } from "../features/admissions/AdmissionsPages";
+import { HospitalizationDashboardPage, HospitalizationDetailPage, HospitalizationFormPage, HospitalizedPatientsPage, HospitalRoomsBedsPage } from "../features/hospitalization/HospitalizationPages";
 
 export const router = createBrowserRouter([
   {
@@ -164,6 +165,11 @@ export const router = createBrowserRouter([
               { path: "/clinic/admissions/new", element: <NewWalkInVisitPage /> },
               { path: "/clinic/admissions/visits/:id", element: <AdmissionVisitDetailsPage /> },
               { path: "/clinic/triage", element: <TriageQueuePage /> },
+              { path: "/clinic/hospitalization", element: <HospitalizationDashboardPage /> },
+              { path: "/clinic/hospitalization/admissions", element: <HospitalizedPatientsPage /> },
+              { path: "/clinic/hospitalization/admissions/:id", element: <HospitalizationDetailPage /> },
+              { path: "/clinic/hospitalization/new", element: <HospitalizationFormPage /> },
+              { path: "/clinic/hospitalization/rooms-beds", element: <HospitalRoomsBedsPage /> },
               { path: "/clinic/patients/new", element: <PatientFormPage /> },
               { path: "/clinic/patients/:id", element: <PatientDetailsPage /> },
               { path: "/clinic/patients/:id/edit", element: <PatientFormPage /> },

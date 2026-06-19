@@ -67,6 +67,11 @@ Todas las peticiones usan el `apiClient` centralizado con `Authorization: Bearer
   - Programación simple de medicamento.
   - Medicamentos pendientes.
   - Acciones de administrar, omitir y retrasar.
+- Sprint 4.5 estabilización:
+  - Payloads limpios para rondas y medicamentos.
+  - Acciones clínicas ocultas si el internamiento está cerrado.
+  - Manejo de listas paginadas y estados vacíos.
+  - Validaciones locales antes de enviar al backend.
 
 ## Separación clínica
 

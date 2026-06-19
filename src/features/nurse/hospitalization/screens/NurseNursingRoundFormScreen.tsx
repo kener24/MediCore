@@ -34,7 +34,16 @@ export function NurseNursingRoundFormScreen() {
     }
     setSaving(true);
     try {
-      await createNursingRound(hospitalizationId, { ...form, pain_level: pain });
+      await createNursingRound(hospitalizationId, {
+        ...form,
+        consciousness_status: form.consciousness_status?.trim(),
+        elimination_status: form.elimination_status?.trim(),
+        feeding_status: form.feeding_status?.trim(),
+        general_condition: form.general_condition?.trim(),
+        mobility_status: form.mobility_status?.trim(),
+        notes: form.notes?.trim(),
+        pain_level: pain,
+      });
       Alert.alert('Ronda de enfermería', 'Ronda registrada correctamente.', [{ text: 'Aceptar', onPress: () => navigation.navigate('NurseNursingRounds', { hospitalizationId }) }]);
     } catch (err) {
       Alert.alert('Ronda de enfermería', err instanceof Error ? err.message : 'No se pudo registrar la ronda.');

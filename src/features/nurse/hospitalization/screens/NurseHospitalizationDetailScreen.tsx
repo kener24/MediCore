@@ -49,6 +49,7 @@ export function NurseHospitalizationDetailScreen() {
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   if (loading) return <LoadingState label="Cargando internamiento..." />;
+  const isClosed = detail ? ['discharged', 'cancelled'].includes(String(detail.status)) : false;
 
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
@@ -74,14 +75,18 @@ export function NurseHospitalizationDetailScreen() {
               <Text style={styles.description}>Ingreso: {formatDateTime(detail.admission_datetime)}</Text>
             </AppCard>
             <CurrentBedCard detail={detail} />
-            <View style={styles.actions}>
-              <AppButton label="Registrar signos" onPress={() => navigation.navigate('NurseInpatientVitalSignsForm', { hospitalizationId })} />
-              <AppButton label="Agregar nota" onPress={() => navigation.navigate('NurseNursingNoteForm', { hospitalizationId })} variant="secondary" />
-            </View>
-            <View style={styles.actions}>
-              <AppButton label="Rondas" onPress={() => navigation.navigate('NurseNursingRounds', { hospitalizationId })} variant="secondary" />
-              <AppButton label="Medicamentos" onPress={() => navigation.navigate('NurseMedicationAdministrations', { hospitalizationId })} variant="secondary" />
-            </View>
+            {!isClosed ? (
+              <>
+                <View style={styles.actions}>
+                  <AppButton label="Registrar signos" onPress={() => navigation.navigate('NurseInpatientVitalSignsForm', { hospitalizationId })} />
+                  <AppButton label="Agregar nota" onPress={() => navigation.navigate('NurseNursingNoteForm', { hospitalizationId })} variant="secondary" />
+                </View>
+                <View style={styles.actions}>
+                  <AppButton label="Rondas" onPress={() => navigation.navigate('NurseNursingRounds', { hospitalizationId })} variant="secondary" />
+                  <AppButton label="Medicamentos" onPress={() => navigation.navigate('NurseMedicationAdministrations', { hospitalizationId })} variant="secondary" />
+                </View>
+              </>
+            ) : null}
             <SectionHeader onPress={() => navigation.navigate('NurseInpatientVitalSignsHistory', { hospitalizationId })} title="Signos vitales recientes" />
             {(detail.recent_vital_signs ?? []).slice(0, 3).map((item) => <InpatientVitalSignsCard item={item} key={item.id ?? `${item.recorded_at}`} />)}
             {(detail.recent_vital_signs ?? []).length === 0 ? <EmptyState description="No hay signos vitales hospitalarios registrados." title="Sin signos" /> : null}

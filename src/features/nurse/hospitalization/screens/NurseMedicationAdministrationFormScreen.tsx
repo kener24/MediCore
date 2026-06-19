@@ -27,7 +27,13 @@ export function NurseMedicationAdministrationFormScreen() {
     }
     setSaving(true);
     try {
-      await createMedicationAdministration(hospitalizationId, form);
+      await createMedicationAdministration(hospitalizationId, {
+        ...form,
+        dosage: form.dosage.trim(),
+        medication_name: form.medication_name.trim(),
+        notes: form.notes?.trim(),
+        scheduled_time: form.scheduled_time?.trim(),
+      });
       Alert.alert('Medicamento', 'Medicamento programado correctamente.', [{ text: 'Aceptar', onPress: () => navigation.navigate('NurseMedicationAdministrations', { hospitalizationId }) }]);
     } catch (err) {
       Alert.alert('Medicamento', err instanceof Error ? err.message : 'No se pudo programar el medicamento.');

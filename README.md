@@ -49,38 +49,30 @@ Todas las peticiones usan el `apiClient` centralizado con `Authorization: Bearer
 - Login funcional con JWT.
 - Módulo paciente MVP.
 - Módulo médico avanzado: dashboard, agenda, sala, detalle de paciente, consultas, recetas, órdenes, consumos clínicos, perfil y seguridad.
-- Sprint 4.0 enfermería / triaje inicial móvil:
-  - Dashboard de enfermería.
-  - Cola de pacientes esperando triaje.
-  - Pacientes en triaje.
-  - Detalle básico del paciente.
-  - Inicio de triaje.
-  - Registro de signos vitales con validaciones e IMC.
-  - Formulario de triaje con prioridad.
-  - Envío del paciente al médico.
-  - Triajes realizados.
-  - Detalle de triaje.
-  - Notificaciones.
-  - Perfil, seguridad y logout.
-- Sprint 4.1 estabilización enfermería / triaje móvil:
-  - Tabs finales: Inicio, Triaje, Signos, Pacientes y Perfil.
-  - Validación de acceso exclusiva para rol enfermería.
-  - Manejo de `visitId` faltante en detalle, signos y triaje.
-  - Normalización de listas DRF y respuestas anidadas.
-  - Endpoints alineados con visitas clínicas del backend.
-  - Errores globales en español limpio, sin mostrar detalles técnicos.
-  - Safe area, teclado y padding inferior revisados en pantallas críticas.
+- Módulo enfermería / triaje inicial: dashboard, cola de triaje, pacientes en triaje, signos vitales de triaje, formulario de triaje, triajes realizados, notificaciones, perfil y seguridad.
+- Sprint 4.3 hospitalización móvil:
+  - Dashboard de hospitalización.
+  - Pacientes internados.
+  - Detalle de internamiento.
+  - Habitación y cama asignada.
+  - Signos vitales hospitalarios.
+  - Historial de signos vitales hospitalarios.
+  - Notas de enfermería.
+  - Eventos de hospitalización.
+  - Estado de camas.
+
+## Separación clínica
+
+Los signos vitales de triaje inicial y los signos vitales hospitalarios son módulos separados. Hospitalización usa endpoints `/hospitalization/...` y no consume endpoints administrativos ni de caja.
 
 ## Alcance futuro de enfermería
 
-Este sprint cubre triaje inicial. Hospitalización no debe mezclarse con triaje.
+Sprint 4.4 recomendado:
 
-Próximos sprints recomendados:
-
-- Sprint 4.1: estabilización de enfermería / triaje móvil con endpoints productivos definitivos.
-- Sprint 4.2: hospitalización web + backend.
-- Sprint 4.3: hospitalización móvil.
-- Sprint 4.4: rondas, seguimiento y administración de medicamentos web + móvil.
+- Rondas avanzadas.
+- Administración de medicamentos.
+- Seguimiento clínico más profundo de pacientes internados.
+- Alertas clínicas configurables.
 
 ## Validaciones locales
 
@@ -91,11 +83,20 @@ npx expo-doctor
 
 No ejecutes builds si TypeScript o Expo Doctor fallan.
 
-## Acceso demo médico
+## Accesos demo
 
 ```text
+Enfermería:
+enfermera@medicore.com
+Enfermera12345*
+
+Doctor:
 doctor@medicore.com
 Doctor12345*
+
+Paciente:
+paciente@medicore.com
+Paciente12345*
 ```
 
 Los accesos dependen de los datos seed del backend activo.

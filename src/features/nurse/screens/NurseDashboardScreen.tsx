@@ -66,6 +66,12 @@ export function NurseDashboardScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Acciones rápidas</Text>
           <QuickActionCard
+            description="Seguimiento de pacientes internados, signos hospitalarios y notas."
+            icon="hospital-building"
+            onPress={() => navigation.navigate('NurseHospitalizationDashboard')}
+            title="Hospitalización"
+          />
+          <QuickActionCard
             description="Pacientes pendientes de evaluación inicial."
             icon="clipboard-account-outline"
             onPress={() => navigation.navigate('NurseTriageQueue')}

@@ -78,4 +78,14 @@ export const endpoints = {
     schedulesAlt: '/doctors/me/schedules/',
     activitySummary: '/doctor/activity-summary/',
   },
+  hospitalization: {
+    dashboard: '/hospitalization/dashboard/',
+    admissions: '/hospitalization/admissions/',
+    admission: (id: number | string) => `/hospitalization/admissions/${id}/`,
+    vitalSigns: (id: number | string) => `/hospitalization/admissions/${id}/vital-signs/`,
+    nursingNotes: (id: number | string) => `/hospitalization/admissions/${id}/nursing-notes/`,
+    events: (id: number | string) => `/hospitalization/admissions/${id}/events/`,
+    beds: '/hospitalization/beds/',
+    availableBeds: '/hospitalization/beds/available/',
+  },
 } as const;

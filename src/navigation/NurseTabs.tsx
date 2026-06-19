@@ -5,6 +5,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RoleGuard } from '@/components/RoleGuard';
 import { NurseCompletedTriagesScreen } from '@/features/nurse/screens/NurseCompletedTriagesScreen';
 import { NurseDashboardScreen } from '@/features/nurse/screens/NurseDashboardScreen';
+import { NurseBedStatusScreen } from '@/features/nurse/hospitalization/screens/NurseBedStatusScreen';
+import { NurseHospitalizationDashboardScreen } from '@/features/nurse/hospitalization/screens/NurseHospitalizationDashboardScreen';
+import { NurseHospitalizationDetailScreen } from '@/features/nurse/hospitalization/screens/NurseHospitalizationDetailScreen';
+import { NurseHospitalizationEventsScreen } from '@/features/nurse/hospitalization/screens/NurseHospitalizationEventsScreen';
+import { NurseInpatientVitalSignsFormScreen } from '@/features/nurse/hospitalization/screens/NurseInpatientVitalSignsFormScreen';
+import { NurseInpatientVitalSignsHistoryScreen } from '@/features/nurse/hospitalization/screens/NurseInpatientVitalSignsHistoryScreen';
+import { NurseInpatientsScreen } from '@/features/nurse/hospitalization/screens/NurseInpatientsScreen';
+import { NurseNursingNoteFormScreen } from '@/features/nurse/hospitalization/screens/NurseNursingNoteFormScreen';
+import { NurseNursingNotesListScreen } from '@/features/nurse/hospitalization/screens/NurseNursingNotesListScreen';
 import { NurseNotificationsScreen } from '@/features/nurse/screens/NurseNotificationsScreen';
 import { NursePatientDetailScreen } from '@/features/nurse/screens/NursePatientDetailScreen';
 import { NursePatientsInTriageScreen } from '@/features/nurse/screens/NursePatientsInTriageScreen';
@@ -24,6 +33,15 @@ function NurseHomeStack() {
   return (
     <Stack.Navigator screenOptions={stackOptions}>
       <Stack.Screen component={NurseDashboardScreen} name="NurseDashboard" />
+      <Stack.Screen component={NurseHospitalizationDashboardScreen} name="NurseHospitalizationDashboard" />
+      <Stack.Screen component={NurseInpatientsScreen} name="NurseInpatients" />
+      <Stack.Screen component={NurseHospitalizationDetailScreen} name="NurseHospitalizationDetail" />
+      <Stack.Screen component={NurseInpatientVitalSignsFormScreen} name="NurseInpatientVitalSignsForm" />
+      <Stack.Screen component={NurseInpatientVitalSignsHistoryScreen} name="NurseInpatientVitalSignsHistory" />
+      <Stack.Screen component={NurseNursingNoteFormScreen} name="NurseNursingNoteForm" />
+      <Stack.Screen component={NurseNursingNotesListScreen} name="NurseNursingNotesList" />
+      <Stack.Screen component={NurseHospitalizationEventsScreen} name="NurseHospitalizationEvents" />
+      <Stack.Screen component={NurseBedStatusScreen} name="NurseBedStatus" />
       <Stack.Screen component={NurseNotificationsScreen} name="NurseNotifications" />
       <Stack.Screen component={NursePatientDetailScreen} name="NursePatientDetail" />
       <Stack.Screen component={NurseVitalSignsFormScreen} name="NurseVitalSignsForm" />
@@ -60,11 +78,29 @@ function NurseVitalsStack() {
 function NursePatientsStack() {
   return (
     <Stack.Navigator screenOptions={stackOptions}>
-      <Stack.Screen component={NursePatientsInTriageScreen} name="NursePatientsInTriage" />
-      <Stack.Screen component={NursePatientDetailScreen} name="NursePatientDetail" />
-      <Stack.Screen component={NurseVitalSignsFormScreen} name="NurseVitalSignsForm" />
-      <Stack.Screen component={NurseTriageFormScreen} name="NurseTriageForm" />
-      <Stack.Screen component={NurseTriageDetailScreen} name="NurseTriageDetail" />
+      <Stack.Screen component={NurseHospitalizationDashboardScreen} name="NurseHospitalizationDashboard" />
+      <Stack.Screen component={NurseInpatientsScreen} name="NurseInpatients" />
+      <Stack.Screen component={NurseHospitalizationDetailScreen} name="NurseHospitalizationDetail" />
+      <Stack.Screen component={NurseInpatientVitalSignsFormScreen} name="NurseInpatientVitalSignsForm" />
+      <Stack.Screen component={NurseInpatientVitalSignsHistoryScreen} name="NurseInpatientVitalSignsHistory" />
+      <Stack.Screen component={NurseNursingNoteFormScreen} name="NurseNursingNoteForm" />
+      <Stack.Screen component={NurseNursingNotesListScreen} name="NurseNursingNotesList" />
+      <Stack.Screen component={NurseHospitalizationEventsScreen} name="NurseHospitalizationEvents" />
+      <Stack.Screen component={NurseBedStatusScreen} name="NurseBedStatus" />
+    </Stack.Navigator>
+  );
+}
+
+function NurseNotesStack() {
+  return (
+    <Stack.Navigator screenOptions={stackOptions}>
+      <Stack.Screen component={NurseInpatientsScreen} initialParams={{ intent: 'note' }} name="NurseInpatients" />
+      <Stack.Screen component={NurseHospitalizationDetailScreen} name="NurseHospitalizationDetail" />
+      <Stack.Screen component={NurseNursingNoteFormScreen} name="NurseNursingNoteForm" />
+      <Stack.Screen component={NurseNursingNotesListScreen} name="NurseNursingNotesList" />
+      <Stack.Screen component={NurseInpatientVitalSignsFormScreen} name="NurseInpatientVitalSignsForm" />
+      <Stack.Screen component={NurseInpatientVitalSignsHistoryScreen} name="NurseInpatientVitalSignsHistory" />
+      <Stack.Screen component={NurseHospitalizationEventsScreen} name="NurseHospitalizationEvents" />
     </Stack.Navigator>
   );
 }
@@ -86,8 +122,8 @@ export function NurseTabs() {
       <Tab.Navigator screenOptions={createTabOptions(insets)}>
         <Tab.Screen component={NurseHomeStack} name="NurseHomeTab" options={{ tabBarIcon: tabIcon('heart-pulse'), title: 'Inicio' }} />
         <Tab.Screen component={NurseTriageStack} name="NurseTriageTab" options={{ tabBarIcon: tabIcon('clipboard-account-outline'), title: 'Triaje' }} />
-        <Tab.Screen component={NurseVitalsStack} name="NurseVitalsTab" options={{ tabBarIcon: tabIcon('pulse'), title: 'Signos' }} />
-        <Tab.Screen component={NursePatientsStack} name="NursePatientsTab" options={{ tabBarIcon: tabIcon('account-group-outline'), title: 'Pacientes' }} />
+        <Tab.Screen component={NursePatientsStack} name="NurseHospitalizationTab" options={{ tabBarIcon: tabIcon('hospital-building'), title: 'Internados' }} />
+        <Tab.Screen component={NurseNotesStack} name="NurseNotesTab" options={{ tabBarIcon: tabIcon('notebook-outline'), title: 'Notas' }} />
         <Tab.Screen component={NurseProfileStack} name="NurseProfileTab" options={{ tabBarIcon: tabIcon('account-heart-outline'), title: 'Perfil' }} />
       </Tab.Navigator>
     </RoleGuard>

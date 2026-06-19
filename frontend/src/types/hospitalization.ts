@@ -63,6 +63,37 @@ export interface NursingNote {
   recorded_at: string;
 }
 
+export interface NursingRound {
+  id: number;
+  round_type: string;
+  status: string;
+  notes?: string;
+  general_condition?: string;
+  pain_level?: number;
+  consciousness_status?: string;
+  mobility_status?: string;
+  feeding_status?: string;
+  elimination_status?: string;
+  nurse_name?: string;
+  created_at?: string;
+  creado_en?: string;
+}
+
+export interface MedicationAdministration {
+  id: number;
+  medication_name: string;
+  dosage: string;
+  route: string;
+  scheduled_time?: string | null;
+  administered_time?: string | null;
+  status: string;
+  administered_by_name?: string;
+  notes?: string;
+  omission_reason?: string;
+  patient_name?: string;
+  created_at?: string;
+}
+
 export interface Hospitalization {
   id: number;
   patient: number;
@@ -86,6 +117,8 @@ export interface Hospitalization {
   transfer_notes?: string;
   recent_vital_signs?: HospitalVitalSigns[];
   recent_nursing_notes?: NursingNote[];
+  nursing_rounds?: NursingRound[];
+  medication_administrations?: MedicationAdministration[];
   events?: Array<{ id: number; event_type: string; description: string; creado_en: string; created_by_name?: string }>;
 }
 

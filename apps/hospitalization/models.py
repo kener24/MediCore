@@ -290,3 +290,136 @@ class HospitalizationEvent(TimeStampedModel):
             models.Index(fields=["hospitalization", "event_type"]),
             models.Index(fields=["event_type", "creado_en"]),
         ]
+
+
+class NursingRound(TimeStampedModel):
+    class RoundType(models.TextChoices):
+        ROUTINE = "routine", "Rutina"
+        URGENT = "urgent", "Urgente"
+        MEDICATION = "medication", "Medicacion"
+        FOLLOW_UP = "follow_up", "Seguimiento"
+        OTHER = "other", "Otro"
+
+    class Status(models.TextChoices):
+        COMPLETED = "completed", "Completada"
+        PENDING_REVIEW = "pending_review", "Pendiente de revision"
+        CANCELLED = "cancelled", "Cancelada"
+
+    clinic = models.ForeignKey("clinics.Clinic", on_delete=models.PROTECT, related_name="nursing_rounds")
+    hospitalization = models.ForeignKey(Hospitalization, on_delete=models.CASCADE, related_name="nursing_rounds")
+    patient = models.ForeignKey("patients.Patient", on_delete=models.PROTECT, related_name="nursing_rounds")
+    nurse = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="nursing_rounds")
+    round_type = models.CharField(max_length=30, choices=RoundType.choices, default=RoundType.ROUTINE)
+    status = models.CharField(max_length=30, choices=Status.choices, default=Status.COMPLETED)
+    notes = models.TextField(blank=True)
+    general_condition = models.CharField(max_length=180, blank=True)
+    pain_level = models.PositiveSmallIntegerField(null=True, blank=True)
+    consciousness_status = models.CharField(max_length=120, blank=True)
+    mobility_status = models.CharField(max_length=120, blank=True)
+    feeding_status = models.CharField(max_length=120, blank=True)
+    elimination_status = models.CharField(max_length=120, blank=True)
+
+    class Meta:
+        ordering = ["-creado_en"]
+        indexes = [
+            models.Index(fields=["clinic", "creado_en"]),
+            models.Index(fields=["hospitalization", "creado_en"]),
+            models.Index(fields=["patient", "creado_en"]),
+            models.Index(fields=["round_type", "status"]),
+        ]
+
+    def clean(self):
+        if self.hospitalization_id:
+            if not self.hospitalization.is_active:
+                raise ValidationError("No se puede crear una ronda en una hospitalizacion cerrada.")
+            if self.clinic_id and self.hospitalization.clinic_id != self.clinic_id:
+                raise ValidationError("La ronda debe pertenecer a la misma clinica del internamiento.")
+            if self.patient_id and self.hospitalization.patient_id != self.patient_id:
+                raise ValidationError("La ronda debe pertenecer al mismo paciente del internamiento.")
+        if self.pain_level is not None and (self.pain_level < 0 or self.pain_level > 10):
+            raise ValidationError({"pain_level": "El nivel de dolor debe estar entre 0 y 10."})
+
+    def save(self, *args, **kwargs):
+        if self.hospitalization_id:
+            self.clinic = self.hospitalization.clinic
+            self.patient = self.hospitalization.patient
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Ronda {self.get_round_type_display()} - {self.patient}"
+
+
+class MedicationAdministration(TimeStampedModel):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pendiente"
+        ADMINISTERED = "administered", "Administrado"
+        OMITTED = "omitted", "Omitido"
+        DELAYED = "delayed", "Retrasado"
+        CANCELLED = "cancelled", "Cancelado"
+
+    class Route(models.TextChoices):
+        ORAL = "oral", "Oral"
+        IV = "iv", "Intravenosa"
+        IM = "im", "Intramuscular"
+        SC = "sc", "Subcutanea"
+        TOPICAL = "topical", "Topica"
+        INHALED = "inhaled", "Inhalada"
+        OTHER = "other", "Otra"
+
+    clinic = models.ForeignKey("clinics.Clinic", on_delete=models.PROTECT, related_name="medication_administrations")
+    hospitalization = models.ForeignKey(Hospitalization, on_delete=models.CASCADE, related_name="medication_administrations")
+    patient = models.ForeignKey("patients.Patient", on_delete=models.PROTECT, related_name="medication_administrations")
+    prescription = models.ForeignKey("prescriptions.Prescription", on_delete=models.SET_NULL, null=True, blank=True, related_name="medication_administrations")
+    prescription_item = models.ForeignKey("prescriptions.PrescriptionItem", on_delete=models.SET_NULL, null=True, blank=True, related_name="medication_administrations")
+    medication_name = models.CharField(max_length=180)
+    dosage = models.CharField(max_length=120)
+    route = models.CharField(max_length=30, choices=Route.choices, default=Route.ORAL)
+    scheduled_time = models.DateTimeField(null=True, blank=True)
+    administered_time = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=30, choices=Status.choices, default=Status.PENDING)
+    administered_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="medication_administrations_done")
+    notes = models.TextField(blank=True)
+    omission_reason = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["scheduled_time", "-creado_en"]
+        indexes = [
+            models.Index(fields=["clinic", "status", "scheduled_time"]),
+            models.Index(fields=["hospitalization", "status"]),
+            models.Index(fields=["patient", "status"]),
+        ]
+
+    def clean(self):
+        if self.hospitalization_id:
+            if self.clinic_id and self.hospitalization.clinic_id != self.clinic_id:
+                raise ValidationError("El medicamento debe pertenecer a la misma clinica del internamiento.")
+            if self.patient_id and self.hospitalization.patient_id != self.patient_id:
+                raise ValidationError("El medicamento debe pertenecer al mismo paciente del internamiento.")
+        if self.prescription_id and self.prescription.clinic_id != self.clinic_id:
+            raise ValidationError("La receta debe pertenecer a la misma clinica.")
+        if self.prescription_item_id and self.prescription_item.prescription_id != self.prescription_id:
+            raise ValidationError("El item de receta no pertenece a la receta seleccionada.")
+        if not self.medication_name:
+            raise ValidationError({"medication_name": "El medicamento es obligatorio."})
+        if not self.dosage:
+            raise ValidationError({"dosage": "La dosis es obligatoria."})
+        if self.status == self.Status.OMITTED and not self.omission_reason:
+            raise ValidationError({"omission_reason": "El motivo de omision es obligatorio."})
+        if self.status == self.Status.ADMINISTERED and (not self.administered_time or not self.administered_by_id):
+            raise ValidationError("Medicamento administrado requiere hora y enfermera responsable.")
+
+    def save(self, *args, **kwargs):
+        if self.hospitalization_id:
+            self.clinic = self.hospitalization.clinic
+            self.patient = self.hospitalization.patient
+        if self.prescription_item_id:
+            self.medication_name = self.medication_name or self.prescription_item.medication_name
+            self.dosage = self.dosage or self.prescription_item.dosage
+            self.route = self.route or self.prescription_item.route
+            self.prescription = self.prescription_item.prescription
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.medication_name} - {self.get_status_display()}"

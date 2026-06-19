@@ -7,7 +7,9 @@ from apps.hospitalization.models import (
     HospitalVitalSigns,
     Hospitalization,
     HospitalizationEvent,
+    MedicationAdministration,
     NursingNote,
+    NursingRound,
 )
 
 
@@ -227,3 +229,100 @@ class HospitalizationEventSerializer(serializers.ModelSerializer):
         model = HospitalizationEvent
         fields = ["id", "event_type", "description", "created_by", "created_by_name", "metadata", "creado_en"]
         read_only_fields = fields
+
+
+class NursingRoundSerializer(serializers.ModelSerializer):
+    nurse_name = serializers.CharField(source="nurse.nombre_completo", read_only=True)
+    patient_name = serializers.CharField(source="patient.nombre_completo", read_only=True)
+    created_at = serializers.DateTimeField(source="creado_en", read_only=True)
+
+    class Meta:
+        model = NursingRound
+        fields = [
+            "id",
+            "clinic",
+            "hospitalization",
+            "patient",
+            "patient_name",
+            "nurse",
+            "nurse_name",
+            "round_type",
+            "status",
+            "notes",
+            "general_condition",
+            "pain_level",
+            "consciousness_status",
+            "mobility_status",
+            "feeding_status",
+            "elimination_status",
+            "created_at",
+            "creado_en",
+            "actualizado_en",
+        ]
+        read_only_fields = ["clinic", "hospitalization", "patient", "nurse", "creado_en", "actualizado_en"]
+
+
+class NursingRoundCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = NursingRound
+        fields = ["round_type", "status", "notes", "general_condition", "pain_level", "consciousness_status", "mobility_status", "feeding_status", "elimination_status"]
+
+    def validate_pain_level(self, value):
+        if value is not None and (value < 0 or value > 10):
+            raise serializers.ValidationError("El nivel de dolor debe estar entre 0 y 10.")
+        return value
+
+
+class MedicationAdministrationSerializer(serializers.ModelSerializer):
+    administered_by_name = serializers.CharField(source="administered_by.nombre_completo", read_only=True)
+    patient_name = serializers.CharField(source="patient.nombre_completo", read_only=True)
+    created_at = serializers.DateTimeField(source="creado_en", read_only=True)
+
+    class Meta:
+        model = MedicationAdministration
+        fields = [
+            "id",
+            "clinic",
+            "hospitalization",
+            "patient",
+            "patient_name",
+            "prescription",
+            "prescription_item",
+            "medication_name",
+            "dosage",
+            "route",
+            "scheduled_time",
+            "administered_time",
+            "status",
+            "administered_by",
+            "administered_by_name",
+            "notes",
+            "omission_reason",
+            "created_at",
+            "creado_en",
+            "actualizado_en",
+        ]
+        read_only_fields = ["clinic", "hospitalization", "patient", "administered_by", "administered_time", "creado_en", "actualizado_en"]
+
+
+class MedicationAdministrationCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MedicationAdministration
+        fields = ["prescription", "prescription_item", "medication_name", "dosage", "route", "scheduled_time", "notes"]
+
+    def validate(self, attrs):
+        item = attrs.get("prescription_item")
+        if item:
+            attrs.setdefault("prescription", item.prescription)
+            attrs.setdefault("medication_name", item.medication_name)
+            attrs.setdefault("dosage", item.dosage)
+        if not attrs.get("medication_name"):
+            raise serializers.ValidationError({"medication_name": "El medicamento es obligatorio."})
+        if not attrs.get("dosage"):
+            raise serializers.ValidationError({"dosage": "La dosis es obligatoria."})
+        return attrs
+
+
+class MedicationAdministrationActionSerializer(serializers.Serializer):
+    notes = serializers.CharField(required=False, allow_blank=True)
+    reason = serializers.CharField(required=False, allow_blank=True)

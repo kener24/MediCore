@@ -6,7 +6,9 @@ import type {
   Hospitalization,
   HospitalizationCreatePayload,
   HospitalizationDashboard,
+  MedicationAdministration,
   NursingNote,
+  NursingRound,
 } from "../types/hospitalization";
 
 export async function getHospitalizationDashboard() {
@@ -81,5 +83,45 @@ export async function createHospitalVitalSigns(id: number | string, payload: Par
 
 export async function createNursingNote(id: number | string, payload: Partial<NursingNote>) {
   const { data } = await api.post<NursingNote>(`/hospitalization/admissions/${id}/nursing-notes/`, payload);
+  return data;
+}
+
+export async function getNursingRounds(id: number | string) {
+  const { data } = await api.get<NursingRound[]>(`/hospitalization/admissions/${id}/nursing-rounds/`);
+  return data;
+}
+
+export async function createNursingRound(id: number | string, payload: Partial<NursingRound>) {
+  const { data } = await api.post<NursingRound>(`/hospitalization/admissions/${id}/nursing-rounds/`, payload);
+  return data;
+}
+
+export async function getMedicationAdministrations(id: number | string) {
+  const { data } = await api.get<MedicationAdministration[]>(`/hospitalization/admissions/${id}/medication-administrations/`);
+  return data;
+}
+
+export async function createMedicationAdministration(id: number | string, payload: Partial<MedicationAdministration>) {
+  const { data } = await api.post<MedicationAdministration>(`/hospitalization/admissions/${id}/medication-administrations/`, payload);
+  return data;
+}
+
+export async function administerMedication(id: number | string, payload: { notes?: string }) {
+  const { data } = await api.post<MedicationAdministration>(`/hospitalization/medication-administrations/${id}/administer/`, payload);
+  return data;
+}
+
+export async function omitMedication(id: number | string, payload: { reason: string; notes?: string }) {
+  const { data } = await api.post<MedicationAdministration>(`/hospitalization/medication-administrations/${id}/omit/`, payload);
+  return data;
+}
+
+export async function delayMedication(id: number | string, payload: { notes?: string }) {
+  const { data } = await api.post<MedicationAdministration>(`/hospitalization/medication-administrations/${id}/delay/`, payload);
+  return data;
+}
+
+export async function getPendingMedications() {
+  const { data } = await api.get<MedicationAdministration[]>("/hospitalization/medications/pending/");
   return data;
 }

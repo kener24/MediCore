@@ -10,7 +10,9 @@ from apps.hospitalization.models import (
     Hospitalization,
     HospitalizationEvent,
     HospitalVitalSigns,
+    MedicationAdministration,
     NursingNote,
+    NursingRound,
 )
 
 
@@ -179,3 +181,96 @@ def create_nursing_note(hospitalization, user=None, request=None, **data):
     _log_event(hospitalization, "nursing_note_created", "Nota de enfermeria creada.", user=user, metadata={"note": note.id})
     log_audit_event(request=request, user=user, clinic=hospitalization.clinic, action=AuditLog.Action.CREATE, module=AuditLog.Module.MEDICAL_RECORDS, obj=note, description="Nota de enfermeria hospitalaria creada.")
     return note
+
+
+def ensure_active_hospitalization(hospitalization):
+    if not hospitalization.is_active:
+        raise ValidationError("No se puede operar sobre una hospitalizacion cerrada.")
+
+
+def create_nursing_round(hospitalization, nurse, request=None, **payload):
+    ensure_active_hospitalization(hospitalization)
+    with transaction.atomic():
+        locked = Hospitalization.objects.select_for_update().get(pk=hospitalization.pk)
+        ensure_active_hospitalization(locked)
+        nursing_round = NursingRound.objects.create(hospitalization=locked, nurse=nurse, **payload)
+        _log_event(locked, "nursing_round_created", "Ronda de enfermeria creada.", user=nurse, metadata={"nursing_round": nursing_round.id})
+        log_audit_event(request=request, user=nurse, clinic=locked.clinic, action=AuditLog.Action.CREATE, module=AuditLog.Module.MEDICAL_RECORDS, obj=nursing_round, description="Ronda de enfermeria hospitalaria creada.")
+        return nursing_round
+
+
+def get_pending_medications(clinic):
+    return MedicationAdministration.objects.select_related("clinic", "hospitalization", "patient", "administered_by").filter(
+        clinic=clinic,
+        hospitalization__status__in=Hospitalization.ACTIVE_STATUSES,
+        status__in=[MedicationAdministration.Status.PENDING, MedicationAdministration.Status.DELAYED],
+    )
+
+
+def create_medication_administration(hospitalization, user=None, request=None, **payload):
+    ensure_active_hospitalization(hospitalization)
+    prescription = payload.get("prescription")
+    prescription_item = payload.get("prescription_item")
+    validate_same_clinic(hospitalization.clinic, prescription=prescription)
+    if prescription_item and prescription_item.prescription.clinic_id != hospitalization.clinic_id:
+        raise ValidationError("El medicamento de receta debe pertenecer a la misma clinica.")
+    with transaction.atomic():
+        locked = Hospitalization.objects.select_for_update().get(pk=hospitalization.pk)
+        ensure_active_hospitalization(locked)
+        medication = MedicationAdministration.objects.create(hospitalization=locked, **payload)
+        _log_event(locked, "medication_scheduled", "Medicamento programado para administracion.", user=user, metadata={"medication_administration": medication.id, "medication_name": medication.medication_name})
+        log_audit_event(request=request, user=user, clinic=locked.clinic, action=AuditLog.Action.CREATE, module=AuditLog.Module.MEDICAL_RECORDS, obj=medication, description="Medicamento hospitalario programado.", new_values={"status": medication.status})
+        return medication
+
+
+def _lock_medication_for_action(medication_administration):
+    medication = MedicationAdministration.objects.select_for_update().select_related("hospitalization").get(pk=medication_administration.pk)
+    ensure_active_hospitalization(medication.hospitalization)
+    if medication.status == MedicationAdministration.Status.ADMINISTERED:
+        raise ValidationError("Este medicamento ya fue administrado.")
+    if medication.status in [MedicationAdministration.Status.OMITTED, MedicationAdministration.Status.CANCELLED]:
+        raise ValidationError("Este medicamento ya no permite cambios de administracion.")
+    return medication
+
+
+def mark_medication_administered(medication_administration, nurse, request=None, notes=""):
+    with transaction.atomic():
+        medication = _lock_medication_for_action(medication_administration)
+        old_status = medication.status
+        medication.status = MedicationAdministration.Status.ADMINISTERED
+        medication.administered_time = timezone.now()
+        medication.administered_by = nurse
+        medication.notes = notes or medication.notes
+        medication.save(update_fields=["status", "administered_time", "administered_by", "notes", "actualizado_en"])
+        _log_event(medication.hospitalization, "medication_administered", "Medicamento administrado.", user=nurse, metadata={"medication_administration": medication.id, "medication_name": medication.medication_name})
+        log_audit_event(request=request, user=nurse, clinic=medication.clinic, action=AuditLog.Action.COMPLETE, module=AuditLog.Module.MEDICAL_RECORDS, obj=medication, description="Medicamento hospitalario administrado.", old_values={"status": old_status}, new_values={"status": medication.status})
+        return medication
+
+
+def mark_medication_omitted(medication_administration, nurse, request=None, reason="", notes=""):
+    if not reason:
+        raise ValidationError("El motivo de omision es obligatorio.")
+    with transaction.atomic():
+        medication = _lock_medication_for_action(medication_administration)
+        old_status = medication.status
+        medication.status = MedicationAdministration.Status.OMITTED
+        medication.administered_by = nurse
+        medication.omission_reason = reason
+        medication.notes = notes or medication.notes
+        medication.save(update_fields=["status", "administered_by", "omission_reason", "notes", "actualizado_en"])
+        _log_event(medication.hospitalization, "medication_omitted", "Medicamento omitido.", user=nurse, metadata={"medication_administration": medication.id, "reason": reason})
+        log_audit_event(request=request, user=nurse, clinic=medication.clinic, action=AuditLog.Action.UPDATE, module=AuditLog.Module.MEDICAL_RECORDS, obj=medication, description="Medicamento hospitalario omitido.", old_values={"status": old_status}, new_values={"status": medication.status, "omission_reason": reason})
+        return medication
+
+
+def mark_medication_delayed(medication_administration, nurse, request=None, notes=""):
+    with transaction.atomic():
+        medication = _lock_medication_for_action(medication_administration)
+        old_status = medication.status
+        medication.status = MedicationAdministration.Status.DELAYED
+        medication.administered_by = nurse
+        medication.notes = notes or medication.notes
+        medication.save(update_fields=["status", "administered_by", "notes", "actualizado_en"])
+        _log_event(medication.hospitalization, "medication_delayed", "Medicamento retrasado.", user=nurse, metadata={"medication_administration": medication.id, "notes": notes})
+        log_audit_event(request=request, user=nurse, clinic=medication.clinic, action=AuditLog.Action.UPDATE, module=AuditLog.Module.MEDICAL_RECORDS, obj=medication, description="Medicamento hospitalario retrasado.", old_values={"status": old_status}, new_values={"status": medication.status, "notes": notes})
+        return medication

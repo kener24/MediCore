@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from apps.hospitalization.models import HospitalBed, HospitalBedAssignment, HospitalRoom, HospitalVitalSigns, Hospitalization, HospitalizationEvent, NursingNote
+from apps.hospitalization.models import HospitalBed, HospitalBedAssignment, HospitalRoom, HospitalVitalSigns, Hospitalization, HospitalizationEvent, MedicationAdministration, NursingNote, NursingRound
 
 
 admin.site.register(HospitalRoom)
@@ -10,3 +10,5 @@ admin.site.register(HospitalBedAssignment)
 admin.site.register(HospitalVitalSigns)
 admin.site.register(NursingNote)
 admin.site.register(HospitalizationEvent)
+admin.site.register(NursingRound)
+admin.site.register(MedicationAdministration)

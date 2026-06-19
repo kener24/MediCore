@@ -21,7 +21,7 @@ from apps.doctors.views import DoctorDashboardView, DoctorProfileViewSet, Specia
 from apps.patients.views import PatientViewSet
 from apps.appointments.views import AppointmentViewSet
 from apps.medical_records.views import ClinicalConsultationViewSet, ClinicalSupplyUsageViewSet, MedicalRecordViewSet
-from apps.hospitalization.views import HospitalBedViewSet, HospitalRoomViewSet, HospitalizationDashboardView, HospitalizationViewSet
+from apps.hospitalization.views import HospitalBedViewSet, HospitalRoomViewSet, HospitalizationDashboardView, HospitalizationViewSet, MedicationAdministrationViewSet, PendingMedicationsView
 from apps.prescriptions.views import DiagnosisViewSet, MedicalOrderViewSet, PrescriptionViewSet
 from apps.billing.views import BillableServiceViewSet, BillingStatsViewSet, CashSessionViewSet, ClinicFiscalProfileViewSet, FiscalDocumentRangeViewSet, InvoiceViewSet, PaymentViewSet
 from apps.inventory.views import InventoryAlertViewSet, InventoryCategoryViewSet, InventoryItemViewSet, InventoryLotViewSet, InventoryMovementViewSet, InventoryStatsViewSet
@@ -108,6 +108,7 @@ router.register("admissions/visits", PatientVisitViewSet, basename="admissions-v
 router.register("hospitalization/rooms", HospitalRoomViewSet, basename="hospitalization-rooms")
 router.register("hospitalization/beds", HospitalBedViewSet, basename="hospitalization-beds")
 router.register("hospitalization/admissions", HospitalizationViewSet, basename="hospitalization-admissions")
+router.register("hospitalization/medication-administrations", MedicationAdministrationViewSet, basename="hospitalization-medication-administrations")
 router.register("medical-records", MedicalRecordViewSet, basename="medical-records")
 router.register("consultations", ClinicalConsultationViewSet, basename="consultations")
 router.register("clinical-consumptions", ClinicalSupplyUsageViewSet, basename="clinical-consumptions")
@@ -163,6 +164,7 @@ urlpatterns = [
     path("api/clinic-admin/my-clinic/", MyClinicView.as_view(), name="clinic_admin_my_clinic"),
     path("api/doctor/dashboard/", DoctorDashboardView.as_view(), name="doctor_dashboard"),
     path("api/hospitalization/dashboard/", HospitalizationDashboardView.as_view(), name="hospitalization-dashboard"),
+    path("api/hospitalization/medications/pending/", PendingMedicationsView.as_view(), name="hospitalization-medications-pending"),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger_ui"),
     path("api/inventory/alerts/low-stock/", InventoryAlertViewSet.as_view({"get": "low_stock"}), name="inventory-low-stock"),

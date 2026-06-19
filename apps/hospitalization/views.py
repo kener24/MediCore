@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.permissions import get_role_name
-from apps.hospitalization.models import HospitalBed, HospitalRoom, HospitalVitalSigns, Hospitalization, NursingNote
+from apps.hospitalization.models import HospitalBed, HospitalRoom, HospitalVitalSigns, Hospitalization, MedicationAdministration, NursingNote
 from apps.hospitalization.serializers import (
     BedActionSerializer,
     CancelHospitalizationSerializer,
@@ -20,7 +20,12 @@ from apps.hospitalization.serializers import (
     HospitalizationDetailSerializer,
     HospitalizationEventSerializer,
     HospitalizationListSerializer,
+    MedicationAdministrationActionSerializer,
+    MedicationAdministrationCreateSerializer,
+    MedicationAdministrationSerializer,
     NursingNoteSerializer,
+    NursingRoundCreateSerializer,
+    NursingRoundSerializer,
 )
 from apps.hospitalization import services
 
@@ -29,6 +34,7 @@ VIEW_ROLES = ["admin", "medico", "enfermera", "recepcionista"]
 MANAGE_BEDS_ROLES = ["admin", "recepcionista"]
 MANAGE_ADMISSIONS_ROLES = ["admin", "medico", "recepcionista"]
 NURSING_CLINICAL_ROLES = ["admin", "medico", "enfermera"]
+NURSING_WRITE_ROLES = ["enfermera"]
 DISCHARGE_ROLES = ["admin", "medico"]
 
 
@@ -280,6 +286,40 @@ class HospitalizationViewSet(viewsets.ModelViewSet):
     def events(self, request, pk=None):
         return Response(HospitalizationEventSerializer(self.get_object().events.all(), many=True).data)
 
+    @action(detail=True, methods=["get", "post"], url_path="nursing-rounds")
+    def nursing_rounds(self, request, pk=None):
+        hospitalization = self.get_object()
+        if request.method == "GET":
+            if role_name(request.user) not in NURSING_CLINICAL_ROLES:
+                return forbidden("No tienes permiso para ver rondas de enfermeria.")
+            return Response(NursingRoundSerializer(hospitalization.nursing_rounds.all(), many=True).data)
+        if role_name(request.user) not in NURSING_WRITE_ROLES:
+            return forbidden("No tienes permiso para crear rondas de enfermeria.")
+        serializer = NursingRoundCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            nursing_round = services.create_nursing_round(hospitalization, nurse=request.user, request=request, **serializer.validated_data)
+        except DjangoValidationError as exc:
+            return Response(exc.message_dict if hasattr(exc, "message_dict") else {"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(NursingRoundSerializer(nursing_round).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["get", "post"], url_path="medication-administrations")
+    def medication_administrations(self, request, pk=None):
+        hospitalization = self.get_object()
+        if request.method == "GET":
+            if role_name(request.user) not in NURSING_CLINICAL_ROLES:
+                return forbidden("No tienes permiso para ver medicamentos hospitalarios.")
+            return Response(MedicationAdministrationSerializer(hospitalization.medication_administrations.all(), many=True).data)
+        if role_name(request.user) not in NURSING_WRITE_ROLES:
+            return forbidden("No tienes permiso para programar medicamentos hospitalarios.")
+        serializer = MedicationAdministrationCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            medication = services.create_medication_administration(hospitalization, user=request.user, request=request, **serializer.validated_data)
+        except DjangoValidationError as exc:
+            return Response(exc.message_dict if hasattr(exc, "message_dict") else {"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(MedicationAdministrationSerializer(medication).data, status=status.HTTP_201_CREATED)
+
 
 class HospitalizationDashboardView(APIView):
     permission_classes = [IsAuthenticated]
@@ -302,3 +342,67 @@ class HospitalizationDashboardView(APIView):
             "recent_vital_signs": HospitalVitalSigns.objects.filter(hospitalization__clinic=clinic).count(),
         }
         return Response(data)
+
+
+class PendingMedicationsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if role_name(request.user) not in NURSING_CLINICAL_ROLES or not request.user.clinica_id or request.user.is_superuser:
+            return forbidden("No tienes permiso para ver medicamentos pendientes.")
+        queryset = services.get_pending_medications(user_clinic(request.user))
+        return Response(MedicationAdministrationSerializer(queryset, many=True).data)
+
+
+class MedicationAdministrationViewSet(viewsets.GenericViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = MedicationAdministrationSerializer
+    queryset = MedicationAdministration.objects.select_related("clinic", "hospitalization", "patient", "administered_by", "prescription", "prescription_item")
+
+    def get_queryset(self):
+        return scoped_queryset(self.request, super().get_queryset())
+
+    def _get_medication(self):
+        medication = self.get_object()
+        if role_name(self.request.user) not in NURSING_WRITE_ROLES:
+            return None, forbidden("No tienes permiso para administrar medicamentos hospitalarios.")
+        return medication, None
+
+    @action(detail=True, methods=["post"])
+    def administer(self, request, pk=None):
+        medication, error = self._get_medication()
+        if error:
+            return error
+        serializer = MedicationAdministrationActionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            medication = services.mark_medication_administered(medication, nurse=request.user, request=request, notes=serializer.validated_data.get("notes", ""))
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(MedicationAdministrationSerializer(medication).data)
+
+    @action(detail=True, methods=["post"])
+    def omit(self, request, pk=None):
+        medication, error = self._get_medication()
+        if error:
+            return error
+        serializer = MedicationAdministrationActionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            medication = services.mark_medication_omitted(medication, nurse=request.user, request=request, reason=serializer.validated_data.get("reason", ""), notes=serializer.validated_data.get("notes", ""))
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(MedicationAdministrationSerializer(medication).data)
+
+    @action(detail=True, methods=["post"])
+    def delay(self, request, pk=None):
+        medication, error = self._get_medication()
+        if error:
+            return error
+        serializer = MedicationAdministrationActionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            medication = services.mark_medication_delayed(medication, nurse=request.user, request=request, notes=serializer.validated_data.get("notes", ""))
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(MedicationAdministrationSerializer(medication).data)

@@ -1,0 +1,42 @@
+export type ReceptionPatient = {
+  id?: number;
+  full_name?: string;
+  nombre_completo?: string;
+  first_name?: string;
+  last_name?: string;
+  nombres?: string;
+  apellidos?: string;
+  identity_number?: string;
+  identidad?: string;
+  phone?: string;
+  telefono?: string;
+  email?: string;
+  correo?: string;
+  gender?: string;
+  genero?: string;
+  birth_date?: string;
+  fecha_nacimiento?: string;
+  age?: number | string;
+  edad?: number | string;
+  address?: string;
+  direccion?: string;
+  patient_code?: string;
+  codigo_paciente?: string;
+  medical_record_number?: string;
+  blood_type?: string | null;
+  allergies?: string | null;
+  alergias?: string | null;
+  chronic_diseases?: string | null;
+  created_at?: string;
+  creado_en?: string;
+};
+
+export type MinimalPatientPayload = {
+  first_name?: string;
+  last_name?: string;
+  full_name?: string;
+  identity_number?: string;
+  phone?: string;
+  gender?: string;
+  birth_date?: string;
+};

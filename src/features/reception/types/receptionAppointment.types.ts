@@ -1,0 +1,20 @@
+export type ReceptionAppointment = {
+  id?: number;
+  patient_id?: number;
+  patient?: number;
+  patient_name?: string;
+  patient_nombre?: string;
+  doctor_id?: number;
+  doctor?: number;
+  doctor_name?: string;
+  doctor_nombre?: string;
+  date?: string;
+  scheduled_date?: string;
+  time?: string;
+  scheduled_time?: string;
+  datetime?: string;
+  modality?: 'presencial' | 'online' | string;
+  status?: string;
+  reason?: string;
+  motivo?: string;
+};

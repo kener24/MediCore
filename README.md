@@ -72,10 +72,20 @@ Todas las peticiones usan el `apiClient` centralizado con `Authorization: Bearer
   - Acciones clínicas ocultas si el internamiento está cerrado.
   - Manejo de listas paginadas y estados vacíos.
   - Validaciones locales antes de enviar al backend.
+- Sprint 5.0 recepción móvil:
+  - Dashboard operativo de recepción.
+  - Búsqueda de paciente por nombre, identidad, teléfono o código.
+  - Creación de paciente mínimo.
+  - Registro de admisión/visita.
+  - Check-in de cita.
+  - Admisiones de hoy y detalle de visita.
+  - Envío operativo a triaje o médico cuando el backend lo permite.
 
 ## Separación clínica
 
 Los signos vitales de triaje inicial y los signos vitales hospitalarios son módulos separados. Hospitalización usa endpoints `/hospitalization/...` y no consume endpoints administrativos ni de caja.
+
+Recepción usa endpoints operativos de pacientes, citas y admisiones. No consume endpoints médicos profundos, caja ni hospitalización clínica.
 
 ## Alcance futuro de enfermería
 
@@ -109,6 +119,10 @@ Doctor12345*
 Paciente:
 paciente@medicore.com
 Paciente12345*
+
+Recepción:
+recepcion@medicore.com
+Recepcion12345*
 ```
 
 Los accesos dependen de los datos seed del backend activo.

@@ -1,0 +1,47 @@
+import { apiClient } from '@/core/api/apiClient';
+import { ApiClientError } from '@/core/api/authInterceptor';
+import type { QueryParams } from '@/features/reception/types/commonReception.types';
+
+export const unavailableReceptionAction = 'Esta acción no está disponible por el momento.';
+
+export async function getFirstAvailable<T>(urls: string[], params?: QueryParams): Promise<T> {
+  let lastError: unknown;
+  for (const url of urls) {
+    try {
+      const { data } = await apiClient.get<T>(url, { params });
+      return data;
+    } catch (error) {
+      lastError = error;
+      if (error instanceof ApiClientError && error.status && ![404, 405].includes(error.status)) throw error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(unavailableReceptionAction);
+}
+
+export async function postFirstAvailable<T>(urls: string[], payload?: unknown): Promise<T> {
+  let lastError: unknown;
+  for (const url of urls) {
+    try {
+      const { data } = await apiClient.post<T>(url, payload ?? {});
+      return data;
+    } catch (error) {
+      lastError = error;
+      if (error instanceof ApiClientError && error.status && ![404, 405].includes(error.status)) throw error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(unavailableReceptionAction);
+}
+
+export async function patchFirstAvailable<T>(urls: string[], payload?: unknown): Promise<T> {
+  let lastError: unknown;
+  for (const url of urls) {
+    try {
+      const { data } = await apiClient.patch<T>(url, payload ?? {});
+      return data;
+    } catch (error) {
+      lastError = error;
+      if (error instanceof ApiClientError && error.status && ![404, 405].includes(error.status)) throw error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(unavailableReceptionAction);
+}

@@ -13,11 +13,16 @@ export function isNurseRole(role?: RoleName | null) {
   return ['enfermera', 'enfermero', 'enfermeria', 'nurse', 'nursing'].includes(normalizeRole(role));
 }
 
+export function isReceptionRole(role?: RoleName | null) {
+  return ['recepcionista', 'recepcion', 'receptionist', 'front desk', 'admisiones', 'admissions'].includes(normalizeRole(role));
+}
+
 export function resolveSupportedAppRole(role?: RoleName | null): AppRole | null {
   const normalized = normalizeRole(role);
   if (normalized === 'doctor') return 'medico';
   if (isNurseRole(normalized)) return 'enfermera';
-  if (['paciente', 'medico', 'recepcionista', 'admin'].includes(normalized)) {
+  if (isReceptionRole(normalized)) return 'recepcionista';
+  if (['paciente', 'medico', 'admin'].includes(normalized)) {
     return normalized as AppRole;
   }
   return null;

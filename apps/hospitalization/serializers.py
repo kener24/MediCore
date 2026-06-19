@@ -37,6 +37,18 @@ class HospitalRoomSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["clinic", "creado_en", "actualizado_en"]
 
+    def validate_name(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("El nombre de la habitacion es obligatorio.")
+        return value
+
+    def validate_room_number(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("El numero de habitacion es obligatorio.")
+        return value
+
 
 class HospitalBedSerializer(serializers.ModelSerializer):
     clinic_nombre = serializers.CharField(source="clinic.nombre", read_only=True)
@@ -73,6 +85,12 @@ class HospitalBedSerializer(serializers.ModelSerializer):
     def get_current_patient(self, obj):
         active = obj.active_hospitalizations.select_related("patient").filter(status__in=Hospitalization.ACTIVE_STATUSES).first()
         return active.patient.nombre_completo if active else ""
+
+    def validate_bed_number(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("El numero de cama es obligatorio.")
+        return value
 
 
 class HospitalBedAssignmentSerializer(serializers.ModelSerializer):
@@ -112,6 +130,28 @@ class HospitalVitalSignsSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["hospitalization", "bmi", "recorded_by", "recorded_at", "creado_en"]
 
+    def validate_temperature(self, value):
+        if value is not None and (value < 30 or value > 45):
+            raise serializers.ValidationError("La temperatura debe estar entre 30 y 45.")
+        return value
+
+    def validate_oxygen_saturation(self, value):
+        if value is not None and (value < 0 or value > 100):
+            raise serializers.ValidationError("La saturacion debe estar entre 0 y 100.")
+        return value
+
+    def validate_pain_scale(self, value):
+        if value is not None and (value < 0 or value > 10):
+            raise serializers.ValidationError("La escala de dolor debe estar entre 0 y 10.")
+        return value
+
+    def validate(self, attrs):
+        systolic = attrs.get("blood_pressure_systolic")
+        diastolic = attrs.get("blood_pressure_diastolic")
+        if systolic is not None and diastolic is not None and systolic <= diastolic:
+            raise serializers.ValidationError({"blood_pressure_systolic": "La presion sistolica debe ser mayor que la diastolica."})
+        return attrs
+
 
 class NursingNoteSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source="created_by.nombre_completo", read_only=True)
@@ -120,6 +160,12 @@ class NursingNoteSerializer(serializers.ModelSerializer):
         model = NursingNote
         fields = ["id", "hospitalization", "note_type", "title", "note", "created_by", "created_by_name", "recorded_at", "creado_en"]
         read_only_fields = ["hospitalization", "created_by", "recorded_at", "creado_en"]
+
+    def validate_note(self, value):
+        value = value.strip()
+        if len(value) < 5:
+            raise serializers.ValidationError("La nota de enfermeria debe tener al menos 5 caracteres.")
+        return value
 
 
 class HospitalizationListSerializer(serializers.ModelSerializer):
@@ -206,6 +252,12 @@ class HospitalizationCreateSerializer(serializers.ModelSerializer):
             "admission_datetime",
         ]
 
+    def validate_reason(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("El motivo de internamiento es obligatorio.")
+        return value
+
 
 class BedActionSerializer(serializers.Serializer):
     bed = serializers.PrimaryKeyRelatedField(queryset=HospitalBed.objects.all())
@@ -213,7 +265,7 @@ class BedActionSerializer(serializers.Serializer):
 
 
 class DischargeSerializer(serializers.Serializer):
-    discharge_reason = serializers.CharField(required=False, allow_blank=True)
+    discharge_reason = serializers.CharField(required=True, allow_blank=False)
     discharge_notes = serializers.CharField(required=False, allow_blank=True)
     bed_status = serializers.ChoiceField(choices=[HospitalBed.Status.CLEANING, HospitalBed.Status.AVAILABLE], default=HospitalBed.Status.CLEANING)
 

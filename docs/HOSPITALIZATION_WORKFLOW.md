@@ -77,3 +77,12 @@
 ## Relacion con movil
 
 Sprint 4.2 deja backend listo para que Sprint 4.3 construya hospitalizacion movil. La app movil no debe reutilizar pantallas de triaje inicial para controles de paciente internado.
+
+## Estabilizacion Sprint 4.5
+
+- Habitaciones y camas validan campos obligatorios y registran auditoria al crear o editar.
+- Recepcion puede operar internamientos y camas, pero no consulta notas, signos, rondas, eventos clinicos ni medicamentos.
+- El alta exige motivo, libera la cama y bloquea signos, notas, rondas y medicamentos posteriores.
+- La web y la app movil ocultan acciones clinicas cuando el internamiento esta cerrado.
+- Las respuestas paginadas se normalizan en web y movil para evitar errores en listas.
+- Los formularios validan rangos basicos antes de enviar datos al backend.

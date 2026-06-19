@@ -66,6 +66,18 @@ function StatusPill({ value }: { value: string }) {
   return <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{statusLabel[value] || bedStatusLabel[value] || value}</span>;
 }
 
+function isClosedAdmission(status: string) {
+  return ["discharged", "cancelled"].includes(status);
+}
+
+function requireTrimmed(value: string, message: string) {
+  if (!value.trim()) {
+    toast.error(message);
+    return false;
+  }
+  return true;
+}
+
 export function HospitalizationDashboardPage() {
   const [stats, setStats] = useState<Awaited<ReturnType<typeof getHospitalizationDashboard>> | null>(null);
   const [admissions, setAdmissions] = useState<Hospitalization[]>([]);
@@ -125,6 +137,8 @@ export function HospitalizationFormPage() {
   }, []);
   async function submit(e: FormEvent) {
     e.preventDefault();
+    if (!form.patient) return toast.error("Selecciona un paciente.");
+    if (!requireTrimmed(form.reason, "El motivo de internamiento es obligatorio.")) return;
     try {
       const created = await createHospitalization({
         patient: Number(form.patient),
@@ -132,8 +146,8 @@ export function HospitalizationFormPage() {
         bed: form.bed ? Number(form.bed) : null,
         admission_source: form.admission_source,
         status: form.status,
-        reason: form.reason,
-        diagnosis_at_admission: form.diagnosis_at_admission,
+        reason: form.reason.trim(),
+        diagnosis_at_admission: form.diagnosis_at_admission.trim(),
       });
       toast.success("Internamiento creado correctamente.");
       navigate(`/clinic/hospitalization/admissions/${created.id}`);
@@ -192,7 +206,7 @@ export function HospitalizationDetailPage() {
           <p className="md:col-span-3"><b>Diagnóstico:</b> {admission.diagnosis_at_admission || "-"}</p>
         </div>
       </Card>
-      {admission.status !== "discharged" && admission.status !== "cancelled" ? <HospitalizationActions admission={admission} beds={beds} onSaved={load} /> : null}
+      {!isClosedAdmission(admission.status) ? <HospitalizationActions admission={admission} beds={beds} onSaved={load} /> : null}
       <div className="grid gap-4 lg:grid-cols-2">
         <VitalSignsSection admission={admission} onSaved={load} />
         <NursingNotesSection admission={admission} onSaved={load} />
@@ -219,7 +233,9 @@ function HospitalizationActions({ admission, beds, onSaved }: { admission: Hospi
   }
   async function discharge() {
     const reason = window.prompt("Motivo de alta hospitalaria") || "";
-    try { await dischargeHospitalization(admission.id, { discharge_reason: reason, bed_status: "cleaning" }); toast.success("Alta hospitalaria registrada."); await onSaved(); } catch (e) { toast.error(getErrorMessage(e)); }
+    if (!reason.trim()) return toast.error("El motivo de alta es obligatorio.");
+    if (!window.confirm("Después de dar alta se liberará la cama y se bloquearán acciones clínicas. ¿Deseas continuar?")) return;
+    try { await dischargeHospitalization(admission.id, { discharge_reason: reason.trim(), bed_status: "cleaning" }); toast.success("Alta hospitalaria registrada."); await onSaved(); } catch (e) { toast.error(getErrorMessage(e)); }
   }
   async function cancel() {
     const reason = window.prompt("Motivo de cancelación") || "";
@@ -233,8 +249,20 @@ function VitalSignsSection({ admission, onSaved }: { admission: Hospitalization;
   const [form, setForm] = useState<Record<string, string>>({});
   async function submit(e: FormEvent) {
     e.preventDefault();
+    const values = Object.fromEntries(Object.entries(form).filter(([, value]) => value !== ""));
+    const checks: Array<[string, number, number, string]> = [
+      ["temperature", 30, 45, "La temperatura debe estar entre 30 y 45."],
+      ["oxygen_saturation", 0, 100, "La saturación debe estar entre 0 y 100."],
+      ["pain_scale", 0, 10, "El dolor debe estar entre 0 y 10."],
+    ];
+    for (const [key, min, max, message] of checks) {
+      if (values[key] !== undefined) {
+        const parsed = Number(values[key]);
+        if (!Number.isFinite(parsed) || parsed < min || parsed > max) return toast.error(message);
+      }
+    }
     try {
-      await createHospitalVitalSigns(admission.id, Object.fromEntries(Object.entries(form).filter(([, value]) => value !== "")));
+      await createHospitalVitalSigns(admission.id, values);
       toast.success("Signos vitales registrados correctamente.");
       setForm({}); await onSaved();
     } catch (error) { toast.error(getErrorMessage(error)); }
@@ -247,7 +275,8 @@ function NursingNotesSection({ admission, onSaved }: { admission: Hospitalizatio
   const [form, setForm] = useState({ note_type: "normal", title: "", note: "" });
   async function submit(e: FormEvent) {
     e.preventDefault();
-    try { await createNursingNote(admission.id, form); toast.success("Nota de enfermería registrada correctamente."); setForm({ note_type: "normal", title: "", note: "" }); await onSaved(); } catch (error) { toast.error(getErrorMessage(error)); }
+    if (form.note.trim().length < 5) return toast.error("La nota de enfermería debe tener al menos 5 caracteres.");
+    try { await createNursingNote(admission.id, { ...form, title: form.title.trim(), note: form.note.trim() }); toast.success("Nota de enfermería registrada correctamente."); setForm({ note_type: "normal", title: "", note: "" }); await onSaved(); } catch (error) { toast.error(getErrorMessage(error)); }
   }
   return <Card title="Notas de enfermería"><form className="grid gap-2" onSubmit={submit}><select className="h-10 rounded-md border px-3 text-sm" value={form.note_type} onChange={(e) => setForm({ ...form, note_type: e.target.value })}><option value="normal">Normal</option><option value="important">Importante</option><option value="urgent">Urgente</option><option value="medication">Medicamento</option><option value="observation">Observación</option><option value="incident">Incidente</option></select><input className="h-10 rounded-md border px-3 text-sm" placeholder="Título" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /><textarea className="min-h-24 rounded-md border px-3 py-2 text-sm" required placeholder="Nota clínica de enfermería" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /><Button type="submit">Agregar nota</Button></form><div className="mt-4 space-y-2">{admission.recent_nursing_notes?.length ? admission.recent_nursing_notes.map((n) => <p key={n.id} className="rounded-md bg-slate-50 p-2 text-xs text-slate-600"><b>{n.title || n.note_type}</b> · {n.note}</p>) : <EmptyState title="Sin notas de enfermería." />}</div></Card>;
 }
@@ -261,7 +290,7 @@ function NursingRoundsSection({ admission, rounds, onSaved }: { admission: Hospi
     e.preventDefault();
     if (form.pain_level && (Number(form.pain_level) < 0 || Number(form.pain_level) > 10)) return toast.error("El dolor debe estar entre 0 y 10.");
     try {
-      await createNursingRound(admission.id, { ...form, pain_level: form.pain_level ? Number(form.pain_level) : undefined });
+      await createNursingRound(admission.id, { ...form, pain_level: form.pain_level ? Number(form.pain_level) : undefined, notes: form.notes.trim() });
       toast.success("Ronda de enfermería registrada correctamente.");
       setForm({ round_type: "routine", general_condition: "", pain_level: "", consciousness_status: "", mobility_status: "", feeding_status: "", elimination_status: "", notes: "" });
       await onSaved();
@@ -274,8 +303,10 @@ function MedicationAdministrationsSection({ admission, medications, onSaved }: {
   const [form, setForm] = useState({ medication_name: "", dosage: "", route: "oral", scheduled_time: "", notes: "" });
   async function submit(e: FormEvent) {
     e.preventDefault();
+    if (!requireTrimmed(form.medication_name, "El medicamento es obligatorio.")) return;
+    if (!requireTrimmed(form.dosage, "La dosis es obligatoria.")) return;
     try {
-      await createMedicationAdministration(admission.id, { ...form, scheduled_time: form.scheduled_time || null });
+      await createMedicationAdministration(admission.id, { ...form, medication_name: form.medication_name.trim(), dosage: form.dosage.trim(), notes: form.notes.trim(), scheduled_time: form.scheduled_time || null });
       toast.success("Medicamento programado correctamente.");
       setForm({ medication_name: "", dosage: "", route: "oral", scheduled_time: "", notes: "" });
       await onSaved();
@@ -307,7 +338,7 @@ export function HospitalRoomsBedsPage() {
   const [bedForm, setBedForm] = useState({ room: "", bed_number: "", status: "available", notes: "" });
   async function load() { const [r, b] = await Promise.all([getHospitalRooms(), getHospitalBeds()]); setRooms(r); setBeds(b); }
   useEffect(() => { load().catch((e) => toast.error(getErrorMessage(e))); }, []);
-  async function saveRoom(e: FormEvent) { e.preventDefault(); try { await createHospitalRoom(roomForm); toast.success("Habitación creada."); setRoomForm({ name: "", room_number: "", floor: "", room_type: "general" }); await load(); } catch (error) { toast.error(getErrorMessage(error)); } }
-  async function saveBed(e: FormEvent) { e.preventDefault(); try { await createHospitalBed({ ...bedForm, room: Number(bedForm.room) }); toast.success("Cama creada."); setBedForm({ room: "", bed_number: "", status: "available", notes: "" }); await load(); } catch (error) { toast.error(getErrorMessage(error)); } }
+  async function saveRoom(e: FormEvent) { e.preventDefault(); if (!requireTrimmed(roomForm.name, "El nombre de habitación es obligatorio.")) return; if (!requireTrimmed(roomForm.room_number, "El número de habitación es obligatorio.")) return; try { await createHospitalRoom({ ...roomForm, name: roomForm.name.trim(), room_number: roomForm.room_number.trim(), floor: roomForm.floor.trim() }); toast.success("Habitación creada."); setRoomForm({ name: "", room_number: "", floor: "", room_type: "general" }); await load(); } catch (error) { toast.error(getErrorMessage(error)); } }
+  async function saveBed(e: FormEvent) { e.preventDefault(); if (!bedForm.room) return toast.error("Selecciona una habitación."); if (!requireTrimmed(bedForm.bed_number, "El número de cama es obligatorio.")) return; try { await createHospitalBed({ ...bedForm, room: Number(bedForm.room), bed_number: bedForm.bed_number.trim(), notes: bedForm.notes.trim() }); toast.success("Cama creada."); setBedForm({ room: "", bed_number: "", status: "available", notes: "" }); await load(); } catch (error) { toast.error(getErrorMessage(error)); } }
   return <div className="space-y-6"><PageHeader title="Habitaciones y camas" description="Gestión operativa de camas hospitalarias." /><div className="grid gap-4 lg:grid-cols-2"><Card title="Nueva habitación"><form className="grid gap-3" onSubmit={saveRoom}><input className="h-10 rounded-md border px-3 text-sm" required placeholder="Nombre" value={roomForm.name} onChange={(e) => setRoomForm({ ...roomForm, name: e.target.value })} /><input className="h-10 rounded-md border px-3 text-sm" required placeholder="Número" value={roomForm.room_number} onChange={(e) => setRoomForm({ ...roomForm, room_number: e.target.value })} /><input className="h-10 rounded-md border px-3 text-sm" placeholder="Piso" value={roomForm.floor} onChange={(e) => setRoomForm({ ...roomForm, floor: e.target.value })} /><Button type="submit">Crear habitación</Button></form></Card><Card title="Nueva cama"><form className="grid gap-3" onSubmit={saveBed}><select className="h-10 rounded-md border px-3 text-sm" required value={bedForm.room} onChange={(e) => setBedForm({ ...bedForm, room: e.target.value })}><option value="">Habitación</option>{rooms.map((r) => <option key={r.id} value={r.id}>{r.room_number} · {r.name}</option>)}</select><input className="h-10 rounded-md border px-3 text-sm" required placeholder="Número de cama" value={bedForm.bed_number} onChange={(e) => setBedForm({ ...bedForm, bed_number: e.target.value })} /><select className="h-10 rounded-md border px-3 text-sm" value={bedForm.status} onChange={(e) => setBedForm({ ...bedForm, status: e.target.value })}><option value="available">Disponible</option><option value="cleaning">Limpieza</option><option value="maintenance">Mantenimiento</option><option value="blocked">Bloqueada</option></select><Button type="submit">Crear cama</Button></form></Card></div><Card title="Camas"><Table data={beds} columns={[{ key: "code", header: "Cama", render: (b) => b.bed_code }, { key: "room", header: "Habitación", render: (b) => b.room_name || "-" }, { key: "status", header: "Estado", render: (b) => <StatusPill value={b.status} /> }, { key: "patient", header: "Paciente", render: (b) => b.current_patient || "-" }]} /></Card></div>;
 }

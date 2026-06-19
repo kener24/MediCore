@@ -32,6 +32,9 @@ La API de hospitalizacion esta bajo `/api/hospitalization/` y siempre respeta la
 - Ronda en internamiento cerrado: no se permite crear.
 - Medicamento omitido sin motivo: se rechaza.
 - Medicamento administrado dos veces: se rechaza.
+- Alta sin motivo: se rechaza.
+- Recepcion consultando datos clinicos internos: se rechaza con 403.
+- Listas paginadas: clientes web y movil deben leer `results` cuando exista.
 
 ## Reportes base
 

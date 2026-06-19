@@ -37,6 +37,18 @@ class HospitalRoom(TimeStampedModel):
             models.Index(fields=["room_type"]),
         ]
 
+    def clean(self):
+        self.name = (self.name or "").strip()
+        self.room_number = (self.room_number or "").strip()
+        if not self.name:
+            raise ValidationError({"name": "El nombre de la habitacion es obligatorio."})
+        if not self.room_number:
+            raise ValidationError({"room_number": "El numero de habitacion es obligatorio."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.room_number} - {self.name}"
 
@@ -68,6 +80,10 @@ class HospitalBed(TimeStampedModel):
         ]
 
     def clean(self):
+        self.bed_number = (self.bed_number or "").strip()
+        self.bed_code = (self.bed_code or "").strip()
+        if not self.bed_number:
+            raise ValidationError({"bed_number": "El numero de cama es obligatorio."})
         if self.room_id and self.clinic_id and self.room.clinic_id != self.clinic_id:
             raise ValidationError("La cama debe pertenecer a una habitacion de la misma clinica.")
         if self.pk and self.status == self.Status.AVAILABLE and self.active_hospitalizations.exists():

@@ -8,6 +8,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.permissions import get_role_name
+from apps.audit.models import AuditLog
+from apps.audit.services import log_audit_event
 from apps.hospitalization.models import HospitalBed, HospitalRoom, HospitalVitalSigns, Hospitalization, MedicationAdministration, NursingNote
 from apps.hospitalization.serializers import (
     BedActionSerializer,
@@ -31,6 +33,7 @@ from apps.hospitalization import services
 
 
 VIEW_ROLES = ["admin", "medico", "enfermera", "recepcionista"]
+CLINICAL_VIEW_ROLES = ["admin", "medico", "enfermera"]
 MANAGE_BEDS_ROLES = ["admin", "recepcionista"]
 MANAGE_ADMISSIONS_ROLES = ["admin", "medico", "recepcionista"]
 NURSING_CLINICAL_ROLES = ["admin", "medico", "enfermera"]
@@ -66,6 +69,14 @@ def forbidden(detail="No tienes permiso para realizar esta accion."):
     return Response({"detail": detail}, status=status.HTTP_403_FORBIDDEN)
 
 
+def validation_response(exc):
+    if hasattr(exc, "message_dict"):
+        return Response(exc.message_dict, status=status.HTTP_400_BAD_REQUEST)
+    if hasattr(exc, "messages") and exc.messages:
+        return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+    return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+
 class HospitalRoomViewSet(viewsets.ModelViewSet):
     serializer_class = HospitalRoomSerializer
     permission_classes = [IsAuthenticated]
@@ -85,13 +96,19 @@ class HospitalRoomViewSet(viewsets.ModelViewSet):
             return forbidden("No tienes permiso para administrar habitaciones.")
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save(clinic=user_clinic(request.user))
+        try:
+            room = serializer.save(clinic=user_clinic(request.user))
+        except DjangoValidationError as exc:
+            return validation_response(exc)
+        log_audit_event(request=request, user=request.user, clinic=user_clinic(request.user), action=AuditLog.Action.CREATE, module=AuditLog.Module.ADMISSIONS, obj=room, description="Habitacion hospitalaria creada.")
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def partial_update(self, request, *args, **kwargs):
         if role_name(request.user) not in MANAGE_BEDS_ROLES:
             return forbidden("No tienes permiso para administrar habitaciones.")
-        return super().partial_update(request, *args, **kwargs)
+        response = super().partial_update(request, *args, **kwargs)
+        log_audit_event(request=request, user=request.user, clinic=user_clinic(request.user), action=AuditLog.Action.UPDATE, module=AuditLog.Module.ADMISSIONS, obj=self.get_object(), description="Habitacion hospitalaria actualizada.")
+        return response
 
 
 class HospitalBedViewSet(viewsets.ModelViewSet):
@@ -118,13 +135,19 @@ class HospitalBedViewSet(viewsets.ModelViewSet):
         room = serializer.validated_data["room"]
         if room.clinic_id != request.user.clinica_id:
             return forbidden("La habitacion no pertenece a tu clinica.")
-        serializer.save(clinic=user_clinic(request.user))
+        try:
+            bed = serializer.save(clinic=user_clinic(request.user))
+        except DjangoValidationError as exc:
+            return validation_response(exc)
+        log_audit_event(request=request, user=request.user, clinic=user_clinic(request.user), action=AuditLog.Action.CREATE, module=AuditLog.Module.ADMISSIONS, obj=bed, description="Cama hospitalaria creada.")
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def partial_update(self, request, *args, **kwargs):
         if role_name(request.user) not in MANAGE_BEDS_ROLES:
             return forbidden("No tienes permiso para administrar camas.")
-        return super().partial_update(request, *args, **kwargs)
+        response = super().partial_update(request, *args, **kwargs)
+        log_audit_event(request=request, user=request.user, clinic=user_clinic(request.user), action=AuditLog.Action.UPDATE, module=AuditLog.Module.ADMISSIONS, obj=self.get_object(), description="Cama hospitalaria actualizada.")
+        return response
 
     @action(detail=False, methods=["get"])
     def available(self, request):
@@ -193,7 +216,7 @@ class HospitalizationViewSet(viewsets.ModelViewSet):
                 **({"admission_datetime": serializer.validated_data["admission_datetime"]} if serializer.validated_data.get("admission_datetime") else {}),
             )
         except DjangoValidationError as exc:
-            return Response({"detail": exc.messages[0] if hasattr(exc, "messages") else str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return validation_response(exc)
         return Response(HospitalizationDetailSerializer(hospitalization).data, status=status.HTTP_201_CREATED)
 
     def partial_update(self, request, *args, **kwargs):
@@ -213,7 +236,7 @@ class HospitalizationViewSet(viewsets.ModelViewSet):
         try:
             hospitalization = services.assign_bed(self.get_object(), serializer.validated_data["bed"], user=request.user, request=request, notes=serializer.validated_data.get("notes", ""))
         except DjangoValidationError as exc:
-            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+            return validation_response(exc)
         return Response(HospitalizationDetailSerializer(hospitalization).data)
 
     @action(detail=True, methods=["post"], url_path="change-bed")
@@ -225,7 +248,7 @@ class HospitalizationViewSet(viewsets.ModelViewSet):
         try:
             hospitalization = services.change_bed(self.get_object(), serializer.validated_data["bed"], user=request.user, request=request, notes=serializer.validated_data.get("notes", ""))
         except DjangoValidationError as exc:
-            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+            return validation_response(exc)
         return Response(HospitalizationDetailSerializer(hospitalization).data)
 
     @action(detail=True, methods=["post"])
@@ -237,7 +260,7 @@ class HospitalizationViewSet(viewsets.ModelViewSet):
         try:
             hospitalization = services.discharge_hospitalization(self.get_object(), user=request.user, request=request, **serializer.validated_data)
         except DjangoValidationError as exc:
-            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+            return validation_response(exc)
         return Response(HospitalizationDetailSerializer(hospitalization).data)
 
     @action(detail=True, methods=["post"])
@@ -249,13 +272,15 @@ class HospitalizationViewSet(viewsets.ModelViewSet):
         try:
             hospitalization = services.cancel_hospitalization(self.get_object(), user=request.user, request=request, reason=serializer.validated_data["reason"])
         except DjangoValidationError as exc:
-            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+            return validation_response(exc)
         return Response(HospitalizationDetailSerializer(hospitalization).data)
 
     @action(detail=True, methods=["get", "post"], url_path="vital-signs")
     def vital_signs(self, request, pk=None):
         hospitalization = self.get_object()
         if request.method == "GET":
+            if role_name(request.user) not in CLINICAL_VIEW_ROLES:
+                return forbidden("No tienes permiso para ver signos vitales hospitalarios.")
             return Response(HospitalVitalSignsSerializer(hospitalization.vital_signs.all(), many=True).data)
         if role_name(request.user) not in NURSING_CLINICAL_ROLES:
             return forbidden("No tienes permiso para registrar signos vitales hospitalarios.")
@@ -264,13 +289,15 @@ class HospitalizationViewSet(viewsets.ModelViewSet):
         try:
             signs = services.create_hospital_vital_signs(hospitalization, user=request.user, request=request, **serializer.validated_data)
         except DjangoValidationError as exc:
-            return Response(exc.message_dict if hasattr(exc, "message_dict") else {"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+            return validation_response(exc)
         return Response(HospitalVitalSignsSerializer(signs).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["get", "post"], url_path="nursing-notes")
     def nursing_notes(self, request, pk=None):
         hospitalization = self.get_object()
         if request.method == "GET":
+            if role_name(request.user) not in CLINICAL_VIEW_ROLES:
+                return forbidden("No tienes permiso para ver notas de enfermeria.")
             return Response(NursingNoteSerializer(hospitalization.nursing_notes.all(), many=True).data)
         if role_name(request.user) not in NURSING_CLINICAL_ROLES:
             return forbidden("No tienes permiso para crear notas de enfermeria.")
@@ -279,11 +306,13 @@ class HospitalizationViewSet(viewsets.ModelViewSet):
         try:
             note = services.create_nursing_note(hospitalization, user=request.user, request=request, **serializer.validated_data)
         except DjangoValidationError as exc:
-            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+            return validation_response(exc)
         return Response(NursingNoteSerializer(note).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["get"])
     def events(self, request, pk=None):
+        if role_name(request.user) not in CLINICAL_VIEW_ROLES:
+            return forbidden("No tienes permiso para ver eventos clinicos de hospitalizacion.")
         return Response(HospitalizationEventSerializer(self.get_object().events.all(), many=True).data)
 
     @action(detail=True, methods=["get", "post"], url_path="nursing-rounds")
@@ -300,7 +329,7 @@ class HospitalizationViewSet(viewsets.ModelViewSet):
         try:
             nursing_round = services.create_nursing_round(hospitalization, nurse=request.user, request=request, **serializer.validated_data)
         except DjangoValidationError as exc:
-            return Response(exc.message_dict if hasattr(exc, "message_dict") else {"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+            return validation_response(exc)
         return Response(NursingRoundSerializer(nursing_round).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["get", "post"], url_path="medication-administrations")
@@ -317,7 +346,7 @@ class HospitalizationViewSet(viewsets.ModelViewSet):
         try:
             medication = services.create_medication_administration(hospitalization, user=request.user, request=request, **serializer.validated_data)
         except DjangoValidationError as exc:
-            return Response(exc.message_dict if hasattr(exc, "message_dict") else {"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+            return validation_response(exc)
         return Response(MedicationAdministrationSerializer(medication).data, status=status.HTTP_201_CREATED)
 
 
@@ -378,7 +407,7 @@ class MedicationAdministrationViewSet(viewsets.GenericViewSet):
         try:
             medication = services.mark_medication_administered(medication, nurse=request.user, request=request, notes=serializer.validated_data.get("notes", ""))
         except DjangoValidationError as exc:
-            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+            return validation_response(exc)
         return Response(MedicationAdministrationSerializer(medication).data)
 
     @action(detail=True, methods=["post"])
@@ -391,7 +420,7 @@ class MedicationAdministrationViewSet(viewsets.GenericViewSet):
         try:
             medication = services.mark_medication_omitted(medication, nurse=request.user, request=request, reason=serializer.validated_data.get("reason", ""), notes=serializer.validated_data.get("notes", ""))
         except DjangoValidationError as exc:
-            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+            return validation_response(exc)
         return Response(MedicationAdministrationSerializer(medication).data)
 
     @action(detail=True, methods=["post"])
@@ -404,5 +433,5 @@ class MedicationAdministrationViewSet(viewsets.GenericViewSet):
         try:
             medication = services.mark_medication_delayed(medication, nurse=request.user, request=request, notes=serializer.validated_data.get("notes", ""))
         except DjangoValidationError as exc:
-            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+            return validation_response(exc)
         return Response(MedicationAdministrationSerializer(medication).data)

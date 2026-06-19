@@ -11,14 +11,20 @@ import type {
   NursingRound,
 } from "../types/hospitalization";
 
+type PaginatedResponse<T> = T[] | { results?: T[] };
+
+function normalizeList<T>(data: PaginatedResponse<T>): T[] {
+  return Array.isArray(data) ? data : data.results ?? [];
+}
+
 export async function getHospitalizationDashboard() {
   const { data } = await api.get<HospitalizationDashboard>("/hospitalization/dashboard/");
   return data;
 }
 
 export async function getHospitalizations(filters?: Record<string, string>) {
-  const { data } = await api.get<Hospitalization[]>("/hospitalization/admissions/", { params: filters });
-  return data;
+  const { data } = await api.get<PaginatedResponse<Hospitalization>>("/hospitalization/admissions/", { params: filters });
+  return normalizeList(data);
 }
 
 export async function getHospitalization(id: number | string) {
@@ -52,8 +58,8 @@ export async function cancelHospitalization(id: number | string, payload: { reas
 }
 
 export async function getHospitalRooms() {
-  const { data } = await api.get<HospitalRoom[]>("/hospitalization/rooms/");
-  return data;
+  const { data } = await api.get<PaginatedResponse<HospitalRoom>>("/hospitalization/rooms/");
+  return normalizeList(data);
 }
 
 export async function createHospitalRoom(payload: Partial<HospitalRoom>) {
@@ -62,8 +68,8 @@ export async function createHospitalRoom(payload: Partial<HospitalRoom>) {
 }
 
 export async function getHospitalBeds(filters?: Record<string, string>) {
-  const { data } = await api.get<HospitalBed[]>("/hospitalization/beds/", { params: filters });
-  return data;
+  const { data } = await api.get<PaginatedResponse<HospitalBed>>("/hospitalization/beds/", { params: filters });
+  return normalizeList(data);
 }
 
 export async function createHospitalBed(payload: Partial<HospitalBed>) {
@@ -72,8 +78,8 @@ export async function createHospitalBed(payload: Partial<HospitalBed>) {
 }
 
 export async function getAvailableHospitalBeds() {
-  const { data } = await api.get<HospitalBed[]>("/hospitalization/beds/available/");
-  return data;
+  const { data } = await api.get<PaginatedResponse<HospitalBed>>("/hospitalization/beds/available/");
+  return normalizeList(data);
 }
 
 export async function createHospitalVitalSigns(id: number | string, payload: Partial<HospitalVitalSigns>) {
@@ -87,8 +93,8 @@ export async function createNursingNote(id: number | string, payload: Partial<Nu
 }
 
 export async function getNursingRounds(id: number | string) {
-  const { data } = await api.get<NursingRound[]>(`/hospitalization/admissions/${id}/nursing-rounds/`);
-  return data;
+  const { data } = await api.get<PaginatedResponse<NursingRound>>(`/hospitalization/admissions/${id}/nursing-rounds/`);
+  return normalizeList(data);
 }
 
 export async function createNursingRound(id: number | string, payload: Partial<NursingRound>) {
@@ -97,8 +103,8 @@ export async function createNursingRound(id: number | string, payload: Partial<N
 }
 
 export async function getMedicationAdministrations(id: number | string) {
-  const { data } = await api.get<MedicationAdministration[]>(`/hospitalization/admissions/${id}/medication-administrations/`);
-  return data;
+  const { data } = await api.get<PaginatedResponse<MedicationAdministration>>(`/hospitalization/admissions/${id}/medication-administrations/`);
+  return normalizeList(data);
 }
 
 export async function createMedicationAdministration(id: number | string, payload: Partial<MedicationAdministration>) {
@@ -122,6 +128,6 @@ export async function delayMedication(id: number | string, payload: { notes?: st
 }
 
 export async function getPendingMedications() {
-  const { data } = await api.get<MedicationAdministration[]>("/hospitalization/medications/pending/");
-  return data;
+  const { data } = await api.get<PaginatedResponse<MedicationAdministration>>("/hospitalization/medications/pending/");
+  return normalizeList(data);
 }

@@ -12,8 +12,13 @@ import { NurseHospitalizationEventsScreen } from '@/features/nurse/hospitalizati
 import { NurseInpatientVitalSignsFormScreen } from '@/features/nurse/hospitalization/screens/NurseInpatientVitalSignsFormScreen';
 import { NurseInpatientVitalSignsHistoryScreen } from '@/features/nurse/hospitalization/screens/NurseInpatientVitalSignsHistoryScreen';
 import { NurseInpatientsScreen } from '@/features/nurse/hospitalization/screens/NurseInpatientsScreen';
+import { NurseMedicationAdministrationFormScreen } from '@/features/nurse/hospitalization/screens/NurseMedicationAdministrationFormScreen';
+import { NurseMedicationAdministrationsScreen } from '@/features/nurse/hospitalization/screens/NurseMedicationAdministrationsScreen';
 import { NurseNursingNoteFormScreen } from '@/features/nurse/hospitalization/screens/NurseNursingNoteFormScreen';
 import { NurseNursingNotesListScreen } from '@/features/nurse/hospitalization/screens/NurseNursingNotesListScreen';
+import { NurseNursingRoundFormScreen } from '@/features/nurse/hospitalization/screens/NurseNursingRoundFormScreen';
+import { NurseNursingRoundsScreen } from '@/features/nurse/hospitalization/screens/NurseNursingRoundsScreen';
+import { NursePendingMedicationsScreen } from '@/features/nurse/hospitalization/screens/NursePendingMedicationsScreen';
 import { NurseNotificationsScreen } from '@/features/nurse/screens/NurseNotificationsScreen';
 import { NursePatientDetailScreen } from '@/features/nurse/screens/NursePatientDetailScreen';
 import { NursePatientsInTriageScreen } from '@/features/nurse/screens/NursePatientsInTriageScreen';
@@ -40,6 +45,11 @@ function NurseHomeStack() {
       <Stack.Screen component={NurseInpatientVitalSignsHistoryScreen} name="NurseInpatientVitalSignsHistory" />
       <Stack.Screen component={NurseNursingNoteFormScreen} name="NurseNursingNoteForm" />
       <Stack.Screen component={NurseNursingNotesListScreen} name="NurseNursingNotesList" />
+      <Stack.Screen component={NurseNursingRoundsScreen} name="NurseNursingRounds" />
+      <Stack.Screen component={NurseNursingRoundFormScreen} name="NurseNursingRoundForm" />
+      <Stack.Screen component={NurseMedicationAdministrationsScreen} name="NurseMedicationAdministrations" />
+      <Stack.Screen component={NurseMedicationAdministrationFormScreen} name="NurseMedicationAdministrationForm" />
+      <Stack.Screen component={NursePendingMedicationsScreen} name="NursePendingMedications" />
       <Stack.Screen component={NurseHospitalizationEventsScreen} name="NurseHospitalizationEvents" />
       <Stack.Screen component={NurseBedStatusScreen} name="NurseBedStatus" />
       <Stack.Screen component={NurseNotificationsScreen} name="NurseNotifications" />
@@ -85,6 +95,11 @@ function NursePatientsStack() {
       <Stack.Screen component={NurseInpatientVitalSignsHistoryScreen} name="NurseInpatientVitalSignsHistory" />
       <Stack.Screen component={NurseNursingNoteFormScreen} name="NurseNursingNoteForm" />
       <Stack.Screen component={NurseNursingNotesListScreen} name="NurseNursingNotesList" />
+      <Stack.Screen component={NurseNursingRoundsScreen} name="NurseNursingRounds" />
+      <Stack.Screen component={NurseNursingRoundFormScreen} name="NurseNursingRoundForm" />
+      <Stack.Screen component={NurseMedicationAdministrationsScreen} name="NurseMedicationAdministrations" />
+      <Stack.Screen component={NurseMedicationAdministrationFormScreen} name="NurseMedicationAdministrationForm" />
+      <Stack.Screen component={NursePendingMedicationsScreen} name="NursePendingMedications" />
       <Stack.Screen component={NurseHospitalizationEventsScreen} name="NurseHospitalizationEvents" />
       <Stack.Screen component={NurseBedStatusScreen} name="NurseBedStatus" />
     </Stack.Navigator>
@@ -98,6 +113,11 @@ function NurseNotesStack() {
       <Stack.Screen component={NurseHospitalizationDetailScreen} name="NurseHospitalizationDetail" />
       <Stack.Screen component={NurseNursingNoteFormScreen} name="NurseNursingNoteForm" />
       <Stack.Screen component={NurseNursingNotesListScreen} name="NurseNursingNotesList" />
+      <Stack.Screen component={NurseNursingRoundsScreen} name="NurseNursingRounds" />
+      <Stack.Screen component={NurseNursingRoundFormScreen} name="NurseNursingRoundForm" />
+      <Stack.Screen component={NurseMedicationAdministrationsScreen} name="NurseMedicationAdministrations" />
+      <Stack.Screen component={NurseMedicationAdministrationFormScreen} name="NurseMedicationAdministrationForm" />
+      <Stack.Screen component={NursePendingMedicationsScreen} name="NursePendingMedications" />
       <Stack.Screen component={NurseInpatientVitalSignsFormScreen} name="NurseInpatientVitalSignsForm" />
       <Stack.Screen component={NurseInpatientVitalSignsHistoryScreen} name="NurseInpatientVitalSignsHistory" />
       <Stack.Screen component={NurseHospitalizationEventsScreen} name="NurseHospitalizationEvents" />

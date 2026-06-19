@@ -60,6 +60,13 @@ Todas las peticiones usan el `apiClient` centralizado con `Authorization: Bearer
   - Notas de enfermería.
   - Eventos de hospitalización.
   - Estado de camas.
+- Sprint 4.4 seguimiento de enfermería:
+  - Rondas de enfermería.
+  - Formulario de ronda.
+  - Administración de medicamentos.
+  - Programación simple de medicamento.
+  - Medicamentos pendientes.
+  - Acciones de administrar, omitir y retrasar.
 
 ## Separación clínica
 
@@ -67,7 +74,7 @@ Los signos vitales de triaje inicial y los signos vitales hospitalarios son mód
 
 ## Alcance futuro de enfermería
 
-Sprint 4.4 recomendado:
+Siguientes mejoras recomendadas:
 
 - Rondas avanzadas.
 - Administración de medicamentos.

@@ -4,6 +4,7 @@ import { colors } from '@/core/theme/colors';
 
 const labels: Record<string, string> = {
   active: 'Activa',
+  administered: 'Administrado',
   anulada: 'Anulada',
   borrador: 'Borrador',
   cancelled: 'Cancelada',
@@ -18,14 +19,16 @@ const labels: Record<string, string> = {
   partially_paid: 'Parcial',
   pending: 'Pendiente',
   pendiente: 'Pendiente',
+  delayed: 'Retrasado',
+  omitted: 'Omitido',
   void: 'Anulada',
 };
 
 function styleFor(status?: string) {
   if (!status) return styles.neutral;
-  if (['active', 'emitida', 'paid', 'pagada', 'completed'].includes(status)) return styles.success;
-  if (['pending', 'pendiente', 'partially_paid', 'parcialmente_pagada', 'parcial', 'draft', 'borrador'].includes(status)) return styles.warning;
-  if (['cancelled', 'cancelada', 'anulada', 'void', 'expired'].includes(status)) return styles.danger;
+  if (['active', 'administered', 'emitida', 'paid', 'pagada', 'completed'].includes(status)) return styles.success;
+  if (['pending', 'pendiente', 'delayed', 'partially_paid', 'parcialmente_pagada', 'parcial', 'draft', 'borrador'].includes(status)) return styles.warning;
+  if (['cancelled', 'cancelada', 'anulada', 'void', 'expired', 'omitted'].includes(status)) return styles.danger;
   return styles.neutral;
 }
 

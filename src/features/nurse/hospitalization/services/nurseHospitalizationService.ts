@@ -5,9 +5,13 @@ import type {
   HospitalizationEvent,
   InpatientVitalSigns,
   InpatientVitalSignsPayload,
+  MedicationAdministration,
+  MedicationAdministrationPayload,
   NurseHospitalizationDashboard,
   NurseHospitalizationDetail,
   NurseHospitalizationListItem,
+  NursingRound,
+  NursingRoundPayload,
   NursingNote,
   NursingNotePayload,
 } from '@/features/nurse/hospitalization/types/nurseHospitalization.types';
@@ -159,4 +163,43 @@ export async function getBedStatus(params?: QueryParams): Promise<HospitalBed[]>
 export async function getAvailableBeds(): Promise<HospitalBed[]> {
   const data = await getOrUnavailable<HospitalBed[] | { results?: HospitalBed[] }>('/hospitalization/beds/available/');
   return normalizeListResponse<HospitalBed>(data);
+}
+
+export async function getNursingRounds(hospitalizationId: number): Promise<NursingRound[]> {
+  if (!hospitalizationId) throw new Error('No se pueden consultar rondas sin internamiento.');
+  const data = await getOrUnavailable<NursingRound[] | { results?: NursingRound[] }>(`/hospitalization/admissions/${hospitalizationId}/nursing-rounds/`);
+  return normalizeListResponse<NursingRound>(data);
+}
+
+export async function createNursingRound(hospitalizationId: number, payload: NursingRoundPayload): Promise<NursingRound> {
+  if (!hospitalizationId) throw new Error('No se puede crear una ronda sin internamiento.');
+  return postOrUnavailable<NursingRound>(`/hospitalization/admissions/${hospitalizationId}/nursing-rounds/`, payload);
+}
+
+export async function getMedicationAdministrations(hospitalizationId: number): Promise<MedicationAdministration[]> {
+  if (!hospitalizationId) throw new Error('No se pueden consultar medicamentos sin internamiento.');
+  const data = await getOrUnavailable<MedicationAdministration[] | { results?: MedicationAdministration[] }>(`/hospitalization/admissions/${hospitalizationId}/medication-administrations/`);
+  return normalizeListResponse<MedicationAdministration>(data);
+}
+
+export async function createMedicationAdministration(hospitalizationId: number, payload: MedicationAdministrationPayload): Promise<MedicationAdministration> {
+  if (!hospitalizationId) throw new Error('No se puede programar medicamento sin internamiento.');
+  return postOrUnavailable<MedicationAdministration>(`/hospitalization/admissions/${hospitalizationId}/medication-administrations/`, payload);
+}
+
+export async function getPendingMedications(): Promise<MedicationAdministration[]> {
+  const data = await getOrUnavailable<MedicationAdministration[] | { results?: MedicationAdministration[] }>('/hospitalization/medications/pending/');
+  return normalizeListResponse<MedicationAdministration>(data);
+}
+
+export async function administerMedication(id: number, payload?: { notes?: string }): Promise<MedicationAdministration> {
+  return postOrUnavailable<MedicationAdministration>(`/hospitalization/medication-administrations/${id}/administer/`, payload ?? {});
+}
+
+export async function omitMedication(id: number, payload: { reason: string; notes?: string }): Promise<MedicationAdministration> {
+  return postOrUnavailable<MedicationAdministration>(`/hospitalization/medication-administrations/${id}/omit/`, payload);
+}
+
+export async function delayMedication(id: number, payload?: { notes?: string }): Promise<MedicationAdministration> {
+  return postOrUnavailable<MedicationAdministration>(`/hospitalization/medication-administrations/${id}/delay/`, payload ?? {});
 }

@@ -190,3 +190,60 @@ export type NurseHospitalizationDashboard = {
 export type HospitalizationFilter = 'active' | 'observation' | 'all';
 export type VitalSignsFilter = 'today' | '24h' | 'all';
 export type NursingNotesFilter = 'all' | 'urgent' | 'incident' | 'today';
+
+export type NursingRound = {
+  id?: number;
+  hospitalization_id?: number;
+  hospitalization?: number;
+  patient_id?: number;
+  nurse_name?: string;
+  round_type?: string;
+  status?: string;
+  general_condition?: string;
+  pain_level?: number | string;
+  consciousness_status?: string;
+  mobility_status?: string;
+  feeding_status?: string;
+  elimination_status?: string;
+  notes?: string;
+  created_at?: string;
+  creado_en?: string;
+};
+
+export type NursingRoundPayload = {
+  round_type: string;
+  general_condition?: string;
+  pain_level?: number | string;
+  consciousness_status?: string;
+  mobility_status?: string;
+  feeding_status?: string;
+  elimination_status?: string;
+  notes?: string;
+};
+
+export type MedicationAdministration = {
+  id?: number;
+  hospitalization_id?: number;
+  hospitalization?: number;
+  patient_id?: number;
+  patient_name?: string;
+  medication_name?: string;
+  dosage?: string;
+  route?: string;
+  scheduled_time?: string | null;
+  administered_time?: string | null;
+  status?: string;
+  administered_by_name?: string;
+  notes?: string;
+  omission_reason?: string;
+  created_at?: string;
+  creado_en?: string;
+};
+
+export type MedicationAdministrationPayload = {
+  medication_name: string;
+  dosage: string;
+  route?: string;
+  scheduled_time?: string;
+  notes?: string;
+};

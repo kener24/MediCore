@@ -59,6 +59,7 @@ export function NurseHospitalizationDashboardScreen() {
           <QuickActionCard description="Ver pacientes con internamiento activo u observación." icon="account-injury-outline" onPress={() => navigation.navigate('NurseInpatients')} title="Pacientes internados" />
           <QuickActionCard description="Abrir pacientes para registrar signos vitales hospitalarios." icon="heart-pulse" onPress={() => navigation.navigate('NurseInpatients', { intent: 'vitals' })} title="Registrar signos hospitalarios" />
           <QuickActionCard description="Crear notas desde el detalle del internamiento." icon="note-plus-outline" onPress={() => navigation.navigate('NurseInpatients', { intent: 'note' })} title="Crear nota de enfermería" />
+          <QuickActionCard description="Ver medicamentos pendientes o retrasados." icon="pill" onPress={() => navigation.navigate('NursePendingMedications')} title="Medicamentos pendientes" />
           <QuickActionCard description="Revisar disponibilidad, limpieza y mantenimiento." icon="bed" onPress={() => navigation.navigate('NurseBedStatus')} title="Estado de camas" />
         </View>
       </ScrollView>

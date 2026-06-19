@@ -21,9 +21,20 @@ Incluye:
 - No permitir acceso a paciente, recepción, administración o superadmin.
 - Todas las peticiones usan `apiClient` y `Authorization: Bearer`.
 
-## Sprint 4.4 recomendado
+## Sprint 4.4: Rondas y medicamentos
+
+Incluye:
+
+- Listado de rondas de enfermería por internamiento.
+- Formulario de nueva ronda.
+- Listado de medicamentos por internamiento.
+- Programación simple de medicamento.
+- Medicamentos pendientes de la clínica.
+- Acciones: administrar, omitir y retrasar.
+
+Queda para un sprint posterior:
 
 - Rondas hospitalarias avanzadas.
-- Administración de medicamentos.
 - Alertas por signos vitales críticos.
 - Plan de cuidados de enfermería.
+- Calendario avanzado de medicamentos.

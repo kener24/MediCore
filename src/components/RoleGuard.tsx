@@ -2,6 +2,7 @@ import { ReactNode } from 'react';
 
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
+import { isNurseRole } from '@/core/utils/roleUtils';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import type { AppRole } from '@/features/auth/types/auth.types';
 
@@ -20,6 +21,7 @@ export function RoleGuard({ children, roles }: RoleGuardProps) {
   if (!user || !appRole || !roles.includes(appRole)) {
     const isPatientPortal = roles.length === 1 && roles[0] === 'paciente';
     const isDoctorModule = roles.includes('medico') || roles.includes('doctor');
+    const isNurseModule = roles.some((role) => isNurseRole(role));
     return (
       <ErrorState
         message={
@@ -27,7 +29,9 @@ export function RoleGuard({ children, roles }: RoleGuardProps) {
             ? 'Tu rol no tiene acceso al portal paciente.'
             : isDoctorModule
               ? 'No tienes acceso al módulo médico.'
-              : 'Tu usuario no tiene permisos para abrir esta sección.'
+              : isNurseModule
+                ? 'No tienes acceso al módulo de enfermería.'
+                : 'Tu usuario no tiene permisos para abrir esta sección.'
         }
         title="Acceso no autorizado"
       />

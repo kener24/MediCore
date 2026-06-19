@@ -8,6 +8,7 @@ import {
   resolveRole,
   saveSession,
 } from '@/core/storage/sessionStorage';
+import { resolveSupportedAppRole } from '@/core/utils/roleUtils';
 import { getMeService, loginService, logoutService } from '@/features/auth/services/authService';
 import type { AppRole, LoginPayload, RoleName, User } from '@/features/auth/types/auth.types';
 
@@ -20,21 +21,7 @@ interface AuthContextValue {
   signOut: () => Promise<void>;
 }
 
-const enabledRoles: AppRole[] = ['paciente', 'medico', 'doctor', 'recepcionista', 'enfermera', 'admin'];
 const AuthContext = createContext<AuthContextValue | null>(null);
-
-function resolveAppRole(role: RoleName | null): AppRole | null {
-  const normalized = role
-    ?.toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim();
-  if (normalized === 'doctor') return 'medico';
-  if (normalized && enabledRoles.includes(normalized as AppRole)) {
-    return normalized as AppRole;
-  }
-  return null;
-}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
@@ -103,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       user,
       role,
-      appRole: resolveAppRole(role),
+      appRole: resolveSupportedAppRole(role),
       signIn,
       signOut,
     }),

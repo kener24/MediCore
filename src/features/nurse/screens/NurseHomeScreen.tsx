@@ -7,7 +7,7 @@ export function NurseHomeScreen() {
       <RoleHomeScreen
         actions={[
           {
-            description: 'Pacientes listos para evaluacion inicial.',
+            description: 'Pacientes listos para evaluación inicial.',
             icon: 'clipboard-account-outline',
             title: 'Triaje',
           },
@@ -23,7 +23,7 @@ export function NurseHomeScreen() {
           },
         ]}
         headline="Cuidado clínico organizado"
-        roleLabel="Enfermeria"
+        roleLabel="Enfermería"
         subtitle="Base lista para triaje, signos vitales y seguimiento de pacientes."
       />
     </RoleGuard>

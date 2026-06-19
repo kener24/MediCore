@@ -11,25 +11,14 @@ Aplicación móvil de MediCore construida con Expo, React Native y TypeScript.
 - Axios.
 - Expo SecureStore para sesión JWT.
 
-## Instalación
-
-```bash
-npm install
-```
-
 ## Ejecutar en desarrollo
 
 ```bash
-npx expo start
-```
-
-Para Expo Go en un teléfono físico:
-
-```bash
+npm install
 npx expo start --lan
 ```
 
-El teléfono y la computadora deben estar en la misma red Wi-Fi. Abre Expo Go y escanea el QR.
+El teléfono y la computadora deben estar en la misma red Wi-Fi. Abre Expo Go y escanea el QR que muestra Metro.
 
 ## API
 
@@ -39,65 +28,57 @@ La URL base está en:
 src/core/config/appConfig.ts
 ```
 
-Valor actual:
+Valor esperado:
 
 ```text
 https://kp-software.tech/api
 ```
 
-Si el certificado HTTPS no está disponible temporalmente, se puede cambiar a:
-
-```text
-http://kp-software.tech/api
-```
-
-No subas secretos, tokens, credenciales reales, archivos `.env`, builds ni llaves al repositorio.
+Todas las peticiones usan el `apiClient` centralizado con `Authorization: Bearer`.
 
 ## Roles soportados
 
 - Paciente.
 - Médico / doctor.
-- Recepción, enfermería y administración quedan como shells móviles o pantallas no disponibles según avance.
+- Enfermería: acepta `enfermera`, `enfermero`, `enfermeria`, `enfermería`, `nurse` y `nursing`.
+- Recepción.
+- Administración.
 
 ## Estado actual
 
+- Login funcional con JWT.
 - Módulo paciente MVP.
-- Módulo médico avanzado.
-- Dashboard médico.
-- Agenda.
-- Sala de espera.
-- Detalle de paciente.
-- Triaje y signos vitales.
-- Consultas.
-- Recetas.
-- Órdenes médicas.
-- Consumos clínicos.
-- Resumen y finalización de consulta.
-- Perfil médico.
-- Seguridad, cambio de contraseña y cierre de sesión.
+- Módulo médico avanzado: dashboard, agenda, sala, detalle de paciente, consultas, recetas, órdenes, consumos clínicos, perfil y seguridad.
+- Sprint 4.0 enfermería / triaje inicial móvil:
+  - Dashboard de enfermería.
+  - Cola de pacientes esperando triaje.
+  - Pacientes en triaje.
+  - Detalle básico del paciente.
+  - Inicio de triaje.
+  - Registro de signos vitales con validaciones e IMC.
+  - Formulario de triaje con prioridad.
+  - Envío del paciente al médico.
+  - Triajes realizados.
+  - Detalle de triaje.
+  - Notificaciones.
+  - Perfil, seguridad y logout.
 
-Pendiente:
+## Alcance futuro de enfermería
 
-- Enfermería móvil.
-- Recepción/caja móvil.
-- Pruebas reales completas con usuarios productivos.
-- Estabilización final para APK productivo.
+Este sprint cubre triaje inicial. Hospitalización no debe mezclarse con triaje.
+
+Próximos sprints recomendados:
+
+- Sprint 4.1: estabilización de enfermería / triaje móvil con endpoints productivos definitivos.
+- Sprint 4.2: hospitalización web + backend.
+- Sprint 4.3: hospitalización móvil.
+- Sprint 4.4: rondas, seguimiento y administración de medicamentos web + móvil.
 
 ## Validaciones locales
 
 ```bash
 npx tsc --noEmit
 npx expo-doctor
-```
-
-## APK preview con EAS
-
-El archivo `eas.json` incluye un perfil `preview` para APK.
-
-Comando futuro:
-
-```bash
-eas build -p android --profile preview
 ```
 
 No ejecutes builds si TypeScript o Expo Doctor fallan.
@@ -109,14 +90,4 @@ doctor@medicore.com
 Doctor12345*
 ```
 
-Estos accesos dependen de los datos seed del backend activo.
-
-## GitHub
-
-Si el proyecto móvil aún no tiene remoto:
-
-```bash
-git remote add origin URL_DEL_REPO
-git branch -M main
-git push -u origin main
-```
+Los accesos dependen de los datos seed del backend activo.

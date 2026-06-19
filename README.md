@@ -62,6 +62,14 @@ Todas las peticiones usan el `apiClient` centralizado con `Authorization: Bearer
   - Detalle de triaje.
   - Notificaciones.
   - Perfil, seguridad y logout.
+- Sprint 4.1 estabilización enfermería / triaje móvil:
+  - Tabs finales: Inicio, Triaje, Signos, Pacientes y Perfil.
+  - Validación de acceso exclusiva para rol enfermería.
+  - Manejo de `visitId` faltante en detalle, signos y triaje.
+  - Normalización de listas DRF y respuestas anidadas.
+  - Endpoints alineados con visitas clínicas del backend.
+  - Errores globales en español limpio, sin mostrar detalles técnicos.
+  - Safe area, teclado y padding inferior revisados en pantallas críticas.
 
 ## Alcance futuro de enfermería
 

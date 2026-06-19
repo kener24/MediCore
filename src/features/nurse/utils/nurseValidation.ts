@@ -37,7 +37,7 @@ export function validateVitalSigns(payload: VitalSignsPayload) {
   inRange(payload.respiratory_rate, 5, 80, 'La frecuencia respiratoria');
   inRange(payload.systolic_pressure, 50, 260, 'La presión sistólica');
   inRange(payload.diastolic_pressure, 30, 180, 'La presión diastólica');
-  inRange(payload.oxygen_saturation, 1, 100, 'La saturación de oxígeno');
+  inRange(payload.oxygen_saturation, 0, 100, 'La saturación de oxígeno');
   inRange(payload.weight_kg, 0.5, 400, 'El peso');
   inRange(payload.height_cm, 20, 250, 'La talla');
   inRange(payload.pain_scale, 0, 10, 'La escala de dolor');

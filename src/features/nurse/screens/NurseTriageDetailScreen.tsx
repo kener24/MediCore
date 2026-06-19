@@ -20,7 +20,10 @@ export function NurseTriageDetailScreen() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!triageId) return;
+    if (!triageId) {
+      setLoading(false);
+      return;
+    }
     getTriageDetail(triageId)
       .then(setTriage)
       .catch(() => setError('El triaje aún no está registrado.'))

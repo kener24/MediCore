@@ -10,11 +10,13 @@ import { LoadingState } from '@/components/LoadingState';
 import { QuickActionCard } from '@/components/QuickActionCard';
 import { StatCard } from '@/components/StatCard';
 import { colors } from '@/core/theme/colors';
+import { useAuth } from '@/features/auth/context/AuthContext';
 import { getNurseDashboard } from '@/features/nurse/services/nurseApi';
 import type { NurseDashboardSummary } from '@/features/nurse/types/nurse.types';
 
 export function NurseDashboardScreen() {
   const navigation = useNavigation<any>();
+  const { user } = useAuth();
   const [summary, setSummary] = useState<NurseDashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -45,7 +47,11 @@ export function NurseDashboardScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl onRefresh={() => { setRefreshing(true); void load(); }} refreshing={refreshing} />}>
-        <AppHeader icon="heart-pulse" subtitle="Triaje inicial, signos vitales y seguimiento operativo." title="Panel de enfermería" />
+        <AppHeader
+          icon="heart-pulse"
+          subtitle={`${user?.nombre_completo || 'Enfermería'} · Triaje inicial, signos vitales y seguimiento operativo.`}
+          title="Panel de enfermería"
+        />
         {error ? <ErrorState message={error} title="Sin conexión con triaje" /> : null}
         {summary ? (
           <View style={styles.stats}>

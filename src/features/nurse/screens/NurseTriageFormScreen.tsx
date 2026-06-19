@@ -4,6 +4,7 @@ import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleShee
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
+import { ErrorState } from '@/components/ErrorState';
 import { AppHeader } from '@/components/AppHeader';
 import { colors } from '@/core/theme/colors';
 import { VitalSignsSummary } from '@/features/nurse/components/NurseCards';
@@ -24,6 +25,10 @@ export function NurseTriageFormScreen() {
   const [saving, setSaving] = useState(false);
 
   async function save() {
+    if (!visitId) {
+      Alert.alert('Visita no encontrada', 'No se encontró la visita del paciente.');
+      return;
+    }
     const payload: CompleteTriagePayload = {
       visit: visitId,
       chief_complaint: chiefComplaint.trim(),
@@ -54,6 +59,7 @@ export function NurseTriageFormScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.safe}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <AppHeader icon="clipboard-pulse-outline" subtitle={patient?.name ?? 'Evaluación inicial'} title="Completar triaje" />
+          {!visitId ? <ErrorState message="No se encontró la visita del paciente." title="Visita no encontrada" /> : null}
           <VitalSignsSummary vitalSigns={vitalSigns} />
           {!vitalSigns ? (
             <AppButton label="Registrar signos vitales" onPress={() => navigation.navigate('NurseVitalSignsForm', { patient, visitId })} variant="secondary" />
@@ -96,7 +102,7 @@ export function NurseTriageFormScreen() {
             style={styles.textArea}
             value={notes}
           />
-          <AppButton label="Enviar paciente al médico" loading={saving} onPress={save} />
+          <AppButton disabled={!visitId} label="Enviar paciente al médico" loading={saving} onPress={save} />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

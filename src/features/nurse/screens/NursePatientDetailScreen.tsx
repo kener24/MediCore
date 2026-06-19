@@ -25,7 +25,11 @@ export function NursePatientDetailScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!visitId) return;
+    if (!visitId) {
+      setError('No se encontró la visita del paciente.');
+      setLoading(false);
+      return;
+    }
     try {
       setError(null);
       const [detail, vitals] = await Promise.all([
@@ -46,7 +50,10 @@ export function NursePatientDetailScreen() {
   }, [load]);
 
   async function handleStart() {
-    if (!visitId) return;
+    if (!visitId) {
+      Alert.alert('Visita no encontrada', 'No se encontró la visita del paciente.');
+      return;
+    }
     try {
       setStarting(true);
       const updated = await startTriage(visitId);
@@ -76,9 +83,9 @@ export function NursePatientDetailScreen() {
           <Text style={styles.body}>{patient?.phone || 'No registrado'}</Text>
         </AppCard>
         <VitalSignsSummary vitalSigns={vitalSigns} />
-        <AppButton label="Iniciar triaje" loading={starting} onPress={handleStart} />
-        <AppButton label="Registrar signos vitales" onPress={() => navigation.navigate('NurseVitalSignsForm', { patient, visitId })} variant="secondary" />
-        <AppButton label="Completar triaje" onPress={() => navigation.navigate('NurseTriageForm', { patient, visitId, vitalSigns })} variant="secondary" />
+        <AppButton disabled={!visitId} label="Iniciar triaje" loading={starting} onPress={handleStart} />
+        <AppButton disabled={!visitId} label="Registrar signos vitales" onPress={() => navigation.navigate('NurseVitalSignsForm', { patient, visitId })} variant="secondary" />
+        <AppButton disabled={!visitId} label="Completar triaje" onPress={() => navigation.navigate('NurseTriageForm', { patient, visitId, vitalSigns })} variant="secondary" />
       </ScrollView>
     </SafeAreaView>
   );

@@ -4,6 +4,7 @@ import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, Te
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
+import { ErrorState } from '@/components/ErrorState';
 import { AppHeader } from '@/components/AppHeader';
 import { AppInput } from '@/components/AppInput';
 import { colors } from '@/core/theme/colors';
@@ -38,6 +39,10 @@ export function NurseVitalSignsFormScreen() {
   }
 
   async function save() {
+    if (!visitId) {
+      Alert.alert('Visita no encontrada', 'No se encontró la visita del paciente.');
+      return;
+    }
     const payload: VitalSignsPayload = {
       visit: visitId,
       temperature: parseOptionalNumber(form.temperature),
@@ -74,6 +79,7 @@ export function NurseVitalSignsFormScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.safe}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <AppHeader icon="heart-pulse" subtitle="Captura inicial antes de enviar al médico." title="Signos vitales" />
+          {!visitId ? <ErrorState message="No se encontró la visita del paciente." title="Visita no encontrada" /> : null}
           <View style={styles.grid}>
             <AppInput keyboardType="decimal-pad" label="Temperatura °C" onChangeText={(value) => setNumeric('temperature', value, true)} value={form.temperature} />
             <AppInput keyboardType="number-pad" label="Frecuencia cardíaca" onChangeText={(value) => setNumeric('heartRate', value)} value={form.heartRate} />
@@ -98,7 +104,7 @@ export function NurseVitalSignsFormScreen() {
             style={styles.notes}
             value={form.notes}
           />
-          <AppButton label="Guardar signos vitales" loading={saving} onPress={save} />
+          <AppButton disabled={!visitId} label="Guardar signos vitales" loading={saving} onPress={save} />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

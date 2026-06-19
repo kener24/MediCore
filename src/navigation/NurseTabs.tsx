@@ -57,10 +57,13 @@ function NurseVitalsStack() {
   );
 }
 
-function NurseCompletedStack() {
+function NursePatientsStack() {
   return (
     <Stack.Navigator screenOptions={stackOptions}>
-      <Stack.Screen component={NurseCompletedTriagesScreen} name="NurseCompletedTriages" />
+      <Stack.Screen component={NursePatientsInTriageScreen} name="NursePatientsInTriage" />
+      <Stack.Screen component={NursePatientDetailScreen} name="NursePatientDetail" />
+      <Stack.Screen component={NurseVitalSignsFormScreen} name="NurseVitalSignsForm" />
+      <Stack.Screen component={NurseTriageFormScreen} name="NurseTriageForm" />
       <Stack.Screen component={NurseTriageDetailScreen} name="NurseTriageDetail" />
     </Stack.Navigator>
   );
@@ -84,7 +87,7 @@ export function NurseTabs() {
         <Tab.Screen component={NurseHomeStack} name="NurseHomeTab" options={{ tabBarIcon: tabIcon('heart-pulse'), title: 'Inicio' }} />
         <Tab.Screen component={NurseTriageStack} name="NurseTriageTab" options={{ tabBarIcon: tabIcon('clipboard-account-outline'), title: 'Triaje' }} />
         <Tab.Screen component={NurseVitalsStack} name="NurseVitalsTab" options={{ tabBarIcon: tabIcon('pulse'), title: 'Signos' }} />
-        <Tab.Screen component={NurseCompletedStack} name="NurseCompletedTab" options={{ tabBarIcon: tabIcon('format-list-checks'), title: 'Realizados' }} />
+        <Tab.Screen component={NursePatientsStack} name="NursePatientsTab" options={{ tabBarIcon: tabIcon('account-group-outline'), title: 'Pacientes' }} />
         <Tab.Screen component={NurseProfileStack} name="NurseProfileTab" options={{ tabBarIcon: tabIcon('account-heart-outline'), title: 'Perfil' }} />
       </Tab.Navigator>
     </RoleGuard>

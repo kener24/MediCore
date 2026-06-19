@@ -14,6 +14,14 @@ export function normalizeListResponse<T>(response: ApiListResponse<T> | T[] | un
   if (Array.isArray(payload?.results)) return payload.results;
   if (Array.isArray(payload?.data)) return payload.data;
   if (Array.isArray(payload?.items)) return payload.items;
+  const nested = (response as { data?: ApiListResponse<T>; payload?: ApiListResponse<T> })?.data;
+  if (Array.isArray(nested?.results)) return nested.results;
+  if (Array.isArray(nested?.data)) return nested.data;
+  if (Array.isArray(nested?.items)) return nested.items;
+  const payloadNested = (response as { payload?: ApiListResponse<T> })?.payload;
+  if (Array.isArray(payloadNested?.results)) return payloadNested.results;
+  if (Array.isArray(payloadNested?.data)) return payloadNested.data;
+  if (Array.isArray(payloadNested?.items)) return payloadNested.items;
   return [];
 }
 

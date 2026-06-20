@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RoleGuard } from '@/components/RoleGuard';
+import { CashierHomeStack } from '@/navigation/CashierTabs';
 import { ReceptionAppointmentCheckInScreen } from '@/features/reception/screens/ReceptionAppointmentCheckInScreen';
 import { ReceptionChangePasswordScreen } from '@/features/reception/screens/ReceptionChangePasswordScreen';
 import { ReceptionCreateAdmissionScreen } from '@/features/reception/screens/ReceptionCreateAdmissionScreen';
@@ -88,6 +89,7 @@ export function ReceptionTabs() {
         <Tab.Screen component={ReceptionPatientsStack} name="ReceptionPatientsTab" options={{ tabBarIcon: tabIcon('account-search-outline'), title: 'Pacientes' }} />
         <Tab.Screen component={ReceptionAdmissionsStack} name="ReceptionAdmissionsTab" options={{ tabBarIcon: tabIcon('clipboard-list-outline'), title: 'Admisiones' }} />
         <Tab.Screen component={ReceptionAppointmentsStack} name="ReceptionAppointmentsTab" options={{ tabBarIcon: tabIcon('calendar-check-outline'), title: 'Citas' }} />
+        <Tab.Screen component={CashierHomeStack} name="ReceptionCashierTab" options={{ tabBarIcon: tabIcon('cash-register'), title: 'Caja' }} />
         <Tab.Screen component={ReceptionProfileStack} name="ReceptionProfileTab" options={{ tabBarIcon: tabIcon('account-cog-outline'), title: 'Perfil' }} />
       </Tab.Navigator>
     </RoleGuard>

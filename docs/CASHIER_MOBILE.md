@@ -16,6 +16,10 @@ No incluye POS completo, facturación fiscal avanzada, impresión PDF ni reporte
 - Errores globales del API normalizados en español.
 - TypeScript validado.
 
+## Acceso desde recepción
+
+En la operación actual, caja móvil queda visible dentro del módulo de recepción como una tab llamada `Caja`. No necesitas iniciar sesión con un rol cajero separado para probar este flujo.
+
 ## Roles permitidos
 
 El helper `isCashierRole` acepta:
@@ -28,7 +32,7 @@ El helper `isCashierRole` acepta:
 - `recepcion_caja`
 - `recepcionista_caja`
 
-También puede aceptar recepción si el usuario trae permiso explícito de caja.
+Recepción puede acceder al flujo de caja desde sus tabs operativas.
 
 No permite paciente, médico, doctor, enfermería, nurse ni superadmin.
 

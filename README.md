@@ -189,5 +189,7 @@ docs/CASHIER_MOBILE.md
 - Validación de monto inválido, monto 0 y sobrepago.
 - Guardia contra doble envío al registrar pago.
 - Acceso de caja reforzado por rol o permiso explícito.
+- Caja disponible dentro del módulo de recepción.
+- Carga de citas de recepción estabilizada para evitar errores por filtro de fecha.
 - Errores globales del API normalizados.
 - Documentación de caja actualizada.

@@ -19,7 +19,7 @@ const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 const stackOptions = { headerShown: false };
 
-function CashierHomeStack() {
+export function CashierHomeStack() {
   return (
     <Stack.Navigator screenOptions={stackOptions}>
       <Stack.Screen component={CashierDashboardScreen} name="CashierDashboard" />
@@ -29,6 +29,9 @@ function CashierHomeStack() {
       <Stack.Screen component={CashierRegisterPaymentScreen} name="CashierRegisterPayment" />
       <Stack.Screen component={CashierPaymentDetailScreen} name="CashierPaymentDetail" />
       <Stack.Screen component={CashierPaymentsHistoryScreen} name="CashierPaymentsHistory" />
+      <Stack.Screen component={CashierProfileScreen} name="CashierProfile" />
+      <Stack.Screen component={CashierSecurityScreen} name="CashierSecurity" />
+      <Stack.Screen component={CashierChangePasswordScreen} name="CashierChangePassword" />
     </Stack.Navigator>
   );
 }
@@ -78,7 +81,7 @@ function CashierProfileStack() {
 export function CashierTabs() {
   const insets = useSafeAreaInsets();
   return (
-    <RoleGuard roles={['cajero']}>
+    <RoleGuard roles={['cajero', 'recepcionista']}>
       <Tab.Navigator screenOptions={createTabOptions(insets)}>
         <Tab.Screen component={CashierHomeStack} name="CashierHomeTab" options={{ tabBarIcon: tabIcon('cash-register'), title: 'Inicio' }} />
         <Tab.Screen component={CashierPendingStack} name="CashierPendingTab" options={{ tabBarIcon: tabIcon('file-clock-outline'), title: 'Pendientes' }} />

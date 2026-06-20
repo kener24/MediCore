@@ -63,7 +63,7 @@ export function CashierDashboardScreen() {
         <CashierQuickActions
           onHistory={() => navigation.navigate('CashierPaymentsHistory')}
           onPending={() => navigation.navigate('CashierPendingInvoices')}
-          onProfile={() => navigation.navigate('CashierProfileTab')}
+          onProfile={() => navigation.navigate('CashierProfile')}
           onSearch={() => navigation.navigate('CashierInvoiceSearch')}
         />
       </ScrollView>

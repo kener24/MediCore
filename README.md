@@ -151,3 +151,33 @@ Los accesos dependen de los datos seed del backend activo.
 - Filtros de citas pendientes, confirmadas, con check-in y canceladas.
 - Perfil de recepcion cargado desde API.
 - Edicion de perfil, seguridad, cambio de contrasena y cierre de sesion.
+
+## Sprint 6.0 caja movil
+
+- Dashboard basico de caja.
+- Facturas pendientes y parciales.
+- Busqueda de factura por texto.
+- Detalle financiero de factura sin notas clinicas profundas.
+- Registro de pago basico total o parcial.
+- Validacion de monto mayor a 0 y bloqueo de sobrepago local.
+- Metodos: efectivo, tarjeta, transferencia, dinero movil, cheque y otro.
+- Historial y detalle de pagos.
+- Perfil, seguridad, cambio de contrasena y cierre de sesion.
+
+Roles aceptados para caja:
+
+```text
+cajero
+caja
+cashier
+billing
+billing_staff
+recepcion_caja
+recepcionista_caja
+```
+
+Documento tecnico:
+
+```text
+docs/CASHIER_MOBILE.md
+```

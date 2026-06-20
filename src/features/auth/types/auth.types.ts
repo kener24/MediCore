@@ -1,4 +1,4 @@
-export type AppRole = 'paciente' | 'medico' | 'doctor' | 'recepcionista' | 'enfermera' | 'enfermero' | 'enfermeria' | 'nurse' | 'nursing' | 'admin';
+export type AppRole = 'paciente' | 'medico' | 'doctor' | 'recepcionista' | 'cajero' | 'enfermera' | 'enfermero' | 'enfermeria' | 'nurse' | 'nursing' | 'admin';
 
 export type RoleName = AppRole | 'superadmin' | string;
 

@@ -14,6 +14,16 @@ Modulo movil para recepcion clinica. Permite buscar pacientes, crear paciente mi
 - Cancelacion de admision requiere confirmacion.
 - Detalle de paciente permite volver al flujo de admisiones de hoy.
 
+## Correccion Sprint 5.2
+
+- Check-in de cita prioriza endpoints operativos reales de admisiones.
+- La respuesta de check-in soporta visita completa, `visit_id`, `admission_id` o cita actualizada.
+- Citas muestra filtros de pendientes, confirmadas, con check-in y canceladas.
+- Check-in pide confirmacion, bloquea doble toque y navega a la visita si el backend devuelve ID.
+- Perfil de recepcion carga desde API con respaldo de la sesion local.
+- Perfil permite editar datos de contacto, abrir seguridad, cambiar contrasena y cerrar sesion.
+- Seguridad muestra datos de sesion, permisos operativos y acciones reales.
+
 ## Roles permitidos
 
 El helper `isReceptionRole` acepta `recepcionista`, `recepcion`, `recepción`, `receptionist`, `front_desk`, `admisiones` y `admissions`. No permite paciente, medico, enfermeria, admin ni superadmin.
@@ -30,7 +40,10 @@ El helper `isReceptionRole` acepta `recepcionista`, `recepcion`, `recepción`, `
 - `GET /admissions/visits/stats-today/`
 - `GET /appointments/?today=true`
 - `POST /admissions/visits/check-in-appointment/`
+- `POST /admissions/check-in-appointment/`
 - `GET /auth/me/`
+- `PATCH /auth/me/`
+- `POST /auth/change-password/`
 
 ## Flujo de prueba
 
@@ -42,7 +55,9 @@ El helper `isReceptionRole` acepta `recepcionista`, `recepcion`, `recepción`, `
 6. Abrir admisiones de hoy y ver detalle.
 7. Enviar a triaje o medico si el backend lo permite.
 8. Abrir citas y realizar check-in.
-9. Cerrar sesion y verificar que no se vuelve al modulo con el boton atras.
+9. Editar telefono en perfil si el backend permite `PATCH /auth/me/`.
+10. Cambiar contrasena y verificar cierre de sesion.
+11. Cerrar sesion y verificar que no se vuelve al modulo con el boton atras.
 
 ## Seguridad
 

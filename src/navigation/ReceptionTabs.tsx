@@ -4,8 +4,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RoleGuard } from '@/components/RoleGuard';
 import { ReceptionAppointmentCheckInScreen } from '@/features/reception/screens/ReceptionAppointmentCheckInScreen';
+import { ReceptionChangePasswordScreen } from '@/features/reception/screens/ReceptionChangePasswordScreen';
 import { ReceptionCreateAdmissionScreen } from '@/features/reception/screens/ReceptionCreateAdmissionScreen';
 import { ReceptionDashboardScreen } from '@/features/reception/screens/ReceptionDashboardScreen';
+import { ReceptionEditProfileScreen } from '@/features/reception/screens/ReceptionEditProfileScreen';
 import { ReceptionPatientCreateScreen } from '@/features/reception/screens/ReceptionPatientCreateScreen';
 import { ReceptionPatientDetailScreen } from '@/features/reception/screens/ReceptionPatientDetailScreen';
 import { ReceptionPatientSearchScreen } from '@/features/reception/screens/ReceptionPatientSearchScreen';
@@ -70,7 +72,9 @@ function ReceptionProfileStack() {
   return (
     <Stack.Navigator screenOptions={stackOptions}>
       <Stack.Screen component={ReceptionProfileScreen} name="ReceptionProfile" />
+      <Stack.Screen component={ReceptionEditProfileScreen} name="ReceptionEditProfile" />
       <Stack.Screen component={ReceptionSecurityScreen} name="ReceptionSecurity" />
+      <Stack.Screen component={ReceptionChangePasswordScreen} name="ReceptionChangePassword" />
     </Stack.Navigator>
   );
 }

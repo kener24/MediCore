@@ -1,38 +1,70 @@
-import { useNavigation } from '@react-navigation/native';
-import { Alert, ScrollView, StyleSheet, Text } from 'react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useCallback, useState } from 'react';
+import { Alert, RefreshControl, ScrollView, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { AppHeader } from '@/components/AppHeader';
+import { ErrorState } from '@/components/ErrorState';
+import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
 import { useAuth } from '@/features/auth/context/AuthContext';
+import { getReceptionProfile } from '@/features/reception/services/receptionProfileService';
+import type { ReceptionProfile } from '@/features/reception/types/receptionProfile.types';
 
 export function ReceptionProfileScreen() {
   const navigation = useNavigation<any>();
   const { role, signOut, user } = useAuth();
+  const [profile, setProfile] = useState<ReceptionProfile | null>(user);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
+
+  const load = useCallback(async (refresh = false) => {
+    if (refresh) setRefreshing(true);
+    else setLoading(true);
+    setError('');
+    try {
+      setProfile(await getReceptionProfile());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo cargar el perfil.');
+      if (user) setProfile(user);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [user]);
+
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   async function logout() {
-    Alert.alert('Cerrar sesión', '¿Deseas cerrar la sesión?', [
+    Alert.alert('Cerrar sesion', 'Deseas cerrar la sesion?', [
       { style: 'cancel', text: 'Cancelar' },
-      { style: 'destructive', text: 'Cerrar sesión', onPress: () => void signOut() },
+      { style: 'destructive', text: 'Cerrar sesion', onPress: () => void signOut() },
     ]);
   }
 
+  if (loading) return <LoadingState label="Cargando perfil..." />;
+  const activeProfile = profile ?? user;
+
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <AppHeader icon="account-cog-outline" subtitle="Perfil operativo de recepción." title="Perfil" />
+      <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl onRefresh={() => void load(true)} refreshing={refreshing} />}>
+        <AppHeader icon="account-cog-outline" subtitle="Perfil operativo de recepcion." title="Perfil" />
+        {error ? <ErrorState message={error} onRetry={() => void load()} title="Perfil parcial" /> : null}
         <AppCard style={styles.card}>
-          <Text style={styles.title}>{user?.nombre_completo ?? 'Recepción'}</Text>
-          <Info label="Correo" value={user?.email ?? 'No registrado'} />
-          <Info label="Rol" value={String(role ?? 'recepcionista')} />
-          <Info label="Clínica" value={user?.clinica_nombre ?? (typeof user?.clinica === 'object' ? user.clinica?.nombre ?? 'No asignada' : 'No asignada')} />
-          <Info label="Teléfono" value={user?.telefono ?? 'No registrado'} />
-          <Info label="Estado" value={user?.is_active ? 'Activo' : 'Inactivo'} />
+          <Text style={styles.title}>{activeProfile?.nombre_completo ?? 'Recepcion'}</Text>
+          <Info label="Correo" value={activeProfile?.email ?? 'No registrado'} />
+          <Info label="Rol" value={String(role ?? activeProfile?.role_nombre ?? 'recepcionista')} />
+          <Info label="Clinica" value={activeProfile?.clinica_nombre ?? (typeof activeProfile?.clinica === 'object' ? activeProfile.clinica?.nombre ?? 'No asignada' : 'No asignada')} />
+          <Info label="Telefono" value={activeProfile?.telefono ?? 'No registrado'} />
+          <Info label="Estado" value={activeProfile?.is_active ? 'Activo' : 'Inactivo'} />
         </AppCard>
-        <AppButton label="Seguridad" onPress={() => navigation.navigate('ReceptionSecurity')} variant="secondary" />
-        <AppButton label="Cerrar sesión" onPress={logout} variant="danger" />
+        <AppButton label="Editar perfil" onPress={() => navigation.navigate('ReceptionEditProfile', { profile: activeProfile })} />
+        <AppButton label="Seguridad y configuracion" onPress={() => navigation.navigate('ReceptionSecurity')} variant="secondary" />
+        <AppButton label="Cambiar contrasena" onPress={() => navigation.navigate('ReceptionChangePassword')} variant="secondary" />
+        <AppButton label="Cerrar sesion" onPress={logout} variant="danger" />
       </ScrollView>
     </SafeAreaView>
   );

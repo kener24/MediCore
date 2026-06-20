@@ -143,3 +143,11 @@ Recepcion12345*
 7. Cerrar sesión y confirmar que no vuelve al módulo con el botón atrás.
 
 Los accesos dependen de los datos seed del backend activo.
+
+## Sprint 5.2 recepcion
+
+- Check-in de cita con endpoints operativos de admisiones.
+- Manejo robusto de respuestas con visita completa, `visit_id`, `admission_id` o cita actualizada.
+- Filtros de citas pendientes, confirmadas, con check-in y canceladas.
+- Perfil de recepcion cargado desde API.
+- Edicion de perfil, seguridad, cambio de contrasena y cierre de sesion.

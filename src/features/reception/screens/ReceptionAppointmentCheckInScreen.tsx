@@ -12,13 +12,14 @@ import { AppointmentCheckInCard } from '@/features/reception/components/Appointm
 import { checkInAppointment, getTodayAppointments } from '@/features/reception/services/receptionAppointmentService';
 import type { ReceptionAppointment } from '@/features/reception/types/receptionAppointment.types';
 
-const filters = [['all', 'Todas'], ['scheduled', 'Pendientes'], ['confirmed', 'Confirmadas']] as const;
+const filters = [['all', 'Todas'], ['scheduled', 'Pendientes'], ['confirmed', 'Confirmadas'], ['checked_in', 'Con check-in'], ['cancelled', 'Canceladas']] as const;
 
 export function ReceptionAppointmentCheckInScreen() {
   const navigation = useNavigation<any>();
   const [appointments, setAppointments] = useState<ReceptionAppointment[]>([]);
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [processingId, setProcessingId] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
@@ -37,15 +38,32 @@ export function ReceptionAppointmentCheckInScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
-  const visible = useMemo(() => filter === 'all' ? appointments : appointments.filter((item) => item.status === filter), [appointments, filter]);
+  const visible = useMemo(() => filter === 'all' ? appointments : appointments.filter((item) => appointmentFilterKey(item) === filter), [appointments, filter]);
+
+  function confirmCheckIn(item: ReceptionAppointment) {
+    if (!item.id) return;
+    Alert.alert('Check-in de cita', 'Despues de registrar la llegada se creara la visita operativa. Deseas continuar?', [
+      { style: 'cancel', text: 'Cancelar' },
+      { text: 'Confirmar', onPress: () => void checkIn(item) },
+    ]);
+  }
 
   async function checkIn(item: ReceptionAppointment) {
-    if (!item.id) return;
+    if (!item.id || processingId) return;
+    setProcessingId(item.id);
     try {
-      const visit = await checkInAppointment(item.id);
-      Alert.alert('Check-in', 'Check-in realizado correctamente.', [{ text: 'Ver visita', onPress: () => navigation.navigate('ReceptionVisitDetail', { visitId: visit.id }) }]);
+      const result = await checkInAppointment(item.id);
+      await load(true);
+      const visitId = result.visit?.id ?? result.visitId;
+      if (visitId) {
+        Alert.alert('Check-in', 'Check-in realizado correctamente.', [{ text: 'Ver visita', onPress: () => navigation.navigate('ReceptionVisitDetail', { visitId }) }]);
+      } else {
+        Alert.alert('Check-in', result.message ?? 'Check-in realizado correctamente.');
+      }
     } catch (err) {
       Alert.alert('Check-in', err instanceof Error ? err.message : 'No se pudo realizar el check-in.');
+    } finally {
+      setProcessingId(null);
     }
   }
 
@@ -53,14 +71,42 @@ export function ReceptionAppointmentCheckInScreen() {
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl onRefresh={() => void load(true)} refreshing={refreshing} />}>
-        <AppHeader icon="calendar-check-outline" subtitle="Citas del día listas para registrar llegada." title="Check-in de cita" />
+        <AppHeader icon="calendar-check-outline" subtitle="Citas del dia listas para registrar llegada." title="Check-in de cita" />
         <View style={styles.filters}>{filters.map(([value, label]) => <Text key={value} onPress={() => setFilter(value)} style={[styles.filter, filter === value && styles.filterActive]}>{label}</Text>)}</View>
         {error ? <ErrorState message={error} onRetry={() => void load()} title="No se pudo cargar" /> : null}
         {!error && visible.length === 0 ? <EmptyState description="No hay citas para este filtro." title="Sin citas de hoy" /> : null}
-        {visible.map((appointment) => <AppointmentCheckInCard appointment={appointment} key={appointment.id} onCheckIn={() => void checkIn(appointment)} />)}
+        {visible.map((appointment) => (
+          <AppointmentCheckInCard
+            appointment={appointment}
+            disabled={Boolean(processingId && processingId !== appointment.id)}
+            key={appointment.id}
+            loading={processingId === appointment.id}
+            onCheckIn={() => confirmCheckIn(appointment)}
+            onViewVisit={() => {
+              const visitId = appointment.visit_id ?? appointment.admission_id ?? appointment.check_in_visit_id ?? (typeof appointment.visit === 'number' ? appointment.visit : undefined);
+              if (visitId) navigation.navigate('ReceptionVisitDetail', { visitId });
+            }}
+          />
+        ))}
       </ScrollView>
     </SafeAreaView>
   );
+}
+
+function appointmentFilterKey(appointment: ReceptionAppointment) {
+  const status = String(appointment.status ?? '').toLowerCase();
+  if (
+    appointment.checked_in ||
+    appointment.visit_id ||
+    appointment.admission_id ||
+    appointment.check_in_visit_id ||
+    status.includes('check') ||
+    status.includes('attended') ||
+    status.includes('atendida')
+  ) return 'checked_in';
+  if (status.includes('cancel') || status.includes('anulad')) return 'cancelled';
+  if (status.includes('confirm')) return 'confirmed';
+  return 'scheduled';
 }
 
 const styles = StyleSheet.create({

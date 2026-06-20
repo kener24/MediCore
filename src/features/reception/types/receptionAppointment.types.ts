@@ -17,4 +17,10 @@ export type ReceptionAppointment = {
   status?: string;
   reason?: string;
   motivo?: string;
+  visit?: number | Record<string, unknown> | null;
+  visit_id?: number | null;
+  admission?: number | Record<string, unknown> | null;
+  admission_id?: number | null;
+  check_in_visit_id?: number | null;
+  checked_in?: boolean;
 };

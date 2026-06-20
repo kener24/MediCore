@@ -53,6 +53,7 @@ export function ReceptionCreateAdmissionScreen() {
           <AppHeader icon="clipboard-plus-outline" subtitle="Registra la llegada del paciente a la clínica." title="Nueva admisión" />
           <AppCard style={styles.form}>
             <AppInput keyboardType="number-pad" label="ID de paciente" onChangeText={(value) => setForm({ ...form, patient_id: value.replace(/[^0-9]/g, '') })} value={form.patient_id} />
+            {!initialPatientId ? <AppButton label="Buscar paciente" onPress={() => navigation.navigate('ReceptionPatientSearch')} variant="secondary" /> : null}
             <Text style={styles.label}>Tipo de visita</Text>
             <View style={styles.chips}>{visitTypes.map(([value, label]) => <Chip active={form.visit_type === value} key={value} label={label} onPress={() => setForm({ ...form, visit_type: value })} />)}</View>
             <AppInput label="Motivo" multiline onChangeText={(value) => setForm({ ...form, reason: value })} style={styles.notes} value={form.reason} />

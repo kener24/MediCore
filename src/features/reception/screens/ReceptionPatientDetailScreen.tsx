@@ -23,6 +23,12 @@ export function ReceptionPatientDetailScreen() {
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
+    if (!patientId) {
+      setPatient(null);
+      setError('No se encontró el paciente.');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -57,6 +63,7 @@ export function ReceptionPatientDetailScreen() {
               {patient.allergies || patient.alergias ? <Info label="Alergias" value={patient.allergies ?? patient.alergias ?? ''} /> : null}
             </AppCard>
             <AppButton label="Crear admisión" onPress={() => navigation.navigate('ReceptionCreateAdmission', { patientId: patient.id })} />
+            <AppButton label="Ver admisiones de hoy" onPress={() => navigation.navigate('ReceptionTodayAdmissions')} variant="secondary" />
           </>
         ) : null}
       </ScrollView>

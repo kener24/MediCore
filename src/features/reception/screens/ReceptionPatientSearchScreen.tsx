@@ -23,7 +23,12 @@ export function ReceptionPatientSearchScreen() {
   const [error, setError] = useState('');
 
   async function runSearch() {
-    if (query.trim().length < 2) return;
+    if (query.trim().length < 2) {
+      setSearched(false);
+      setPatients([]);
+      setError('Escribe al menos 2 caracteres para buscar.');
+      return;
+    }
     setLoading(true);
     setError('');
     setSearched(true);
@@ -44,7 +49,7 @@ export function ReceptionPatientSearchScreen() {
         <AppButton disabled={query.trim().length < 2} label="Buscar" loading={loading} onPress={runSearch} />
         <AppButton label="Crear paciente nuevo" onPress={() => navigation.navigate('ReceptionPatientCreate')} variant="secondary" />
         {loading ? <LoadingState label="Buscando pacientes..." /> : null}
-        {error ? <ErrorState message={error} onRetry={runSearch} title="No se pudo buscar" /> : null}
+        {error ? <ErrorState message={error} onRetry={query.trim().length >= 2 ? runSearch : undefined} title={query.trim().length < 2 ? 'Búsqueda incompleta' : 'No se pudo buscar'} /> : null}
         {!loading && searched && !error && patients.length === 0 ? <EmptyState description="Puedes crear un paciente mínimo para continuar." title="No se encontraron pacientes." /> : null}
         {patients.map((patient) => (
           <ReceptionPatientCard

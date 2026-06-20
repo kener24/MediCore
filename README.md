@@ -80,6 +80,13 @@ Todas las peticiones usan el `apiClient` centralizado con `Authorization: Bearer
   - Check-in de cita.
   - Admisiones de hoy y detalle de visita.
   - Envío operativo a triaje o médico cuando el backend lo permite.
+- Sprint 5.1 estabilización de recepción:
+  - Validación de roles y mensajes de acceso.
+  - Manejo de IDs faltantes en paciente y visita.
+  - Búsqueda con mínimo de dos caracteres.
+  - Confirmación antes de cancelar admisión.
+  - Mensajes globales de API corregidos en español.
+  - Normalización reforzada de listas paginadas.
 
 ## Separación clínica
 
@@ -124,5 +131,15 @@ Recepción:
 recepcion@medicore.com
 Recepcion12345*
 ```
+
+## Pruebas recomendadas recepción
+
+1. Login con recepción y verificar redirección al dashboard.
+2. Buscar paciente con menos de dos caracteres y luego con un nombre real.
+3. Crear paciente mínimo y crear admisión desde el resultado.
+4. Abrir admisiones de hoy, filtrar y entrar al detalle.
+5. Enviar a triaje, enviar a médico o cancelar si el backend lo permite.
+6. Hacer check-in de una cita presencial sin validar configuración online.
+7. Cerrar sesión y confirmar que no vuelve al módulo con el botón atrás.
 
 Los accesos dependen de los datos seed del backend activo.

@@ -1,4 +1,4 @@
-import { useFocusEffect, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,6 +16,7 @@ import { visitDoctorName, visitPatientName } from '@/features/reception/services
 import type { ReceptionVisit } from '@/features/reception/types/receptionAdmission.types';
 
 export function ReceptionVisitDetailScreen() {
+  const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const visitId = Number(route.params?.visitId);
   const [visit, setVisit] = useState<ReceptionVisit | null>(null);
@@ -24,6 +25,12 @@ export function ReceptionVisitDetailScreen() {
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
+    if (!visitId) {
+      setVisit(null);
+      setError('No se encontró la visita.');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -41,18 +48,34 @@ export function ReceptionVisitDetailScreen() {
     if (!visit?.id) return;
     try {
       setBusy(true);
-      if (action === 'triage') setVisit(await sendToTriage(visit.id));
-      if (action === 'doctor') setVisit(await sendToDoctor(visit.id));
+      if (action === 'triage') {
+        setVisit(await sendToTriage(visit.id));
+        Alert.alert('Visita', 'Paciente enviado a triaje.');
+        return;
+      }
+      if (action === 'doctor') {
+        setVisit(await sendToDoctor(visit.id));
+        Alert.alert('Visita', 'Paciente enviado al médico.');
+        return;
+      }
       if (action === 'cancel') {
         const reason = 'Cancelada desde recepción móvil';
         setVisit(await cancelAdmission(visit.id, reason));
+        Alert.alert('Visita', 'Admisión cancelada correctamente.');
+        return;
       }
-      Alert.alert('Visita', 'Estado actualizado correctamente.');
     } catch (err) {
       Alert.alert('Visita', err instanceof Error ? err.message : 'Esta acción no está disponible por el momento.');
     } finally {
       setBusy(false);
     }
+  }
+
+  function confirmCancel() {
+    Alert.alert('Cancelar admisión', '¿Deseas cancelar esta admisión?', [
+      { style: 'cancel', text: 'No' },
+      { style: 'destructive', text: 'Cancelar admisión', onPress: () => void run('cancel') },
+    ]);
   }
 
   if (loading) return <LoadingState label="Cargando visita..." />;
@@ -80,9 +103,10 @@ export function ReceptionVisitDetailScreen() {
               <View style={styles.actions}>
                 <AppButton disabled={busy} label="Enviar a triaje" onPress={() => void run('triage')} />
                 <AppButton disabled={busy} label="Enviar a médico" onPress={() => void run('doctor')} variant="secondary" />
-                <AppButton disabled={busy} label="Cancelar admisión" onPress={() => void run('cancel')} variant="danger" />
+                <AppButton disabled={busy} label="Cancelar admisión" onPress={confirmCancel} variant="danger" />
               </View>
             ) : null}
+            <AppButton label="Volver" onPress={() => navigation.goBack()} variant="secondary" />
           </>
         ) : null}
       </ScrollView>

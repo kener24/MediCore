@@ -41,6 +41,7 @@ function ReceptionPatientsStack() {
       <Stack.Screen component={ReceptionPatientCreateScreen} name="ReceptionPatientCreate" />
       <Stack.Screen component={ReceptionPatientDetailScreen} name="ReceptionPatientDetail" />
       <Stack.Screen component={ReceptionCreateAdmissionScreen} name="ReceptionCreateAdmission" />
+      <Stack.Screen component={ReceptionTodayAdmissionsScreen} name="ReceptionTodayAdmissions" />
       <Stack.Screen component={ReceptionVisitDetailScreen} name="ReceptionVisitDetail" />
     </Stack.Navigator>
   );

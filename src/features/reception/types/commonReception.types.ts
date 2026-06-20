@@ -13,6 +13,10 @@ export function normalizeListResponse<T>(response: ApiListResponse<T> | unknown)
   if (Array.isArray(payload?.results)) return payload.results;
   if (Array.isArray(payload?.data)) return payload.data;
   if (Array.isArray(payload?.items)) return payload.items;
+  const nested = (response as { data?: ApiListResponse<T>; payload?: ApiListResponse<T> })?.data;
+  if (nested) return normalizeListResponse<T>(nested);
+  const payloadNested = (response as { payload?: ApiListResponse<T> })?.payload;
+  if (payloadNested) return normalizeListResponse<T>(payloadNested);
   return [];
 }
 

@@ -14,7 +14,7 @@ export async function getAppointmentDetail(appointmentId: number | string): Prom
 
 export async function checkInAppointment(appointmentId: number | string, payload?: { priority?: string; symptoms?: string }): Promise<ReceptionVisit> {
   return postFirstAvailable<ReceptionVisit>(
-    [`/appointments/${appointmentId}/check-in/`, `/admissions/visits/check-in-appointment/`, `/admissions/check-in-appointment/`],
+    [`/appointments/${appointmentId}/check-in/`, `/admissions/appointments/${appointmentId}/check-in/`, `/admissions/visits/check-in-appointment/`, `/admissions/check-in-appointment/`],
     { appointment: appointmentId, priority: payload?.priority ?? 'normal', symptoms: payload?.symptoms ?? '' },
   );
 }

@@ -7,9 +7,9 @@ export function paymentMethodLabel(method?: string) {
   if (value === 'cash') return 'Efectivo';
   if (value === 'card') return 'Tarjeta';
   if (value === 'transfer') return 'Transferencia';
-  if (value === 'mobile_money') return 'Dinero movil';
+  if (value === 'mobile_money') return 'Dinero móvil';
   if (value === 'check') return 'Cheque';
-  return method ? 'Otro' : 'Sin metodo';
+  return method ? 'Otro' : 'Sin método';
 }
 
 export function PaymentMethodBadge({ method }: { method?: string }) {

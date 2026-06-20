@@ -29,7 +29,7 @@ export function CashierInvoiceDetailScreen() {
 
   const load = useCallback(async (refresh = false) => {
     if (!params.invoiceId) {
-      setError('No se recibio la factura.');
+      setError('No se encontró la factura.');
       setLoading(false);
       return;
     }
@@ -49,7 +49,7 @@ export function CashierInvoiceDetailScreen() {
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   if (loading) return <LoadingState label="Cargando factura..." />;
-  if (error || !invoice) return <ErrorState message={error || 'No hay informacion disponible.'} onRetry={() => void load()} title="Factura no disponible" />;
+  if (error || !invoice) return <ErrorState message={error || 'No hay información disponible.'} onRetry={() => void load()} title="Factura no disponible" />;
 
   const balance = numericValue(invoice.balance_due ?? invoice.balance);
 

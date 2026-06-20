@@ -34,7 +34,7 @@ export function CashierRegisterPaymentScreen() {
 
   async function load() {
     if (!params.invoiceId) {
-      setError('No se recibio la factura.');
+      setError('No se encontró la factura.');
       setLoading(false);
       return;
     }
@@ -53,7 +53,8 @@ export function CashierRegisterPaymentScreen() {
   }
 
   async function submit() {
-    if (!params.invoiceId || !invoice) return Alert.alert('Pago', 'No se recibio la factura.');
+    if (saving) return;
+    if (!params.invoiceId || !invoice) return Alert.alert('Pago', 'No se encontró la factura.');
     const validation = validate();
     if (validation) return Alert.alert('Pago', validation);
     setSaving(true);
@@ -73,11 +74,11 @@ export function CashierRegisterPaymentScreen() {
   function validate() {
     const value = Number(amount);
     const balance = numericValue(invoice?.balance_due ?? invoice?.balance);
-    if (!Number.isFinite(value)) return 'Ingresa un monto valido.';
+    if (!Number.isFinite(value)) return 'Ingresa un monto válido.';
     if (value <= 0) return 'El monto debe ser mayor a 0.';
-    if (balance > 0 && value > balance) return 'El monto no puede ser mayor que el saldo.';
-    if (!method) return 'Selecciona un metodo de pago.';
-    if (method !== 'cash' && !reference.trim()) return 'La referencia es requerida para este metodo.';
+    if (balance > 0 && value > balance) return 'El monto no puede ser mayor al saldo pendiente.';
+    if (!method) return 'Selecciona un método de pago.';
+    if (method !== 'cash' && !reference.trim()) return 'La referencia es requerida para este método.';
     return '';
   }
 

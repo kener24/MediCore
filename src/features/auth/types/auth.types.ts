@@ -24,6 +24,8 @@ export interface User {
   is_active: boolean;
   is_staff: boolean;
   is_superuser: boolean;
+  permissions?: string[];
+  user_permissions?: string[];
   role: number | RoleSummary;
   role_nombre?: RoleName;
   clinica: number | ClinicSummary | null;

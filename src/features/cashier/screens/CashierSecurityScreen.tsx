@@ -13,31 +13,31 @@ export function CashierSecurityScreen() {
   const { role, signOut, user } = useAuth();
 
   function logout() {
-    Alert.alert('Cerrar sesion', 'Deseas cerrar la sesion?', [
+    Alert.alert('Cerrar sesión', '¿Deseas cerrar la sesión?', [
       { style: 'cancel', text: 'Cancelar' },
-      { style: 'destructive', text: 'Cerrar sesion', onPress: () => void signOut() },
+      { style: 'destructive', text: 'Cerrar sesión', onPress: () => void signOut() },
     ]);
   }
 
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content}>
-        <CashierHeader subtitle="Sesion y permisos de caja." title="Seguridad" />
+        <CashierHeader subtitle="Sesión y permisos de caja." title="Seguridad" />
         <AppCard style={styles.card}>
-          <Text style={styles.title}>Sesion activa</Text>
+          <Text style={styles.title}>Sesión activa</Text>
           <Text style={styles.text}>Correo: {user?.email ?? 'No registrado'}</Text>
           <Text style={styles.text}>Rol: {String(role ?? 'cajero')}</Text>
-          <Text style={styles.text}>Clinica: {user?.clinica_nombre ?? (typeof user?.clinica === 'object' ? user.clinica?.nombre ?? 'No asignada' : 'No asignada')}</Text>
+          <Text style={styles.text}>Clínica: {user?.clinica_nombre ?? (typeof user?.clinica === 'object' ? user.clinica?.nombre ?? 'No asignada' : 'No asignada')}</Text>
         </AppCard>
         <AppCard style={styles.card}>
           <Text style={styles.title}>Permisos</Text>
           <Text style={styles.text}>Caja puede ver facturas, saldos y pagos necesarios para cobrar.</Text>
-          <Text style={styles.text}>Caja no ve notas clinicas profundas, no registra signos vitales, no crea consultas y no administra medicamentos.</Text>
-          <Text style={styles.text}>Todas las peticiones usan la sesion segura con JWT Bearer.</Text>
+          <Text style={styles.text}>Caja no ve notas clínicas profundas, no registra signos vitales, no crea consultas y no administra medicamentos.</Text>
+          <Text style={styles.text}>Todas las peticiones usan la sesión segura con JWT Bearer.</Text>
         </AppCard>
-        <AppButton label="Cambiar contrasena" onPress={() => navigation.navigate('CashierChangePassword')} />
+        <AppButton label="Cambiar contraseña" onPress={() => navigation.navigate('CashierChangePassword')} />
         <AppButton label="Volver" onPress={() => navigation.goBack()} variant="secondary" />
-        <AppButton label="Cerrar sesion" onPress={logout} variant="danger" />
+        <AppButton label="Cerrar sesión" onPress={logout} variant="danger" />
       </ScrollView>
     </SafeAreaView>
   );

@@ -43,10 +43,10 @@ export function CashierDashboardScreen() {
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl onRefresh={() => void load(true)} refreshing={refreshing} />}>
-        <CashierHeader subtitle="Cobros y pagos basicos de la clinica." title="Caja" />
+        <CashierHeader subtitle="Cobros y pagos básicos de la clínica." title="Caja" />
         <AppCard style={styles.card}>
           <Text style={styles.title}>Hola, {user?.nombre_completo ?? 'caja'}</Text>
-          <Text style={styles.meta}>Clinica: {user?.clinica_nombre ?? (typeof user?.clinica === 'object' ? user.clinica?.nombre ?? 'No asignada' : 'No asignada')}</Text>
+          <Text style={styles.meta}>Clínica: {user?.clinica_nombre ?? (typeof user?.clinica === 'object' ? user.clinica?.nombre ?? 'No asignada' : 'No asignada')}</Text>
         </AppCard>
         {error ? <ErrorState message={error} onRetry={() => void load()} title="No se pudo cargar" /> : null}
         {!error && dashboard ? (

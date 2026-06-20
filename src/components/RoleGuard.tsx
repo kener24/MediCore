@@ -31,14 +31,14 @@ export function RoleGuard({ children, roles }: RoleGuardProps) {
           isPatientPortal
             ? 'Tu rol no tiene acceso al portal paciente.'
             : isDoctorModule
-              ? 'No tienes acceso al modulo medico.'
+              ? 'No tienes acceso al m?dulo m?dico.'
               : isNurseModule
-                ? 'No tienes acceso al modulo de enfermeria.'
+                ? 'No tienes acceso al m?dulo de enfermer?a.'
                 : isReceptionModule
-                  ? 'No tienes acceso al modulo de recepcion.'
+                  ? 'No tienes acceso al m?dulo de recepci?n.'
                   : isCashierModule
-                    ? 'No tienes acceso al modulo de caja.'
-                    : 'Tu usuario no tiene permisos para abrir esta seccion.'
+                    ? 'No tienes acceso al m?dulo de caja.'
+                    : 'Tu usuario no tiene permisos para abrir esta secci?n.'
         }
         title="Acceso no autorizado"
       />

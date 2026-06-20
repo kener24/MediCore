@@ -25,11 +25,11 @@ export function isCashierRole(role?: RoleName | null, permissions?: string[] | n
   return normalizedPermissions.some((permission) => ['cashier', 'caja', 'billing', 'billing staff', 'payments', 'pagos'].includes(permission));
 }
 
-export function resolveSupportedAppRole(role?: RoleName | null): AppRole | null {
+export function resolveSupportedAppRole(role?: RoleName | null, permissions?: string[] | null): AppRole | null {
   const normalized = normalizeRole(role);
   if (normalized === 'doctor') return 'medico';
   if (isNurseRole(normalized)) return 'enfermera';
-  if (isCashierRole(normalized)) return 'cajero';
+  if (isCashierRole(normalized, permissions)) return 'cajero';
   if (isReceptionRole(normalized)) return 'recepcionista';
   if (['paciente', 'medico', 'admin'].includes(normalized)) {
     return normalized as AppRole;

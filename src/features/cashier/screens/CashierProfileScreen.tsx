@@ -40,9 +40,9 @@ export function CashierProfileScreen() {
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   function logout() {
-    Alert.alert('Cerrar sesion', 'Deseas cerrar la sesion?', [
+    Alert.alert('Cerrar sesión', '¿Deseas cerrar la sesión?', [
       { style: 'cancel', text: 'Cancelar' },
-      { style: 'destructive', text: 'Cerrar sesion', onPress: () => void signOut() },
+      { style: 'destructive', text: 'Cerrar sesión', onPress: () => void signOut() },
     ]);
   }
 
@@ -57,14 +57,14 @@ export function CashierProfileScreen() {
           <Text style={styles.title}>{active?.nombre_completo ?? 'Caja'}</Text>
           <Info label="Correo" value={active?.email ?? 'No registrado'} />
           <Info label="Rol" value={String(role ?? active?.role_nombre ?? 'cajero')} />
-          <Info label="Clinica" value={active?.clinica_nombre ?? (typeof active?.clinica === 'object' ? active.clinica?.nombre ?? 'No asignada' : 'No asignada')} />
-          <Info label="Telefono" value={active?.telefono ?? 'No registrado'} />
+          <Info label="Clínica" value={active?.clinica_nombre ?? (typeof active?.clinica === 'object' ? active.clinica?.nombre ?? 'No asignada' : 'No asignada')} />
+          <Info label="Teléfono" value={active?.telefono ?? 'No registrado'} />
           <Info label="Estado" value={active?.is_active ? 'Activo' : 'Inactivo'} />
           <Info label="Ultimo inicio" value={formatDateTime(active?.last_login)} />
         </AppCard>
         <AppButton label="Seguridad" onPress={() => navigation.navigate('CashierSecurity')} variant="secondary" />
-        <AppButton label="Cambiar contrasena" onPress={() => navigation.navigate('CashierChangePassword')} variant="secondary" />
-        <AppButton label="Cerrar sesion" onPress={logout} variant="danger" />
+        <AppButton label="Cambiar contraseña" onPress={() => navigation.navigate('CashierChangePassword')} variant="secondary" />
+        <AppButton label="Cerrar sesión" onPress={logout} variant="danger" />
       </ScrollView>
     </SafeAreaView>
   );

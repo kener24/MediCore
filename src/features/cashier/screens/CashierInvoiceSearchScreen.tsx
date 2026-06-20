@@ -23,14 +23,14 @@ export function CashierInvoiceSearchScreen() {
   const canSearch = useMemo(() => query.trim().length >= 2, [query]);
 
   async function submit() {
-    if (!canSearch) return Alert.alert('Buscar factura', 'Escribe al menos 2 caracteres.');
+    if (!canSearch) return Alert.alert('Buscar factura', 'Escribe al menos 2 caracteres para buscar.');
     setLoading(true);
     setError('');
     setSearched(true);
     try {
       setResults(await searchInvoices(query.trim()));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo buscar la factura.');
+      setError(err instanceof Error ? err.message : 'No se pudo buscar facturas.');
     } finally {
       setLoading(false);
     }
@@ -39,10 +39,10 @@ export function CashierInvoiceSearchScreen() {
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <CashierHeader subtitle="Busca por numero, paciente, identidad o telefono." title="Buscar factura" />
+        <CashierHeader subtitle="Busca por número, paciente, identidad o teléfono." title="Buscar factura" />
         <AppInput label="Busqueda" onChangeText={setQuery} onSubmitEditing={submit} placeholder="Factura o paciente" value={query} />
         <AppButton disabled={!canSearch} label="Buscar" loading={loading} onPress={submit} />
-        {error ? <ErrorState message={error} onRetry={submit} title="No se pudo buscar" /> : null}
+        {error ? <ErrorState message={error} onRetry={submit} title="No se pudo buscar facturas" /> : null}
         {!error && searched && results.length === 0 ? <EmptyState description="No se encontraron facturas." title="Sin resultados" /> : null}
         {results.map((invoice) => (
           <InvoiceCard

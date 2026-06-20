@@ -181,3 +181,13 @@ Documento tecnico:
 ```text
 docs/CASHIER_MOBILE.md
 ```
+
+## Sprint 6.1 estabilización caja móvil
+
+- Textos visibles de caja corregidos en español.
+- Mensajes de factura y pago faltante estandarizados.
+- Validación de monto inválido, monto 0 y sobrepago.
+- Guardia contra doble envío al registrar pago.
+- Acceso de caja reforzado por rol o permiso explícito.
+- Errores globales del API normalizados.
+- Documentación de caja actualizada.

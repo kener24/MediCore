@@ -9,7 +9,7 @@ export const paymentMethods: { label: string; value: PaymentMethod }[] = [
   { label: 'Efectivo', value: 'cash' },
   { label: 'Tarjeta', value: 'card' },
   { label: 'Transferencia', value: 'transfer' },
-  { label: 'Dinero movil', value: 'mobile_money' },
+  { label: 'Dinero móvil', value: 'mobile_money' },
   { label: 'Cheque', value: 'check' },
   { label: 'Otro', value: 'other' },
 ];
@@ -40,7 +40,7 @@ export function PaymentForm({
   return (
     <View style={styles.form}>
       <AppInput keyboardType="decimal-pad" label="Monto" onChangeText={(value) => onChangeAmount(value.replace(/[^0-9.]/g, ''))} value={amount} />
-      <Text style={styles.label}>Metodo de pago</Text>
+      <Text style={styles.label}>Método de pago</Text>
       <View style={styles.methods}>
         {paymentMethods.map((item) => (
           <Pressable key={item.value} onPress={() => onChangeMethod(item.value)} style={[styles.method, method === item.value && styles.methodActive]}>

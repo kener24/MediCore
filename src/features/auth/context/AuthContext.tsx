@@ -90,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       user,
       role,
-      appRole: resolveSupportedAppRole(role),
+      appRole: resolveSupportedAppRole(role, user?.permissions ?? user?.user_permissions),
       signIn,
       signOut,
     }),

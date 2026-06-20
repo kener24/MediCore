@@ -1,10 +1,20 @@
-# Caja movil MediCore
+# Caja móvil MediCore
 
-## Alcance Sprint 6.0
+## Alcance
 
-Modulo movil basico para caja/pagos. Permite ver resumen de caja, facturas pendientes, buscar facturas, abrir detalle, registrar pagos basicos y revisar historial de pagos.
+Módulo móvil básico para caja/pagos. Permite ver resumen de caja, facturas pendientes, buscar facturas, abrir detalle, registrar pagos básicos y revisar historial de pagos.
 
-No incluye POS completo, facturacion fiscal avanzada, impresion PDF ni reportes financieros avanzados.
+No incluye POS completo, facturación fiscal avanzada, impresión PDF ni reportes financieros avanzados.
+
+## Estabilización Sprint 6.1
+
+- Textos visibles corregidos con tildes.
+- Mensajes de factura/pago faltante estandarizados.
+- Validación interna para evitar doble envío de pago.
+- Validación de sobrepago con mensaje claro.
+- Rol caja puede resolverse por rol directo o permiso explícito.
+- Errores globales del API normalizados en español.
+- TypeScript validado.
 
 ## Roles permitidos
 
@@ -18,7 +28,9 @@ El helper `isCashierRole` acepta:
 - `recepcion_caja`
 - `recepcionista_caja`
 
-No permite paciente, medico, doctor, enfermeria, nurse ni superadmin.
+También puede aceptar recepción si el usuario trae permiso explícito de caja.
+
+No permite paciente, médico, doctor, enfermería, nurse ni superadmin.
 
 ## Pantallas
 
@@ -56,36 +68,69 @@ No permite paciente, medico, doctor, enfermeria, nurse ni superadmin.
 
 La base URL ya incluye `/api`, por eso no se duplica en los servicios.
 
-## Flujo de prueba
+## Flujo de facturas pendientes
 
-1. Iniciar sesion con un usuario de rol caja/cajero.
-2. Confirmar que abre el dashboard de caja.
-3. Abrir facturas pendientes.
-4. Filtrar pendientes, parciales y todas.
-5. Abrir detalle de factura.
-6. Revisar datos financieros, paciente, items y pagos.
-7. Registrar pago efectivo menor o igual al saldo.
-8. Registrar pago por transferencia con referencia.
-9. Intentar monto 0, negativo o mayor al saldo y confirmar validacion.
-10. Abrir historial de pagos.
-11. Abrir detalle de pago.
-12. Abrir perfil, seguridad y cambio de contrasena.
-13. Cerrar sesion y verificar que no vuelve al modulo con el boton atras.
+1. Entrar a Pendientes.
+2. Filtrar pendientes, parciales o todas.
+3. Abrir detalle de factura.
+4. Registrar pago si la factura tiene saldo.
+
+## Flujo de búsqueda
+
+1. Entrar a Buscar.
+2. Escribir al menos 2 caracteres.
+3. Buscar por número, paciente, identidad, teléfono o estado si el backend lo permite.
+4. Abrir detalle o registrar pago.
+
+## Pago parcial
+
+1. Abrir factura con saldo.
+2. Registrar un monto menor al saldo.
+3. Confirmar que el backend devuelve saldo actualizado o estado parcial.
+
+## Pago total
+
+1. Abrir factura con saldo.
+2. Registrar monto igual al saldo.
+3. Confirmar que el backend devuelve saldo cero o estado pagada.
+
+## Validaciones de pago
+
+- Monto requerido.
+- Monto mayor a 0.
+- Bloqueo de monto mayor al saldo pendiente.
+- Referencia requerida para métodos distintos de efectivo.
+- Botón bloqueado mientras se procesa para evitar doble pago.
 
 ## Seguridad
 
 - Todas las peticiones usan `apiClient` con JWT Bearer.
-- Si el backend responde 401, la sesion se limpia desde el interceptor.
-- Caja solo muestra informacion financiera necesaria.
-- Caja no muestra notas clinicas profundas.
+- Si el backend responde 401, la sesión se limpia desde el interceptor.
+- Caja solo muestra información financiera necesaria.
+- Caja no muestra notas clínicas profundas.
 - Caja no registra signos vitales.
-- Caja no crea consultas medicas.
+- Caja no crea consultas médicas.
 - Caja no administra medicamentos.
+
+## Pruebas en Android físico
+
+- Login con rol caja/cajero.
+- Redirección a dashboard.
+- Médico, enfermería, paciente y superadmin no deben entrar a caja.
+- Ver facturas pendientes y parciales.
+- Buscar factura.
+- Abrir detalle.
+- Registrar pago efectivo.
+- Registrar transferencia con referencia.
+- Validar monto 0, negativo, texto y sobrepago.
+- Confirmar que no se puede hacer doble tap.
+- Revisar historial y detalle de pago.
+- Abrir perfil y cerrar sesión.
 
 ## Limitaciones actuales
 
 - Si el backend no expone dashboard de caja, se calcula un resumen con facturas y pagos disponibles.
 - Si no existe endpoint dedicado de pagos por factura, se intenta `POST /billing/payments/`.
 - No se procesan tarjetas reales ni se guardan datos sensibles de tarjeta.
-- No hay PDF ni impresion en este sprint.
-- Acceso de recepcion a caja queda limitado a roles explicitos como `recepcion_caja` o `recepcionista_caja`.
+- No hay PDF ni impresión en este sprint.
+- El estado final de pago parcial o total depende de la respuesta real del backend.

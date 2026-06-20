@@ -28,7 +28,7 @@ export function CashierPaymentDetailScreen() {
 
   async function load() {
     if (!params.paymentId) {
-      setError('No se recibio el pago.');
+      setError('No se encontró el pago.');
       setLoading(false);
       return;
     }

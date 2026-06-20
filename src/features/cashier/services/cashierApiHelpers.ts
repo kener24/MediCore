@@ -2,7 +2,7 @@ import { apiClient } from '@/core/api/apiClient';
 import { ApiClientError } from '@/core/api/authInterceptor';
 import type { QueryParams } from '@/features/cashier/types/commonCashier.types';
 
-export const unavailableCashierAction = 'Esta accion no esta disponible por el momento.';
+export const unavailableCashierAction = 'Esta acción no está disponible por el momento.';
 
 export async function getFirstAvailable<T>(urls: string[], params?: QueryParams): Promise<T> {
   let lastError: unknown;

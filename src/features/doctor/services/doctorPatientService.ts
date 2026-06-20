@@ -1,4 +1,5 @@
 import { endpoints } from '@/core/api/endpoints';
+import { startConsultation as startVisitConsultation } from '@/features/doctor/services/doctorConsultationService';
 import { getFirstAvailable, postFirstAvailable } from '@/features/doctor/services/doctorApiHelpers';
 import { normalizeListResponse, type ApiListResponse } from '@/features/doctor/types/commonDoctor.types';
 import type {
@@ -44,7 +45,5 @@ export async function getPatientMedicalSummary(patientId: number | string) {
 }
 
 export async function startConsultation(visitId: number | string) {
-  return postFirstAvailable<{ id?: number; consultation_id?: number }>([
-    endpoints.doctor.startConsultation(visitId),
-  ]);
+  return startVisitConsultation(visitId);
 }

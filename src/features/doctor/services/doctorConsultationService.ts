@@ -96,7 +96,11 @@ export async function getVisitVitalSigns(visitId: number | string) {
 }
 
 export async function startConsultation(visitId: number | string) {
-  return postFirstAvailable<StartConsultationResponse>([endpoints.doctor.startConsultation(visitId)]);
+  const response = await patchFirstAvailable<unknown>([
+    `/doctor/visits/${visitId}/start-consultation/`,
+    endpoints.doctor.startConsultation(visitId),
+  ]);
+  return normalizeStartConsultationResponse(response, visitId);
 }
 
 export async function getConsultationDetail(consultationId: number | string) {
@@ -194,8 +198,8 @@ export async function saveConsultationDraft(consultationId: number | string, pay
 export const saveDraft = saveConsultationDraft;
 
 export async function completeConsultation(visitId: number | string, payload?: ConsultationPayload) {
-  return postFirstAvailable<DoctorConsultation>(
-    [endpoints.doctor.completeConsultation(visitId)],
+  return patchFirstAvailable<DoctorConsultation>(
+    [`/doctor/visits/${visitId}/complete-consultation/`, endpoints.doctor.completeConsultation(visitId)],
     payload ? sanitizePayload(payload) : undefined,
   );
 }
@@ -219,6 +223,25 @@ export function sanitizePayload(payload: ConsultationPayload) {
 
 function isConsultationObject(value: unknown): value is DoctorConsultation {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function normalizeStartConsultationResponse(response: unknown, visitId: number | string): StartConsultationResponse {
+  const root = asRecord(response);
+  const visit = asRecord(root.visit);
+  const consultation = root.consultation ?? root.consulta ?? root.consultation_id ?? root.id ?? visit.consultation ?? visit.consultation_id;
+  const consultationId = Number(consultation);
+  const responseId = Number(root.id);
+  return {
+    id: Number.isFinite(responseId) && responseId > 0 ? responseId : Number.isFinite(consultationId) && consultationId > 0 ? consultationId : undefined,
+    consultation_id: Number.isFinite(consultationId) && consultationId > 0 ? consultationId : undefined,
+    message: typeof root.message === 'string' ? root.message : undefined,
+    status: typeof root.status === 'string' ? root.status : typeof visit.status === 'string' ? visit.status : undefined,
+    visit_id: Number(visit.id ?? root.visit_id ?? visitId),
+  };
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
 function normalizeConsultationError(err: unknown) {

@@ -20,9 +20,13 @@ from apps.audit.models import AuditLog
 from apps.audit.services import log_audit_event
 
 
-CLINIC_VIEW_ROLES = ["admin", "medico", "enfermera", "recepcionista"]
+CLINIC_VIEW_ROLES = ["superadmin", "admin", "medico", "enfermera", "recepcionista"]
 PATIENT_WRITE_ROLES = ["admin", "enfermera", "recepcionista"]
 PATIENT_DEACTIVATE_ROLES = ["admin"]
+
+
+def normalized_role(user):
+    return str(get_role_name(user) or "").lower()
 
 
 class PatientViewSet(viewsets.ModelViewSet):
@@ -40,13 +44,13 @@ class PatientViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        role = get_role_name(user)
+        role = normalized_role(user)
         queryset = super().get_queryset()
         if role == "superadmin" or user.is_superuser:
-            queryset = queryset.none()
+            pass
         elif role in ["admin", "medico", "enfermera", "recepcionista"] and user.clinica_id:
             queryset = queryset.filter(clinic_id=user.clinica_id)
-        elif role == "paciente":
+        elif role in ["paciente", "patient"]:
             queryset = queryset.filter(user=user)
         else:
             queryset = queryset.none()
@@ -83,15 +87,15 @@ class PatientViewSet(viewsets.ModelViewSet):
         return queryset
 
     def list(self, request, *args, **kwargs):
-        role = get_role_name(request.user)
-        if role == "paciente":
+        role = normalized_role(request.user)
+        if role in ["paciente", "patient"]:
             return Response({"detail": "No tienes permiso para listar pacientes."}, status=status.HTTP_403_FORBIDDEN)
-        if role not in CLINIC_VIEW_ROLES:
+        if role not in CLINIC_VIEW_ROLES and not request.user.is_superuser:
             return Response({"detail": "No tienes permiso para ver pacientes."}, status=status.HTTP_403_FORBIDDEN)
         return super().list(request, *args, **kwargs)
 
     def create(self, request, *args, **kwargs):
-        if get_role_name(request.user) not in PATIENT_WRITE_ROLES:
+        if normalized_role(request.user) not in PATIENT_WRITE_ROLES:
             return Response({"detail": "No tienes permiso para crear pacientes."}, status=status.HTTP_403_FORBIDDEN)
         response = super().create(request, *args, **kwargs)
         if response.status_code == status.HTTP_201_CREATED:
@@ -99,7 +103,7 @@ class PatientViewSet(viewsets.ModelViewSet):
         return response
 
     def update(self, request, *args, **kwargs):
-        if get_role_name(request.user) not in PATIENT_WRITE_ROLES:
+        if normalized_role(request.user) not in PATIENT_WRITE_ROLES:
             return Response({"detail": "No tienes permiso para actualizar pacientes."}, status=status.HTTP_403_FORBIDDEN)
         patient = self.get_object()
         old_values = {"nombre_completo": patient.nombre_completo, "telefono": patient.telefono, "correo": patient.correo, "activo": patient.activo}
@@ -109,7 +113,7 @@ class PatientViewSet(viewsets.ModelViewSet):
         return response
 
     def destroy(self, request, *args, **kwargs):
-        if get_role_name(request.user) not in PATIENT_DEACTIVATE_ROLES:
+        if normalized_role(request.user) not in PATIENT_DEACTIVATE_ROLES:
             return Response({"detail": "No tienes permiso para desactivar pacientes."}, status=status.HTTP_403_FORBIDDEN)
         patient = self.get_object()
         patient.activo = False
@@ -119,7 +123,7 @@ class PatientViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def me(self, request):
-        if get_role_name(request.user) != "paciente":
+        if normalized_role(request.user) not in ["paciente", "patient"]:
             return Response({"detail": "Solo disponible para pacientes."}, status=status.HTTP_403_FORBIDDEN)
         patient = Patient.objects.filter(user=request.user).select_related("clinic", "user").first()
         if not patient:
@@ -129,7 +133,7 @@ class PatientViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"])
     def stats(self, request):
         queryset = self.get_queryset()
-        if get_role_name(request.user) == "paciente":
+        if normalized_role(request.user) in ["paciente", "patient"]:
             return Response({"detail": "No tienes permiso para ver estadísticas."}, status=status.HTTP_403_FORBIDDEN)
         total = queryset.count()
         active = queryset.filter(activo=True).count()
@@ -145,7 +149,7 @@ class PatientViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["patch"])
     def activate(self, request, pk=None):
-        if get_role_name(request.user) not in PATIENT_DEACTIVATE_ROLES:
+        if normalized_role(request.user) not in PATIENT_DEACTIVATE_ROLES:
             return Response({"detail": "No tienes permiso para activar pacientes."}, status=status.HTTP_403_FORBIDDEN)
         patient = self.get_object()
         patient.activo = True
@@ -155,7 +159,7 @@ class PatientViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["patch"])
     def deactivate(self, request, pk=None):
-        if get_role_name(request.user) not in PATIENT_DEACTIVATE_ROLES:
+        if normalized_role(request.user) not in PATIENT_DEACTIVATE_ROLES:
             return Response({"detail": "No tienes permiso para desactivar pacientes."}, status=status.HTTP_403_FORBIDDEN)
         patient = self.get_object()
         patient.activo = False

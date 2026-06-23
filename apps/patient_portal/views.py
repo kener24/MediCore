@@ -46,7 +46,7 @@ class PatientPortalBaseView(APIView):
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
         self.patient = patient_for_user(request.user)
-        if get_role_name(request.user) != "paciente" or not self.patient:
+        if str(get_role_name(request.user) or "").lower() not in ["paciente", "patient"] or not self.patient:
             self.permission_denied(request, message="Solo pacientes pueden usar el portal.")
         self.clinic_settings = get_or_create_clinic_settings(self.patient.clinic)
         if not self.clinic_settings.allow_patient_portal:

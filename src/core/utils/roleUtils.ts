@@ -17,16 +17,21 @@ export function isReceptionRole(role?: RoleName | null) {
   return ['recepcionista', 'recepcion', 'receptionist', 'front desk', 'admisiones', 'admissions'].includes(normalizeRole(role));
 }
 
+export function isPatientRole(role?: RoleName | null) {
+  return ['paciente', 'patient'].includes(normalizeRole(role));
+}
+
 export function isCashierRole(role?: RoleName | null, permissions?: string[] | null) {
   const normalized = normalizeRole(role);
   const normalizedPermissions = (permissions ?? []).map((permission) => normalizeRole(permission));
   if (['cajero', 'caja', 'cashier', 'billing', 'billing staff', 'recepcion caja', 'recepcionista caja'].includes(normalized)) return true;
-  if (['paciente', 'medico', 'doctor', 'enfermera', 'enfermero', 'enfermeria', 'nurse', 'nursing', 'superadmin'].includes(normalized)) return false;
+  if (['paciente', 'patient', 'medico', 'doctor', 'enfermera', 'enfermero', 'enfermeria', 'nurse', 'nursing', 'superadmin'].includes(normalized)) return false;
   return normalizedPermissions.some((permission) => ['cashier', 'caja', 'billing', 'billing staff', 'payments', 'pagos'].includes(permission));
 }
 
 export function resolveSupportedAppRole(role?: RoleName | null, permissions?: string[] | null): AppRole | null {
   const normalized = normalizeRole(role);
+  if (isPatientRole(normalized)) return 'paciente';
   if (normalized === 'doctor') return 'medico';
   if (isNurseRole(normalized)) return 'enfermera';
   if (isCashierRole(normalized, permissions)) return 'cajero';

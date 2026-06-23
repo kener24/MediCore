@@ -2,7 +2,7 @@ import { ReactNode } from 'react';
 
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
-import { isCashierRole, isNurseRole, isReceptionRole } from '@/core/utils/roleUtils';
+import { isCashierRole, isNurseRole, isPatientRole, isReceptionRole } from '@/core/utils/roleUtils';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import type { AppRole } from '@/features/auth/types/auth.types';
 
@@ -24,21 +24,22 @@ export function RoleGuard({ children, roles }: RoleGuardProps) {
     const isNurseModule = roles.some((role) => isNurseRole(role));
     const isReceptionModule = roles.some((role) => isReceptionRole(role));
     const isCashierModule = roles.some((role) => isCashierRole(role));
+    const isPatientRoleOnly = roles.some((role) => isPatientRole(role));
 
     return (
       <ErrorState
         message={
-          isPatientPortal
+          isPatientPortal || isPatientRoleOnly
             ? 'Tu rol no tiene acceso al portal paciente.'
             : isDoctorModule
-              ? 'No tienes acceso al m?dulo m?dico.'
+              ? 'No tienes acceso al modulo medico.'
               : isNurseModule
-                ? 'No tienes acceso al m?dulo de enfermer?a.'
+                ? 'No tienes acceso al modulo de enfermeria.'
                 : isReceptionModule
-                  ? 'No tienes acceso al m?dulo de recepci?n.'
+                  ? 'No tienes acceso al modulo de recepcion.'
                   : isCashierModule
-                    ? 'No tienes acceso al m?dulo de caja.'
-                    : 'Tu usuario no tiene permisos para abrir esta secci?n.'
+                    ? 'No tienes acceso al modulo de caja.'
+                    : 'Tu usuario no tiene permisos para abrir esta seccion.'
         }
         title="Acceso no autorizado"
       />

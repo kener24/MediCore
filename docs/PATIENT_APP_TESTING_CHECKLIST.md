@@ -38,7 +38,22 @@ Fecha: 2026-06-22
 
 | Comando | Resultado esperado |
 |---|---|
-| `npx tsc --noEmit` | Sin errores TypeScript |
-| `npx expo-doctor` | Sin errores criticos |
-| `python manage.py check` | Sin errores Django si backend fue tocado |
+| `npx tsc --noEmit` | OK, sin errores TypeScript |
+| `npx expo-doctor` | OK, 18/18 checks passed |
+| `python manage.py check` | OK, sin errores Django |
+| `python manage.py test apps.patients apps.documents apps.notifications` | OK, 27/27 pruebas pasaron |
 
+## Produccion
+
+| Prueba | Estado |
+|---|---|
+| Deploy backend en `/var/www/medicore` | OK |
+| `git pull --ff-only origin main` | OK |
+| `python manage.py migrate` | OK, aplicada migracion `hospitalization.0002` que estaba pendiente en servidor |
+| `python manage.py check` | OK, con warnings conocidos de MySQL por constraints condicionales |
+| `python manage.py collectstatic --noinput` | OK |
+| Reinicio `medicore.service` | OK |
+| Reinicio `nginx.service` | OK |
+| GET `/api/patient-portal/profile/` sin token | OK, devuelve 401 |
+| Login paciente demo | OK |
+| GET `/api/patient-portal/profile/` con token paciente | OK, devuelve paciente `PAC-000001` |

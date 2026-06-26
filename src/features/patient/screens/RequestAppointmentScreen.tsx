@@ -1,14 +1,14 @@
 import { useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { AppInput } from '@/components/AppInput';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
+import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen';
 import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
 import { isPastISODate, toISODate } from '@/core/utils/dateUtils';
@@ -133,8 +133,7 @@ export function RequestAppointmentScreen() {
   if (loading) return <LoadingState label="Cargando especialidades..." />;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <KeyboardAwareScreen contentContainerStyle={styles.content}>
         <PatientHeader subtitle="Completa los datos requeridos para enviar tu solicitud." title="Solicitar cita" />
         {error ? <ErrorState message={error} title="No se pudo cargar información" /> : null}
 
@@ -227,8 +226,7 @@ export function RequestAppointmentScreen() {
         </Step>
 
         <AppButton label="Enviar solicitud" loading={submitting} onPress={submit} />
-      </ScrollView>
-    </SafeAreaView>
+    </KeyboardAwareScreen>
   );
 }
 
@@ -278,10 +276,6 @@ const styles = StyleSheet.create({
   },
   options: {
     gap: 8,
-  },
-  safeArea: {
-    backgroundColor: colors.background,
-    flex: 1,
   },
   step: {
     gap: 12,

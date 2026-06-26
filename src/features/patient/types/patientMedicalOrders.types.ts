@@ -1,0 +1,20 @@
+export type PatientMedicalOrder = {
+  id: number;
+  clinic?: number;
+  clinic_nombre?: string;
+  patient?: number;
+  patient_nombre?: string;
+  doctor?: number;
+  doctor_nombre?: string;
+  consultation?: number;
+  order_number?: string;
+  order_type?: string;
+  title?: string;
+  description?: string;
+  instructions?: string;
+  priority?: string;
+  status?: string;
+  activo?: boolean;
+  creado_en?: string;
+  actualizado_en?: string;
+};

@@ -22,8 +22,17 @@ export async function getPatientUnreadNotificationsCount() {
 }
 
 export async function markPatientNotificationRead(id: number | string) {
-  const { data } = await apiClient.patch<PatientNotification>(endpoints.notifications.markRead(id));
+  const { data } = await apiClient.patch<PatientNotification>(
+    endpoints.patientPortal.markNotificationRead(id),
+  );
   return data;
+}
+
+export async function markAllPatientNotificationsRead() {
+  const { data } = await apiClient.post<{ updated: number }>(
+    endpoints.patientPortal.markAllNotificationsRead,
+  );
+  return data.updated ?? 0;
 }
 
 export const markNotificationAsRead = markPatientNotificationRead;

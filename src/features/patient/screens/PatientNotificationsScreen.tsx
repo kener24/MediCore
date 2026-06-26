@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppButton } from '@/components/AppButton';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
@@ -13,6 +14,7 @@ import { UnreadBadge } from '@/features/patient/components/UnreadBadge';
 import {
   getPatientNotifications,
   getPatientUnreadNotificationsCount,
+  markAllPatientNotificationsRead,
   markNotificationAsRead,
 } from '@/features/patient/services/patientNotificationsService';
 import type { PatientNotification } from '@/features/patient/types/patientNotifications.types';
@@ -28,9 +30,7 @@ export function PatientNotificationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const filteredNotifications = useMemo(() => {
-    if (filter === 'unread') {
-      return notifications.filter((item) => !isNotificationRead(item));
-    }
+    if (filter === 'unread') return notifications.filter((item) => !isNotificationRead(item));
     return notifications;
   }, [filter, notifications]);
 
@@ -65,14 +65,23 @@ export function PatientNotificationsScreen() {
         ),
       );
       setUnreadCount((current) => Math.max(current - 1, 0));
-      Alert.alert('Notificaciones', 'Notificación marcada como leída.');
     } catch (err) {
-      Alert.alert('Notificaciones', err instanceof Error ? err.message : 'No se pudo marcar como leída.');
+      Alert.alert('Notificaciones', err instanceof Error ? err.message : 'No se pudo marcar como leida.');
     }
   }
 
-  function handleNotificationPress(notification: PatientNotification) {
-    void markRead(notification);
+  async function markAllRead() {
+    if (unreadCount <= 0) return;
+    try {
+      await markAllPatientNotificationsRead();
+      setNotifications((current) =>
+        current.map((item) => ({ ...item, is_read: true, read: true, status: 'read' })),
+      );
+      setUnreadCount(0);
+      Alert.alert('Notificaciones', 'Todas las notificaciones fueron marcadas como leidas.');
+    } catch (err) {
+      Alert.alert('Notificaciones', err instanceof Error ? err.message : 'No se pudieron marcar las notificaciones.');
+    }
   }
 
   if (loading) return <LoadingState label="Cargando notificaciones..." />;
@@ -83,18 +92,24 @@ export function PatientNotificationsScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl onRefresh={() => load(true)} refreshing={refreshing} />}
         showsVerticalScrollIndicator={false}>
-        <PatientHeader subtitle="Avisos enviados por tu clínica." title="Notificaciones" />
+        <PatientHeader subtitle="Avisos enviados por tu clinica." title="Notificaciones" />
         <View style={styles.counterCard}>
           <View>
-            <Text style={styles.counterLabel}>No leídas</Text>
+            <Text style={styles.counterLabel}>No leidas</Text>
             <Text style={styles.counterText}>{unreadCount}</Text>
           </View>
           <UnreadBadge count={unreadCount} />
         </View>
         <View style={styles.filters}>
           <FilterButton active={filter === 'all'} label="Todas" onPress={() => setFilter('all')} />
-          <FilterButton active={filter === 'unread'} label="No leídas" onPress={() => setFilter('unread')} />
+          <FilterButton active={filter === 'unread'} label="No leidas" onPress={() => setFilter('unread')} />
         </View>
+        <AppButton
+          disabled={unreadCount <= 0}
+          label="Marcar todas como leidas"
+          onPress={markAllRead}
+          variant="secondary"
+        />
         {error ? (
           <ErrorState message={error} onRetry={() => load()} title="No se pudieron cargar las notificaciones" />
         ) : filteredNotifications.length ? (
@@ -103,13 +118,13 @@ export function PatientNotificationsScreen() {
               key={notification.id}
               notification={notification}
               onMarkAsRead={() => markRead(notification)}
-              onPress={() => handleNotificationPress(notification)}
+              onPress={() => markRead(notification)}
             />
           ))
         ) : (
           <EmptyState
             description={filter === 'unread' ? 'No tienes notificaciones pendientes.' : 'No tienes notificaciones.'}
-            title={filter === 'unread' ? 'Todo al día' : 'Sin notificaciones'}
+            title={filter === 'unread' ? 'Todo al dia' : 'Sin notificaciones'}
           />
         )}
       </ScrollView>
@@ -137,17 +152,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 16,
   },
-  counterLabel: {
-    color: colors.muted,
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  counterText: {
-    color: colors.ink,
-    fontSize: 26,
-    fontWeight: '900',
-  },
+  counterLabel: { color: colors.muted, fontSize: 12, fontWeight: '900', textTransform: 'uppercase' },
+  counterText: { color: colors.ink, fontSize: 26, fontWeight: '900' },
   filterButton: {
     alignItems: 'center',
     backgroundColor: colors.white,
@@ -157,21 +163,9 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 11,
   },
-  filterButtonActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  filterText: {
-    color: colors.muted,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  filterTextActive: {
-    color: colors.white,
-  },
-  filters: {
-    flexDirection: 'row',
-    gap: 10,
-  },
+  filterButtonActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  filterText: { color: colors.muted, fontSize: 13, fontWeight: '900' },
+  filterTextActive: { color: colors.white },
+  filters: { flexDirection: 'row', gap: 10 },
   safeArea: { backgroundColor: colors.background, flex: 1 },
 });

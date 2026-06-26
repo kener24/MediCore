@@ -46,7 +46,9 @@ export type InvoicePayment = PatientInvoicePayment;
 
 export type PatientInvoice = {
   id: number;
+  clinic_nombre?: string;
   clinic_name?: string;
+  patient_nombre?: string;
   patient_name?: string;
   invoice_number?: string;
   issue_date?: string;
@@ -64,6 +66,10 @@ export type PatientInvoice = {
   balance?: string | number;
   balance_due?: string | number;
   notes?: string | null;
+  is_fiscal?: boolean;
+  fiscal_status?: string | null;
+  fiscal_number?: string | null;
+  cai?: string | null;
   pdf_url?: string | null;
   file_url?: string | null;
   items?: PatientInvoiceItem[];

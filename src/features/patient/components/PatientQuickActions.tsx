@@ -5,8 +5,11 @@ import { QuickActionCard } from '@/components/QuickActionCard';
 interface PatientQuickActionsProps {
   onAppointments?: () => void;
   onDocuments?: () => void;
+  onHistory?: () => void;
   onInvoices?: () => void;
-  onNavigate?: (target: 'appointments' | 'documents' | 'invoices' | 'prescriptions' | 'profile' | 'requestAppointment') => void;
+  onMedicalOrders?: () => void;
+  onNavigate?: (target: 'appointments' | 'documents' | 'history' | 'invoices' | 'medicalOrders' | 'payments' | 'prescriptions' | 'profile' | 'requestAppointment') => void;
+  onPayments?: () => void;
   onPrescriptions?: () => void;
   onProfile?: () => void;
   onRequestAppointment?: () => void;
@@ -15,8 +18,11 @@ interface PatientQuickActionsProps {
 export function PatientQuickActions({
   onAppointments,
   onDocuments,
+  onHistory,
   onInvoices,
+  onMedicalOrders,
   onNavigate,
+  onPayments,
   onPrescriptions,
   onProfile,
   onRequestAppointment,
@@ -41,16 +47,34 @@ export function PatientQuickActions({
         title="Solicitar cita"
       />
       <QuickActionCard
+        description="Resumen de consultas y diagnosticos."
+        icon="clipboard-pulse-outline"
+        onPress={() => navigate('history', onHistory)}
+        title="Historial"
+      />
+      <QuickActionCard
         description="Medicamentos e indicaciones medicas."
         icon="pill"
         onPress={() => navigate('prescriptions', onPrescriptions)}
         title="Recetas"
       />
       <QuickActionCard
+        description="Laboratorio, imagenes y solicitudes."
+        icon="clipboard-text-outline"
+        onPress={() => navigate('medicalOrders', onMedicalOrders)}
+        title="Ordenes"
+      />
+      <QuickActionCard
         description="Facturas, pagos y saldos."
         icon="receipt-text-outline"
         onPress={() => navigate('invoices', onInvoices)}
         title="Facturas"
+      />
+      <QuickActionCard
+        description="Historial de pagos aplicados."
+        icon="cash-check"
+        onPress={() => navigate('payments', onPayments)}
+        title="Pagos"
       />
       <QuickActionCard
         description="Documentos clínicos visibles."

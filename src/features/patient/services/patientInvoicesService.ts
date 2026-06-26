@@ -19,11 +19,15 @@ export async function getPatientInvoice(id: number | string) {
 export const getInvoiceDetail = getPatientInvoice;
 
 export async function getInvoicePrintData(id: number | string) {
-  const { data } = await apiClient.get(`/billing/invoices/${id}/print-data/`);
+  const { data } = await apiClient.get(endpoints.patientPortal.invoice(id));
   return data;
 }
 
-export async function getInvoicePdf(id: number | string) {
-  const { data } = await apiClient.get(`/billing/invoices/${id}/pdf/`);
+export async function getInvoiceFiscalPdf(id: number | string) {
+  const { data } = await apiClient.get<ArrayBuffer>(endpoints.patientPortal.invoiceFiscalPdf(id), {
+    responseType: 'arraybuffer',
+  });
   return data;
 }
+
+export const getInvoicePdf = getInvoiceFiscalPdf;

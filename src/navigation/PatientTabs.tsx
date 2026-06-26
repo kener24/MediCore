@@ -13,7 +13,12 @@ import { PatientDocumentDetailScreen } from '@/features/patient/screens/PatientD
 import { PatientDocumentsScreen } from '@/features/patient/screens/PatientDocumentsScreen';
 import { PatientInvoiceDetailScreen } from '@/features/patient/screens/PatientInvoiceDetailScreen';
 import { PatientInvoicesScreen } from '@/features/patient/screens/PatientInvoicesScreen';
+import { PatientMedicalHistoryScreen } from '@/features/patient/screens/PatientMedicalHistoryScreen';
+import { PatientMedicalOrderDetailScreen } from '@/features/patient/screens/PatientMedicalOrderDetailScreen';
+import { PatientMedicalOrdersScreen } from '@/features/patient/screens/PatientMedicalOrdersScreen';
 import { PatientNotificationsScreen } from '@/features/patient/screens/PatientNotificationsScreen';
+import { PatientPaymentDetailScreen } from '@/features/patient/screens/PatientPaymentDetailScreen';
+import { PatientPaymentsScreen } from '@/features/patient/screens/PatientPaymentsScreen';
 import { PatientPrescriptionDetailScreen } from '@/features/patient/screens/PatientPrescriptionDetailScreen';
 import { PatientPrescriptionsScreen } from '@/features/patient/screens/PatientPrescriptionsScreen';
 import { PatientProfileScreen } from '@/features/patient/screens/PatientProfileScreen';
@@ -34,8 +39,13 @@ function PatientHomeStack() {
       <Stack.Screen component={PatientAppointmentDetailScreen} name="PatientAppointmentDetail" />
       <Stack.Screen component={PatientPrescriptionsScreen} name="PatientPrescriptions" />
       <Stack.Screen component={PatientPrescriptionDetailScreen} name="PatientPrescriptionDetail" />
+      <Stack.Screen component={PatientMedicalHistoryScreen} name="PatientMedicalHistory" />
+      <Stack.Screen component={PatientMedicalOrdersScreen} name="PatientMedicalOrders" />
+      <Stack.Screen component={PatientMedicalOrderDetailScreen} name="PatientMedicalOrderDetail" />
       <Stack.Screen component={PatientInvoicesScreen} name="PatientInvoices" />
       <Stack.Screen component={PatientInvoiceDetailScreen} name="PatientInvoiceDetail" />
+      <Stack.Screen component={PatientPaymentsScreen} name="PatientPayments" />
+      <Stack.Screen component={PatientPaymentDetailScreen} name="PatientPaymentDetail" />
       <Stack.Screen component={PatientDocumentDetailScreen} name="PatientDocumentDetail" />
     </Stack.Navigator>
   );

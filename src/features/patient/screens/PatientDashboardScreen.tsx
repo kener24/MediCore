@@ -51,11 +51,14 @@ export function PatientDashboardScreen() {
   );
 
   function navigateQuickAction(
-    target: 'appointments' | 'documents' | 'invoices' | 'prescriptions' | 'profile' | 'requestAppointment',
+    target: 'appointments' | 'documents' | 'history' | 'invoices' | 'medicalOrders' | 'payments' | 'prescriptions' | 'profile' | 'requestAppointment',
   ) {
     if (target === 'appointments') navigation.getParent()?.navigate('PatientAppointmentsTab');
     if (target === 'documents') navigation.getParent()?.navigate('PatientDocumentsTab');
+    if (target === 'history') navigation.navigate('PatientMedicalHistory');
     if (target === 'invoices') navigation.navigate('PatientInvoices');
+    if (target === 'medicalOrders') navigation.navigate('PatientMedicalOrders');
+    if (target === 'payments') navigation.navigate('PatientPayments');
     if (target === 'prescriptions') navigation.navigate('PatientPrescriptions');
     if (target === 'profile') navigation.getParent()?.navigate('PatientProfileTab');
     if (target === 'requestAppointment') navigation.navigate('RequestAppointment');

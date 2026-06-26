@@ -1,6 +1,6 @@
 # Checklist de Pruebas App Paciente - MediCore
 
-Fecha: 2026-06-22
+Fecha: 2026-06-25
 
 ## Mobile Android fisico
 
@@ -23,9 +23,14 @@ Fecha: 2026-06-22
 | Cancelar cita permitida | pendiente Android fisico |
 | Cancelar cita fuera de limite | pendiente Android fisico |
 | Recetas | pendiente Android fisico |
+| Historial clinico | pendiente Android fisico |
+| Ordenes medicas y detalle | pendiente Android fisico |
 | Documentos/preview/download | pendiente Android fisico |
 | Facturas | pendiente Android fisico |
-| Notificaciones y marcar leida | pendiente Android fisico |
+| PDF fiscal desde portal paciente | pendiente Android fisico |
+| Pagos y detalle de pago | pendiente Android fisico |
+| Notificaciones, marcar leida y marcar todas leidas | pendiente Android fisico |
+| Configuracion visible del portal | pendiente Android fisico |
 | Sin internet | pendiente Android fisico |
 | 401 token vencido | pendiente Android fisico |
 | 403 portal deshabilitado | pendiente Android fisico |
@@ -41,7 +46,7 @@ Fecha: 2026-06-22
 | `npx tsc --noEmit` | OK, sin errores TypeScript |
 | `npx expo-doctor` | OK, 18/18 checks passed |
 | `python manage.py check` | OK, sin errores Django |
-| `python manage.py test apps.patients apps.documents apps.notifications` | OK, 27/27 pruebas pasaron |
+| `python manage.py test apps.notifications apps.documents` | OK, 15/15 pruebas pasaron |
 
 ## Produccion
 

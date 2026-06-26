@@ -1,11 +1,10 @@
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
-import { Alert, ScrollView, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert, StyleSheet } from 'react-native';
 
 import { ErrorState } from '@/components/ErrorState';
+import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen';
 import { LoadingState } from '@/components/LoadingState';
-import { colors } from '@/core/theme/colors';
 import { EditableProfileForm } from '@/features/patient/components/EditableProfileForm';
 import { PatientHeader } from '@/features/patient/components/PatientHeader';
 import { getPatientProfile, updatePatientProfile } from '@/features/patient/services/patientProfileService';
@@ -51,8 +50,7 @@ export function EditPatientProfileScreen() {
   if (loading) return <LoadingState label="Preparando formulario..." />;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <KeyboardAwareScreen contentContainerStyle={styles.content}>
         <PatientHeader subtitle="Solo puedes modificar datos de contacto permitidos." title="Editar perfil" />
         {error ? (
           <ErrorState message={error} onRetry={load} title="No se pudo cargar el perfil" />
@@ -64,12 +62,10 @@ export function EditPatientProfileScreen() {
             submitting={submitting}
           />
         ) : null}
-      </ScrollView>
-    </SafeAreaView>
+    </KeyboardAwareScreen>
   );
 }
 
 const styles = StyleSheet.create({
   content: { gap: 14, padding: 22, paddingBottom: 34 },
-  safeArea: { backgroundColor: colors.background, flex: 1 },
 });

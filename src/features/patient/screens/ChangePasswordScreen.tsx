@@ -1,12 +1,11 @@
 import { useNavigation } from '@react-navigation/native';
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert, StyleSheet } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { AppInput } from '@/components/AppInput';
-import { colors } from '@/core/theme/colors';
+import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen';
 import { changePasswordService } from '@/features/auth/services/authService';
 import { PatientHeader } from '@/features/patient/components/PatientHeader';
 
@@ -21,19 +20,19 @@ export function ChangePasswordScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   function validate() {
-    if (!currentPassword) return 'La contraseña actual es requerida.';
-    if (!newPassword) return 'La nueva contraseña es requerida.';
-    if (!confirmPassword) return 'Confirma la nueva contraseña.';
-    if (newPassword.length < 8) return 'La contraseña debe tener al menos 8 caracteres.';
-    if (newPassword !== confirmPassword) return 'Las contraseñas no coinciden.';
-    if (newPassword === currentPassword) return 'La nueva contraseña debe ser diferente a la actual.';
+    if (!currentPassword) return 'La contrasena actual es requerida.';
+    if (!newPassword) return 'La nueva contrasena es requerida.';
+    if (!confirmPassword) return 'Confirma la nueva contrasena.';
+    if (newPassword.length < 8) return 'La contrasena debe tener al menos 8 caracteres.';
+    if (newPassword !== confirmPassword) return 'Las contrasenas no coinciden.';
+    if (newPassword === currentPassword) return 'La nueva contrasena debe ser diferente a la actual.';
     return '';
   }
 
   async function save() {
     const validation = validate();
     if (validation) {
-      Alert.alert('Contraseña', validation);
+      Alert.alert('Contrasena', validation);
       return;
     }
     setSubmitting(true);
@@ -43,57 +42,54 @@ export function ChangePasswordScreen() {
         current_password: currentPassword,
         new_password: newPassword,
       });
-      Alert.alert('Contraseña', 'Contraseña actualizada correctamente.');
+      Alert.alert('Contrasena', 'Contrasena actualizada correctamente.');
       navigation.goBack();
     } catch (err) {
-      Alert.alert('Contraseña', err instanceof Error ? err.message : 'No se pudo cambiar la contraseña.');
+      Alert.alert('Contrasena', err instanceof Error ? err.message : 'No se pudo cambiar la contrasena.');
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <PatientHeader subtitle="Actualiza tu acceso de forma segura." title="Cambiar contraseña" />
-        <AppCard style={styles.form}>
-          <AppInput
-            icon="lock-outline"
-            label="Contraseña actual"
-            onChangeText={setCurrentPassword}
-            onPressRightIcon={() => setSecureCurrent((value) => !value)}
-            rightIcon={secureCurrent ? 'eye-outline' : 'eye-off-outline'}
-            secureTextEntry={secureCurrent}
-            value={currentPassword}
-          />
-          <AppInput
-            icon="lock-plus-outline"
-            label="Nueva contraseña"
-            onChangeText={setNewPassword}
-            onPressRightIcon={() => setSecureNew((value) => !value)}
-            rightIcon={secureNew ? 'eye-outline' : 'eye-off-outline'}
-            secureTextEntry={secureNew}
-            value={newPassword}
-          />
-          <AppInput
-            icon="lock-check-outline"
-            label="Confirmar contraseña"
-            onChangeText={setConfirmPassword}
-            onPressRightIcon={() => setSecureConfirm((value) => !value)}
-            rightIcon={secureConfirm ? 'eye-outline' : 'eye-off-outline'}
-            secureTextEntry={secureConfirm}
-            value={confirmPassword}
-          />
-          <AppButton label="Guardar cambios" loading={submitting} onPress={save} />
-          <AppButton label="Cancelar" onPress={() => navigation.goBack()} variant="secondary" />
-        </AppCard>
-      </ScrollView>
-    </SafeAreaView>
+    <KeyboardAwareScreen contentContainerStyle={styles.content}>
+      <PatientHeader subtitle="Actualiza tu acceso de forma segura." title="Cambiar contrasena" />
+      <AppCard style={styles.form}>
+        <AppInput
+          icon="lock-outline"
+          label="Contrasena actual"
+          onChangeText={setCurrentPassword}
+          onPressRightIcon={() => setSecureCurrent((value) => !value)}
+          rightIcon={secureCurrent ? 'eye-outline' : 'eye-off-outline'}
+          secureTextEntry={secureCurrent}
+          value={currentPassword}
+        />
+        <AppInput
+          icon="lock-plus-outline"
+          label="Nueva contrasena"
+          onChangeText={setNewPassword}
+          onPressRightIcon={() => setSecureNew((value) => !value)}
+          rightIcon={secureNew ? 'eye-outline' : 'eye-off-outline'}
+          secureTextEntry={secureNew}
+          value={newPassword}
+        />
+        <AppInput
+          icon="lock-check-outline"
+          label="Confirmar contrasena"
+          onChangeText={setConfirmPassword}
+          onPressRightIcon={() => setSecureConfirm((value) => !value)}
+          rightIcon={secureConfirm ? 'eye-outline' : 'eye-off-outline'}
+          secureTextEntry={secureConfirm}
+          value={confirmPassword}
+        />
+        <AppButton label="Guardar cambios" loading={submitting} onPress={save} />
+        <AppButton label="Cancelar" onPress={() => navigation.goBack()} variant="secondary" />
+      </AppCard>
+    </KeyboardAwareScreen>
   );
 }
 
 const styles = StyleSheet.create({
   content: { gap: 14, padding: 22, paddingBottom: 34 },
   form: { gap: 14 },
-  safeArea: { backgroundColor: colors.background, flex: 1 },
 });

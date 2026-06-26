@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta
+from io import BytesIO
 
+from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -10,7 +12,7 @@ from apps.accounts.permissions import get_role_name
 from apps.appointments.models import Appointment
 from apps.appointments.serializers import AppointmentDetailSerializer, AppointmentListSerializer, build_availability
 from apps.billing.models import Invoice, Payment
-from apps.billing.serializers import InvoiceDetailSerializer, InvoiceListSerializer, PaymentListSerializer
+from apps.billing.serializers import InvoiceDetailSerializer, InvoiceListSerializer, PaymentDetailSerializer, PaymentListSerializer
 from apps.clinic_settings.models import get_or_create_clinic_settings
 from apps.doctors.models import DoctorProfile, MedicalSpecialty
 from apps.medical_records.models import ClinicalConsultation, MedicalRecord
@@ -300,11 +302,73 @@ class PatientPortalInvoicesView(PatientPortalBaseView):
 class PatientPortalPaymentsView(PatientPortalBaseView):
     serializer_class = PaymentListSerializer
 
-    def get(self, request):
+    def get(self, request, payment_id=None):
         if not self.clinic_settings.allow_patient_invoice_view:
             return portal_denied()
         qs = Payment.objects.filter(patient=self.patient, active=True).select_related("invoice", "patient", "received_by")
+        if payment_id:
+            payment = qs.filter(id=payment_id).first()
+            if not payment:
+                return Response({"detail": "Pago no encontrado."}, status=status.HTTP_404_NOT_FOUND)
+            return Response(PaymentDetailSerializer(payment).data)
         return Response(PaymentListSerializer(qs, many=True).data)
+
+
+class PatientPortalInvoiceFiscalPdfView(PatientPortalBaseView):
+    def get(self, request, invoice_id):
+        if not self.clinic_settings.allow_patient_invoice_view:
+            return portal_denied()
+        invoice = (
+            Invoice.objects.filter(patient=self.patient, active=True, id=invoice_id)
+            .select_related("clinic", "patient")
+            .prefetch_related("items")
+            .first()
+        )
+        if not invoice:
+            return Response({"detail": "Factura no encontrada."}, status=status.HTTP_404_NOT_FOUND)
+        if invoice.fiscal_status not in [Invoice.FiscalStatus.ISSUED, Invoice.FiscalStatus.CANCELLED]:
+            return Response({"detail": "La factura fiscal aun no esta emitida."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table as PdfTable
+
+        stream = BytesIO()
+        doc = SimpleDocTemplate(stream, pagesize=letter, rightMargin=32, leftMargin=32, topMargin=32, bottomMargin=32)
+        styles = getSampleStyleSheet()
+        story = [
+            Paragraph(invoice.emitter_legal_name or invoice.clinic.nombre, styles["Title"]),
+            Paragraph(f"RTN: {invoice.emitter_rtn or '-'}", styles["Normal"]),
+            Paragraph(invoice.emitter_address or invoice.clinic.direccion or "", styles["Normal"]),
+            Spacer(1, 8),
+            Paragraph(f"FACTURA FISCAL: {invoice.fiscal_number}", styles["Heading2"]),
+            Paragraph(f"CAI: {invoice.cai}", styles["Normal"]),
+            Paragraph(f"Rango autorizado: {invoice.fiscal_range_start} a {invoice.fiscal_range_end}", styles["Normal"]),
+            Paragraph(f"Fecha limite de emision: {invoice.fiscal_expiration_date}", styles["Normal"]),
+            Spacer(1, 8),
+            Paragraph(f"Cliente: {invoice.customer_name or invoice.patient.nombre_completo}", styles["Normal"]),
+            Paragraph(f"RTN cliente: {invoice.customer_rtn or '-'}", styles["Normal"]),
+        ]
+        rows = [["Cant.", "Descripcion", "Precio", "Desc.", "ISV", "Total"]]
+        for item in invoice.items.filter(active=True):
+            rows.append([str(item.quantity), item.description, str(item.unit_price), str(item.discount_amount), str(item.tax_amount), str(item.line_total)])
+        story.extend([Spacer(1, 10), PdfTable(rows), Spacer(1, 10)])
+        totals = [
+            ["Importe exento", invoice.subtotal_exempt],
+            ["Importe exonerado", invoice.subtotal_exonerated],
+            ["Importe gravado 15%", invoice.subtotal_taxed_15],
+            ["Importe gravado 18%", invoice.subtotal_taxed_18],
+            ["ISV 15%", invoice.isv_15],
+            ["ISV 18%", invoice.isv_18],
+            ["Total", invoice.total_amount],
+        ]
+        story.append(PdfTable([[label, f"L {value}"] for label, value in totals]))
+        story.append(Spacer(1, 8))
+        story.append(Paragraph(invoice.amount_in_words or "", styles["Normal"]))
+        doc.build(story)
+        response = HttpResponse(stream.getvalue(), content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="factura-fiscal-{invoice.fiscal_number}.pdf"'
+        return response
 
 
 class PatientPortalMedicalRecordSummaryView(PatientPortalBaseView):
@@ -344,6 +408,28 @@ class PatientPortalNotificationsView(PatientPortalBaseView):
         return Response(NotificationListSerializer(qs[:50], many=True).data)
 
 
+class PatientPortalNotificationMarkReadView(PatientPortalBaseView):
+    serializer_class = NotificationListSerializer
+
+    def patch(self, request, notification_id):
+        notification = Notification.objects.filter(id=notification_id, recipient=request.user).first()
+        if not notification:
+            return Response({"detail": "Notificacion no encontrada."}, status=status.HTTP_404_NOT_FOUND)
+        notification.status = Notification.Status.READ
+        notification.read_at = timezone.now()
+        notification.save(update_fields=["status", "read_at", "actualizado_en"])
+        return Response(NotificationListSerializer(notification).data)
+
+
+class PatientPortalNotificationsMarkAllReadView(PatientPortalBaseView):
+    serializer_class = NotificationListSerializer
+
+    def post(self, request):
+        qs = Notification.objects.filter(recipient=request.user, status=Notification.Status.UNREAD)
+        updated = qs.update(status=Notification.Status.READ, read_at=timezone.now())
+        return Response({"updated": updated})
+
+
 class PatientPortalUnreadNotificationsView(PatientPortalBaseView):
     serializer_class = NotificationListSerializer
 
@@ -356,3 +442,28 @@ class PatientPortalClinicInfoView(PatientPortalBaseView):
 
     def get(self, request):
         return Response(self.clinic_payload())
+
+
+class PatientPortalSettingsView(PatientPortalBaseView):
+    serializer_class = PatientPortalDashboardSerializer
+
+    def get(self, request):
+        return Response(
+            {
+                "clinic": self.clinic_payload(),
+                "permissions": self.permissions_payload(),
+                "portal": {
+                    "allow_patient_portal": self.clinic_settings.allow_patient_portal,
+                    "allow_online_appointments": self.clinic_settings.allow_online_appointments,
+                    "allow_patient_cancellations": self.clinic_settings.allow_patient_cancellations,
+                    "cancellation_hours_limit": self.clinic_settings.cancellation_hours_limit,
+                    "allow_patient_medical_record_view": self.clinic_settings.allow_patient_medical_record_view,
+                    "allow_patient_prescription_view": self.clinic_settings.allow_patient_prescription_view,
+                    "allow_patient_invoice_view": self.clinic_settings.allow_patient_invoice_view,
+                    "currency": self.clinic_settings.currency,
+                    "language": self.clinic_settings.language,
+                    "terms_and_conditions": self.clinic_settings.terms_and_conditions,
+                    "privacy_policy": self.clinic_settings.privacy_policy,
+                },
+            }
+        )

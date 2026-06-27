@@ -11,6 +11,9 @@ export async function checkInAppointment(payload: Record<string, unknown>) { con
 export async function getTriageQueue(filters?: Record<string, string>) { const { data } = await api.get<PatientVisit[]>("/admissions/triage-queue/", { params: filters }); return data; }
 export async function startTriage(id: number | string) { const { data } = await api.patch<PatientVisit>(`/admissions/visits/${id}/start-triage/`); return data; }
 export async function completeTriage(id: number | string) { const { data } = await api.patch<PatientVisit>(`/admissions/visits/${id}/complete-triage/`); return data; }
+export async function sendVisitToTriage(id: number | string) { const { data } = await api.patch<PatientVisit>(`/reception/visits/${id}/send-to-triage/`); return data; }
+export async function sendVisitToDoctor(id: number | string) { const { data } = await api.patch<PatientVisit>(`/reception/visits/${id}/send-to-doctor/`); return data; }
+export async function cancelReceptionVisit(id: number | string, reason: string) { const { data } = await api.patch<PatientVisit>(`/reception/visits/${id}/cancel/`, { reason }); return data; }
 export async function getVisitVitalSigns(id: number | string) { const { data } = await api.get<VitalSigns[]>(`/admissions/visits/${id}/vital-signs/`); return data; }
 export async function createVisitVitalSigns(id: number | string, payload: VitalSignsPayload & { pain_scale?: number }) { const { data } = await api.post<VitalSigns>(`/admissions/visits/${id}/vital-signs/`, payload); return data; }
 export async function getDoctorWaitingRoom(filters?: Record<string, string>) { const { data } = await api.get<PatientVisit[]>("/admissions/doctor-waiting-room/", { params: filters }); return data; }

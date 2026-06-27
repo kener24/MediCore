@@ -164,7 +164,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
 
         return start_consultation_from_appointment(request, self.get_object())
 
-    @action(detail=True, methods=["patch"], url_path="check-in")
+    @action(detail=True, methods=["patch", "post"], url_path="check-in")
     def check_in(self, request, pk=None):
         from apps.admissions.models import PatientVisit
         from apps.admissions.serializers import AppointmentCheckInSerializer, PatientVisitSerializer

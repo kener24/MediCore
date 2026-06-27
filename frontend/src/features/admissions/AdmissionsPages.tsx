@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { getErrorMessage } from "../../api/axios";
-import { completeTriage, createVisitVitalSigns, generateInvoiceFromVisit, getAdmissionStatsToday, getDoctorWaitingRoom, getPendingBillingVisits, getTriageQueue, getVisit, getVisitVitalSigns, getVisits, registerWalkIn, startTriage, startVisitConsultation } from "../../api/admissionsApi";
+import { cancelReceptionVisit, completeTriage, createVisitVitalSigns, generateInvoiceFromVisit, getAdmissionStatsToday, getDoctorWaitingRoom, getPendingBillingVisits, getTriageQueue, getVisit, getVisitVitalSigns, getVisits, registerWalkIn, sendVisitToDoctor, sendVisitToTriage, startTriage, startVisitConsultation } from "../../api/admissionsApi";
 import { getDoctors } from "../../api/doctorsApi";
 import { getPatients } from "../../api/patientsApi";
 import { Button } from "../../components/ui/Button";
@@ -80,9 +80,52 @@ export function AdmissionVisitDetailsPage() {
   const { id } = useParams();
   const [visit, setVisit] = useState<PatientVisit | null>(null);
   const [signs, setSigns] = useState<VitalSigns[]>([]);
-  useEffect(() => { if (id) Promise.all([getVisit(id), getVisitVitalSigns(id)]).then(([v, s]) => { setVisit(v); setSigns(s); }).catch((e) => toast.error(getErrorMessage(e))); }, [id]);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const navigate = useNavigate();
+  async function load() {
+    if (!id) return;
+    const [v, s] = await Promise.all([getVisit(id), getVisitVitalSigns(id)]);
+    setVisit(v);
+    setSigns(s);
+  }
+  useEffect(() => { load().catch((e) => toast.error(getErrorMessage(e))); }, [id]);
+  async function run(action: "triage" | "doctor" | "invoice" | "cancel") {
+    if (!visit) return;
+    try {
+      if (action === "triage") {
+        setVisit(await sendVisitToTriage(visit.id));
+        toast.success("Paciente enviado a triaje.");
+      }
+      if (action === "doctor") {
+        setVisit(await sendVisitToDoctor(visit.id));
+        toast.success("Paciente enviado a medico.");
+      }
+      if (action === "invoice") {
+        const invoice = await generateInvoiceFromVisit(visit.id);
+        toast.success("Factura generada desde visita.");
+        navigate(`/clinic/billing/invoices/${invoice.id}`);
+      }
+      if (action === "cancel") {
+        if (cancelReason.trim().length < 5) {
+          toast.error("Indica un motivo claro de cancelacion.");
+          return;
+        }
+        setVisit(await cancelReceptionVisit(visit.id, cancelReason.trim()));
+        setCancelOpen(false);
+        setCancelReason("");
+        toast.success("Admision cancelada correctamente.");
+      }
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
+  }
   if (!visit) return <Loader />;
-  return <div className="space-y-6"><PageHeader title={`Atencion ${visit.visit_number}`} description={visit.patient_nombre || ""} actions={<Link className="inline-flex h-10 items-center rounded-md border px-4 text-sm font-semibold" to="/clinic/admissions">Volver</Link>} /><Card><div className="grid gap-3 text-sm md:grid-cols-3"><p><b>Estado:</b> {statusLabel[visit.status]}</p><p><b>Prioridad:</b> {visit.priority}</p><p><b>Motivo:</b> {visit.reason}</p><p><b>Sintomas:</b> {visit.symptoms || "-"}</p><p><b>Medico:</b> {visit.assigned_doctor_nombre || "-"}</p><p><b>Enfermera:</b> {visit.assigned_nurse_nombre || "-"}</p></div></Card><Card title="Signos vitales">{signs.length ? <Table data={signs} columns={[{ key: "date", header: "Fecha", render: (s) => s.recorded_at?.slice(0, 16).replace("T", " ") }, { key: "bp", header: "Presion", render: (s) => `${s.blood_pressure_systolic || "-"} / ${s.blood_pressure_diastolic || "-"}` }, { key: "temp", header: "Temp.", render: (s) => s.temperature || "-" }, { key: "ox", header: "Oxigeno", render: (s) => s.oxygen_saturation || "-" }, { key: "bmi", header: "IMC", render: (s) => s.bmi || "-" }]} /> : <EmptyState title="Sin signos vitales." description="La evaluacion de enfermeria aparecera aqui." />}</Card></div>;
+  const closed = ["cancelled", "completed", "paid"].includes(visit.status);
+  const canSendTriage = !closed && !["waiting_triage", "in_triage", "waiting_billing"].includes(visit.status);
+  const canSendDoctor = !closed && !["waiting_doctor", "in_consultation", "waiting_billing"].includes(visit.status);
+  const canInvoice = visit.status === "waiting_billing" && !visit.invoice;
+  return <div className="space-y-6"><PageHeader title={`Atencion ${visit.visit_number}`} description={visit.patient_nombre || ""} actions={<div className="flex flex-wrap gap-2"><Link className="inline-flex h-10 items-center rounded-md border px-4 text-sm font-semibold" to="/clinic/admissions">Volver</Link>{canSendTriage ? <Button variant="outline" onClick={() => run("triage")}>Enviar a triaje</Button> : null}{canSendDoctor ? <Button variant="outline" onClick={() => run("doctor")}>Enviar a medico</Button> : null}{canInvoice ? <Button onClick={() => run("invoice")}>Generar factura</Button> : null}{!closed ? <Button variant="danger" onClick={() => setCancelOpen(true)}>Cancelar admision</Button> : null}</div>} /><Card><div className="grid gap-3 text-sm md:grid-cols-3"><p><b>Estado:</b> {statusLabel[visit.status]}</p><p><b>Prioridad:</b> {visit.priority}</p><p><b>Motivo:</b> {visit.reason}</p><p><b>Sintomas:</b> {visit.symptoms || "-"}</p><p><b>Medico:</b> {visit.assigned_doctor_nombre || "-"}</p><p><b>Enfermera:</b> {visit.assigned_nurse_nombre || "-"}</p><p><b>Factura:</b> {visit.invoice ? `#${visit.invoice}` : "Sin factura"}</p></div></Card><Card title="Signos vitales">{signs.length ? <Table data={signs} columns={[{ key: "date", header: "Fecha", render: (s) => s.recorded_at?.slice(0, 16).replace("T", " ") }, { key: "bp", header: "Presion", render: (s) => `${s.blood_pressure_systolic || "-"} / ${s.blood_pressure_diastolic || "-"}` }, { key: "temp", header: "Temp.", render: (s) => s.temperature || "-" }, { key: "ox", header: "Oxigeno", render: (s) => s.oxygen_saturation || "-" }, { key: "bmi", header: "IMC", render: (s) => s.bmi || "-" }]} /> : <EmptyState title="Sin signos vitales." description="La evaluacion de enfermeria aparecera aqui." />}</Card><Modal open={cancelOpen} title="Cancelar admision" onClose={() => setCancelOpen(false)} actions={<><ModalCloseButton onClick={() => setCancelOpen(false)} /><Button variant="danger" onClick={() => run("cancel")}>Confirmar cancelacion</Button></>}><div className="space-y-3"><p className="text-sm text-slate-600">Escribe el motivo. La cancelacion quedara registrada en auditoria.</p><textarea className="min-h-28 w-full rounded-md border px-3 py-2 text-sm" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="Ej. Paciente decide retirarse antes de ser atendido" /></div></Modal></div>;
 }
 
 function VitalSignsMiniForm({ visit, onSaved }: { visit: PatientVisit; onSaved: () => void }) {

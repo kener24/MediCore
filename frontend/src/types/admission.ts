@@ -2,7 +2,7 @@ import type { VitalSigns } from "./medicalRecord";
 
 export type VisitType = "walk_in" | "appointment" | "emergency" | "follow_up" | "control" | "procedure";
 export type VisitPriority = "normal" | "priority" | "urgent" | "emergency";
-export type VisitStatus = "registered" | "waiting_triage" | "in_triage" | "waiting_doctor" | "in_consultation" | "waiting_billing" | "completed" | "cancelled" | "no_show";
+export type VisitStatus = "registered" | "waiting_triage" | "in_triage" | "waiting_doctor" | "in_consultation" | "consultation_finished" | "waiting_billing" | "waiting_payment" | "paid" | "completed" | "cancelled" | "no_show";
 
 export interface PatientVisit {
   id: number;

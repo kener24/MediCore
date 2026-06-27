@@ -32,6 +32,8 @@ export type ReceptionVisit = {
   assigned_doctor_nombre?: string;
   appointment_id?: number | null;
   appointment?: number | null;
+  invoice?: number | null;
+  invoice_id?: number | null;
   arrived_at?: string;
   arrival_time?: string;
   visit_date?: string;
@@ -57,6 +59,7 @@ export type ReceptionStats = {
   in_triage?: number;
   waiting_doctor?: number;
   in_consultation?: number;
+  waiting_billing?: number;
   completed?: number;
   cancelled?: number;
 };

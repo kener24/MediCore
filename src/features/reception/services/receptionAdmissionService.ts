@@ -31,13 +31,31 @@ export async function getVisitDetail(visitId: number | string): Promise<Receptio
 }
 
 export async function sendToTriage(visitId: number | string): Promise<ReceptionVisit> {
-  return patchFirstAvailable<ReceptionVisit>([`/admissions/visits/${visitId}/`, `/reception/visits/${visitId}/send-to-triage/`], { status: 'waiting_triage' });
+  return patchFirstAvailable<ReceptionVisit>([`/reception/visits/${visitId}/send-to-triage/`, `/admissions/visits/${visitId}/send-to-triage/`, `/admissions/visits/${visitId}/`], { status: 'waiting_triage' });
 }
 
 export async function sendToDoctor(visitId: number | string): Promise<ReceptionVisit> {
-  return patchFirstAvailable<ReceptionVisit>([`/admissions/visits/${visitId}/`, `/reception/visits/${visitId}/send-to-doctor/`], { status: 'waiting_doctor' });
+  return patchFirstAvailable<ReceptionVisit>([`/reception/visits/${visitId}/send-to-doctor/`, `/admissions/visits/${visitId}/send-to-doctor/`, `/admissions/visits/${visitId}/`], { status: 'waiting_doctor' });
 }
 
 export async function cancelAdmission(visitId: number | string, reason: string): Promise<ReceptionVisit> {
-  return patchFirstAvailable<ReceptionVisit>([`/admissions/visits/${visitId}/`, `/reception/visits/${visitId}/cancel/`], { status: 'cancelled', cancellation_reason: reason.trim() });
+  return patchFirstAvailable<ReceptionVisit>([`/reception/visits/${visitId}/cancel/`, `/admissions/visits/${visitId}/cancel/`, `/admissions/visits/${visitId}/`], { status: 'cancelled', reason: reason.trim(), cancellation_reason: reason.trim() });
+}
+
+export async function generateInvoiceFromReceptionVisit(visitId: number | string): Promise<{ id?: number; invoice_number?: string; status?: string }> {
+  return postFirstAvailable<{ id?: number; invoice_number?: string; status?: string }>([`/billing/visits/${visitId}/generate-invoice/`, `/cashier/visits/${visitId}/generate-invoice/`, `/admissions/visits/${visitId}/generate-invoice/`]);
+}
+
+export type ReceptionDoctorOption = {
+  id: number;
+  user_nombre?: string;
+  nombre_completo?: string;
+  full_name?: string;
+  specialty_nombre?: string;
+  especialidad_nombre?: string;
+};
+
+export async function getReceptionDoctors(): Promise<ReceptionDoctorOption[]> {
+  const data = await getFirstAvailable<ApiListResponse<ReceptionDoctorOption>>(['/doctors/', '/clinic/doctors/'], { is_active: true });
+  return normalizeListResponse<ReceptionDoctorOption>(data).filter((doctor) => Number.isFinite(Number(doctor.id)));
 }

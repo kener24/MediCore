@@ -52,6 +52,7 @@ export function ReceptionDashboardScreen() {
           <QuickAction label="Nueva admisión" onPress={() => navigation.navigate('ReceptionCreateAdmission')} />
           <QuickAction label="Check-in de cita" onPress={() => navigation.navigate('ReceptionAppointmentCheckIn')} />
           <QuickAction label="Admisiones de hoy" onPress={() => navigation.navigate('ReceptionTodayAdmissions')} />
+          <QuickAction label="Caja y cobros" onPress={() => navigation.navigate('ReceptionCashierTab')} />
         </View>
       </ScrollView>
     </SafeAreaView>

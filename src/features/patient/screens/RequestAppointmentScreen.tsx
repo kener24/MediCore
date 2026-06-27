@@ -114,7 +114,14 @@ export function RequestAppointmentScreen() {
       } else if (nextSlots.length) {
         setAvailabilityMessage(`${nextSlots.length} horario${nextSlots.length === 1 ? '' : 's'} disponible${nextSlots.length === 1 ? '' : 's'} para la fecha seleccionada.`);
       } else {
-        setAvailabilityMessage(availability.message || 'No hay horarios disponibles para esta fecha. Prueba otro dia o selecciona otro medico.');
+        const nextAvailability = await findNextAvailability(doctor.id, date.trim(), modality);
+        if (nextAvailability) {
+          setDate(nextAvailability.date);
+          setSlots(nextAvailability.slots);
+          setAvailabilityMessage(`No habia cupos para ${date.trim()}, pero encontre disponibilidad para ${nextAvailability.date}. Selecciona un horario para continuar.`);
+        } else {
+          setAvailabilityMessage(availability.message || 'No hay horarios disponibles en los proximos dias. Prueba otro medico o contacta a la clinica.');
+        }
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'No hay horarios disponibles.';
@@ -258,6 +265,23 @@ function addDays(days: number) {
   const date = new Date();
   date.setDate(date.getDate() + days);
   return date;
+}
+
+function addDaysToISODate(value: string, days: number) {
+  const date = new Date(`${value}T00:00:00`);
+  date.setDate(date.getDate() + days);
+  return toISODate(date);
+}
+
+async function findNextAvailability(doctorId: number, fromDate: string, modality: AppointmentModality) {
+  for (let offset = 1; offset <= 21; offset += 1) {
+    const candidateDate = addDaysToISODate(fromDate, offset);
+    const availability = await getPatientDoctorAvailability(doctorId, candidateDate, modality);
+    if (modality === 'online' && availability.allow_online_appointments === false) return null;
+    const candidateSlots = (availability.available_slots ?? []).filter((item) => item.available !== false);
+    if (candidateSlots.length) return { date: candidateDate, slots: candidateSlots };
+  }
+  return null;
 }
 
 function validateDate(value: string) {

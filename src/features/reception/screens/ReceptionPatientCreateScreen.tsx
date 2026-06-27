@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
+import { AppDateInput } from '@/components/AppDateInput';
 import { AppHeader } from '@/components/AppHeader';
 import { AppInput } from '@/components/AppInput';
 import { colors } from '@/core/theme/colors';
@@ -56,7 +57,7 @@ export function ReceptionPatientCreateScreen() {
             <AppInput keyboardType="phone-pad" label="Telefono" maxLength={20} onChangeText={(value) => setForm({ ...form, phone: value.replace(/[^0-9+()\-\s]/g, '') })} value={form.phone} />
             <Text style={styles.label}>Sexo</Text>
             <View style={styles.chips}>{genders.map(([value, label]) => <Chip active={form.gender === value} key={value} label={label} onPress={() => setForm({ ...form, gender: value })} />)}</View>
-            <AppInput keyboardType="numbers-and-punctuation" label="Fecha de nacimiento" maxLength={10} onChangeText={(value) => setForm({ ...form, birth_date: value.replace(/[^0-9-]/g, '') })} placeholder="YYYY-MM-DD" value={form.birth_date} />
+            <AppDateInput label="Fecha de nacimiento" maximumDate={new Date()} onChange={(value) => setForm({ ...form, birth_date: value })} placeholder="Seleccionar fecha" value={form.birth_date ?? ''} />
             <AppButton label="Guardar paciente" loading={saving} onPress={submit} />
           </AppCard>
         </ScrollView>

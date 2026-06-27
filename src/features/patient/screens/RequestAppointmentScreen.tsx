@@ -5,7 +5,7 @@ import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
-import { AppInput } from '@/components/AppInput';
+import { AppDateInput } from '@/components/AppDateInput';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen';
@@ -209,11 +209,10 @@ export function RequestAppointmentScreen() {
       </Step>
 
       <Step title="3. Fecha">
-        <AppInput
-          icon="calendar"
-          keyboardType="numbers-and-punctuation"
+        <AppDateInput
           label="Fecha"
-          onChangeText={updateDate}
+          minimumDate={new Date()}
+          onChange={updateDate}
           placeholder="YYYY-MM-DD"
           value={date}
         />

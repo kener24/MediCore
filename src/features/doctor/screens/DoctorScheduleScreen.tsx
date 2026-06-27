@@ -4,7 +4,7 @@ import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } 
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
-import { AppInput } from '@/components/AppInput';
+import { AppDateInput } from '@/components/AppDateInput';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
@@ -104,7 +104,7 @@ export function DoctorScheduleScreen() {
         showsVerticalScrollIndicator={false}>
         <DoctorHeader title="Agenda médica" />
         <View style={styles.controls}>
-          <AppInput icon="calendar" keyboardType="numbers-and-punctuation" label="Fecha seleccionada" onChangeText={setDate} value={date} />
+          <AppDateInput label="Fecha seleccionada" onChange={setDate} value={date} />
           <View style={styles.dateButtons}>
             <AppButton label="Dia anterior" onPress={() => setDate(shiftDate(date, -1))} style={styles.dateButton} variant="secondary" />
             <AppButton label="Hoy" onPress={() => setDate(toISODate(new Date()))} style={styles.dateButton} variant="secondary" />

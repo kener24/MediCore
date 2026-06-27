@@ -1,5 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { AppDateInput } from '@/components/AppDateInput';
 import { AppInput } from '@/components/AppInput';
 import { colors } from '@/core/theme/colors';
 
@@ -50,11 +51,9 @@ export function ConsultationFilters({
         placeholder="Nombre, identidad o motivo"
         value={search}
       />
-      <AppInput
-        icon="calendar"
-        keyboardType="numbers-and-punctuation"
+      <AppDateInput
         label="Fecha"
-        onChangeText={onChangeDate}
+        onChange={onChangeDate}
         placeholder="YYYY-MM-DD"
         value={date}
       />

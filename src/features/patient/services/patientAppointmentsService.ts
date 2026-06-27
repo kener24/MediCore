@@ -3,6 +3,7 @@ import { endpoints } from '@/core/api/endpoints';
 import { normalizeList, type ListResponse } from '@/features/patient/types/pagination.types';
 import type {
   AppointmentAvailability,
+  AppointmentAvailabilitySlot,
   CancelAppointmentPayload,
   PatientAppointment,
   PatientAppointmentRequestPayload,
@@ -70,7 +71,34 @@ export async function getPatientDoctorAvailability(doctorId: number | string, da
     endpoints.patientPortal.doctorAvailability(doctorId),
     { params: { date, modality } },
   );
-  return data;
+  return normalizeAvailability(data);
 }
 
 export const getDoctorAvailability = getPatientDoctorAvailability;
+
+function normalizeAvailability(data: AppointmentAvailability | AppointmentAvailabilitySlot[]): AppointmentAvailability {
+  if (Array.isArray(data)) return { available_slots: data, booked_slots: [] };
+  return {
+    ...data,
+    available_slots: normalizeSlots(data.available_slots),
+    booked_slots: normalizeSlots(data.booked_slots),
+  };
+}
+
+function normalizeSlots(slots?: AppointmentAvailabilitySlot[]) {
+  if (!Array.isArray(slots)) return [];
+  return slots
+    .map((slot) => ({
+      ...slot,
+      start_time: normalizeTime(slot.start_time),
+      end_time: slot.end_time ? normalizeTime(slot.end_time) : undefined,
+      available: slot.available,
+    }))
+    .filter((slot) => Boolean(slot.start_time));
+}
+
+function normalizeTime(value?: string) {
+  if (!value) return '';
+  const match = String(value).match(/^(\d{2}:\d{2})/);
+  return match ? match[1] : String(value);
+}

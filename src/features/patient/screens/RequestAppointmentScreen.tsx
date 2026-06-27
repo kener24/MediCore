@@ -28,7 +28,7 @@ import type {
   PatientSpecialty,
 } from '@/features/patient/types/patientAppointments.types';
 
-const onlineDisabledMessage = 'Esta clínica no tiene habilitadas las citas en línea. Puedes solicitar una cita presencial.';
+const onlineDisabledMessage = 'Esta clinica no tiene habilitadas las citas en linea. Puedes solicitar una cita presencial.';
 
 export function RequestAppointmentScreen() {
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
@@ -42,6 +42,8 @@ export function RequestAppointmentScreen() {
   const [slot, setSlot] = useState<AppointmentAvailabilitySlot | null>(null);
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
+  const [availabilityMessage, setAvailabilityMessage] = useState('');
+  const [availabilityChecked, setAvailabilityChecked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -61,48 +63,73 @@ export function RequestAppointmentScreen() {
     loadSpecialties();
   }, []);
 
+  function resetAvailability() {
+    setSlot(null);
+    setSlots([]);
+    setAvailabilityChecked(false);
+    setAvailabilityMessage('');
+  }
+
+  function updateDate(nextDate: string) {
+    setDate(nextDate);
+    resetAvailability();
+  }
+
   async function selectSpecialty(nextSpecialty: PatientSpecialty) {
     setSpecialty(nextSpecialty);
     setDoctor(null);
-    setSlot(null);
-    setSlots([]);
+    resetAvailability();
     setError('');
     try {
       setDoctors(await getPatientDoctors(nextSpecialty.id));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al cargar médicos.');
+      setError(err instanceof Error ? err.message : 'Error al cargar medicos.');
     }
   }
 
   async function loadAvailability() {
     const validation = validateDate(date);
     if (!doctor) {
-      Alert.alert('Disponibilidad', 'Selecciona un médico.');
+      Alert.alert('Disponibilidad', 'Selecciona un medico.');
       return;
     }
     if (validation) {
       Alert.alert('Disponibilidad', validation);
       return;
     }
+
     setLoadingAvailability(true);
+    setAvailabilityChecked(false);
+    setAvailabilityMessage('');
     try {
       const availability = await getPatientDoctorAvailability(doctor.id, date.trim(), modality);
-      setSlots((availability.available_slots ?? []).filter((item) => item.available !== false));
+      const nextSlots = (availability.available_slots ?? []).filter((item) => item.available !== false);
+      setSlots(nextSlots);
       setSlot(null);
+
       if (modality === 'online' && availability.allow_online_appointments === false) {
-        Alert.alert('Citas en línea', availability.message || onlineDisabledMessage);
+        const message = availability.message || onlineDisabledMessage;
+        setAvailabilityMessage(message);
+        Alert.alert('Citas en linea', message);
+      } else if (nextSlots.length) {
+        setAvailabilityMessage(`${nextSlots.length} horario${nextSlots.length === 1 ? '' : 's'} disponible${nextSlots.length === 1 ? '' : 's'} para la fecha seleccionada.`);
+      } else {
+        setAvailabilityMessage(availability.message || 'No hay horarios disponibles para esta fecha. Prueba otro dia o selecciona otro medico.');
       }
     } catch (err) {
-      Alert.alert('Disponibilidad', err instanceof Error ? err.message : 'No hay horarios disponibles.');
+      const message = err instanceof Error ? err.message : 'No hay horarios disponibles.';
+      setAvailabilityMessage(message);
+      Alert.alert('Disponibilidad', message);
     } finally {
+      setAvailabilityChecked(true);
       setLoadingAvailability(false);
     }
   }
 
   async function submit() {
     if (!specialty) return Alert.alert('Solicitud', 'Selecciona una especialidad.');
-    if (!doctor) return Alert.alert('Solicitud', 'Selecciona un médico.');
-    if (!modality) return Alert.alert('Solicitud', 'Selecciona una modalidad válida.');
+    if (!doctor) return Alert.alert('Solicitud', 'Selecciona un medico.');
+    if (!modality) return Alert.alert('Solicitud', 'Selecciona una modalidad valida.');
     const dateValidation = validateDate(date);
     if (dateValidation) return Alert.alert('Solicitud', dateValidation);
     if (!slot) return Alert.alert('Solicitud', 'Selecciona un horario.');
@@ -134,98 +161,95 @@ export function RequestAppointmentScreen() {
 
   return (
     <KeyboardAwareScreen contentContainerStyle={styles.content}>
-        <PatientHeader subtitle="Completa los datos requeridos para enviar tu solicitud." title="Solicitar cita" />
-        {error ? <ErrorState message={error} title="No se pudo cargar información" /> : null}
+      <PatientHeader subtitle="Completa los datos requeridos para enviar tu solicitud." title="Solicitar cita" />
+      {error ? <ErrorState message={error} title="No se pudo cargar informacion" /> : null}
 
-        <Step title="1. Especialidad">
-          {specialties.length ? (
-            <View style={styles.options}>
-              {specialties.map((item) => (
-                <AppButton
-                  key={item.id}
-                  label={item.nombre || item.name || `Especialidad ${item.id}`}
-                  onPress={() => selectSpecialty(item)}
-                  variant={specialty?.id === item.id ? 'primary' : 'secondary'}
-                />
-              ))}
-            </View>
-          ) : (
-            <EmptyState description="La clínica no tiene especialidades disponibles." title="Sin especialidades" />
-          )}
-        </Step>
-
-        <Step title="2. Médico">
-          {doctors.length ? (
-            <View style={styles.options}>
-              {doctors.map((item) => (
-                <AppButton
-                  key={item.id}
-                  label={item.nombre_completo || item.full_name || item.user_nombre || item.nombre || item.name || `Médico ${item.id}`}
-                  onPress={() => {
-                    setDoctor(item);
-                    setSlot(null);
-                    setSlots([]);
-                  }}
-                  variant={doctor?.id === item.id ? 'primary' : 'secondary'}
-                />
-              ))}
-            </View>
-          ) : (
-            <Text style={styles.help}>Selecciona una especialidad para ver médicos.</Text>
-          )}
-        </Step>
-
-        <Step title="3. Fecha">
-          <AppInput
-            icon="calendar"
-            keyboardType="numbers-and-punctuation"
-            label="Fecha"
-            onChangeText={(value) => {
-              setDate(value);
-              setSlot(null);
-              setSlots([]);
-            }}
-            placeholder="YYYY-MM-DD"
-            value={date}
-          />
-          <View style={styles.dateActions}>
-            <AppButton label="Mañana" onPress={() => setDate(toISODate(addDays(1)))} style={styles.dateAction} variant="secondary" />
-            <AppButton label="En 7 días" onPress={() => setDate(toISODate(addDays(7)))} style={styles.dateAction} variant="secondary" />
+      <Step title="1. Especialidad">
+        {specialties.length ? (
+          <View style={styles.options}>
+            {specialties.map((item) => (
+              <AppButton
+                key={item.id}
+                label={item.nombre || item.name || `Especialidad ${item.id}`}
+                onPress={() => selectSpecialty(item)}
+                variant={specialty?.id === item.id ? 'primary' : 'secondary'}
+              />
+            ))}
           </View>
-        </Step>
+        ) : (
+          <EmptyState description="La clinica no tiene especialidades disponibles." title="Sin especialidades" />
+        )}
+      </Step>
 
-        <Step title="4. Modalidad">
-          <AppointmentModalitySelector
-            onChange={(value) => {
-              setModality(value);
-              setSlot(null);
-              setSlots([]);
-            }}
-            value={modality}
-          />
-        </Step>
+      <Step title="2. Medico">
+        {doctors.length ? (
+          <View style={styles.options}>
+            {doctors.map((item) => (
+              <AppButton
+                key={item.id}
+                label={item.nombre_completo || item.full_name || item.user_nombre || item.nombre || item.name || `Medico ${item.id}`}
+                onPress={() => {
+                  setDoctor(item);
+                  resetAvailability();
+                }}
+                variant={doctor?.id === item.id ? 'primary' : 'secondary'}
+              />
+            ))}
+          </View>
+        ) : (
+          <Text style={styles.help}>Selecciona una especialidad para ver medicos.</Text>
+        )}
+      </Step>
 
-        <Step title="5. Disponibilidad">
-          <AppButton label="Consultar disponibilidad" loading={loadingAvailability} onPress={loadAvailability} variant="secondary" />
-          {slots.length ? (
-            <AvailabilitySlotSelector onSelectSlot={setSlot} selectedSlot={slot} slots={slots} />
-          ) : (
-            <Text style={styles.help}>No hay horarios disponibles para esta fecha y modalidad.</Text>
-          )}
-        </Step>
+      <Step title="3. Fecha">
+        <AppInput
+          icon="calendar"
+          keyboardType="numbers-and-punctuation"
+          label="Fecha"
+          onChangeText={updateDate}
+          placeholder="YYYY-MM-DD"
+          value={date}
+        />
+        <View style={styles.dateActions}>
+          <AppButton label="Manana" onPress={() => updateDate(toISODate(addDays(1)))} style={styles.dateAction} variant="secondary" />
+          <AppButton label="En 7 dias" onPress={() => updateDate(toISODate(addDays(7)))} style={styles.dateAction} variant="secondary" />
+        </View>
+      </Step>
 
-        <Step title="6. Motivo">
-          <TextInput
-            multiline
-            onChangeText={setReason}
-            placeholder="Describe brevemente el motivo de tu cita"
-            placeholderTextColor="#98a2b3"
-            style={styles.textArea}
-            value={reason}
-          />
-        </Step>
+      <Step title="4. Modalidad">
+        <AppointmentModalitySelector
+          onChange={(value) => {
+            setModality(value);
+            resetAvailability();
+          }}
+          value={modality}
+        />
+      </Step>
 
-        <AppButton label="Enviar solicitud" loading={submitting} onPress={submit} />
+      <Step title="5. Disponibilidad">
+        <AppButton label="Consultar disponibilidad" loading={loadingAvailability} onPress={loadAvailability} variant="secondary" />
+        {availabilityMessage ? <Text style={[styles.help, slots.length ? styles.success : styles.warning]}>{availabilityMessage}</Text> : null}
+        {slots.length ? (
+          <AvailabilitySlotSelector onSelectSlot={setSlot} selectedSlot={slot} slots={slots} />
+        ) : availabilityChecked ? (
+          <Text style={styles.help}>No se encontraron horarios disponibles con los datos seleccionados.</Text>
+        ) : (
+          <Text style={styles.help}>Selecciona medico, fecha y modalidad; luego consulta disponibilidad.</Text>
+        )}
+      </Step>
+
+      <Step title="6. Motivo">
+        <TextInput
+          multiline
+          onChangeText={setReason}
+          placeholder="Describe brevemente el motivo de tu cita"
+          placeholderTextColor="#98a2b3"
+          style={styles.textArea}
+          value={reason}
+        />
+      </Step>
+
+      <AppButton label="Enviar solicitud" loading={submitting} onPress={submit} />
     </KeyboardAwareScreen>
   );
 }
@@ -239,9 +263,9 @@ function addDays(days: number) {
 function validateDate(value: string) {
   const trimmed = value.trim();
   if (!trimmed) return 'Selecciona una fecha.';
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return 'Ingresa una fecha válida en formato YYYY-MM-DD.';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return 'Ingresa una fecha valida en formato YYYY-MM-DD.';
   const parsed = new Date(`${trimmed}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) return 'Ingresa una fecha válida.';
+  if (Number.isNaN(parsed.getTime())) return 'Ingresa una fecha valida.';
   if (isPastISODate(trimmed)) return 'La fecha no puede ser pasada.';
   return '';
 }
@@ -285,6 +309,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
   },
+  success: {
+    color: colors.success,
+    fontWeight: '800',
+  },
   textArea: {
     backgroundColor: colors.surfaceMuted,
     borderColor: colors.border,
@@ -294,5 +322,9 @@ const styles = StyleSheet.create({
     minHeight: 110,
     padding: 14,
     textAlignVertical: 'top',
+  },
+  warning: {
+    color: colors.warning,
+    fontWeight: '800',
   },
 });

@@ -242,9 +242,15 @@ class PatientPortalDoctorAvailabilityView(PatientPortalBaseView):
                     "message": "Esta clínica no tiene habilitadas las citas en línea. Puedes solicitar una cita presencial.",
                 }
             )
-        availability = build_availability(doctor, datetime.fromisoformat(date_value).date())
+        try:
+            target_date = datetime.fromisoformat(date_value).date()
+        except ValueError:
+            return Response({"date": ["Ingresa una fecha valida en formato YYYY-MM-DD."]}, status=status.HTTP_400_BAD_REQUEST)
+        availability = build_availability(doctor, target_date)
         availability["allow_online_appointments"] = self.clinic_settings.allow_online_appointments
         availability["modality"] = modality
+        if not availability.get("available_slots"):
+            availability["message"] = "No hay horarios disponibles para la fecha seleccionada."
         return Response(availability)
 
 

@@ -1,19 +1,10 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useState } from 'react';
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { AppInput } from '@/components/AppInput';
+import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen';
 import { ApiClientError } from '@/core/api/authInterceptor';
 import { es } from '@/core/i18n/es';
 import { colors } from '@/core/theme/colors';
@@ -50,15 +41,10 @@ export function LoginScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.keyboard}>
-        <ScrollView
-          bounces={false}
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}>
+    <KeyboardAwareScreen
+      bounces={false}
+      contentContainerStyle={styles.content}
+      keyboardDismissMode="on-drag">
           <View style={styles.brandArea}>
             <View style={styles.logoMark}>
               <MaterialCommunityIcons color={colors.white} name="heart-pulse" size={34} />
@@ -130,9 +116,7 @@ export function LoginScreen() {
               </View>
             </View>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+    </KeyboardAwareScreen>
   );
 }
 
@@ -166,7 +150,8 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: 22,
-    paddingVertical: 30,
+    paddingTop: 30,
+    paddingBottom: 120,
   },
   description: {
     color: colors.muted,
@@ -185,9 +170,6 @@ const styles = StyleSheet.create({
   form: {
     gap: 16,
     marginBottom: 18,
-  },
-  keyboard: {
-    flex: 1,
   },
   logoMark: {
     alignItems: 'center',
@@ -215,10 +197,6 @@ const styles = StyleSheet.create({
   },
   passwordRow: {
     gap: 8,
-  },
-  safeArea: {
-    backgroundColor: colors.background,
-    flex: 1,
   },
   securityBox: {
     alignItems: 'center',

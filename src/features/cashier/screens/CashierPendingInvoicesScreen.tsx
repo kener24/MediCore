@@ -1,8 +1,9 @@
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useCallback, useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppInput } from '@/components/AppInput';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
@@ -17,6 +18,7 @@ const filters = [['pending', 'Pendientes'], ['partial', 'Parciales'], ['all', 'T
 export function CashierPendingInvoicesScreen() {
   const navigation = useNavigation<any>();
   const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
   const [invoices, setInvoices] = useState<CashierInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -37,7 +39,38 @@ export function CashierPendingInvoicesScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
-  const visible = useMemo(() => filter === 'all' ? invoices : invoices.filter((invoice) => normalizedStatus(invoice.status) === filter), [filter, invoices]);
+  const visible = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    return invoices.filter((invoice) => {
+      if (filter !== 'all' && normalizedStatus(invoice.status) !== filter) return false;
+      if (!needle) return true;
+      const searchable = [
+        invoice.invoice_number,
+        invoice.number,
+        invoice.patient_name,
+        invoice.patient_identity,
+        invoice.patient_phone,
+        invoice.status,
+      ].join(' ').toLowerCase();
+      return searchable.includes(needle);
+    });
+  }, [filter, invoices, search]);
+
+  function openInvoice(invoice: CashierInvoice) {
+    if (!invoice.id) {
+      Alert.alert('Factura', 'Esta factura no tiene identificador para abrir el detalle.');
+      return;
+    }
+    navigation.navigate('CashierInvoiceDetail', { invoiceId: invoice.id });
+  }
+
+  function payInvoice(invoice: CashierInvoice) {
+    if (!invoice.id) {
+      Alert.alert('Factura', 'Esta factura no tiene identificador para registrar pago.');
+      return;
+    }
+    navigation.navigate('CashierRegisterPayment', { invoiceId: invoice.id });
+  }
 
   if (loading) return <LoadingState label="Cargando facturas..." />;
   return (
@@ -45,14 +78,15 @@ export function CashierPendingInvoicesScreen() {
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl onRefresh={() => void load(true)} refreshing={refreshing} />}>
         <CashierHeader subtitle="Facturas pendientes o parcialmente pagadas." title="Facturas pendientes" />
         <View style={styles.filters}>{filters.map(([value, label]) => <Text key={value} onPress={() => setFilter(value)} style={[styles.filter, filter === value && styles.filterActive]}>{label}</Text>)}</View>
+        <AppInput autoCapitalize="none" label="Buscar factura" onChangeText={setSearch} placeholder="Paciente, identidad, telefono o factura" value={search} />
         {error ? <ErrorState message={error} onRetry={() => void load()} title="No se pudieron cargar" /> : null}
-        {!error && visible.length === 0 ? <EmptyState description="No hay facturas pendientes." title="Sin facturas" /> : null}
+        {!error && visible.length === 0 ? <EmptyState description="Ajusta la busqueda o el filtro para ver mas facturas." title="Sin facturas" /> : null}
         {visible.map((invoice) => (
           <InvoiceCard
             invoice={invoice}
             key={invoice.id ?? invoice.invoice_number}
-            onPay={() => navigation.navigate('CashierRegisterPayment', { invoiceId: invoice.id })}
-            onPress={() => navigation.navigate('CashierInvoiceDetail', { invoiceId: invoice.id })}
+            onPay={() => payInvoice(invoice)}
+            onPress={() => openInvoice(invoice)}
           />
         ))}
       </ScrollView>

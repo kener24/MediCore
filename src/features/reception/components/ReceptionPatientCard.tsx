@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text } from 'react-native';
 
 import { AppCard } from '@/components/AppCard';
 import { colors } from '@/core/theme/colors';

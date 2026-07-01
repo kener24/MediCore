@@ -1,5 +1,5 @@
-import { useRoute } from '@react-navigation/native';
-import { useEffect, useMemo, useState } from 'react';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -12,9 +12,8 @@ import { CashierHeader } from '@/features/cashier/components/CashierHeader';
 import { PaymentMethodBadge } from '@/features/cashier/components/PaymentMethodBadge';
 import { PaymentStatusBadge } from '@/features/cashier/components/PaymentStatusBadge';
 import { getPaymentDetail } from '@/features/cashier/services/cashierPaymentService';
-import { formatCurrency, formatDateTime } from '@/features/cashier/types/commonCashier.types';
 import type { CashierPayment } from '@/features/cashier/types/cashierPayment.types';
-import { useNavigation } from '@react-navigation/native';
+import { formatCurrency, formatDateTime } from '@/features/cashier/types/commonCashier.types';
 
 export function CashierPaymentDetailScreen() {
   const navigation = useNavigation<any>();
@@ -24,11 +23,9 @@ export function CashierPaymentDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => { void load(); }, [params.paymentId]);
-
-  async function load() {
+  const load = useCallback(async () => {
     if (!params.paymentId) {
-      setError('No se encontró el pago.');
+      setError('No se encontro el pago.');
       setLoading(false);
       return;
     }
@@ -41,7 +38,9 @@ export function CashierPaymentDetailScreen() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [params.paymentId]);
+
+  useEffect(() => { void load(); }, [load]);
 
   if (loading) return <LoadingState label="Cargando pago..." />;
   if (error || !payment) return <ErrorState message={error || 'Pago no disponible.'} onRetry={() => void load()} title="Pago no disponible" />;

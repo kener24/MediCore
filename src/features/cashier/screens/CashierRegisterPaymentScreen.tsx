@@ -1,5 +1,5 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -13,9 +13,9 @@ import { InvoiceTotalsCard } from '@/features/cashier/components/InvoiceTotalsCa
 import { PaymentForm } from '@/features/cashier/components/PaymentForm';
 import { getInvoiceDetail } from '@/features/cashier/services/cashierInvoiceService';
 import { registerPayment } from '@/features/cashier/services/cashierPaymentService';
-import { formatCurrency, numericValue } from '@/features/cashier/types/commonCashier.types';
 import type { CashierInvoiceDetail } from '@/features/cashier/types/cashierInvoice.types';
 import type { PaymentMethod } from '@/features/cashier/types/cashierPayment.types';
+import { formatCurrency, numericValue } from '@/features/cashier/types/commonCashier.types';
 
 export function CashierRegisterPaymentScreen() {
   const navigation = useNavigation<any>();
@@ -30,11 +30,9 @@ export function CashierRegisterPaymentScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => { void load(); }, [params.invoiceId]);
-
-  async function load() {
+  const load = useCallback(async () => {
     if (!params.invoiceId) {
-      setError('No se encontró la factura.');
+      setError('No se encontro la factura.');
       setLoading(false);
       return;
     }
@@ -44,22 +42,30 @@ export function CashierRegisterPaymentScreen() {
       const data = await getInvoiceDetail(params.invoiceId);
       setInvoice(data);
       const balance = numericValue(data.balance_due ?? data.balance);
-      setAmount(balance > 0 ? String(balance.toFixed(2)) : '');
+      setAmount(balance > 0 ? balance.toFixed(2) : '');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar la factura.');
     } finally {
       setLoading(false);
     }
-  }
+  }, [params.invoiceId]);
+
+  useEffect(() => { void load(); }, [load]);
 
   async function submit() {
     if (saving) return;
-    if (!params.invoiceId || !invoice) return Alert.alert('Pago', 'No se encontró la factura.');
+    if (!params.invoiceId || !invoice) return Alert.alert('Pago', 'No se encontro la factura.');
     const validation = validate();
     if (validation) return Alert.alert('Pago', validation);
     setSaving(true);
     try {
-      const payment = await registerPayment(params.invoiceId, { amount: Number(amount), invoice_id: params.invoiceId, method, notes: notes.trim(), reference: reference.trim() });
+      const payment = await registerPayment(params.invoiceId, {
+        amount: Number(amount),
+        invoice_id: params.invoiceId,
+        method,
+        notes: notes.trim(),
+        reference: reference.trim(),
+      });
       Alert.alert('Pago', 'Pago registrado correctamente.', [
         { text: 'Ver factura', onPress: () => navigation.navigate('CashierInvoiceDetail', { invoiceId: params.invoiceId }) },
         { text: 'Ver pago', onPress: () => payment?.id ? navigation.navigate('CashierPaymentDetail', { invoiceId: params.invoiceId, paymentId: payment.id }) : navigation.navigate('CashierInvoiceDetail', { invoiceId: params.invoiceId }) },
@@ -74,11 +80,11 @@ export function CashierRegisterPaymentScreen() {
   function validate() {
     const value = Number(amount);
     const balance = numericValue(invoice?.balance_due ?? invoice?.balance);
-    if (!Number.isFinite(value)) return 'Ingresa un monto válido.';
+    if (!Number.isFinite(value)) return 'Ingresa un monto valido.';
     if (value <= 0) return 'El monto debe ser mayor a 0.';
     if (balance > 0 && value > balance) return 'El monto no puede ser mayor al saldo pendiente.';
-    if (!method) return 'Selecciona un método de pago.';
-    if (method !== 'cash' && !reference.trim()) return 'La referencia es requerida para este método.';
+    if (!method) return 'Selecciona un metodo de pago.';
+    if (method !== 'cash' && !reference.trim()) return 'La referencia es requerida para este metodo.';
     return '';
   }
 
@@ -97,6 +103,7 @@ export function CashierRegisterPaymentScreen() {
           <AppCard>
             <PaymentForm
               amount={amount}
+              balanceLabel={formatCurrency(balance, currency)}
               loading={saving}
               method={method}
               notes={notes}
@@ -111,7 +118,6 @@ export function CashierRegisterPaymentScreen() {
               onSubmit={submit}
               reference={reference}
               referenceRequired={method !== 'cash'}
-              balanceLabel={formatCurrency(balance, currency)}
             />
           </AppCard>
           <AppButton label="Cancelar" onPress={() => navigation.goBack()} variant="secondary" />

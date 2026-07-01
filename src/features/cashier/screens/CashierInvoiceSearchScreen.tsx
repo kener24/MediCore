@@ -36,11 +36,27 @@ export function CashierInvoiceSearchScreen() {
     }
   }
 
+  function openInvoice(invoice: CashierInvoice) {
+    if (!invoice.id) {
+      Alert.alert('Factura', 'Esta factura no tiene identificador para abrir el detalle.');
+      return;
+    }
+    navigation.navigate('CashierInvoiceDetail', { invoiceId: invoice.id });
+  }
+
+  function payInvoice(invoice: CashierInvoice) {
+    if (!invoice.id) {
+      Alert.alert('Factura', 'Esta factura no tiene identificador para registrar pago.');
+      return;
+    }
+    navigation.navigate('CashierRegisterPayment', { invoiceId: invoice.id });
+  }
+
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <CashierHeader subtitle="Busca por número, paciente, identidad o teléfono." title="Buscar factura" />
-        <AppInput label="Busqueda" onChangeText={setQuery} onSubmitEditing={submit} placeholder="Factura o paciente" value={query} />
+        <CashierHeader subtitle="Busca por numero, paciente, identidad o telefono." title="Buscar factura" />
+        <AppInput autoCapitalize="none" label="Busqueda" onChangeText={setQuery} onSubmitEditing={submit} placeholder="Factura o paciente" value={query} />
         <AppButton disabled={!canSearch} label="Buscar" loading={loading} onPress={submit} />
         {error ? <ErrorState message={error} onRetry={submit} title="No se pudo buscar facturas" /> : null}
         {!error && searched && results.length === 0 ? <EmptyState description="No se encontraron facturas." title="Sin resultados" /> : null}
@@ -48,8 +64,8 @@ export function CashierInvoiceSearchScreen() {
           <InvoiceCard
             invoice={invoice}
             key={invoice.id ?? invoice.invoice_number}
-            onPay={() => navigation.navigate('CashierRegisterPayment', { invoiceId: invoice.id })}
-            onPress={() => navigation.navigate('CashierInvoiceDetail', { invoiceId: invoice.id })}
+            onPay={() => payInvoice(invoice)}
+            onPress={() => openInvoice(invoice)}
           />
         ))}
       </ScrollView>

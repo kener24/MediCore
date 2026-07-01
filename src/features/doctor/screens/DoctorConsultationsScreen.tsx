@@ -11,7 +11,6 @@ import { colors } from '@/core/theme/colors';
 import {
   ConsultationCard,
   consultationId,
-  isCompleted,
   patientId,
   patientName,
   visitId,

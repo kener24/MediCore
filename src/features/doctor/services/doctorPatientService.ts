@@ -1,6 +1,6 @@
 import { endpoints } from '@/core/api/endpoints';
 import { startConsultation as startVisitConsultation } from '@/features/doctor/services/doctorConsultationService';
-import { getFirstAvailable, postFirstAvailable } from '@/features/doctor/services/doctorApiHelpers';
+import { getFirstAvailable } from '@/features/doctor/services/doctorApiHelpers';
 import { normalizeListResponse, type ApiListResponse } from '@/features/doctor/types/commonDoctor.types';
 import type {
   DoctorPatientBasicInfo,

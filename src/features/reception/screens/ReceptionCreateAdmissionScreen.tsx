@@ -9,7 +9,9 @@ import { AppHeader } from '@/components/AppHeader';
 import { AppInput } from '@/components/AppInput';
 import { colors } from '@/core/theme/colors';
 import { createAdmission, getReceptionDoctors, type ReceptionDoctorOption } from '@/features/reception/services/receptionAdmissionService';
+import { patientIdentity, patientName, patientPhone } from '@/features/reception/services/receptionMappers';
 import type { CreateAdmissionPayload } from '@/features/reception/types/receptionAdmission.types';
+import type { ReceptionPatient } from '@/features/reception/types/receptionPatient.types';
 
 const visitTypes = [
   ['walk_in', 'Sin cita'],
@@ -30,7 +32,8 @@ const priorities = [
 export function ReceptionCreateAdmissionScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const initialPatientId = route.params?.patientId ? String(route.params.patientId) : '';
+  const selectedPatient = route.params?.patient as ReceptionPatient | undefined;
+  const initialPatientId = route.params?.patientId ? String(route.params.patientId) : selectedPatient?.id ? String(selectedPatient.id) : '';
   const [saving, setSaving] = useState(false);
   const [doctors, setDoctors] = useState<ReceptionDoctorOption[]>([]);
   const [form, setForm] = useState({ patient_id: initialPatientId, visit_type: 'walk_in', reason: '', priority: 'normal', doctor_id: '' });
@@ -53,7 +56,10 @@ export function ReceptionCreateAdmissionScreen() {
         doctor_id: form.doctor_id ? Number(form.doctor_id) : undefined,
       };
       const visit = await createAdmission(payload);
-      Alert.alert('Admision', 'Admision registrada correctamente.', [{ text: 'Ver visita', onPress: () => navigation.navigate('ReceptionVisitDetail', { visitId: visit.id }) }]);
+      Alert.alert('Admision', 'Admision registrada correctamente.', [
+        { text: 'Ver visita', onPress: () => navigation.navigate('ReceptionVisitDetail', { visitId: visit.id }) },
+        { text: 'Admisiones', onPress: () => navigation.navigate('ReceptionTodayAdmissions') },
+      ]);
     } catch (err) {
       Alert.alert('Admision', err instanceof Error ? err.message : 'No se pudo crear la admision.');
     } finally {
@@ -67,8 +73,27 @@ export function ReceptionCreateAdmissionScreen() {
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <AppHeader icon="clipboard-plus-outline" subtitle="Registra la llegada del paciente a la clinica." title="Nueva admision" />
           <AppCard style={styles.form}>
-            <AppInput keyboardType="number-pad" label="ID de paciente" onChangeText={(value) => setForm({ ...form, patient_id: value.replace(/[^0-9]/g, '') })} value={form.patient_id} />
-            {!initialPatientId ? <AppButton label="Buscar paciente" onPress={() => navigation.navigate('ReceptionPatientSearch')} variant="secondary" /> : null}
+            {form.patient_id ? (
+              <View style={styles.patientBox}>
+                <Text style={styles.patientEyebrow}>Paciente seleccionado</Text>
+                <Text style={styles.patientName}>{selectedPatient ? patientName(selectedPatient) : `Paciente #${form.patient_id}`}</Text>
+                <Text style={styles.patientMeta}>Identidad: {selectedPatient ? patientIdentity(selectedPatient) : 'Pendiente de confirmar'}</Text>
+                <Text style={styles.patientMeta}>Telefono: {selectedPatient ? patientPhone(selectedPatient) : 'No indicado'}</Text>
+                <View style={styles.actions}>
+                  <AppButton label="Cambiar paciente" onPress={() => navigation.navigate('ReceptionPatientSearch')} variant="secondary" />
+                </View>
+              </View>
+            ) : (
+              <View style={styles.patientBox}>
+                <Text style={styles.patientEyebrow}>Paciente requerido</Text>
+                <Text style={styles.patientName}>Selecciona un paciente antes de crear la admision.</Text>
+                <Text style={styles.patientMeta}>Esto evita errores por ID manual y mantiene el expediente correcto.</Text>
+                <View style={styles.actions}>
+                  <AppButton label="Buscar paciente" onPress={() => navigation.navigate('ReceptionPatientSearch')} />
+                  <AppButton label="Crear paciente nuevo" onPress={() => navigation.navigate('ReceptionPatientCreate')} variant="secondary" />
+                </View>
+              </View>
+            )}
             <Text style={styles.label}>Tipo de visita</Text>
             <View style={styles.chips}>{visitTypes.map(([value, label]) => <Chip active={form.visit_type === value} key={value} label={label} onPress={() => setForm({ ...form, visit_type: value })} />)}</View>
             <AppInput label="Motivo" multiline onChangeText={(value) => setForm({ ...form, reason: value })} style={styles.notes} value={form.reason} />
@@ -86,7 +111,7 @@ export function ReceptionCreateAdmissionScreen() {
                 />
               ))}
             </View>
-            <AppButton label="Registrar admision" loading={saving} onPress={submit} />
+            <AppButton disabled={!form.patient_id} label="Registrar admision" loading={saving} onPress={submit} />
           </AppCard>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -108,5 +133,10 @@ const styles = StyleSheet.create({
   keyboard: { flex: 1 },
   label: { color: colors.ink, fontSize: 14, fontWeight: '900' },
   notes: { minHeight: 96, textAlignVertical: 'top' },
+  actions: { gap: 10, marginTop: 8 },
+  patientBox: { backgroundColor: colors.surfaceMuted, borderColor: colors.border, borderRadius: 16, borderWidth: 1, gap: 6, padding: 14 },
+  patientEyebrow: { color: colors.primary, fontSize: 12, fontWeight: '900', textTransform: 'uppercase' },
+  patientMeta: { color: colors.muted, fontSize: 13, lineHeight: 18 },
+  patientName: { color: colors.ink, fontSize: 17, fontWeight: '900', lineHeight: 23 },
   safe: { backgroundColor: colors.background, flex: 1 },
 });

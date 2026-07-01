@@ -54,7 +54,7 @@ export function ReceptionPatientSearchScreen() {
         {patients.map((patient) => (
           <ReceptionPatientCard
             key={patient.id}
-            onCreateAdmission={() => navigation.navigate('ReceptionCreateAdmission', { patientId: patient.id })}
+            onCreateAdmission={() => navigation.navigate('ReceptionCreateAdmission', { patient, patientId: patient.id })}
             onPress={() => navigation.navigate('ReceptionPatientDetail', { patientId: patient.id })}
             patient={patient}
           />

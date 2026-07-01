@@ -13,7 +13,7 @@ import { InvoiceTotalsCard } from '@/features/cashier/components/InvoiceTotalsCa
 import { PaymentForm } from '@/features/cashier/components/PaymentForm';
 import { getInvoiceDetail } from '@/features/cashier/services/cashierInvoiceService';
 import { registerPayment } from '@/features/cashier/services/cashierPaymentService';
-import { numericValue } from '@/features/cashier/types/commonCashier.types';
+import { formatCurrency, numericValue } from '@/features/cashier/types/commonCashier.types';
 import type { CashierInvoiceDetail } from '@/features/cashier/types/cashierInvoice.types';
 import type { PaymentMethod } from '@/features/cashier/types/cashierPayment.types';
 
@@ -85,6 +85,9 @@ export function CashierRegisterPaymentScreen() {
   if (loading) return <LoadingState label="Preparando pago..." />;
   if (error || !invoice) return <ErrorState message={error || 'Factura no disponible.'} onRetry={() => void load()} title="No se puede registrar" />;
 
+  const balance = numericValue(invoice.balance_due ?? invoice.balance);
+  const currency = invoice.currency ?? 'L';
+
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboard}>
@@ -98,11 +101,17 @@ export function CashierRegisterPaymentScreen() {
               method={method}
               notes={notes}
               onChangeAmount={setAmount}
-              onChangeMethod={setMethod}
+              onChangeMethod={(value) => {
+                setMethod(value);
+                if (value === 'cash') setReference('');
+              }}
               onChangeNotes={setNotes}
               onChangeReference={setReference}
+              onFillBalance={() => setAmount(balance > 0 ? balance.toFixed(2) : '')}
               onSubmit={submit}
               reference={reference}
+              referenceRequired={method !== 'cash'}
+              balanceLabel={formatCurrency(balance, currency)}
             />
           </AppCard>
           <AppButton label="Cancelar" onPress={() => navigation.goBack()} variant="secondary" />

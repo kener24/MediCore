@@ -38,7 +38,7 @@ export function ReceptionPatientCreateScreen() {
     setSaving(true);
     try {
       const patient = await createMinimalPatient({ ...form, full_name: fullName, identity_number: identity, phone, birth_date: birthDate || undefined });
-      Alert.alert('Paciente', 'Paciente creado correctamente.', [{ text: 'Crear admision', onPress: () => navigation.navigate('ReceptionCreateAdmission', { patientId: patient.id }) }]);
+      Alert.alert('Paciente', 'Paciente creado correctamente.', [{ text: 'Crear admision', onPress: () => navigation.navigate('ReceptionCreateAdmission', { patient, patientId: patient.id }) }]);
     } catch (err) {
       Alert.alert('Paciente', err instanceof Error ? err.message : 'No se pudo crear el paciente.');
     } finally {

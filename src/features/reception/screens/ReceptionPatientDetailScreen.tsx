@@ -62,7 +62,7 @@ export function ReceptionPatientDetailScreen() {
               <Info label="Código" value={patient.patient_code ?? patient.codigo_paciente ?? 'Sin código'} />
               {patient.allergies || patient.alergias ? <Info label="Alergias" value={patient.allergies ?? patient.alergias ?? ''} /> : null}
             </AppCard>
-            <AppButton label="Crear admisión" onPress={() => navigation.navigate('ReceptionCreateAdmission', { patientId: patient.id })} />
+            <AppButton label="Crear admision" onPress={() => navigation.navigate('ReceptionCreateAdmission', { patient, patientId: patient.id })} />
             <AppButton label="Ver admisiones de hoy" onPress={() => navigation.navigate('ReceptionTodayAdmissions')} variant="secondary" />
           </>
         ) : null}

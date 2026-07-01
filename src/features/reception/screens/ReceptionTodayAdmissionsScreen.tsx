@@ -4,20 +4,23 @@ import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/AppHeader';
+import { AppInput } from '@/components/AppInput';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
 import { TodayAdmissionCard } from '@/features/reception/components/TodayAdmissionCard';
 import { getTodayAdmissions } from '@/features/reception/services/receptionAdmissionService';
+import { visitDoctorName, visitPatientName } from '@/features/reception/services/receptionMappers';
 import type { ReceptionVisit } from '@/features/reception/types/receptionAdmission.types';
 
-const filters = [['all', 'Todas'], ['waiting_triage', 'Triaje'], ['in_triage', 'En triaje'], ['waiting_doctor', 'Médico'], ['in_consultation', 'Consulta'], ['completed', 'Finalizadas'], ['cancelled', 'Canceladas']] as const;
+const filters = [['all', 'Todas'], ['waiting_triage', 'Triaje'], ['in_triage', 'En triaje'], ['waiting_doctor', 'Medico'], ['in_consultation', 'Consulta'], ['waiting_billing', 'Caja'], ['completed', 'Finalizadas'], ['cancelled', 'Canceladas']] as const;
 
 export function ReceptionTodayAdmissionsScreen() {
   const navigation = useNavigation<any>();
   const [visits, setVisits] = useState<ReceptionVisit[]>([]);
   const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -37,7 +40,24 @@ export function ReceptionTodayAdmissionsScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
-  const visible = useMemo(() => filter === 'all' ? visits : visits.filter((item) => item.status === filter), [filter, visits]);
+
+  const visible = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    return visits.filter((item) => {
+      if (filter !== 'all' && visitFilterKey(item) !== filter) return false;
+      if (!needle) return true;
+      const searchable = [
+        visitPatientName(item),
+        visitDoctorName(item),
+        item.reason,
+        item.visit_number,
+        item.priority,
+        item.status,
+      ].join(' ').toLowerCase();
+      return searchable.includes(needle);
+    });
+  }, [filter, search, visits]);
+
   if (loading) return <LoadingState label="Cargando admisiones..." />;
 
   return (
@@ -45,12 +65,25 @@ export function ReceptionTodayAdmissionsScreen() {
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl onRefresh={() => void load(true)} refreshing={refreshing} />}>
         <AppHeader icon="clipboard-list-outline" subtitle="Visitas y admisiones registradas hoy." title="Admisiones de hoy" />
         <View style={styles.filters}>{filters.map(([value, label]) => <Text key={value} onPress={() => setFilter(value)} style={[styles.filter, filter === value && styles.filterActive]}>{label}</Text>)}</View>
+        <AppInput autoCapitalize="none" label="Buscar admision" onChangeText={setSearch} placeholder="Paciente, medico, motivo o numero" value={search} />
         {error ? <ErrorState message={error} onRetry={() => void load()} title="No se pudo cargar" /> : null}
-        {!error && visible.length === 0 ? <EmptyState description="Las admisiones registradas aparecerán aquí." title="Sin admisiones" /> : null}
+        {!error && visible.length === 0 ? <EmptyState description="Ajusta el filtro o registra una nueva admision." title="Sin admisiones" /> : null}
         {visible.map((visit) => <TodayAdmissionCard key={visit.id} onPress={() => navigation.navigate('ReceptionVisitDetail', { visitId: visit.id })} visit={visit} />)}
       </ScrollView>
     </SafeAreaView>
   );
+}
+
+function visitFilterKey(visit: ReceptionVisit) {
+  const status = String(visit.status ?? '').toLowerCase();
+  if (status.includes('cancel') || status.includes('anulad')) return 'cancelled';
+  if (status.includes('complete') || status.includes('final') || status.includes('paid')) return 'completed';
+  if (status.includes('billing') || status.includes('payment') || status.includes('caja') || status.includes('pago')) return 'waiting_billing';
+  if (status.includes('consult')) return 'in_consultation';
+  if (status.includes('doctor') || status.includes('medic')) return 'waiting_doctor';
+  if (status.includes('in_triage') || status.includes('en_triaje')) return 'in_triage';
+  if (status.includes('triage') || status.includes('triaje')) return 'waiting_triage';
+  return status || 'waiting_triage';
 }
 
 const styles = StyleSheet.create({

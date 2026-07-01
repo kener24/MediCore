@@ -18,7 +18,11 @@ export async function getMeService() {
 }
 
 export async function changePasswordService(payload: ChangePasswordPayload) {
-  const { data } = await apiClient.post(endpoints.auth.changePassword, payload);
+  const { data } = await apiClient.post(endpoints.auth.changePassword, {
+    confirm_password: payload.confirm_password,
+    new_password: payload.new_password,
+    old_password: payload.current_password,
+  });
   return data;
 }
 

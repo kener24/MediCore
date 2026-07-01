@@ -144,24 +144,30 @@ export function RequestAppointmentScreen() {
 
     setSubmitting(true);
     try {
-      const created = await requestPatientAppointment({
+      await requestPatientAppointment({
         doctor: doctor.id,
         modality,
         reason: reason.trim(),
         scheduled_date: date.trim(),
         start_time: slot.start_time,
       });
-      Alert.alert('Solicitud enviada', 'Solicitud de cita enviada correctamente.');
-      if (created?.id) {
-        navigation.navigate('PatientAppointmentDetail', { id: created.id });
-      } else {
-        navigation.getParent()?.navigate('PatientAppointmentsTab');
-      }
+      Alert.alert('Solicitud enviada', 'Solicitud de cita enviada correctamente.', [
+        { text: 'Ver mis citas', onPress: goToAppointments },
+      ]);
     } catch (err) {
       Alert.alert('Solicitud', err instanceof Error ? err.message : 'El horario ya fue tomado.');
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function goToAppointments() {
+    const parent = navigation.getParent<NavigationProp<ParamListBase>>();
+    if (parent) {
+      parent.navigate('PatientAppointmentsTab', { screen: 'PatientAppointments' });
+      return;
+    }
+    navigation.navigate('PatientAppointments');
   }
 
   if (loading) return <LoadingState label="Cargando especialidades..." />;

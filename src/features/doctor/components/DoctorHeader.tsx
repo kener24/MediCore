@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { HeaderBackButton } from '@/components/HeaderBackButton';
 import { colors } from '@/core/theme/colors';
 
 export function DoctorHeader({
@@ -20,6 +21,7 @@ export function DoctorHeader({
 }) {
   return (
     <View style={styles.container}>
+      <HeaderBackButton />
       <View style={styles.copy}>
         <Text style={styles.eyebrow}>MediCore Médico</Text>
         <Text style={styles.title}>{doctorName ? `${title}, ${doctorName}` : title}</Text>

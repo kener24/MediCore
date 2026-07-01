@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { HeaderBackButton } from '@/components/HeaderBackButton';
 import { colors } from '@/core/theme/colors';
 
 interface PatientHeaderProps {
@@ -25,6 +26,7 @@ export function PatientHeader({
   const displayName = patientName ?? name;
   return (
     <View style={styles.container}>
+      <HeaderBackButton />
       <View style={styles.copy}>
         <Text style={styles.eyebrow}>MediCore Paciente</Text>
         <Text style={styles.title}>{displayName ? `${title}, ${displayName}` : title}</Text>

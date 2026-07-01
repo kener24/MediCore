@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { HeaderBackButton } from '@/components/HeaderBackButton';
 import { colors } from '@/core/theme/colors';
 
 interface AppHeaderProps {
@@ -12,6 +13,7 @@ interface AppHeaderProps {
 export function AppHeader({ icon = 'heart-pulse', subtitle, title }: AppHeaderProps) {
   return (
     <View style={styles.container}>
+      <HeaderBackButton />
       <View style={styles.icon}>
         <MaterialCommunityIcons color={colors.white} name={icon} size={26} />
       </View>

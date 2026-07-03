@@ -78,6 +78,7 @@ function appointmentState(appointment: ReceptionAppointment) {
   ) {
     return { key: 'checked_in', label: 'Con check-in', style: styles.statusSuccess };
   }
+  if (status.includes('no_asistio') || status.includes('no show') || status.includes('no_show')) return { key: 'no_show', label: 'No asistio', style: styles.statusDanger };
   if (status.includes('cancel') || status.includes('anulad')) return { key: 'cancelled', label: 'Cancelada', style: styles.statusDanger };
   if (status.includes('confirm')) return { key: 'confirmed', label: 'Confirmada', style: styles.statusInfo };
   if (status.includes('pend') || status.includes('sched') || status.includes('program')) return { key: 'scheduled', label: 'Pendiente', style: styles.statusWarning };

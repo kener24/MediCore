@@ -43,10 +43,11 @@ export async function checkInAppointment(appointmentId: number | string, payload
 
 export async function updateAppointmentReceptionStatus(appointmentId: number | string, status: 'confirmed' | 'cancelled' | 'no_show', reason?: string): Promise<ReceptionAppointment> {
   const payload = { cancellation_reason: reason?.trim(), no_show_reason: reason?.trim(), reason: reason?.trim(), status };
+  const actionUrl = status === 'confirmed' ? 'confirm' : status === 'cancelled' ? 'cancel' : 'mark-no-show';
   return patchFirstAvailable<ReceptionAppointment>(
     [
-      `/appointments/${appointmentId}/set-status/`,
-      `/appointments/${appointmentId}/${status}/`,
+      `/appointments/${appointmentId}/${actionUrl}/`,
+      status === 'no_show' ? `/appointments/${appointmentId}/mark-no-show/` : `/appointments/${appointmentId}/${status}/`,
       `/appointments/${appointmentId}/`,
       `/reception/appointments/${appointmentId}/`,
     ],

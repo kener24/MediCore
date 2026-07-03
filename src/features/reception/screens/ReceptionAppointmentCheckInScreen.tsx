@@ -17,7 +17,7 @@ import { appointmentDoctorName, appointmentPatientName } from '@/features/recept
 import { checkInAppointment, getTodayAppointments, updateAppointmentReceptionStatus } from '@/features/reception/services/receptionAppointmentService';
 import type { ReceptionAppointment } from '@/features/reception/types/receptionAppointment.types';
 
-const filters = [['all', 'Todas'], ['scheduled', 'Pendientes'], ['confirmed', 'Confirmadas'], ['checked_in', 'Con check-in'], ['cancelled', 'Canceladas']] as const;
+const filters = [['all', 'Todas'], ['scheduled', 'Pendientes'], ['confirmed', 'Confirmadas'], ['checked_in', 'Con check-in'], ['no_show', 'No asistio'], ['cancelled', 'Canceladas']] as const;
 
 export function ReceptionAppointmentCheckInScreen() {
   const navigation = useNavigation<any>();
@@ -218,6 +218,7 @@ function appointmentFilterKey(appointment: ReceptionAppointment) {
     status.includes('attended') ||
     status.includes('atendida')
   ) return 'checked_in';
+  if (status.includes('no_asistio') || status.includes('no show') || status.includes('no_show')) return 'no_show';
   if (status.includes('cancel') || status.includes('anulad')) return 'cancelled';
   if (status.includes('confirm')) return 'confirmed';
   return 'scheduled';

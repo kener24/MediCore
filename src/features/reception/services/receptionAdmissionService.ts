@@ -42,6 +42,14 @@ export async function cancelAdmission(visitId: number | string, reason: string):
   return patchFirstAvailable<ReceptionVisit>([`/reception/visits/${visitId}/cancel/`, `/admissions/visits/${visitId}/cancel/`, `/admissions/visits/${visitId}/`], { status: 'cancelled', reason: reason.trim(), cancellation_reason: reason.trim() });
 }
 
+export async function updateReceptionVisitNote(visitId: number | string, note: string): Promise<ReceptionVisit> {
+  const cleanNote = note.trim();
+  return patchFirstAvailable<ReceptionVisit>(
+    [`/reception/visits/${visitId}/notes/`, `/admissions/visits/${visitId}/notes/`, `/admissions/visits/${visitId}/`],
+    { notes: cleanNote, reception_notes: cleanNote },
+  );
+}
+
 export async function generateInvoiceFromReceptionVisit(visitId: number | string): Promise<{ id?: number; invoice_number?: string; status?: string }> {
   return postFirstAvailable<{ id?: number; invoice_number?: string; status?: string }>([`/billing/visits/${visitId}/generate-invoice/`, `/cashier/visits/${visitId}/generate-invoice/`, `/admissions/visits/${visitId}/generate-invoice/`]);
 }

@@ -26,6 +26,11 @@ export type ReceptionVisit = {
   status?: VisitStatus;
   reason?: string;
   priority?: string;
+  reception_notes?: string;
+  notes?: string;
+  cancellation_reason?: string;
+  updated_at?: string;
+  updated_by_name?: string;
   doctor_id?: number;
   assigned_doctor?: number;
   doctor_name?: string;

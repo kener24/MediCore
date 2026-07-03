@@ -11,7 +11,7 @@ import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
 import { VisitStatusBadge } from '@/features/reception/components/VisitStatusBadge';
-import { cancelAdmission, generateInvoiceFromReceptionVisit, getVisitDetail, sendToDoctor, sendToTriage } from '@/features/reception/services/receptionAdmissionService';
+import { cancelAdmission, generateInvoiceFromReceptionVisit, getVisitDetail, sendToDoctor, sendToTriage, updateReceptionVisitNote } from '@/features/reception/services/receptionAdmissionService';
 import { visitDoctorName, visitPatientName } from '@/features/reception/services/receptionMappers';
 import type { ReceptionVisit } from '@/features/reception/types/receptionAdmission.types';
 
@@ -25,6 +25,7 @@ export function ReceptionVisitDetailScreen() {
   const [error, setError] = useState('');
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  const [note, setNote] = useState('');
 
   const load = useCallback(async () => {
     if (!visitId) {
@@ -36,7 +37,9 @@ export function ReceptionVisitDetailScreen() {
     setLoading(true);
     setError('');
     try {
-      setVisit(await getVisitDetail(visitId));
+      const data = await getVisitDetail(visitId);
+      setVisit(data);
+      setNote(data.reception_notes ?? data.notes ?? '');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar la visita.');
     } finally {
@@ -91,6 +94,20 @@ export function ReceptionVisitDetailScreen() {
     }
   }
 
+  async function saveNote() {
+    if (!visit?.id) return;
+    if (note.trim().length < 3) return Alert.alert('Nota administrativa', 'Escribe una nota mas clara.');
+    try {
+      setBusy(true);
+      setVisit(await updateReceptionVisitNote(visit.id, note));
+      Alert.alert('Nota administrativa', 'Nota guardada correctamente.');
+    } catch (err) {
+      Alert.alert('Nota administrativa', err instanceof Error ? err.message : 'No se pudo guardar la nota.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (loading) return <LoadingState label="Cargando visita..." />;
   const status = String(visit?.status ?? '');
   const closed = ['cancelled', 'completed', 'paid'].includes(status);
@@ -116,6 +133,21 @@ export function ReceptionVisitDetailScreen() {
               <Info label="Llegada" value={visit.arrival_time || visit.creado_en || 'Sin hora'} />
               <Info label="Cita relacionada" value={String(visit.appointment ?? visit.appointment_id ?? 'Sin cita')} />
               <Info label="Factura" value={visit.invoice ? `#${visit.invoice}` : 'Sin factura'} />
+              {visit.updated_at ? <Info label="Ultima actualizacion" value={visit.updated_at} /> : null}
+              {visit.updated_by_name ? <Info label="Actualizado por" value={visit.updated_by_name} /> : null}
+            </AppCard>
+            <AppCard style={styles.card}>
+              <Text style={styles.modalTitle}>Nota administrativa</Text>
+              <Text style={styles.modalMeta}>Visible para seguimiento interno de recepcion.</Text>
+              <TextInput
+                multiline
+                onChangeText={setNote}
+                placeholder="Ej. Paciente llega tarde, debe actualizar RTN, trae referencia..."
+                placeholderTextColor="#98a2b3"
+                style={styles.reasonInput}
+                value={note}
+              />
+              <AppButton disabled={busy || note.trim().length < 3} label="Guardar nota" loading={busy} onPress={saveNote} variant="secondary" />
             </AppCard>
             {!closed ? (
               <View style={styles.actions}>

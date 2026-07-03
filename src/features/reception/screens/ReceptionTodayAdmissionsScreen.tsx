@@ -20,9 +20,10 @@ export function ReceptionTodayAdmissionsScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const initialFilter = String(route.params?.initialFilter ?? 'all');
+  const initialSearch = String(route.params?.initialSearch ?? '');
   const [visits, setVisits] = useState<ReceptionVisit[]>([]);
   const [filter, setFilter] = useState(initialFilter);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialSearch);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -45,6 +46,9 @@ export function ReceptionTodayAdmissionsScreen() {
   useEffect(() => {
     if (initialFilter && initialFilter !== filter) setFilter(initialFilter);
   }, [filter, initialFilter]);
+  useEffect(() => {
+    if (initialSearch && initialSearch !== search) setSearch(initialSearch);
+  }, [initialSearch, search]);
 
   const visible = useMemo(() => {
     const needle = search.trim().toLowerCase();

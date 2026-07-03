@@ -1,4 +1,4 @@
-import { getFirstAvailable, postFirstAvailable } from '@/features/reception/services/receptionApiHelpers';
+import { getFirstAvailable, patchFirstAvailable, postFirstAvailable } from '@/features/reception/services/receptionApiHelpers';
 import { normalizeListResponse, type ApiListResponse, type QueryParams } from '@/features/reception/types/commonReception.types';
 import type { ReceptionVisit } from '@/features/reception/types/receptionAdmission.types';
 import type { ReceptionAppointment } from '@/features/reception/types/receptionAppointment.types';
@@ -39,6 +39,19 @@ export async function checkInAppointment(appointmentId: number | string, payload
     { appointment: appointmentId, priority: payload?.priority ?? 'normal', symptoms: payload?.symptoms ?? '' },
   );
   return mapCheckInResponse(data);
+}
+
+export async function updateAppointmentReceptionStatus(appointmentId: number | string, status: 'confirmed' | 'cancelled' | 'no_show', reason?: string): Promise<ReceptionAppointment> {
+  const payload = { cancellation_reason: reason?.trim(), no_show_reason: reason?.trim(), reason: reason?.trim(), status };
+  return patchFirstAvailable<ReceptionAppointment>(
+    [
+      `/appointments/${appointmentId}/set-status/`,
+      `/appointments/${appointmentId}/${status}/`,
+      `/appointments/${appointmentId}/`,
+      `/reception/appointments/${appointmentId}/`,
+    ],
+    payload,
+  );
 }
 
 function mapCheckInResponse(response: unknown): AppointmentCheckInResult {

@@ -9,13 +9,19 @@ export function AppointmentCheckInCard({
   appointment,
   disabled,
   loading,
+  onCancel,
   onCheckIn,
+  onConfirm,
+  onNoShow,
   onViewVisit,
 }: {
   appointment: ReceptionAppointment;
   disabled?: boolean;
   loading?: boolean;
+  onCancel?: () => void;
   onCheckIn: () => void;
+  onConfirm?: () => void;
+  onNoShow?: () => void;
   onViewVisit?: () => void;
 }) {
   const state = appointmentState(appointment);
@@ -39,6 +45,21 @@ export function AppointmentCheckInCard({
             {loading ? <ActivityIndicator color={colors.white} /> : <Text style={styles.buttonText}>Hacer check-in</Text>}
           </Pressable>
         )}
+        {state.key === 'scheduled' && onConfirm ? (
+          <Pressable disabled={disabled || loading} onPress={onConfirm} style={[styles.smallButton, styles.secondaryButton]}>
+            <Text style={[styles.buttonText, styles.secondaryText]}>Confirmar</Text>
+          </Pressable>
+        ) : null}
+        {['scheduled', 'confirmed'].includes(state.key) && onNoShow ? (
+          <Pressable disabled={disabled || loading} onPress={onNoShow} style={[styles.smallButton, styles.warningButton]}>
+            <Text style={styles.warningText}>No asistio</Text>
+          </Pressable>
+        ) : null}
+        {['scheduled', 'confirmed'].includes(state.key) && onCancel ? (
+          <Pressable disabled={disabled || loading} onPress={onCancel} style={[styles.smallButton, styles.dangerButton]}>
+            <Text style={styles.dangerText}>Cancelar</Text>
+          </Pressable>
+        ) : null}
       </View>
     </AppCard>
   );
@@ -69,13 +90,18 @@ const styles = StyleSheet.create({
   card: { gap: 6 },
   disabledButton: { opacity: 0.45 },
   meta: { color: colors.muted, fontSize: 13, lineHeight: 19 },
-  row: { alignItems: 'flex-start' },
+  row: { alignItems: 'flex-start', flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   secondaryButton: { backgroundColor: colors.palePrimary, borderColor: '#ccebe7', borderWidth: 1 },
   secondaryText: { color: colors.primaryDark },
+  dangerButton: { backgroundColor: '#fee2e2', borderColor: '#fecaca', borderWidth: 1 },
+  dangerText: { color: colors.danger, fontSize: 12, fontWeight: '900' },
+  smallButton: { alignItems: 'center', borderRadius: 12, marginTop: 6, minHeight: 40, paddingHorizontal: 12, paddingVertical: 10 },
   status: { alignSelf: 'flex-start', borderRadius: 999, fontSize: 12, fontWeight: '900', overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 5 },
   statusDanger: { backgroundColor: '#fee2e2', color: colors.danger },
   statusInfo: { backgroundColor: '#dbeafe', color: '#1d4ed8' },
   statusSuccess: { backgroundColor: '#dcfce7', color: '#15803d' },
   statusWarning: { backgroundColor: '#fef3c7', color: '#92400e' },
   title: { color: colors.ink, fontSize: 17, fontWeight: '900' },
+  warningButton: { backgroundColor: '#fef3c7', borderColor: '#fde68a', borderWidth: 1 },
+  warningText: { color: colors.warning, fontSize: 12, fontWeight: '900' },
 });

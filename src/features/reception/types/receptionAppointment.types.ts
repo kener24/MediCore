@@ -15,6 +15,8 @@ export type ReceptionAppointment = {
   datetime?: string;
   modality?: 'presencial' | 'online' | string;
   status?: string;
+  cancellation_reason?: string;
+  no_show_reason?: string;
   reason?: string;
   motivo?: string;
   visit?: number | Record<string, unknown> | null;

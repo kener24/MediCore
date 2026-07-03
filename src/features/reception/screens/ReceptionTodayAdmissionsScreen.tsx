@@ -1,5 +1,5 @@
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { useCallback, useMemo, useState } from 'react';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -18,8 +18,10 @@ const filters = [['all', 'Todas'], ['waiting_triage', 'Triaje'], ['in_triage', '
 
 export function ReceptionTodayAdmissionsScreen() {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+  const initialFilter = String(route.params?.initialFilter ?? 'all');
   const [visits, setVisits] = useState<ReceptionVisit[]>([]);
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState(initialFilter);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -40,6 +42,9 @@ export function ReceptionTodayAdmissionsScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
+  useEffect(() => {
+    if (initialFilter && initialFilter !== filter) setFilter(initialFilter);
+  }, [filter, initialFilter]);
 
   const visible = useMemo(() => {
     const needle = search.trim().toLowerCase();

@@ -1,22 +1,35 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppButton } from '@/components/AppButton';
+import { AppCard } from '@/components/AppCard';
 import { AppHeader } from '@/components/AppHeader';
+import { AppInput } from '@/components/AppInput';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
+import { QuickActionCard } from '@/components/QuickActionCard';
 import { colors } from '@/core/theme/colors';
 import { useAuth } from '@/features/auth/context/AuthContext';
+import { AppointmentCheckInCard } from '@/features/reception/components/AppointmentCheckInCard';
 import { ReceptionStatsGrid } from '@/features/reception/components/ReceptionStatsGrid';
+import { TodayAdmissionCard } from '@/features/reception/components/TodayAdmissionCard';
+import { getTodayAdmissions } from '@/features/reception/services/receptionAdmissionService';
+import { getTodayAppointments } from '@/features/reception/services/receptionAppointmentService';
 import { getReceptionDashboard } from '@/features/reception/services/receptionDashboardService';
-import type { ReceptionStats } from '@/features/reception/types/receptionAdmission.types';
+import type { ReceptionStats, ReceptionVisit } from '@/features/reception/types/receptionAdmission.types';
+import type { ReceptionAppointment } from '@/features/reception/types/receptionAppointment.types';
 
 export function ReceptionDashboardScreen() {
   const navigation = useNavigation<any>();
   const { user } = useAuth();
   const [stats, setStats] = useState<ReceptionStats | null>(null);
+  const [admissions, setAdmissions] = useState<ReceptionVisit[]>([]);
+  const [appointments, setAppointments] = useState<ReceptionAppointment[]>([]);
+  const [quickSearch, setQuickSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -26,9 +39,19 @@ export function ReceptionDashboardScreen() {
     else setLoading(true);
     setError('');
     try {
-      setStats(await getReceptionDashboard());
+      const [dashboardStats, todayAdmissions, todayAppointments] = await Promise.all([
+        getReceptionDashboard().catch(() => null),
+        getTodayAdmissions().catch(() => []),
+        getTodayAppointments().catch(() => []),
+      ]);
+      setStats(dashboardStats);
+      setAdmissions(todayAdmissions);
+      setAppointments(todayAppointments);
+      if (!dashboardStats && todayAdmissions.length === 0 && todayAppointments.length === 0) {
+        setError('No se pudo cargar la informacion operativa de recepcion.');
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo cargar recepción.');
+      setError(err instanceof Error ? err.message : 'No se pudo cargar recepcion.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -37,36 +60,154 @@ export function ReceptionDashboardScreen() {
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
-  if (loading) return <LoadingState label="Cargando recepción..." />;
+  const work = useMemo(() => buildWorkSummary(admissions, appointments), [admissions, appointments]);
+  const priorityAdmissions = useMemo(() => admissions.filter((item) => isPriority(item)).slice(0, 3), [admissions]);
+  const nextAppointments = useMemo(() => appointments.filter((item) => !appointmentIsCheckedIn(item)).slice(0, 3), [appointments]);
+
+  function runQuickSearch() {
+    const value = quickSearch.trim();
+    navigation.navigate('ReceptionPatientSearch', value.length >= 2 ? { initialQuery: value } : undefined);
+  }
+
+  if (loading) return <LoadingState label="Cargando recepcion..." />;
 
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl onRefresh={() => void load(true)} refreshing={refreshing} />}>
-        <AppHeader icon="desk" subtitle={`${user?.clinica_nombre ?? 'Clínica asignada'} · ${user?.nombre_completo ?? 'Recepción'}`} title="Recepción" />
-        {error ? <ErrorState message={error} onRetry={() => void load()} title="No se pudo cargar el panel" /> : null}
+        <AppHeader icon="desk" subtitle={`${user?.clinica_nombre ?? 'Clinica asignada'} - ${user?.nombre_completo ?? 'Recepcion'}`} title="Centro de recepcion" />
+        {error ? <ErrorState message={error} onRetry={() => void load()} title="Panel incompleto" /> : null}
+
+        <AppCard style={styles.searchCard}>
+          <View style={styles.sectionHeader}>
+            <View>
+              <Text style={styles.sectionTitle}>Busqueda rapida</Text>
+              <Text style={styles.sectionMeta}>Nombre, identidad, telefono o codigo.</Text>
+            </View>
+            <MaterialCommunityIcons color={colors.primary} name="account-search-outline" size={26} />
+          </View>
+          <AppInput autoCapitalize="words" label="Paciente" onChangeText={setQuickSearch} onSubmitEditing={runQuickSearch} placeholder="Buscar paciente" value={quickSearch} />
+          <View style={styles.rowButtons}>
+            <AppButton label="Buscar" onPress={runQuickSearch} />
+            <AppButton label="Nuevo" onPress={() => navigation.navigate('ReceptionPatientCreate')} variant="secondary" />
+          </View>
+        </AppCard>
+
         {stats ? <ReceptionStatsGrid stats={stats} /> : null}
-        {!error && !stats ? <EmptyState description="Cuando existan citas o admisiones se mostrarán aquí." title="Sin datos de recepción" /> : null}
-        <View style={styles.actions}>
-          <QuickAction label="Buscar paciente" onPress={() => navigation.navigate('ReceptionPatientSearch')} />
-          <QuickAction label="Crear paciente" onPress={() => navigation.navigate('ReceptionPatientCreate')} />
-          <QuickAction label="Nueva admisión" onPress={() => navigation.navigate('ReceptionCreateAdmission')} />
-          <QuickAction label="Check-in de cita" onPress={() => navigation.navigate('ReceptionAppointmentCheckIn')} />
-          <QuickAction label="Admisiones de hoy" onPress={() => navigation.navigate('ReceptionTodayAdmissions')} />
-          <QuickAction label="Caja y cobros" onPress={() => navigation.navigate('ReceptionCashierTab')} />
+
+        <Text style={styles.sectionTitle}>Bandeja operativa</Text>
+        <View style={styles.workflowGrid}>
+          <WorkflowCard count={work.pendingCheckIn} icon="calendar-clock" label="Citas por recibir" onPress={() => navigation.navigate('ReceptionAppointmentCheckIn', { initialFilter: 'scheduled' })} tone="blue" />
+          <WorkflowCard count={work.waitingTriage} icon="clipboard-pulse-outline" label="Esperando triaje" onPress={() => navigation.navigate('ReceptionTodayAdmissions', { initialFilter: 'waiting_triage' })} tone="warning" />
+          <WorkflowCard count={work.waitingDoctor} icon="doctor" label="Listos para medico" onPress={() => navigation.navigate('ReceptionTodayAdmissions', { initialFilter: 'waiting_doctor' })} tone="primary" />
+          <WorkflowCard count={work.waitingBilling} icon="cash-register" label="Pendiente caja" onPress={() => navigation.navigate('ReceptionTodayAdmissions', { initialFilter: 'waiting_billing' })} tone="danger" />
         </View>
+
+        <Text style={styles.sectionTitle}>Acciones frecuentes</Text>
+        <View style={styles.actions}>
+          <QuickActionCard description="Busca, valida identidad y abre expediente operativo." icon="account-search-outline" onPress={() => navigation.navigate('ReceptionPatientSearch')} title="Buscar paciente" />
+          <QuickActionCard description="Registra un paciente minimo para atencion inmediata." icon="account-plus-outline" onPress={() => navigation.navigate('ReceptionPatientCreate')} title="Crear paciente" />
+          <QuickActionCard description="Crea una visita sin cita y asigna prioridad/medico." icon="clipboard-plus-outline" onPress={() => navigation.navigate('ReceptionCreateAdmission')} title="Nueva admision" />
+          <QuickActionCard description="Recibe pacientes con cita y crea la visita operativa." icon="calendar-check-outline" onPress={() => navigation.navigate('ReceptionAppointmentCheckIn')} title="Check-in de cita" />
+        </View>
+
+        <SectionHeader action="Ver agenda" onPress={() => navigation.navigate('ReceptionAppointmentCheckIn')} title="Proximas citas" />
+        {nextAppointments.length ? nextAppointments.map((appointment) => (
+          <AppointmentCheckInCard
+            appointment={appointment}
+            key={appointment.id ?? `${appointment.patient_name}-${appointment.time}`}
+            onCheckIn={() => navigation.navigate('ReceptionAppointmentCheckIn', { focusAppointmentId: appointment.id })}
+            onViewVisit={() => navigation.navigate('ReceptionAppointmentCheckIn')}
+          />
+        )) : <EmptyState description="No hay citas pendientes por recibir." title="Agenda al dia" />}
+
+        <SectionHeader action="Ver flujo" onPress={() => navigation.navigate('ReceptionTodayAdmissions')} title="Prioridades de atencion" />
+        {priorityAdmissions.length ? priorityAdmissions.map((visit) => (
+          <TodayAdmissionCard key={visit.id} onPress={() => navigation.navigate('ReceptionVisitDetail', { visitId: visit.id })} visit={visit} />
+        )) : <EmptyState description="No hay pacientes urgentes o atrasados en este momento." title="Sin prioridades" />}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function QuickAction({ label, onPress }: { label: string; onPress: () => void }) {
-  return <Pressable onPress={onPress} style={styles.action}><Text style={styles.actionText}>{label}</Text></Pressable>;
+function SectionHeader({ action, onPress, title }: { action: string; onPress: () => void; title: string }) {
+  return (
+    <View style={styles.listHeader}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <Text onPress={onPress} style={styles.link}>{action}</Text>
+    </View>
+  );
+}
+
+function WorkflowCard({
+  count,
+  icon,
+  label,
+  onPress,
+  tone,
+}: {
+  count: number;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  label: string;
+  onPress: () => void;
+  tone: 'primary' | 'blue' | 'warning' | 'danger';
+}) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.workflowCard, pressed && styles.pressed]}>
+      <View style={[styles.workflowIcon, styles[tone]]}>
+        <MaterialCommunityIcons color={colors.white} name={icon} size={20} />
+      </View>
+      <Text style={styles.workflowCount}>{count}</Text>
+      <Text style={styles.workflowLabel}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function buildWorkSummary(admissions: ReceptionVisit[], appointments: ReceptionAppointment[]) {
+  return {
+    pendingCheckIn: appointments.filter((item) => !appointmentIsCheckedIn(item) && !String(item.status ?? '').toLowerCase().includes('cancel')).length,
+    waitingBilling: admissions.filter((item) => normalizeVisitStatus(item) === 'waiting_billing').length,
+    waitingDoctor: admissions.filter((item) => normalizeVisitStatus(item) === 'waiting_doctor').length,
+    waitingTriage: admissions.filter((item) => normalizeVisitStatus(item) === 'waiting_triage').length,
+  };
+}
+
+function normalizeVisitStatus(visit: ReceptionVisit) {
+  const status = String(visit.status ?? '').toLowerCase();
+  if (status.includes('billing') || status.includes('payment') || status.includes('caja') || status.includes('pago')) return 'waiting_billing';
+  if (status.includes('doctor') || status.includes('medic')) return 'waiting_doctor';
+  if (status.includes('triage') || status.includes('triaje') || status === 'registered') return 'waiting_triage';
+  return status;
+}
+
+function isPriority(visit: ReceptionVisit) {
+  const priority = String(visit.priority ?? '').toLowerCase();
+  return ['urgent', 'emergency', 'priority', 'alta', 'emergencia', 'urgente'].some((value) => priority.includes(value)) || ['waiting_triage', 'waiting_doctor', 'waiting_billing'].includes(normalizeVisitStatus(visit));
+}
+
+function appointmentIsCheckedIn(appointment: ReceptionAppointment) {
+  const status = String(appointment.status ?? '').toLowerCase();
+  return Boolean(appointment.checked_in || appointment.visit_id || appointment.admission_id || appointment.check_in_visit_id || status.includes('check') || status.includes('attended'));
 }
 
 const styles = StyleSheet.create({
-  action: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, padding: 16 },
-  actionText: { color: colors.ink, fontSize: 15, fontWeight: '900' },
   actions: { gap: 10 },
-  content: { gap: 16, padding: 18, paddingBottom: 120 },
+  blue: { backgroundColor: colors.medicalBlue },
+  content: { gap: 16, padding: 18, paddingBottom: 140 },
+  danger: { backgroundColor: colors.danger },
+  link: { color: colors.primary, fontSize: 13, fontWeight: '900' },
+  listHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  pressed: { opacity: 0.86, transform: [{ scale: 0.99 }] },
+  primary: { backgroundColor: colors.primary },
+  rowButtons: { flexDirection: 'row', gap: 10 },
   safe: { backgroundColor: colors.background, flex: 1 },
+  searchCard: { gap: 12 },
+  sectionHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  sectionMeta: { color: colors.muted, fontSize: 12, fontWeight: '700', marginTop: 3 },
+  sectionTitle: { color: colors.ink, fontSize: 17, fontWeight: '900' },
+  warning: { backgroundColor: colors.warning },
+  workflowCard: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 18, borderWidth: 1, flexBasis: '47%', flexGrow: 1, gap: 6, padding: 14 },
+  workflowCount: { color: colors.ink, fontSize: 24, fontWeight: '900' },
+  workflowGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  workflowIcon: { alignItems: 'center', borderRadius: 12, height: 38, justifyContent: 'center', width: 38 },
+  workflowLabel: { color: colors.muted, fontSize: 12, fontWeight: '800', lineHeight: 17 },
 });

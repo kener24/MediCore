@@ -11,7 +11,7 @@ const labels: Record<string, string> = {
   paid: 'Pagada',
   registered: 'Registrada',
   waiting_billing: 'Pendiente de cobro',
-  waiting_doctor: 'Esperando médico',
+  waiting_doctor: 'Esperando medico',
   waiting_payment: 'Pendiente de pago',
   waiting_triage: 'Esperando triaje',
 };

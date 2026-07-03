@@ -153,9 +153,14 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         appointment = self.get_object()
         if appointment.status == Appointment.Status.CANCELADA:
             return Response({"detail": "No puedes marcar no asistio una cita cancelada."}, status=status.HTTP_400_BAD_REQUEST)
+        reason = str(request.data.get("reason") or request.data.get("no_show_reason") or request.data.get("cancellation_reason") or "").strip()
         appointment.status = Appointment.Status.NO_ASISTIO
-        appointment.save(update_fields=["status"])
-        log_audit_event(request=request, clinic=appointment.clinic, action=AuditLog.Action.UPDATE, module=AuditLog.Module.APPOINTMENTS, model_name="Appointment", object_id=appointment.id, object_repr=str(appointment), description="Cita marcada como no asistio.")
+        appointment.activo = False
+        appointment.cancellation_reason = reason
+        appointment.cancelled_by = request.user
+        appointment.cancelled_at = timezone.now()
+        appointment.save(update_fields=["status", "activo", "cancellation_reason", "cancelled_by", "cancelled_at"])
+        log_audit_event(request=request, clinic=appointment.clinic, action=AuditLog.Action.UPDATE, module=AuditLog.Module.APPOINTMENTS, model_name="Appointment", object_id=appointment.id, object_repr=str(appointment), description="Cita marcada como no asistio.", new_values={"reason": reason})
         return Response(AppointmentDetailSerializer(appointment).data)
 
     @action(detail=True, methods=["post"], url_path="start-consultation")

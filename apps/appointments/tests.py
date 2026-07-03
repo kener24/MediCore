@@ -138,6 +138,18 @@ class AppointmentsModuleTests(APITestCase):
         self.assertEqual(self.client.patch(f"/api/appointments/{appointment.id}/mark-attended/").status_code, status.HTTP_200_OK)
         self.assertEqual(self.client.patch(f"/api/appointments/{appointment.id}/cancel/").status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_mark_no_show_guarda_motivo_y_cierra_cita(self):
+        appointment = self.create_appointment()
+        self.auth(self.recepcion)
+        response = self.client.patch(f"/api/appointments/{appointment.id}/mark-no-show/", {"reason": "Paciente no se presento"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.status, Appointment.Status.NO_ASISTIO)
+        self.assertFalse(appointment.activo)
+        self.assertEqual(appointment.cancellation_reason, "Paciente no se presento")
+        self.assertEqual(appointment.cancelled_by, self.recepcion)
+        self.assertIsNotNone(appointment.cancelled_at)
+
     def test_availability_devuelve_slots(self):
         self.create_appointment()
         self.auth(self.admin)

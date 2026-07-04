@@ -10,21 +10,23 @@ import { formatTime } from '@/features/patient/utils/formatters';
 
 export function WaitingRoomPatientCard({
   item,
+  loading,
   onStartConsultation,
   onView,
 }: {
   item: WaitingRoomPatient;
+  loading?: boolean;
   onStartConsultation?: () => void;
   onView?: () => void;
 }) {
   const name = item.patient_name ?? item.paciente_nombre ?? item.patient?.full_name ?? item.patient?.nombre_completo ?? 'Paciente';
   const visitId = item.visit_id ?? item.visita_id ?? item.id;
-  const demographic = [item.age ?? item.edad ? `${item.age ?? item.edad} años` : null, item.gender ?? item.genero]
+  const demographic = [item.age ?? item.edad ? `${item.age ?? item.edad} anos` : null, item.gender ?? item.genero]
     .filter(Boolean)
-    .join(' · ');
+    .join(' - ');
 
   return (
-    <Pressable onPress={onView}>
+    <Pressable disabled={loading} onPress={onView}>
       <AppCard style={styles.card}>
         <View style={styles.header}>
           <Text style={styles.title}>{name}</Text>
@@ -37,18 +39,18 @@ export function WaitingRoomPatientCard({
           <Text style={styles.meta}>Llegada: {formatTime(item.arrived_at ?? item.llegada_en)}</Text>
         </View>
         <Text style={styles.meta}>
-          Triaje: {item.triage_completed ?? item.triaje_completado ? 'completado' : 'pendiente'} · Visita #{visitId}
-          {item.waiting_time_minutes ? ` · Espera ${item.waiting_time_minutes} min` : ''}
+          Triaje: {item.triage_completed ?? item.triaje_completado ? 'completado' : 'pendiente'} - Visita #{visitId}
+          {item.waiting_time_minutes ? ` - Espera ${item.waiting_time_minutes} min` : ''}
         </Text>
         {item.vital_signs ? (
           <Text style={styles.vitals}>
-            Temp {item.vital_signs.temperature || '-'} · PA {item.vital_signs.blood_pressure || '-'} · FC{' '}
-            {item.vital_signs.heart_rate || '-'} · Sat {item.vital_signs.oxygen_saturation || '-'}%
+            Temp {item.vital_signs.temperature || '-'} - PA {item.vital_signs.blood_pressure || '-'} - FC{' '}
+            {item.vital_signs.heart_rate || '-'} - Sat {item.vital_signs.oxygen_saturation || '-'}%
           </Text>
         ) : null}
         <View style={styles.actions}>
-          <AppButton label="Ver paciente" onPress={onView} style={styles.button} variant="secondary" />
-          <AppButton label="Iniciar consulta" onPress={onStartConsultation} style={styles.button} />
+          <AppButton disabled={loading} label="Ver paciente" onPress={onView} style={styles.button} variant="secondary" />
+          <AppButton label={loading ? 'Iniciando...' : 'Iniciar consulta'} loading={loading} onPress={onStartConsultation} style={styles.button} />
         </View>
       </AppCard>
     </Pressable>

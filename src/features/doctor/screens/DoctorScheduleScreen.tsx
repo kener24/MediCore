@@ -12,6 +12,7 @@ import { colors } from '@/core/theme/colors';
 import { toISODate } from '@/core/utils/dateUtils';
 import { DoctorAppointmentCard } from '@/features/doctor/components/DoctorAppointmentCard';
 import { DoctorHeader } from '@/features/doctor/components/DoctorHeader';
+import { startConsultation } from '@/features/doctor/services/doctorConsultationService';
 import { getDoctorAppointmentsByDate } from '@/features/doctor/services/doctorScheduleService';
 import type { DoctorAppointment, DoctorScheduleFilter } from '@/features/doctor/types/doctorSchedule.types';
 
@@ -32,6 +33,7 @@ export function DoctorScheduleScreen() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [startingVisitId, setStartingVisitId] = useState<number | null>(null);
 
   const visibleAppointments = useMemo(() => {
     if (filter === 'all') return appointments;
@@ -52,7 +54,7 @@ export function DoctorScheduleScreen() {
     try {
       setAppointments(await getDoctorAppointmentsByDate(date));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'El módulo de agenda aún no está disponible.');
+      setError(err instanceof Error ? err.message : 'El modulo de agenda aun no esta disponible.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -65,7 +67,7 @@ export function DoctorScheduleScreen() {
     const visitId = item.visit_id ?? item.visita_id;
     const patientId = item.patient_id ?? item.patient;
     if (!visitId) {
-      Alert.alert('Agenda médica', 'Esta cita aún no tiene admisión registrada.');
+      Alert.alert('Agenda medica', 'Esta cita aun no tiene admision registrada. Primero debe pasar por recepcion.');
     }
     navigation.navigate('DoctorPatientDetail', {
       appointment: item,
@@ -82,16 +84,34 @@ export function DoctorScheduleScreen() {
 
   function attendAppointment(item: DoctorAppointment) {
     const visitId = item.visit_id ?? item.visita_id;
-    const patientId = item.patient_id ?? item.patient;
     if (!visitId) {
-      Alert.alert('Agenda médica', 'Esta cita aún no tiene admisión registrada.');
+      Alert.alert('Agenda medica', 'Esta cita aun no tiene admision registrada. Primero debe pasar por recepcion.');
       return;
     }
-    navigation.navigate('DoctorConsultation', {
-      appointmentId: item.appointment_id ?? item.id,
-      patientId,
-      visitId,
-    });
+    Alert.alert('Iniciar consulta', 'Deseas iniciar la consulta de este paciente?', [
+      { style: 'cancel', text: 'Cancelar' },
+      { onPress: () => handleAttend(item, visitId), text: 'Iniciar' },
+    ]);
+  }
+
+  async function handleAttend(item: DoctorAppointment, visitId: number) {
+    if (startingVisitId) return;
+    setStartingVisitId(visitId);
+    try {
+      const patientId = item.patient_id ?? item.patient;
+      const response = await startConsultation(visitId);
+      const consultationId = response.consultation_id ?? response.id;
+      navigation.navigate('DoctorConsultation', {
+        appointmentId: item.appointment_id ?? item.id,
+        consultationId,
+        patientId,
+        visitId,
+      });
+    } catch (err) {
+      Alert.alert('Consulta', err instanceof Error ? err.message : 'No se pudo iniciar la consulta.');
+    } finally {
+      setStartingVisitId(null);
+    }
   }
 
   if (loading) return <LoadingState label="Cargando agenda..." />;
@@ -102,7 +122,7 @@ export function DoctorScheduleScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl onRefresh={() => load(true)} refreshing={refreshing} />}
         showsVerticalScrollIndicator={false}>
-        <DoctorHeader title="Agenda médica" />
+        <DoctorHeader title="Agenda medica" />
         <View style={styles.controls}>
           <AppDateInput label="Fecha seleccionada" onChange={setDate} value={date} />
           <View style={styles.dateButtons}>
@@ -129,10 +149,11 @@ export function DoctorScheduleScreen() {
               key={item.id}
               onAttend={() => attendAppointment(item)}
               onPress={() => viewAppointment(item)}
+              attendLoading={startingVisitId === (item.visit_id ?? item.visita_id)}
             />
           ))
         ) : (
-          <EmptyState description="No tienes citas para este día." title="Agenda vacía" />
+          <EmptyState description="No tienes citas para este dia." title="Agenda vacia" />
         )}
       </ScrollView>
     </SafeAreaView>

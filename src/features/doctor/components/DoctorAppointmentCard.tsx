@@ -9,10 +9,12 @@ import { formatDate, formatTime } from '@/features/patient/utils/formatters';
 
 export function DoctorAppointmentCard({
   appointment,
+  attendLoading,
   onAttend,
   onPress,
 }: {
   appointment: DoctorAppointment;
+  attendLoading?: boolean;
   onAttend?: () => void;
   onPress?: () => void;
 }) {
@@ -43,7 +45,7 @@ export function DoctorAppointmentCard({
         {visitId ? <Text style={styles.visit}>Visita asociada</Text> : null}
         <View style={styles.actions}>
           <AppButton label="Ver" onPress={onPress} style={styles.button} variant="secondary" />
-          {canAttend ? <AppButton label="Atender" onPress={onAttend} style={styles.button} /> : null}
+          {canAttend ? <AppButton label={attendLoading ? 'Iniciando...' : 'Atender'} loading={attendLoading} onPress={onAttend} style={styles.button} /> : null}
         </View>
       </AppCard>
     </Pressable>

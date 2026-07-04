@@ -1,5 +1,5 @@
-import { useNavigation, useRoute } from '@react-navigation/native';
-import { useState } from 'react';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import { useCallback, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -8,8 +8,8 @@ import { ErrorState } from '@/components/ErrorState';
 import { AppHeader } from '@/components/AppHeader';
 import { colors } from '@/core/theme/colors';
 import { VitalSignsSummary } from '@/features/nurse/components/NurseCards';
-import { completeTriage } from '@/features/nurse/services/nurseApi';
-import type { CompleteTriagePayload, TriagePriority } from '@/features/nurse/types/nurse.types';
+import { completeTriage, getLatestVitalSigns } from '@/features/nurse/services/nurseApi';
+import type { CompleteTriagePayload, NurseVitalSigns, TriagePriority } from '@/features/nurse/types/nurse.types';
 import { priorityOptions, validateTriage } from '@/features/nurse/utils/nurseValidation';
 
 export function NurseTriageFormScreen() {
@@ -17,14 +17,44 @@ export function NurseTriageFormScreen() {
   const route = useRoute<any>();
   const visitId = route.params?.visitId;
   const patient = route.params?.patient;
-  const vitalSigns = route.params?.vitalSigns;
+  const initialVitalSigns = route.params?.vitalSigns as NurseVitalSigns | null | undefined;
+  const [currentVitalSigns, setCurrentVitalSigns] = useState<NurseVitalSigns | null>(initialVitalSigns ?? null);
   const [chiefComplaint, setChiefComplaint] = useState(patient?.reason ?? '');
   const [initialAssessment, setInitialAssessment] = useState('');
   const [priority, setPriority] = useState<TriagePriority>('normal');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
+  useFocusEffect(useCallback(() => {
+    if (!visitId) return undefined;
+    let active = true;
+    getLatestVitalSigns(visitId)
+      .then((data) => {
+        if (active && data) setCurrentVitalSigns(data);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [visitId]));
+
+  function confirmSave() {
+    if (saving) return;
+    if (!currentVitalSigns) {
+      Alert.alert('Signos vitales requeridos', 'Registra signos vitales antes de completar el triaje.', [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Registrar signos', onPress: () => navigation.navigate('NurseVitalSignsForm', { patient, visitId }) },
+      ]);
+      return;
+    }
+    Alert.alert('Completar triaje', 'El paciente será enviado a la cola médica. ¿Deseas continuar?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Completar', onPress: () => void save() },
+    ]);
+  }
+
   async function save() {
+    if (saving) return;
     if (!visitId) {
       Alert.alert('Visita no encontrada', 'No se encontró la visita del paciente.');
       return;
@@ -60,9 +90,9 @@ export function NurseTriageFormScreen() {
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <AppHeader icon="clipboard-pulse-outline" subtitle={patient?.name ?? 'Evaluación inicial'} title="Completar triaje" />
           {!visitId ? <ErrorState message="No se encontró la visita del paciente." title="Visita no encontrada" /> : null}
-          <VitalSignsSummary vitalSigns={vitalSigns} />
-          {!vitalSigns ? (
-            <AppButton label="Registrar signos vitales" onPress={() => navigation.navigate('NurseVitalSignsForm', { patient, visitId })} variant="secondary" />
+          <VitalSignsSummary vitalSigns={currentVitalSigns} />
+          {!currentVitalSigns ? (
+            <AppButton disabled={saving} label="Registrar signos vitales" onPress={() => navigation.navigate('NurseVitalSignsForm', { patient, visitId })} variant="secondary" />
           ) : null}
           <Text style={styles.label}>Queja principal</Text>
           <TextInput
@@ -102,7 +132,7 @@ export function NurseTriageFormScreen() {
             style={styles.textArea}
             value={notes}
           />
-          <AppButton disabled={!visitId} label="Enviar paciente al médico" loading={saving} onPress={save} />
+          <AppButton disabled={!visitId || saving} label="Enviar paciente al médico" loading={saving} onPress={confirmSave} />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

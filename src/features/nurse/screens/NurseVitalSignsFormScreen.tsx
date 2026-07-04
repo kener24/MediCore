@@ -39,6 +39,7 @@ export function NurseVitalSignsFormScreen() {
   }
 
   async function save() {
+    if (saving) return;
     if (!visitId) {
       Alert.alert('Visita no encontrada', 'No se encontró la visita del paciente.');
       return;
@@ -104,7 +105,7 @@ export function NurseVitalSignsFormScreen() {
             style={styles.notes}
             value={form.notes}
           />
-          <AppButton disabled={!visitId} label="Guardar signos vitales" loading={saving} onPress={save} />
+          <AppButton disabled={!visitId || saving} label="Guardar signos vitales" loading={saving} onPress={save} />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

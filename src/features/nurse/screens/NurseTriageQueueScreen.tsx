@@ -41,7 +41,7 @@ export function NurseTriageQueueScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl onRefresh={() => { setRefreshing(true); void load(); }} refreshing={refreshing} />}>
         <AppHeader icon="clipboard-account-outline" subtitle="Pacientes esperando evaluación inicial." title="Cola de triaje" />
-        {error ? <ErrorState message={error} title="Triaje no disponible" /> : null}
+        {error ? <ErrorState message={error} onRetry={() => void load()} title="Triaje no disponible" /> : null}
         {!error && patients.length === 0 ? <EmptyState description="No hay pacientes esperando triaje." title="Cola vacía" /> : null}
         {patients.map((patient) => (
           <PatientQueueCard

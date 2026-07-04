@@ -41,7 +41,7 @@ export function NurseCompletedTriagesScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl onRefresh={() => { setRefreshing(true); void load(); }} refreshing={refreshing} />}>
         <AppHeader icon="format-list-checks" subtitle="Evaluaciónes iniciales finalizadas." title="Triajes realizados" />
-        {error ? <ErrorState message={error} title="Triajes no disponibles" /> : null}
+        {error ? <ErrorState message={error} onRetry={() => void load()} title="Triajes no disponibles" /> : null}
         {!error && triages.length === 0 ? <EmptyState description="No hay triajes completados." title="Sin registros" /> : null}
         {triages.map((triage) => (
           <TriageCard key={`${triage.id}`} onPress={() => navigation.navigate('NurseTriageDetail', { triage, triageId: triage.id })} triage={triage} />

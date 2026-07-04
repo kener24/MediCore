@@ -52,7 +52,7 @@ export function NurseDashboardScreen() {
           subtitle={`${user?.nombre_completo || 'Enfermería'} · Triaje inicial, signos vitales y seguimiento operativo.`}
           title="Panel de enfermería"
         />
-        {error ? <ErrorState message={error} title="Sin conexión con triaje" /> : null}
+        {error ? <ErrorState message={error} onRetry={() => void load()} title="Sin conexión con triaje" /> : null}
         {summary ? (
           <View style={styles.stats}>
             <StatCard icon="account-clock-outline" label="En espera" value={String(summary.waitingCount)} />

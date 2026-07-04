@@ -23,7 +23,10 @@ export function parseOptionalNumber(value: string) {
 
 export function onlyNumericText(value: string, allowDecimal = false) {
   const normalized = value.replace(',', '.');
-  return normalized.replace(allowDecimal ? /[^0-9.]/g : /[^0-9]/g, '');
+  const cleaned = normalized.replace(allowDecimal ? /[^0-9.]/g : /[^0-9]/g, '');
+  if (!allowDecimal) return cleaned;
+  const [integer, ...decimals] = cleaned.split('.');
+  return decimals.length ? `${integer}.${decimals.join('')}` : integer;
 }
 
 export function validateVitalSigns(payload: VitalSignsPayload) {
@@ -48,6 +51,18 @@ export function validateVitalSigns(payload: VitalSignsPayload) {
     payload.systolic_pressure <= payload.diastolic_pressure
   ) {
     errors.push('La presión sistólica debe ser mayor que la diastólica.');
+  }
+  if (
+    (payload.systolic_pressure !== undefined && payload.diastolic_pressure === undefined) ||
+    (payload.systolic_pressure === undefined && payload.diastolic_pressure !== undefined)
+  ) {
+    errors.push('Registra presión sistólica y diastólica juntas.');
+  }
+  if (
+    (payload.weight_kg !== undefined && payload.height_cm === undefined) ||
+    (payload.weight_kg === undefined && payload.height_cm !== undefined)
+  ) {
+    errors.push('Registra peso y talla juntos para calcular el IMC.');
   }
   const hasAnyVital = [
     payload.temperature,

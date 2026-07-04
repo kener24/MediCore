@@ -16,7 +16,9 @@ import type { PatientDocument } from '@/features/patient/types/patientDocuments.
 export function PatientDocumentDetailScreen() {
   const navigation = useNavigation();
   const route = useRoute();
-  const { id } = route.params as { id: number };
+  const routeParams = (route.params ?? {}) as { id?: number | string };
+  const id = Number(routeParams.id);
+  const hasValidId = Number.isFinite(id) && id > 0;
   const [document, setDocument] = useState<PatientDocument | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -24,6 +26,11 @@ export function PatientDocumentDetailScreen() {
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
+    if (!hasValidId) {
+      setError('No se encontro el documento solicitado.');
+      setLoading(false);
+      return;
+    }
     try {
       setDocument(await getPatientDocument(id));
     } catch (err) {
@@ -31,7 +38,7 @@ export function PatientDocumentDetailScreen() {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [hasValidId, id]);
 
   useEffect(() => { load(); }, [load]);
 

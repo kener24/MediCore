@@ -18,7 +18,9 @@ import type { PatientInvoice } from '@/features/patient/types/patientInvoices.ty
 export function PatientInvoiceDetailScreen() {
   const navigation = useNavigation();
   const route = useRoute();
-  const { id } = route.params as { id: number };
+  const routeParams = (route.params ?? {}) as { id?: number | string };
+  const id = Number(routeParams.id);
+  const hasValidId = Number.isFinite(id) && id > 0;
   const [invoice, setInvoice] = useState<PatientInvoice | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -27,6 +29,11 @@ export function PatientInvoiceDetailScreen() {
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
+    if (!hasValidId) {
+      setError('No se encontro la factura solicitada.');
+      setLoading(false);
+      return;
+    }
     try {
       setInvoice(await getPatientInvoice(id));
     } catch (err) {
@@ -34,7 +41,7 @@ export function PatientInvoiceDetailScreen() {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [hasValidId, id]);
 
   useEffect(() => { load(); }, [load]);
 

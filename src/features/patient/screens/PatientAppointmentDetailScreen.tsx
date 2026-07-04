@@ -17,7 +17,9 @@ import type { PatientAppointment } from '@/features/patient/types/patientAppoint
 export function PatientAppointmentDetailScreen() {
   const navigation = useNavigation();
   const route = useRoute();
-  const { id } = route.params as { id: number };
+  const routeParams = (route.params ?? {}) as { id?: number | string };
+  const id = Number(routeParams.id);
+  const hasValidId = Number.isFinite(id) && id > 0;
   const [appointment, setAppointment] = useState<PatientAppointment | null>(null);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelVisible, setCancelVisible] = useState(false);
@@ -28,6 +30,11 @@ export function PatientAppointmentDetailScreen() {
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
+    if (!hasValidId) {
+      setError('No se encontro la cita solicitada.');
+      setLoading(false);
+      return;
+    }
     try {
       setAppointment(await getPatientAppointment(id));
     } catch (err) {
@@ -35,13 +42,14 @@ export function PatientAppointmentDetailScreen() {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [hasValidId, id]);
 
   useEffect(() => {
     load();
   }, [load]);
 
   async function submitCancellation() {
+    if (!hasValidId) return;
     if (!cancelReason.trim()) {
       Alert.alert('Cancelación', 'Escribe el motivo de cancelación.');
       return;

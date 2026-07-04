@@ -17,7 +17,9 @@ import type { PatientPayment } from '@/features/patient/types/patientPayments.ty
 export function PatientPaymentDetailScreen() {
   const navigation = useNavigation();
   const route = useRoute();
-  const { id } = route.params as { id: number };
+  const routeParams = (route.params ?? {}) as { id?: number | string };
+  const id = Number(routeParams.id);
+  const hasValidId = Number.isFinite(id) && id > 0;
   const [payment, setPayment] = useState<PatientPayment | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -25,6 +27,11 @@ export function PatientPaymentDetailScreen() {
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
+    if (!hasValidId) {
+      setError('No se encontro el pago solicitado.');
+      setLoading(false);
+      return;
+    }
     try {
       setPayment(await getPatientPayment(id));
     } catch (err) {
@@ -32,7 +39,7 @@ export function PatientPaymentDetailScreen() {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [hasValidId, id]);
 
   useEffect(() => { load(); }, [load]);
 

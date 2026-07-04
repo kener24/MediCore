@@ -14,6 +14,16 @@ function resolveRole(user: User | null): RoleName | null {
   return null;
 }
 
+async function parseStoredUser(userPayload: string | null): Promise<User | null> {
+  if (!userPayload) return null;
+  try {
+    return JSON.parse(userPayload) as User;
+  } catch {
+    await SecureStore.deleteItemAsync(USER_KEY);
+    return null;
+  }
+}
+
 export async function saveSession(payload: {
   accessToken: string;
   refreshToken: string;
@@ -39,12 +49,13 @@ export async function getSession(): Promise<SessionData> {
     SecureStore.getItemAsync(SESSION_KEY),
     SecureStore.getItemAsync(USER_KEY),
   ]);
+  const user = await parseStoredUser(userPayload);
 
   return {
     accessToken,
     refreshToken,
     sessionKey,
-    user: userPayload ? (JSON.parse(userPayload) as User) : null,
+    user,
   };
 }
 
@@ -67,7 +78,7 @@ export async function getRefreshToken() {
 
 export async function getUser() {
   const userPayload = await SecureStore.getItemAsync(USER_KEY);
-  return userPayload ? (JSON.parse(userPayload) as User) : null;
+  return parseStoredUser(userPayload);
 }
 
 export async function getUserRole() {

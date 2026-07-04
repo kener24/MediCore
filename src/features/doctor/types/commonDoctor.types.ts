@@ -10,6 +10,7 @@ export type ApiListResponse<T> = T[] | PaginatedResponse<T> | { data?: T[]; item
 export function normalizeListResponse<T>(response: ApiListResponse<T> | null | undefined): T[] {
   if (!response) return [];
   if (Array.isArray(response)) return response;
+  if (typeof response !== 'object') return [];
   if ('results' in response && Array.isArray(response.results)) return response.results;
   if ('data' in response && Array.isArray(response.data)) return response.data;
   if ('items' in response && Array.isArray(response.items)) return response.items;

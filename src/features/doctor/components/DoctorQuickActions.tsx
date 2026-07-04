@@ -14,7 +14,7 @@ const actions: {
   { description: 'Citas programadas de hoy', icon: 'calendar-account-outline', label: 'Agenda', target: 'schedule' },
   { description: 'Pacientes listos para médico', icon: 'account-clock-outline', label: 'Sala', target: 'waitingRoom' },
   { description: 'Atenciones en curso', icon: 'stethoscope', label: 'Consultas', target: 'consultations' },
-  { description: 'Avisos clínicos', icon: 'bell-outline', label: 'Notificaciónes', target: 'notifications' },
+  { description: 'Avisos clínicos', icon: 'bell-outline', label: 'Notificaciones', target: 'notifications' },
   { description: 'Datos de cuenta', icon: 'account-circle-outline', label: 'Perfil', target: 'profile' },
 ];
 

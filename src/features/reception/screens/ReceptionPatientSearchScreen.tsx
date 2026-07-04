@@ -60,7 +60,7 @@ export function ReceptionPatientSearchScreen() {
         <AppButton label="Crear paciente nuevo" onPress={() => navigation.navigate('ReceptionPatientCreate')} variant="secondary" />
         {loading ? <LoadingState label="Buscando pacientes..." /> : null}
         {error ? <ErrorState message={error} onRetry={query.trim().length >= 2 ? () => void runSearch() : undefined} title={query.trim().length < 2 ? 'Búsqueda incompleta' : 'No se pudo buscar'} /> : null}
-        {!loading && searched && !error && patients.length === 0 ? <EmptyState description="Puedes crear un paciente minimo para continuar." title="No se encontraron pacientes." /> : null}
+        {!loading && searched && !error && patients.length === 0 ? <EmptyState description="Puedes crear un paciente mínimo para continuar." title="No se encontraron pacientes." /> : null}
         {patients.map((patient) => (
           <ReceptionPatientCard
             key={patient.id}

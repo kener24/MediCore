@@ -27,6 +27,7 @@ export function PatientNotificationsScreen() {
   const [filter, setFilter] = useState<Filter>('all');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [markingAll, setMarkingAll] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const filteredNotifications = useMemo(() => {
@@ -66,21 +67,24 @@ export function PatientNotificationsScreen() {
       );
       setUnreadCount((current) => Math.max(current - 1, 0));
     } catch (err) {
-      Alert.alert('Notificaciónes', err instanceof Error ? err.message : 'No se pudo marcar como leída.');
+      Alert.alert('Notificaciones', err instanceof Error ? err.message : 'No se pudo marcar como leída.');
     }
   }
 
   async function markAllRead() {
-    if (unreadCount <= 0) return;
+    if (unreadCount <= 0 || markingAll) return;
     try {
+      setMarkingAll(true);
       await markAllPatientNotificationsRead();
       setNotifications((current) =>
         current.map((item) => ({ ...item, is_read: true, read: true, status: 'read' })),
       );
       setUnreadCount(0);
-      Alert.alert('Notificaciónes', 'Todas las notificaciones fueron marcadas como leídas.');
+      Alert.alert('Notificaciones', 'Todas las notificaciones fueron marcadas como leídas.');
     } catch (err) {
-      Alert.alert('Notificaciónes', err instanceof Error ? err.message : 'No se pudieron marcar las notificaciones.');
+      Alert.alert('Notificaciones', err instanceof Error ? err.message : 'No se pudieron marcar las notificaciones.');
+    } finally {
+      setMarkingAll(false);
     }
   }
 
@@ -92,21 +96,22 @@ export function PatientNotificationsScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl onRefresh={() => load(true)} refreshing={refreshing} />}
         showsVerticalScrollIndicator={false}>
-        <PatientHeader subtitle="Avisos enviados por tu clínica." title="Notificaciónes" />
+        <PatientHeader subtitle="Avisos enviados por tu clínica." title="Notificaciones" />
         <View style={styles.counterCard}>
           <View>
-            <Text style={styles.counterLabel}>No leidas</Text>
+            <Text style={styles.counterLabel}>No leídas</Text>
             <Text style={styles.counterText}>{unreadCount}</Text>
           </View>
           <UnreadBadge count={unreadCount} />
         </View>
         <View style={styles.filters}>
           <FilterButton active={filter === 'all'} label="Todas" onPress={() => setFilter('all')} />
-          <FilterButton active={filter === 'unread'} label="No leidas" onPress={() => setFilter('unread')} />
+          <FilterButton active={filter === 'unread'} label="No leídas" onPress={() => setFilter('unread')} />
         </View>
         <AppButton
-          disabled={unreadCount <= 0}
-          label="Marcar todas como leidas"
+          disabled={unreadCount <= 0 || markingAll}
+          label="Marcar todas como leídas"
+          loading={markingAll}
           onPress={markAllRead}
           variant="secondary"
         />

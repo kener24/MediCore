@@ -64,7 +64,7 @@ export function DoctorMedicalOrderDetailScreen() {
           <Info label="Estado" value={order?.status ?? 'Registrada'} />
           <Info label="Prioridad" value={order?.priority ?? 'normal'} />
           <Info label="Fecha" value={formatDateTime(order?.created_at)} />
-          <Info label="Descripcion" value={order?.description} />
+          <Info label="Descripción" value={order?.description} />
           <Info label="Instrucciones" value={order?.instructions} />
           <Info label="Notas" value={order?.notes} />
         </AppCard>

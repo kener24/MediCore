@@ -55,7 +55,7 @@ export function MedicalOrderForm({
   async function submit() {
     if (disabled) return;
     if (!orderType) return Alert.alert('Orden médica', 'Selecciona el tipo de orden.');
-    if (description.trim().length < 5) return Alert.alert('Orden médica', 'Escribe la descripcion de la orden.');
+    if (description.trim().length < 5) return Alert.alert('Orden médica', 'Escribe la descripción de la orden.');
     if (priority === 'urgente' && instructions.trim().length < 5) {
       return Alert.alert('Orden médica', 'Las Órdenes urgentes deben incluir instrucciones claras.');
     }
@@ -83,7 +83,7 @@ export function MedicalOrderForm({
       ) : null}
       <AppInput
         editable={!disabled}
-        label="Descripcion"
+        label="Descripción"
         multiline
         onChangeText={(value) => {
           setDescription(value);
@@ -96,7 +96,7 @@ export function MedicalOrderForm({
           {orderCatalog.slice(0, 4).map((item) => (
             <Pressable disabled={disabled} key={item.id} onPress={() => setDescription(item.name ?? item.nombre ?? '')} style={styles.suggestion}>
               <Text style={styles.suggestionTitle}>{item.name ?? item.nombre ?? `Item ${item.id}`}</Text>
-              <Text style={styles.suggestionMeta}>{item.sku ? `${item.sku} - ` : ''}{item.category_name ?? item.item_type ?? 'Catalogo'}</Text>
+              <Text style={styles.suggestionMeta}>{item.sku ? `${item.sku} - ` : ''}{item.category_name ?? item.item_type ?? 'Catálogo'}</Text>
             </Pressable>
           ))}
         </View>

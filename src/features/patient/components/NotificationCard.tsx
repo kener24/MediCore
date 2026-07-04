@@ -57,7 +57,7 @@ export function NotificationCard({
         </View>
         {!isRead && markRead ? (
           <Pressable onPress={markRead} style={styles.action}>
-            <Text style={styles.actionText}>Marcar como leida</Text>
+            <Text style={styles.actionText}>Marcar como leída</Text>
           </Pressable>
         ) : null}
       </AppCard>

@@ -23,7 +23,7 @@ export function NurseNotificationsScreen() {
       setError(null);
       setNotifications(await getNurseNotifications());
     } catch {
-      setError('Notificaciónes no disponibles por el momento.');
+      setError('Notificaciones no disponibles por el momento.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -45,7 +45,7 @@ export function NurseNotificationsScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl onRefresh={() => { setRefreshing(true); void load(); }} refreshing={refreshing} />}>
-        <AppHeader icon="bell-outline" subtitle="Avisos operativos y clínicos." title="Notificaciónes" />
+        <AppHeader icon="bell-outline" subtitle="Avisos operativos y clínicos." title="Notificaciones" />
         {error ? <ErrorState message={error} title="Sin notificaciones" /> : null}
         {!error && notifications.length === 0 ? <EmptyState description="No hay notificaciones para mostrar." title="Bandeja vacía" /> : null}
         {notifications.map((notification) => (

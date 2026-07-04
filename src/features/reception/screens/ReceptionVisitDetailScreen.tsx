@@ -49,8 +49,21 @@ export function ReceptionVisitDetailScreen() {
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
+  function confirmAction(action: 'triage' | 'doctor' | 'invoice') {
+    if (busy) return;
+    const messages = {
+      doctor: 'El paciente pasará a la cola médica. ¿Deseas continuar?',
+      invoice: 'Se generará una factura para esta visita. ¿Deseas continuar?',
+      triage: 'El paciente pasará a la cola de triaje. ¿Deseas continuar?',
+    };
+    Alert.alert('Confirmar acción', messages[action], [
+      { style: 'cancel', text: 'Cancelar' },
+      { text: 'Confirmar', onPress: () => void run(action) },
+    ]);
+  }
+
   async function run(action: 'triage' | 'doctor' | 'invoice') {
-    if (!visit?.id) return;
+    if (!visit?.id || busy) return;
     try {
       setBusy(true);
       if (action === 'triage') {
@@ -151,9 +164,9 @@ export function ReceptionVisitDetailScreen() {
             </AppCard>
             {!closed ? (
               <View style={styles.actions}>
-                {canSendTriage ? <AppButton disabled={busy} label="Enviar a triaje" onPress={() => void run('triage')} /> : null}
-                {canSendDoctor ? <AppButton disabled={busy} label="Enviar a médico" onPress={() => void run('doctor')} variant="secondary" /> : null}
-                {canInvoice ? <AppButton disabled={busy} label="Generar factura" onPress={() => void run('invoice')} /> : null}
+                {canSendTriage ? <AppButton disabled={busy} label="Enviar a triaje" onPress={() => confirmAction('triage')} /> : null}
+                {canSendDoctor ? <AppButton disabled={busy} label="Enviar a médico" onPress={() => confirmAction('doctor')} variant="secondary" /> : null}
+                {canInvoice ? <AppButton disabled={busy} label="Generar factura" onPress={() => confirmAction('invoice')} /> : null}
                 <AppButton disabled={busy} label="Cancelar admisión" onPress={() => setCancelOpen(true)} variant="danger" />
               </View>
             ) : null}
@@ -176,7 +189,7 @@ export function ReceptionVisitDetailScreen() {
             />
             <View style={styles.modalActions}>
               <AppButton disabled={busy} label="Cerrar" onPress={() => setCancelOpen(false)} variant="secondary" />
-              <AppButton disabled={busy} label="Confirmar" loading={busy} onPress={confirmCancel} variant="danger" />
+              <AppButton disabled={busy || cancelReason.trim().length < 5} label="Confirmar" loading={busy} onPress={confirmCancel} variant="danger" />
             </View>
           </View>
         </View>

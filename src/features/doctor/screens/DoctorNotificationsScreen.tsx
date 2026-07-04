@@ -52,9 +52,9 @@ export function DoctorNotificationsScreen() {
       await markDoctorNotificationAsRead(notification.id);
       setNotifications((current) => current.map((item) => (item.id === notification.id ? { ...item, is_read: true, status: 'read' } : item)));
       setUnreadCount((current) => Math.max(current - 1, 0));
-      Alert.alert('Notificaciónes', 'Notificación marcada como leída.');
+      Alert.alert('Notificaciones', 'Notificación marcada como leída.');
     } catch (err) {
-      Alert.alert('Notificaciónes', err instanceof Error ? err.message : 'No se pudo marcar como leída.');
+      Alert.alert('Notificaciones', err instanceof Error ? err.message : 'No se pudo marcar como leída.');
     }
   }
 
@@ -66,7 +66,7 @@ export function DoctorNotificationsScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl onRefresh={() => load(true)} refreshing={refreshing} />}
         showsVerticalScrollIndicator={false}>
-        <DoctorHeader title="Notificaciónes" unreadCount={unreadCount || unread} />
+        <DoctorHeader title="Notificaciones" unreadCount={unreadCount || unread} />
         {error ? (
           <ErrorState message={error} onRetry={() => load()} title="No se pudieron cargar las notificaciones" />
         ) : notifications.length ? (

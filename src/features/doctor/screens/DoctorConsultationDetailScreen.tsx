@@ -115,11 +115,11 @@ export function DoctorConsultationDetailScreen() {
         </AppCard>
 
         <RelatedSection title="Signos vitales y triaje" count={consultation.vital_signs || consultation.triage ? 1 : 0} />
-        <RelatedSection title="Recetas medicas" count={related.prescriptions.length} />
+        <RelatedSection title="Recetas médicas" count={related.prescriptions.length} />
         <RelatedSection title="Órdenes médicas" count={related.medical_orders.length} />
         <RelatedSection title="Consumos clínicos" count={related.consumptions.length} />
 
-        <AppButton disabled={completed} label="Continuar edicion" onPress={() => navigation.navigate('DoctorConsultation', { consultationId, patientId, visitId })} />
+        <AppButton disabled={completed} label="Continuar edición" onPress={() => navigation.navigate('DoctorConsultation', { consultationId, patientId, visitId })} />
         <AppButton label="Ver resumen" onPress={() => navigation.navigate('DoctorConsultationSummary', { consultationId, patientId, visitId })} variant="secondary" />
         <AppButton
           label="Historial del paciente"

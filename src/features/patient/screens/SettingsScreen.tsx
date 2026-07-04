@@ -92,7 +92,7 @@ export function SettingsScreen() {
             icon="bell-outline"
             onPress={() => navigation.navigate('PatientNotifications')}
             subtitle="Avisos y mensajes del portal"
-            title="Notificaciónes"
+            title="Notificaciones"
           />
           <SettingsOption
             danger

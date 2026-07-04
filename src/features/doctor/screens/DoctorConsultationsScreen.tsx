@@ -104,7 +104,7 @@ export function DoctorConsultationsScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl onRefresh={() => load(true)} refreshing={refreshing} />}
         showsVerticalScrollIndicator={false}>
-        <DoctorHeader title="Consultas medicas" />
+        <DoctorHeader title="Consultas médicas" />
         <AppCard style={styles.summaryCard}>
           <Text style={styles.summaryNumber}>{items.length}</Text>
           <Text style={styles.summaryText}>consultas encontradas</Text>

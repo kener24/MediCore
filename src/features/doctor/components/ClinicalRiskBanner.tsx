@@ -23,7 +23,7 @@ export function ClinicalRiskBanner({
         <Text style={styles.title}>Alertas clínicas</Text>
       </View>
       {allergies ? <Risk label="Alergias" value={allergies} danger /> : null}
-      {chronic ? <Risk label="Cronicos" value={chronic} /> : null}
+      {chronic ? <Risk label="Crónicos" value={chronic} /> : null}
       {medications ? <Risk label="Medicamentos actuales" value={medications} /> : null}
     </AppCard>
   );

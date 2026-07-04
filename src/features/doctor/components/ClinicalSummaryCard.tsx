@@ -34,7 +34,7 @@ export function ClinicalSummaryCard({
         <Info label="Prioridad" value={visit?.priority ?? visit?.prioridad} />
         <Info label="Presion arterial" value={bloodPressure} />
         <Info label="Temperatura" value={withSuffix(vitalSigns?.temperature, 'C')} />
-        <Info label="Frecuencia cardiaca" value={withSuffix(vitalSigns?.heart_rate, 'lpm')} />
+        <Info label="Frecuencia cardíaca" value={withSuffix(vitalSigns?.heart_rate, 'lpm')} />
         <Info label="Saturación de oxígeno" value={withSuffix(vitalSigns?.oxygen_saturation, '%')} />
       </View>
       <Info label="Alergias" value={medicalSummary?.allergies ?? medicalSummary?.alergias} />

@@ -13,7 +13,7 @@ const items: {
 }[] = [
   { icon: 'calendar-clock', key: 'upcomingAppointments', label: 'Citas próximas' },
   { icon: 'receipt-text-outline', key: 'pendingInvoices', label: 'Facturas' },
-  { icon: 'bell-outline', key: 'unreadNotifications', label: 'Notificaciónes' },
+  { icon: 'bell-outline', key: 'unreadNotifications', label: 'Notificaciones' },
   { icon: 'file-document-outline', key: 'recentDocuments', label: 'Documentos' },
 ];
 

@@ -27,9 +27,9 @@ export function validateConsultationDraft(form: ConsultationFormValues) {
 
 export function validateConsultationSave(form: ConsultationFormValues) {
   for (const field of requiredForSave) {
-    if (form[field].trim().length < 3) return `Completa ${labels[field]}.`;
+    if (form[field].trim().length < 5) return `Completa ${labels[field]} con mayor detalle.`;
   }
-  if (form.assessment.trim().length < 3 && form.diagnosis_text.trim().length < 3) {
+  if (form.assessment.trim().length < 5 && form.diagnosis_text.trim().length < 5) {
     return 'Agrega un diagnóstico o evaluación clínica.';
   }
   return '';
@@ -38,18 +38,24 @@ export function validateConsultationSave(form: ConsultationFormValues) {
 export function validateConsultationFinish(form: ConsultationFormValues, consultation?: DoctorConsultation | null) {
   const source = consultation ? toFormValuesFromConsultation(consultation, form) : form;
   for (const field of requiredForFinish) {
-    if (source[field].trim().length < 3) return `Antes de finalizar completa ${labels[field]}.`;
+    if (source[field].trim().length < 5) return `Antes de finalizar completa ${labels[field]} con mayor detalle.`;
   }
   return '';
 }
 
 export function consultationProgress(form: ConsultationFormValues) {
-  const completed = requiredForFinish.filter((field) => form[field].trim().length >= 3).length;
+  const completed = requiredForFinish.filter((field) => form[field].trim().length >= 5).length;
   return {
     completed,
     percent: Math.round((completed / requiredForFinish.length) * 100),
     required: requiredForFinish.length,
   };
+}
+
+export function consultationMissingFields(form: ConsultationFormValues) {
+  return requiredForFinish
+    .filter((field) => form[field].trim().length < 5)
+    .map((field) => labels[field]);
 }
 
 function toFormValuesFromConsultation(

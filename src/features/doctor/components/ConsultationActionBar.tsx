@@ -21,9 +21,9 @@ export function ConsultationActionBar({
 }) {
   return (
     <AppCard style={styles.card}>
-      <Text style={styles.title}>Acciones clinicas</Text>
+      <Text style={styles.title}>Acciones clínicas</Text>
       <Text style={styles.subtitle}>
-        {readOnly ? 'Consulta finalizada: las acciones quedan en modo lectura.' : 'Guarda la consulta antes de agregar indicaciones clinicas.'}
+        {readOnly ? 'Consulta finalizada: las acciones quedan en modo lectura.' : 'Guarda la consulta antes de agregar indicaciones clínicas.'}
       </Text>
       <AppButton disabled={disabled || readOnly} label="Crear receta" onPress={onPrescription} variant="secondary" />
       <AppButton disabled={disabled || readOnly} label="Crear orden médica" onPress={onMedicalOrder} variant="secondary" />

@@ -1,4 +1,4 @@
-import { useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
+import { useNavigation, useRoute, type NavigationProp, type ParamListBase } from '@react-navigation/native';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -32,6 +32,12 @@ const onlineDisabledMessage = 'Esta clínica no tiene habilitadas las citas en l
 
 export function RequestAppointmentScreen() {
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
+  const route = useRoute();
+  const routeParams = (route.params ?? {}) as {
+    previousAppointmentDate?: string;
+    previousAppointmentDoctor?: string;
+    rescheduleFrom?: number | string;
+  };
   const [specialties, setSpecialties] = useState<PatientSpecialty[]>([]);
   const [doctors, setDoctors] = useState<PatientDoctor[]>([]);
   const [slots, setSlots] = useState<AppointmentAvailabilitySlot[]>([]);
@@ -47,6 +53,8 @@ export function RequestAppointmentScreen() {
   const [loading, setLoading] = useState(true);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const canSubmit = Boolean(specialty && doctor && date.trim() && slot && reason.trim().length >= 5 && !submitting);
+  const isRescheduleFlow = Boolean(routeParams.rescheduleFrom);
 
   useEffect(() => {
     async function loadSpecialties() {
@@ -174,8 +182,20 @@ export function RequestAppointmentScreen() {
 
   return (
     <KeyboardAwareScreen contentContainerStyle={styles.content}>
-      <PatientHeader subtitle="Completa los datos requeridos para enviar tu solicitud." title="Solicitar cita" />
+      <PatientHeader
+        subtitle={isRescheduleFlow ? 'Selecciona una nueva fecha y horario. La cita anterior no se cancela automáticamente.' : 'Completa los datos requeridos para enviar tu solicitud.'}
+        title={isRescheduleFlow ? 'Reprogramar cita' : 'Solicitar cita'}
+      />
       {error ? <ErrorState message={error} title="No se pudo cargar información" /> : null}
+      {isRescheduleFlow ? (
+        <AppCard style={styles.notice}>
+          <Text style={styles.noticeTitle}>Reprogramación guiada</Text>
+          <Text style={styles.help}>
+            Cita original: {routeParams.previousAppointmentDate || 'fecha no indicada'}
+            {routeParams.previousAppointmentDoctor ? ` con ${routeParams.previousAppointmentDoctor}` : ''}. Al confirmar la nueva cita, revisa si debes cancelar la anterior.
+          </Text>
+        </AppCard>
+      ) : null}
 
       <Step title="1. Especialidad">
         {specialties.length ? (
@@ -210,7 +230,7 @@ export function RequestAppointmentScreen() {
             ))}
           </View>
         ) : (
-          <Text style={styles.help}>Selecciona una especialidad para ver medicos.</Text>
+          <Text style={styles.help}>Selecciona una especialidad para ver médicos.</Text>
         )}
       </Step>
 
@@ -223,7 +243,7 @@ export function RequestAppointmentScreen() {
           value={date}
         />
         <View style={styles.dateActions}>
-          <AppButton label="Manana" onPress={() => updateDate(toISODate(addDays(1)))} style={styles.dateAction} variant="secondary" />
+          <AppButton label="Mañana" onPress={() => updateDate(toISODate(addDays(1)))} style={styles.dateAction} variant="secondary" />
           <AppButton label="En 7 días" onPress={() => updateDate(toISODate(addDays(7)))} style={styles.dateAction} variant="secondary" />
         </View>
       </Step>
@@ -259,9 +279,12 @@ export function RequestAppointmentScreen() {
           style={styles.textArea}
           value={reason}
         />
+        <Text style={[styles.help, reason.trim().length >= 5 ? styles.success : styles.warning]}>
+          {reason.trim().length}/5 caracteres mínimos
+        </Text>
       </Step>
 
-      <AppButton label="Enviar solicitud" loading={submitting} onPress={submit} />
+      <AppButton disabled={!canSubmit} label={isRescheduleFlow ? 'Solicitar nueva cita' : 'Enviar solicitud'} loading={submitting} onPress={submit} />
     </KeyboardAwareScreen>
   );
 }
@@ -281,10 +304,14 @@ function addDaysToISODate(value: string, days: number) {
 async function findNextAvailability(doctorId: number, fromDate: string, modality: AppointmentModality) {
   for (let offset = 1; offset <= 21; offset += 1) {
     const candidateDate = addDaysToISODate(fromDate, offset);
-    const availability = await getPatientDoctorAvailability(doctorId, candidateDate, modality);
-    if (modality === 'online' && availability.allow_online_appointments === false) return null;
-    const candidateSlots = (availability.available_slots ?? []).filter((item) => item.available !== false);
-    if (candidateSlots.length) return { date: candidateDate, slots: candidateSlots };
+    try {
+      const availability = await getPatientDoctorAvailability(doctorId, candidateDate, modality);
+      if (modality === 'online' && availability.allow_online_appointments === false) return null;
+      const candidateSlots = (availability.available_slots ?? []).filter((item) => item.available !== false);
+      if (candidateSlots.length) return { date: candidateDate, slots: candidateSlots };
+    } catch {
+      // Keep scanning the next dates; one failing day should not block scheduling.
+    }
   }
   return null;
 }
@@ -326,6 +353,16 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 13,
     lineHeight: 19,
+  },
+  notice: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#bfdbfe',
+    gap: 6,
+  },
+  noticeTitle: {
+    color: colors.primaryDark,
+    fontSize: 15,
+    fontWeight: '900',
   },
   options: {
     gap: 8,

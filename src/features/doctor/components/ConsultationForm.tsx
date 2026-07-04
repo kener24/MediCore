@@ -6,7 +6,7 @@ import { AppCard } from '@/components/AppCard';
 import { AppInput } from '@/components/AppInput';
 import { colors } from '@/core/theme/colors';
 import type { ConsultationFormValues } from '@/features/doctor/types/doctorConsultation.types';
-import { consultationProgress } from '@/features/doctor/utils/clinicalValidation';
+import { consultationMissingFields, consultationProgress } from '@/features/doctor/utils/clinicalValidation';
 
 type FieldName = keyof ConsultationFormValues;
 
@@ -45,6 +45,7 @@ export function ConsultationForm({
   onSubmit: () => void;
 }) {
   const progress = consultationProgress(initialValues);
+  const missingFields = consultationMissingFields(initialValues);
 
   return (
     <AppCard style={styles.form}>
@@ -60,6 +61,16 @@ export function ConsultationForm({
       <View style={styles.progressTrack}>
         <View style={[styles.progressFill, { width: `${progress.percent}%` }]} />
       </View>
+      {missingFields.length ? (
+        <View style={styles.missingBox}>
+          <Text style={styles.missingTitle}>Pendiente para finalizar</Text>
+          <Text style={styles.missingText}>{missingFields.join(', ')}</Text>
+        </View>
+      ) : (
+        <View style={styles.readyBox}>
+          <Text style={styles.readyText}>Checklist clínico completo para finalizar.</Text>
+        </View>
+      )}
       {fields.map((field) => (
         <AppInput
           editable={!disabled}
@@ -87,6 +98,11 @@ const styles = StyleSheet.create({
   percent: { color: colors.primary, fontSize: 18, fontWeight: '900' },
   progressFill: { backgroundColor: colors.primary, borderRadius: 999, height: 8 },
   progressTrack: { backgroundColor: colors.surfaceMuted, borderRadius: 999, height: 8, overflow: 'hidden' },
+  missingBox: { backgroundColor: '#fffbeb', borderColor: '#fde68a', borderRadius: 14, borderWidth: 1, gap: 3, padding: 12 },
+  missingText: { color: colors.warning, fontSize: 12, fontWeight: '700', lineHeight: 18 },
+  missingTitle: { color: colors.warning, fontSize: 13, fontWeight: '900' },
+  readyBox: { backgroundColor: '#dcfce7', borderColor: '#bbf7d0', borderRadius: 14, borderWidth: 1, padding: 12 },
+  readyText: { color: colors.success, fontSize: 13, fontWeight: '900' },
   subtitle: { color: colors.muted, fontSize: 12, fontWeight: '700', marginTop: 3 },
   title: { color: colors.ink, fontSize: 17, fontWeight: '900' },
 });

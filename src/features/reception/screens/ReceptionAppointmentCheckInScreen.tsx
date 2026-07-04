@@ -17,7 +17,7 @@ import { appointmentDoctorName, appointmentPatientName } from '@/features/recept
 import { checkInAppointment, getTodayAppointments, updateAppointmentReceptionStatus } from '@/features/reception/services/receptionAppointmentService';
 import type { ReceptionAppointment } from '@/features/reception/types/receptionAppointment.types';
 
-const filters = [['all', 'Todas'], ['scheduled', 'Pendientes'], ['confirmed', 'Confirmadas'], ['checked_in', 'Con check-in'], ['no_show', 'No asisti?'], ['cancelled', 'Canceladas']] as const;
+const filters = [['all', 'Todas'], ['scheduled', 'Pendientes'], ['confirmed', 'Confirmadas'], ['checked_in', 'Con check-in'], ['no_show', 'No asistió'], ['cancelled', 'Canceladas']] as const;
 
 export function ReceptionAppointmentCheckInScreen() {
   const navigation = useNavigation<any>();
@@ -96,7 +96,7 @@ export function ReceptionAppointmentCheckInScreen() {
 
   function confirmCheckIn(item: ReceptionAppointment) {
     if (!item.id) return;
-    Alert.alert('Check-in de cita', 'Despues de registrar la llegada se creara la visita operativa. Deseas continuar?', [
+    Alert.alert('Check-in de cita', 'Después de registrar la llegada se creará la visita operativa. ¿Deseas continuar?', [
       { style: 'cancel', text: 'Cancelar' },
       { text: 'Confirmar', onPress: () => void checkIn(item) },
     ]);
@@ -171,8 +171,8 @@ export function ReceptionAppointmentCheckInScreen() {
       <Modal animationType="fade" transparent visible={Boolean(reasonModal)} onRequestClose={() => setReasonModal(null)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>{reasonModal?.action === 'no_show' ? 'Marcar no asisti?' : 'Cancelar cita'}</Text>
-            <Text style={styles.modalText}>Registra un motivo claro para auditoria y seguimiento administrativo.</Text>
+            <Text style={styles.modalTitle}>{reasonModal?.action === 'no_show' ? 'Marcar no asistió' : 'Cancelar cita'}</Text>
+            <Text style={styles.modalText}>Registra un motivo claro para auditoría y seguimiento administrativo.</Text>
             <TextInput
               multiline
               onChangeText={setReason}

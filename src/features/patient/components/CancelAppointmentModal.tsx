@@ -27,14 +27,14 @@ export function CancelAppointmentModal({
           <TextInput
             multiline
             onChangeText={onChangeReason}
-            placeholder="No podre asistir"
+            placeholder="No podré asistir"
             placeholderTextColor="#94A3B8"
             style={styles.input}
             value={reason}
           />
           <View style={styles.actions}>
             <AppButton label="Cerrar" onPress={onCancel} variant="secondary" />
-            <AppButton label="Confirmar cancelación" loading={loading} onPress={onConfirm} variant="danger" />
+            <AppButton disabled={reason.trim().length < 5} label="Confirmar cancelación" loading={loading} onPress={onConfirm} variant="danger" />
           </View>
         </View>
       </View>

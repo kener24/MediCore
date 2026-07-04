@@ -9,8 +9,9 @@ import { AppDateInput } from '@/components/AppDateInput';
 import { AppHeader } from '@/components/AppHeader';
 import { AppInput } from '@/components/AppInput';
 import { colors } from '@/core/theme/colors';
-import { createMinimalPatient } from '@/features/reception/services/receptionPatientService';
-import type { MinimalPatientPayload } from '@/features/reception/types/receptionPatient.types';
+import { patientIdentity, patientName, patientPhone } from '@/features/reception/services/receptionMappers';
+import { createMinimalPatient, searchPatients } from '@/features/reception/services/receptionPatientService';
+import type { MinimalPatientPayload, ReceptionPatient } from '@/features/reception/types/receptionPatient.types';
 
 const genders = [
   ['masculino', 'Masculino'],
@@ -31,13 +32,40 @@ export function ReceptionPatientCreateScreen() {
     const birthDate = form.birth_date?.trim() ?? '';
 
     if (fullName.length < 5) return Alert.alert('Paciente', 'Ingresa el nombre completo del paciente.');
-    if (identity && identity.length < 8) return Alert.alert('Paciente', 'La identidad debe tener al menos 8 digitos.');
+    if (identity && identity.length < 8) return Alert.alert('Paciente', 'La identidad debe tener al menos 8 dígitos.');
     if (phone && phone.replace(/\D/g, '').length < 8) return Alert.alert('Paciente', 'El teléfono debe tener al menos 8 dígitos.');
     if (birthDate && !/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) return Alert.alert('Paciente', 'La fecha debe tener formato YYYY-MM-DD.');
 
+    const payload = { ...form, full_name: fullName, identity_number: identity, phone, birth_date: birthDate || undefined };
+
     setSaving(true);
     try {
-      const patient = await createMinimalPatient({ ...form, full_name: fullName, identity_number: identity, phone, birth_date: birthDate || undefined });
+      const duplicate = await findPossibleDuplicate(identity, phone);
+      if (duplicate) {
+        setSaving(false);
+        Alert.alert(
+          'Paciente posiblemente existente',
+          `${patientName(duplicate)}\nIdentidad: ${patientIdentity(duplicate)}\nTeléfono: ${patientPhone(duplicate)}`,
+          [
+            { style: 'cancel', text: 'Revisar datos' },
+            { text: 'Ver paciente', onPress: () => navigation.navigate('ReceptionPatientDetail', { patientId: duplicate.id }) },
+            { text: 'Crear de todos modos', onPress: () => void persistPatient(payload) },
+          ],
+        );
+        return;
+      }
+      await persistPatient(payload);
+    } catch (err) {
+      Alert.alert('Paciente', err instanceof Error ? err.message : 'No se pudo crear el paciente.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function persistPatient(payload: MinimalPatientPayload) {
+    setSaving(true);
+    try {
+      const patient = await createMinimalPatient(payload);
       Alert.alert('Paciente', 'Paciente creado correctamente.', [{ text: 'Crear admisión', onPress: () => navigation.navigate('ReceptionCreateAdmission', { patient, patientId: patient.id }) }]);
     } catch (err) {
       Alert.alert('Paciente', err instanceof Error ? err.message : 'No se pudo crear el paciente.');
@@ -68,6 +96,20 @@ export function ReceptionPatientCreateScreen() {
 
 function Chip({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
   return <Text onPress={onPress} style={[styles.chip, active && styles.chipActive, active && styles.chipTextActive]}>{label}</Text>;
+}
+
+async function findPossibleDuplicate(identity: string, phone: string): Promise<ReceptionPatient | null> {
+  const terms = [identity, phone.replace(/\D/g, '')].filter((term) => term.length >= 8);
+  for (const term of terms) {
+    const matches = await searchPatients(term).catch(() => []);
+    const duplicate = matches.find((patient) => {
+      const sameIdentity = identity && patientIdentity(patient).replace(/\D/g, '') === identity.replace(/\D/g, '');
+      const samePhone = phone && patientPhone(patient).replace(/\D/g, '') === phone.replace(/\D/g, '');
+      return sameIdentity || samePhone;
+    });
+    if (duplicate) return duplicate;
+  }
+  return null;
 }
 
 const styles = StyleSheet.create({

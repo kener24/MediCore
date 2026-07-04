@@ -20,7 +20,7 @@ export function ClinicalRiskBanner({
     <AppCard style={styles.card}>
       <View style={styles.header}>
         <MaterialCommunityIcons color={colors.danger} name="alert-octagon-outline" size={22} />
-        <Text style={styles.title}>Alertas clinicas</Text>
+        <Text style={styles.title}>Alertas clínicas</Text>
       </View>
       {allergies ? <Risk label="Alergias" value={allergies} danger /> : null}
       {chronic ? <Risk label="Cronicos" value={chronic} /> : null}

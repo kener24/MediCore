@@ -155,7 +155,7 @@ export function DoctorPatientDetailScreen() {
       });
       return;
     }
-    Alert.alert('Iniciar consulta', 'Deseas iniciar la consulta de este paciente?', [
+    Alert.alert('Iniciar consulta', '¿Deseas iniciar la consulta de este paciente?', [
       { style: 'cancel', text: 'Cancelar' },
       {
         onPress: async () => {

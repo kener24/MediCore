@@ -249,7 +249,7 @@ export function DoctorConsultationScreen() {
     const validation = validateConsultationFinish(form, consultation);
     if (validation) return Alert.alert('Finalizar consulta', validation);
     if (!visitId) return Alert.alert('Finalizar consulta', 'No se encontró la visita asociada.');
-    Alert.alert('Finalizar consulta', 'Despues de finalizar no podras editar esta consulta. Deseas continuar?', [
+    Alert.alert('Finalizar consulta', 'Después de finalizar no podrás editar esta consulta. ¿Deseas continuar?', [
       { style: 'cancel', text: 'Cancelar' },
       { onPress: finishConsultation, text: 'Finalizar' },
     ]);

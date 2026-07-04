@@ -88,7 +88,7 @@ export function DoctorScheduleScreen() {
       Alert.alert('Agenda médica', 'Esta cita aún no tiene admisión registrada. Primero debe pasar por recepción.');
       return;
     }
-    Alert.alert('Iniciar consulta', 'Deseas iniciar la consulta de este paciente?', [
+    Alert.alert('Iniciar consulta', '¿Deseas iniciar la consulta de este paciente?', [
       { style: 'cancel', text: 'Cancelar' },
       { onPress: () => handleAttend(item, visitId), text: 'Iniciar' },
     ]);

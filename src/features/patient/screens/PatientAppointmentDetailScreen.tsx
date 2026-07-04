@@ -15,7 +15,7 @@ import { cancelPatientAppointment, getPatientAppointment } from '@/features/pati
 import type { PatientAppointment } from '@/features/patient/types/patientAppointments.types';
 
 export function PatientAppointmentDetailScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const route = useRoute();
   const routeParams = (route.params ?? {}) as { id?: number | string };
   const id = Number(routeParams.id);
@@ -50,8 +50,8 @@ export function PatientAppointmentDetailScreen() {
 
   async function submitCancellation() {
     if (!hasValidId) return;
-    if (!cancelReason.trim()) {
-      Alert.alert('Cancelación', 'Escribe el motivo de cancelación.');
+    if (cancelReason.trim().length < 5) {
+      Alert.alert('Cancelación', 'Escribe un motivo de cancelación claro.');
       return;
     }
     setSubmitting(true);
@@ -112,7 +112,22 @@ export function PatientAppointmentDetailScreen() {
           <Detail label="Motivo de cancelación" value={appointment.cancellation_reason} />
         </AppCard>
 
-        {canCancel ? <AppButton label="Cancelar cita" onPress={() => setCancelVisible(true)} variant="danger" /> : null}
+        {canCancel ? (
+          <>
+            <AppButton
+              label="Solicitar reprogramación"
+              onPress={() =>
+                navigation.navigate('RequestAppointment' as never, {
+                  previousAppointmentDate: formatDate(appointment.scheduled_date),
+                  previousAppointmentDoctor: appointment.doctor_name || appointment.doctor_nombre,
+                  rescheduleFrom: appointment.id,
+                } as never)
+              }
+              variant="secondary"
+            />
+            <AppButton label="Cancelar cita" onPress={() => setCancelVisible(true)} variant="danger" />
+          </>
+        ) : null}
       </ScrollView>
 
       <CancelAppointmentModal

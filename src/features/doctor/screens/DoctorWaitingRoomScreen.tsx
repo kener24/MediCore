@@ -74,7 +74,7 @@ export function DoctorWaitingRoomScreen() {
       Alert.alert('Consulta', 'No se puede iniciar consulta sin visita asociada.');
       return;
     }
-    Alert.alert('Iniciar consulta', 'Deseas iniciar la consulta de este paciente?', [
+    Alert.alert('Iniciar consulta', '¿Deseas iniciar la consulta de este paciente?', [
       { style: 'cancel', text: 'Cancelar' },
       { onPress: () => handleStart(item, visitId), text: 'Iniciar' },
     ]);

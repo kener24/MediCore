@@ -70,7 +70,7 @@ export function DoctorConsultationDetailScreen() {
     if (!consultationId || !visitId) return Alert.alert('Consulta médica', 'No se encontró la consulta o visita asociada.');
     const validation = validateConsultationFinish(form, consultation);
     if (validation) return Alert.alert('Finalizar consulta', validation);
-    Alert.alert('Finalizar consulta', 'Despues de finalizar no podras editarla desde la app. Deseas continuar?', [
+    Alert.alert('Finalizar consulta', 'Después de finalizar no podrás editarla desde la app. ¿Deseas continuar?', [
       { style: 'cancel', text: 'Cancelar' },
       { onPress: finish, text: 'Finalizar' },
     ]);

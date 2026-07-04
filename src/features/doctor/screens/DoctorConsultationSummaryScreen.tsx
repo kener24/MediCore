@@ -42,6 +42,7 @@ export function DoctorConsultationSummaryScreen() {
   const form = useMemo(() => toFormValues(consultation), [consultation]);
   const progress = consultationProgress(form);
   const completed = isConsultationFinalized(consultation?.status);
+  const hasClinicalActions = prescriptions.length > 0 || orders.length > 0 || consumptions.length > 0;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -78,7 +79,10 @@ export function DoctorConsultationSummaryScreen() {
     if (!visitId) return Alert.alert('Finalizar consulta', 'No se encontró la visita.');
     const validation = validateConsultationFinish(form, consultation);
     if (validation) return Alert.alert('Finalizar consulta', validation);
-    Alert.alert('Finalizar consulta', 'Despues de finalizar no podras editarla desde la app. Deseas continuar?', [
+    const warning = hasClinicalActions
+      ? 'Después de finalizar no podrás editarla desde la app. ¿Deseas continuar?'
+      : 'No hay receta, orden médica ni consumo clínico asociado. Si no aplica, puedes finalizar. Después no podrás editarla desde la app. ¿Deseas continuar?';
+    Alert.alert('Finalizar consulta', warning, [
       { style: 'cancel', text: 'Cancelar' },
       { onPress: finish, text: 'Finalizar' },
     ]);
@@ -116,6 +120,12 @@ export function DoctorConsultationSummaryScreen() {
           <Info label="Plan" value={consultation?.plan ?? consultation?.treatment_plan} />
           <Info label="Recomendaciones" value={consultation?.recommendations} />
         </AppCard>
+        {!completed && !hasClinicalActions ? (
+          <AppCard style={styles.warningCard}>
+            <Text style={styles.warningTitle}>Sin indicaciones adjuntas</Text>
+            <Text style={styles.warningText}>Antes de finalizar confirma si el paciente necesita receta, orden médica o consumo clínico. Si no aplica, puedes cerrar la consulta.</Text>
+          </AppCard>
+        ) : null}
         <PrescriptionPreviewCard
           items={prescriptions}
           onPressItem={(item) => navigation.navigate('DoctorPrescriptionDetail', { prescription: item, prescriptionId: item.id })}
@@ -167,4 +177,7 @@ const styles = StyleSheet.create({
   safeArea: { backgroundColor: colors.background, flex: 1 },
   title: { color: colors.ink, fontSize: 17, fontWeight: '900' },
   value: { color: colors.ink, fontSize: 14, lineHeight: 20 },
+  warningCard: { backgroundColor: '#fffbeb', borderColor: '#fde68a', gap: 6 },
+  warningText: { color: colors.warning, fontSize: 13, fontWeight: '700', lineHeight: 19 },
+  warningTitle: { color: colors.warning, fontSize: 15, fontWeight: '900' },
 });

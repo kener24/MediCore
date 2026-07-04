@@ -4,7 +4,7 @@ import { colors } from '@/core/theme/colors';
 import type { PatientAppointmentFilter } from '@/features/patient/types/patientAppointments.types';
 
 const options: { label: string; value: PatientAppointmentFilter }[] = [
-  { label: 'Proximas', value: 'upcoming' },
+  { label: 'Próximas', value: 'upcoming' },
   { label: 'Historial', value: 'history' },
   { label: 'Todas', value: 'all' },
 ];

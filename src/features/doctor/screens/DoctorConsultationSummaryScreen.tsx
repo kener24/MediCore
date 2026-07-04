@@ -13,16 +13,17 @@ import { ConsultationStatusBadge } from '@/features/doctor/components/Consultati
 import { DoctorHeader } from '@/features/doctor/components/DoctorHeader';
 import { MedicalOrderPreviewCard } from '@/features/doctor/components/MedicalOrderPreviewCard';
 import { PrescriptionPreviewCard } from '@/features/doctor/components/PrescriptionPreviewCard';
+import { getConsultationConsumptions } from '@/features/doctor/services/doctorClinicalConsumptionService';
 import { completeConsultation, completeConsultationById } from '@/features/doctor/services/doctorConsultationService';
 import { resolveRequiredConsultation } from '@/features/doctor/services/doctorConsultationContextService';
-import { getConsultationConsumptions } from '@/features/doctor/services/doctorClinicalConsumptionService';
 import { getConsultationMedicalOrders } from '@/features/doctor/services/doctorMedicalOrderService';
 import { getConsultationPrescriptions } from '@/features/doctor/services/doctorPrescriptionService';
 import { isConsultationFinalized } from '@/features/doctor/types/commonDoctor.types';
-import type { DoctorConsultation } from '@/features/doctor/types/doctorConsultation.types';
 import type { DoctorClinicalConsumption } from '@/features/doctor/types/doctorClinicalConsumption.types';
+import type { ConsultationFormValues, DoctorConsultation } from '@/features/doctor/types/doctorConsultation.types';
 import type { DoctorMedicalOrder } from '@/features/doctor/types/doctorMedicalOrder.types';
 import type { DoctorPrescription } from '@/features/doctor/types/doctorPrescription.types';
+import { consultationProgress, validateConsultationFinish } from '@/features/doctor/utils/clinicalValidation';
 
 export function DoctorConsultationSummaryScreen() {
   const navigation = useNavigation<any>();
@@ -37,6 +38,10 @@ export function DoctorConsultationSummaryScreen() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [finishing, setFinishing] = useState(false);
+
+  const form = useMemo(() => toFormValues(consultation), [consultation]);
+  const progress = consultationProgress(form);
+  const completed = isConsultationFinalized(consultation?.status);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -68,14 +73,12 @@ export function DoctorConsultationSummaryScreen() {
   }, [load]);
 
   function confirmFinish() {
-    if (isConsultationFinalized(consultation?.status)) return Alert.alert('Finalizar consulta', 'Esta consulta ya fue finalizada.');
-    if (!consultationId) return Alert.alert('Finalizar consulta', 'No se encontró la consulta.');
-    if (!visitId) return Alert.alert('Finalizar consulta', 'No se encontró la visita.');
-    if (!consultation?.chief_complaint?.trim()) return Alert.alert('Finalizar consulta', 'Escribe el motivo principal antes de finalizar.');
-    if (!consultation.diagnosis_text?.trim() && !consultation.assessment?.trim() && !consultation.preliminary_diagnosis?.trim() && !consultation.clinical_assessment?.trim()) {
-      return Alert.alert('Finalizar consulta', 'Agrega un diagnóstico o evaluación clínica antes de finalizar.');
-    }
-    Alert.alert('Finalizar consulta', '¿Deseas finalizar esta consulta? Después de finalizar no podrás editarla desde la app.', [
+    if (completed) return Alert.alert('Finalizar consulta', 'Esta consulta ya fue finalizada.');
+    if (!consultationId) return Alert.alert('Finalizar consulta', 'No se encontro la consulta.');
+    if (!visitId) return Alert.alert('Finalizar consulta', 'No se encontro la visita.');
+    const validation = validateConsultationFinish(form, consultation);
+    if (validation) return Alert.alert('Finalizar consulta', validation);
+    Alert.alert('Finalizar consulta', 'Despues de finalizar no podras editarla desde la app. Deseas continuar?', [
       { style: 'cancel', text: 'Cancelar' },
       { onPress: finish, text: 'Finalizar' },
     ]);
@@ -89,7 +92,7 @@ export function DoctorConsultationSummaryScreen() {
       Alert.alert('Consulta finalizada', 'Consulta finalizada correctamente.');
       navigation.getParent()?.navigate('DoctorWaitingRoomTab');
     } catch (err) {
-      Alert.alert('Finalizar consulta', err instanceof Error ? err.message : 'Ocurrió un error en el servidor.');
+      Alert.alert('Finalizar consulta', err instanceof Error ? err.message : 'Ocurrio un error en el servidor.');
     } finally {
       setFinishing(false);
     }
@@ -97,7 +100,6 @@ export function DoctorConsultationSummaryScreen() {
 
   if (loading) return <LoadingState label="Cargando resumen de consulta..." />;
   if (error) return <ErrorState message={error} onRetry={load} title="No se pudo cargar el resumen" />;
-  const completed = isConsultationFinalized(consultation?.status);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -108,8 +110,9 @@ export function DoctorConsultationSummaryScreen() {
             <Text style={styles.title}>Consulta</Text>
             <ConsultationStatusBadge status={consultation?.status} />
           </View>
+          <Text style={styles.progress}>Checklist clinico: {progress.completed}/{progress.required} ({progress.percent}%)</Text>
           <Info label="Motivo principal" value={consultation?.chief_complaint} />
-          <Info label="Diagnóstico" value={consultation?.diagnosis_text ?? consultation?.preliminary_diagnosis} />
+          <Info label="Diagnostico" value={consultation?.diagnosis_text ?? consultation?.preliminary_diagnosis} />
           <Info label="Plan" value={consultation?.plan ?? consultation?.treatment_plan} />
           <Info label="Recomendaciones" value={consultation?.recommendations} />
         </AppCard>
@@ -122,10 +125,10 @@ export function DoctorConsultationSummaryScreen() {
           onPressItem={(item) => navigation.navigate('DoctorMedicalOrderDetail', { order: item, orderId: item.id })}
         />
         <ClinicalConsumptionCard items={consumptions} />
-        <AppButton label={completed ? 'Ver recetas' : 'Agregar receta'} onPress={() => navigation.navigate('DoctorPrescription', { consultationId, patientId: params.patientId, visitId })} variant="secondary" />
-        <AppButton label={completed ? 'Ver órdenes médicas' : 'Agregar orden médica'} onPress={() => navigation.navigate('DoctorMedicalOrder', { consultationId, patientId: params.patientId, visitId })} variant="secondary" />
-        <AppButton label={completed ? 'Ver consumos clínicos' : 'Agregar consumo clínico'} onPress={() => navigation.navigate('DoctorClinicalConsumption', { consultationId, patientId: params.patientId, visitId })} variant="secondary" />
-        <AppButton label="Volver a editar consulta" onPress={() => navigation.goBack()} variant="secondary" />
+        <AppButton disabled={completed} label={completed ? 'Consulta finalizada' : 'Agregar receta'} onPress={() => navigation.navigate('DoctorPrescription', { consultationId, patientId: params.patientId, visitId })} variant="secondary" />
+        <AppButton disabled={completed} label={completed ? 'Consulta finalizada' : 'Agregar orden medica'} onPress={() => navigation.navigate('DoctorMedicalOrder', { consultationId, patientId: params.patientId, visitId })} variant="secondary" />
+        <AppButton disabled={completed} label={completed ? 'Consulta finalizada' : 'Agregar consumo clinico'} onPress={() => navigation.navigate('DoctorClinicalConsumption', { consultationId, patientId: params.patientId, visitId })} variant="secondary" />
+        <AppButton label="Volver a consulta" onPress={() => navigation.goBack()} variant="secondary" />
         <AppButton disabled={completed} label={completed ? 'Consulta finalizada' : 'Finalizar consulta'} loading={finishing} onPress={confirmFinish} />
       </ScrollView>
     </SafeAreaView>
@@ -141,11 +144,25 @@ function Info({ label, value }: { label: string; value?: string | null }) {
   );
 }
 
+function toFormValues(consultation?: DoctorConsultation | null): ConsultationFormValues {
+  return {
+    assessment: consultation?.assessment ?? consultation?.clinical_assessment ?? '',
+    chief_complaint: consultation?.chief_complaint ?? '',
+    diagnosis_text: consultation?.diagnosis_text ?? consultation?.preliminary_diagnosis ?? '',
+    history_present_illness: consultation?.history_present_illness ?? consultation?.symptoms ?? '',
+    notes: consultation?.notes ?? consultation?.private_notes ?? '',
+    physical_examination: consultation?.physical_examination ?? consultation?.physical_exam ?? '',
+    plan: consultation?.plan ?? consultation?.treatment_plan ?? '',
+    recommendations: consultation?.recommendations ?? '',
+  };
+}
+
 const styles = StyleSheet.create({
   card: { gap: 10 },
   content: { gap: 14, padding: 22, paddingBottom: 128 },
   info: { gap: 3 },
   label: { color: colors.muted, fontSize: 11, fontWeight: '900', textTransform: 'uppercase' },
+  progress: { color: colors.primaryDark, fontSize: 13, fontWeight: '900' },
   row: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   safeArea: { backgroundColor: colors.background, flex: 1 },
   title: { color: colors.ink, fontSize: 17, fontWeight: '900' },

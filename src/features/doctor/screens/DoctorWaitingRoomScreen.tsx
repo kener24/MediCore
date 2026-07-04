@@ -49,7 +49,7 @@ export function DoctorWaitingRoomScreen() {
       if (filter === 'urgent') return ['urgent', 'urgente'].includes(priority);
       if (filter === 'emergency') return ['emergency', 'emergencia', 'critical'].includes(priority);
       return ['normal', 'baja', 'low'].includes(priority);
-    });
+    }).sort((a, b) => patientWeight(b) - patientWeight(a));
   }, [filter, patients, search]);
 
   const load = useCallback(async (refresh = false) => {
@@ -172,3 +172,16 @@ const styles = StyleSheet.create({
   filters: { flexDirection: 'row', gap: 8 },
   safeArea: { backgroundColor: colors.background, flex: 1 },
 });
+
+function patientWeight(item: WaitingRoomPatient) {
+  const priority = (item.priority ?? item.prioridad ?? 'normal').toLowerCase();
+  const priorityScore = ['emergency', 'emergencia', 'critical'].includes(priority)
+    ? 400
+    : ['urgent', 'urgente'].includes(priority)
+      ? 300
+      : ['priority', 'prioridad', 'alta', 'high'].includes(priority)
+        ? 200
+        : 100;
+  const waitingMinutes = Number(item.waiting_time_minutes ?? 0);
+  return priorityScore + Math.min(waitingMinutes, 120);
+}

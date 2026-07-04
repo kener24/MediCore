@@ -16,6 +16,8 @@ import { DoctorHeader } from '@/features/doctor/components/DoctorHeader';
 import { PatientSummaryCard } from '@/features/doctor/components/PatientSummaryCard';
 import { VisitInfoCard } from '@/features/doctor/components/VisitInfoCard';
 import {
+  completeConsultation,
+  completeConsultationById,
   createConsultation,
   getConsultationByVisit,
   getConsultationDetail,
@@ -44,6 +46,11 @@ import type {
   DoctorVisitDetail,
   DoctorVitalSigns,
 } from '@/features/doctor/types/doctorPatient.types';
+import {
+  validateConsultationDraft,
+  validateConsultationFinish,
+  validateConsultationSave,
+} from '@/features/doctor/utils/clinicalValidation';
 
 const emptyForm: ConsultationFormValues = {
   assessment: '',
@@ -79,6 +86,7 @@ export function DoctorConsultationScreen() {
   const [loading, setLoading] = useState(true);
   const [savingDraft, setSavingDraft] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [finishing, setFinishing] = useState(false);
 
   const consultationId = consultation?.id ?? consultation?.consultation_id ?? params.consultationId;
   const visitId = params.visitId ?? consultation?.visit_id ?? consultation?.patient_visit ?? visit?.id ?? visit?.visit_id;
@@ -90,11 +98,12 @@ export function DoctorConsultationScreen() {
     visit?.patient_id ??
     visit?.paciente_id;
   const completed = isConsultationFinalized(consultation?.status);
+  const busy = saving || savingDraft || finishing;
 
   const load = useCallback(async () => {
     if (!params.visitId && !params.consultationId) {
       setLoading(false);
-      setError('No se encontró la consulta médica.');
+      setError('No se encontro la consulta medica.');
       return;
     }
 
@@ -163,7 +172,7 @@ export function DoctorConsultationScreen() {
       );
       setForm(toFormValues(consultationData));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Ocurrió un error en el servidor.');
+      setError(err instanceof Error ? err.message : 'Ocurrio un error en el servidor.');
     } finally {
       setLoading(false);
     }
@@ -178,39 +187,35 @@ export function DoctorConsultationScreen() {
   }
 
   async function handleSaveDraft() {
-    const validation = validateDraft(form);
-    if (validation) return Alert.alert('Consulta médica', validation);
+    const validation = validateConsultationDraft(form);
+    if (validation) return Alert.alert('Consulta medica', validation);
     await persist('draft');
   }
 
   async function handleSave() {
-    const validation = validateFormalSave(form);
-    if (validation) return Alert.alert('Consulta médica', validation);
+    const validation = validateConsultationSave(form);
+    if (validation) return Alert.alert('Consulta medica', validation);
     await persist('in_progress');
   }
 
   async function persist(status: 'draft' | 'in_progress') {
-    if (completed) return Alert.alert('Consulta médica', 'Esta consulta ya fue finalizada.');
-    if (!visitId && !consultationId) return Alert.alert('Consulta médica', 'No se encontró la visita o consulta.');
+    if (completed) return Alert.alert('Consulta medica', 'Esta consulta ya fue finalizada.');
+    if (!visitId && !consultationId) return Alert.alert('Consulta medica', 'No se encontro la visita o consulta.');
 
     const setBusy = status === 'draft' ? setSavingDraft : setSaving;
     setBusy(true);
     try {
       const payload = buildPayload(form, status, visitId, resolvedPatientId);
-      let saved: DoctorConsultation;
-      if (consultationId) {
-        saved =
-          status === 'draft'
-            ? await saveConsultationDraft(consultationId, payload)
-            : await updateConsultation(consultationId, payload);
-      } else {
-        saved = await createConsultation(payload);
-      }
+      const saved = consultationId
+        ? status === 'draft'
+          ? await saveConsultationDraft(consultationId, payload)
+          : await updateConsultation(consultationId, payload)
+        : await createConsultation(payload);
       setConsultation(saved);
       setForm(toFormValues(saved));
-      Alert.alert('Consulta médica', status === 'draft' ? 'Borrador guardado correctamente.' : 'Consulta guardada correctamente.');
+      Alert.alert('Consulta medica', status === 'draft' ? 'Borrador guardado correctamente.' : 'Consulta guardada correctamente.');
     } catch (err) {
-      Alert.alert('Consulta médica', err instanceof Error ? err.message : 'No se pudo guardar la consulta.');
+      Alert.alert('Consulta medica', err instanceof Error ? err.message : 'No se pudo guardar la consulta.');
     } finally {
       setBusy(false);
     }
@@ -218,13 +223,46 @@ export function DoctorConsultationScreen() {
 
   function navigateAction(routeName: string) {
     if (!consultationId) {
-      Alert.alert('Consulta médica', 'Primero debes guardar la consulta médica para continuar.');
+      Alert.alert('Consulta medica', 'Primero debes guardar la consulta medica para continuar.');
       return;
     }
     navigation.navigate(routeName, { consultationId, patientId: resolvedPatientId, visitId });
   }
 
-  if (loading) return <LoadingState label="Cargando consulta médica..." />;
+  function confirmFinish() {
+    if (completed) return Alert.alert('Finalizar consulta', 'Esta consulta ya fue finalizada.');
+    const validation = validateConsultationFinish(form, consultation);
+    if (validation) return Alert.alert('Finalizar consulta', validation);
+    if (!visitId) return Alert.alert('Finalizar consulta', 'No se encontro la visita asociada.');
+    Alert.alert('Finalizar consulta', 'Despues de finalizar no podras editar esta consulta. Deseas continuar?', [
+      { style: 'cancel', text: 'Cancelar' },
+      { onPress: finishConsultation, text: 'Finalizar' },
+    ]);
+  }
+
+  async function finishConsultation() {
+    if (!visitId) return;
+    setFinishing(true);
+    try {
+      const payload = buildPayload(form, 'in_progress', visitId, resolvedPatientId);
+      const saved = consultationId ? await updateConsultation(consultationId, payload) : await createConsultation(payload);
+      const currentConsultationId = saved.id ?? saved.consultation_id ?? consultationId;
+      if (!currentConsultationId) throw new Error('No se pudo confirmar la consulta para finalizar.');
+      await completeConsultation(visitId, { status: 'completed' }).catch(() =>
+        completeConsultationById(currentConsultationId, { status: 'completed' }),
+      );
+      setConsultation({ ...saved, status: 'completed' });
+      Alert.alert('Consulta finalizada', 'Consulta finalizada correctamente.', [
+        { onPress: () => navigation.getParent()?.navigate('DoctorWaitingRoomTab'), text: 'Aceptar' },
+      ]);
+    } catch (err) {
+      Alert.alert('Finalizar consulta', err instanceof Error ? err.message : 'No se pudo finalizar la consulta.');
+    } finally {
+      setFinishing(false);
+    }
+  }
+
+  if (loading) return <LoadingState label="Cargando consulta medica..." />;
   if (error) return <ErrorState message={error} onRetry={load} title="No se pudo cargar la consulta" />;
 
   const subtitle = completed
@@ -237,7 +275,7 @@ export function DoctorConsultationScreen() {
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboard}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <DoctorHeader title="Consulta médica" />
+          <DoctorHeader title="Consulta medica" />
           <View style={styles.statusRow}>
             <Text style={styles.subtitle}>{subtitle}</Text>
             <ConsultationStatusBadge status={consultation?.status ?? 'in_progress'} />
@@ -249,13 +287,14 @@ export function DoctorConsultationScreen() {
           <ConsultationForm
             disabled={completed}
             initialValues={form}
-            loading={saving || savingDraft}
+            loading={busy}
             onChange={updateField}
+            onFinish={confirmFinish}
             onSaveDraft={handleSaveDraft}
             onSubmit={handleSave}
           />
           <ConsultationActionBar
-            disabled={false}
+            disabled={!consultationId}
             onClinicalConsumption={() => navigateAction('DoctorClinicalConsumption')}
             onMedicalOrder={() => navigateAction('DoctorMedicalOrder')}
             onPrescription={() => navigateAction('DoctorPrescription')}
@@ -310,18 +349,6 @@ function buildPayload(
     treatment_plan: form.plan.trim(),
     visit: visitId,
   };
-}
-
-function validateDraft(form: ConsultationFormValues) {
-  return Object.values(form).some((value) => value.trim().length > 0) ? '' : 'No hay información para guardar.';
-}
-
-function validateFormalSave(form: ConsultationFormValues) {
-  if (form.chief_complaint.trim().length < 3) return 'Escribe el motivo principal.';
-  if (form.diagnosis_text.trim().length < 3 && form.assessment.trim().length < 3) {
-    return 'Agrega un diagnóstico o evaluación clínica.';
-  }
-  return '';
 }
 
 function mergePatient(...values: (DoctorPatientBasicInfo | null | undefined)[]): DoctorPatientBasicInfo | null {

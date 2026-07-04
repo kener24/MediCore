@@ -21,16 +21,20 @@ export function ConsultationActionBar({
 }) {
   return (
     <AppCard style={styles.card}>
-      <Text style={styles.title}>Acciones clínicas</Text>
-      <AppButton disabled={disabled} label="Crear receta" onPress={onPrescription} variant="secondary" />
-      <AppButton disabled={disabled} label="Crear orden médica" onPress={onMedicalOrder} variant="secondary" />
-      <AppButton disabled={disabled} label="Registrar consumo clínico" onPress={onClinicalConsumption} variant="secondary" />
-      <AppButton label={readOnly ? 'Ver resumen' : 'Ver resumen y finalizar'} onPress={onSummary} />
+      <Text style={styles.title}>Acciones clinicas</Text>
+      <Text style={styles.subtitle}>
+        {readOnly ? 'Consulta finalizada: las acciones quedan en modo lectura.' : 'Guarda la consulta antes de agregar indicaciones clinicas.'}
+      </Text>
+      <AppButton disabled={disabled || readOnly} label="Crear receta" onPress={onPrescription} variant="secondary" />
+      <AppButton disabled={disabled || readOnly} label="Crear orden medica" onPress={onMedicalOrder} variant="secondary" />
+      <AppButton disabled={disabled || readOnly} label="Registrar consumo clinico" onPress={onClinicalConsumption} variant="secondary" />
+      <AppButton disabled={disabled} label={readOnly ? 'Ver resumen' : 'Ver resumen y finalizar'} onPress={onSummary} />
     </AppCard>
   );
 }
 
 const styles = StyleSheet.create({
   card: { gap: 10 },
+  subtitle: { color: colors.muted, fontSize: 12, lineHeight: 18 },
   title: { color: colors.ink, fontSize: 17, fontWeight: '900' },
 });

@@ -27,5 +27,5 @@ export async function resolveRequiredConsultation(params: DoctorConsultationRout
       };
     }
   }
-  throw new Error('Primero debes guardar la consulta médica para continuar.');
+  throw new Error('Primero debes guardar la consulta medica para continuar.');
 }

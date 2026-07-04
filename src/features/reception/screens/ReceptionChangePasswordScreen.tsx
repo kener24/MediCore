@@ -30,16 +30,16 @@ export function ReceptionChangePasswordScreen() {
 
   async function submit() {
     const validation = validate(values);
-    if (validation) return Alert.alert('Cambiar contrasena', validation);
+    if (validation) return Alert.alert('Cambiar contraseña', validation);
     setSaving(true);
     try {
       await changeReceptionPassword(values);
       setValues(initialValues);
-      Alert.alert('Contrasena actualizada', 'Contrasena actualizada correctamente. Por seguridad inicia sesion nuevamente.', [
+      Alert.alert('Contraseña actualizada', 'Contraseña actualizada correctamente. Por seguridad inicia sesión nuevamente.', [
         { onPress: signOut, text: 'Aceptar' },
       ]);
     } catch (err) {
-      Alert.alert('Cambiar contrasena', err instanceof Error ? err.message : 'No se pudo actualizar la contrasena.');
+      Alert.alert('Cambiar contraseña', err instanceof Error ? err.message : 'No se pudo actualizar la contraseña.');
     } finally {
       setSaving(false);
     }
@@ -49,12 +49,12 @@ export function ReceptionChangePasswordScreen() {
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboard}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <AppHeader icon="key-outline" subtitle="Protege el acceso de recepcion." title="Cambiar contrasena" />
+          <AppHeader icon="key-outline" subtitle="Protege el acceso de recepción." title="Cambiar contraseña" />
           <AppCard style={styles.card}>
-            <AppInput label="Contrasena actual" onChangeText={(value) => update('current_password', value)} secureTextEntry value={values.current_password} />
-            <AppInput label="Nueva contrasena" onChangeText={(value) => update('new_password', value)} secureTextEntry value={values.new_password} />
-            <AppInput label="Confirmar contrasena" onChangeText={(value) => update('confirm_password', value)} secureTextEntry value={values.confirm_password} />
-            <AppButton label="Actualizar contrasena" loading={saving} onPress={submit} />
+            <AppInput label="Contraseña actual" onChangeText={(value) => update('current_password', value)} secureTextEntry value={values.current_password} />
+            <AppInput label="Nueva contraseña" onChangeText={(value) => update('new_password', value)} secureTextEntry value={values.new_password} />
+            <AppInput label="Confirmar contraseña" onChangeText={(value) => update('confirm_password', value)} secureTextEntry value={values.confirm_password} />
+            <AppButton label="Actualizar contraseña" loading={saving} onPress={submit} />
             <AppButton label="Volver" onPress={() => navigation.goBack()} variant="secondary" />
           </AppCard>
         </ScrollView>
@@ -64,10 +64,10 @@ export function ReceptionChangePasswordScreen() {
 }
 
 function validate(values: ReceptionChangePasswordPayload) {
-  if (!values.current_password) return 'Escribe tu contrasena actual.';
-  if (!values.new_password || values.new_password.length < 8) return 'La nueva contrasena debe tener al menos 8 caracteres.';
-  if (values.new_password !== values.confirm_password) return 'Las contrasenas no coinciden.';
-  if (values.new_password === values.current_password) return 'La nueva contrasena debe ser diferente a la actual.';
+  if (!values.current_password) return 'Escribe tu contraseña actual.';
+  if (!values.new_password || values.new_password.length < 8) return 'La nueva contraseña debe tener al menos 8 caracteres.';
+  if (values.new_password !== values.confirm_password) return 'Las contraseñas no coinciden.';
+  if (values.new_password === values.current_password) return 'La nueva contraseña debe ser diferente a la actual.';
   return '';
 }
 

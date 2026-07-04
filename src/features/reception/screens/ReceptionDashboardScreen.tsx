@@ -48,10 +48,10 @@ export function ReceptionDashboardScreen() {
       setAdmissions(todayAdmissions);
       setAppointments(todayAppointments);
       if (!dashboardStats && todayAdmissions.length === 0 && todayAppointments.length === 0) {
-        setError('No se pudo cargar la informacion operativa de recepcion.');
+        setError('No se pudo cargar la información operativa de recepción.');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo cargar recepcion.');
+      setError(err instanceof Error ? err.message : 'No se pudo cargar recepción.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -69,19 +69,19 @@ export function ReceptionDashboardScreen() {
     navigation.navigate('ReceptionPatientSearch', value.length >= 2 ? { initialQuery: value } : undefined);
   }
 
-  if (loading) return <LoadingState label="Cargando recepcion..." />;
+  if (loading) return <LoadingState label="Cargando recepción..." />;
 
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl onRefresh={() => void load(true)} refreshing={refreshing} />}>
-        <AppHeader icon="desk" subtitle={`${user?.clinica_nombre ?? 'Clinica asignada'} - ${user?.nombre_completo ?? 'Recepcion'}`} title="Centro de recepcion" />
+        <AppHeader icon="desk" subtitle={`${user?.clinica_nombre ?? 'Clínica asignada'} - ${user?.nombre_completo ?? 'Recepción'}`} title="Centro de recepción" />
         {error ? <ErrorState message={error} onRetry={() => void load()} title="Panel incompleto" /> : null}
 
         <AppCard style={styles.searchCard}>
           <View style={styles.sectionHeader}>
             <View>
-              <Text style={styles.sectionTitle}>Busqueda rapida</Text>
-              <Text style={styles.sectionMeta}>Nombre, identidad, telefono o codigo.</Text>
+              <Text style={styles.sectionTitle}>Búsqueda rápida</Text>
+              <Text style={styles.sectionMeta}>Nombre, identidad, teléfono o código.</Text>
             </View>
             <MaterialCommunityIcons color={colors.primary} name="account-search-outline" size={26} />
           </View>
@@ -98,15 +98,15 @@ export function ReceptionDashboardScreen() {
         <View style={styles.workflowGrid}>
           <WorkflowCard count={work.pendingCheckIn} icon="calendar-clock" label="Citas por recibir" onPress={() => navigation.navigate('ReceptionAppointmentCheckIn', { initialFilter: 'scheduled' })} tone="blue" />
           <WorkflowCard count={work.waitingTriage} icon="clipboard-pulse-outline" label="Esperando triaje" onPress={() => navigation.navigate('ReceptionTodayAdmissions', { initialFilter: 'waiting_triage' })} tone="warning" />
-          <WorkflowCard count={work.waitingDoctor} icon="doctor" label="Listos para medico" onPress={() => navigation.navigate('ReceptionTodayAdmissions', { initialFilter: 'waiting_doctor' })} tone="primary" />
+          <WorkflowCard count={work.waitingDoctor} icon="doctor" label="Listos para médico" onPress={() => navigation.navigate('ReceptionTodayAdmissions', { initialFilter: 'waiting_doctor' })} tone="primary" />
           <WorkflowCard count={work.waitingBilling} icon="cash-register" label="Pendiente caja" onPress={() => navigation.navigate('ReceptionTodayAdmissions', { initialFilter: 'waiting_billing' })} tone="danger" />
         </View>
 
         <Text style={styles.sectionTitle}>Acciones frecuentes</Text>
         <View style={styles.actions}>
           <QuickActionCard description="Busca, valida identidad y abre expediente operativo." icon="account-search-outline" onPress={() => navigation.navigate('ReceptionPatientSearch')} title="Buscar paciente" />
-          <QuickActionCard description="Registra un paciente minimo para atencion inmediata." icon="account-plus-outline" onPress={() => navigation.navigate('ReceptionPatientCreate')} title="Crear paciente" />
-          <QuickActionCard description="Crea una visita sin cita y asigna prioridad/medico." icon="clipboard-plus-outline" onPress={() => navigation.navigate('ReceptionCreateAdmission')} title="Nueva admision" />
+          <QuickActionCard description="Registra un paciente mínimo para atención inmediata." icon="account-plus-outline" onPress={() => navigation.navigate('ReceptionPatientCreate')} title="Crear paciente" />
+          <QuickActionCard description="Crea una visita sin cita y asigna prioridad/médico." icon="clipboard-plus-outline" onPress={() => navigation.navigate('ReceptionCreateAdmission')} title="Nueva admisión" />
           <QuickActionCard description="Recibe pacientes con cita y crea la visita operativa." icon="calendar-check-outline" onPress={() => navigation.navigate('ReceptionAppointmentCheckIn')} title="Check-in de cita" />
         </View>
 
@@ -118,9 +118,9 @@ export function ReceptionDashboardScreen() {
             onCheckIn={() => navigation.navigate('ReceptionAppointmentCheckIn', { focusAppointmentId: appointment.id })}
             onViewVisit={() => navigation.navigate('ReceptionAppointmentCheckIn')}
           />
-        )) : <EmptyState description="No hay citas pendientes por recibir." title="Agenda al dia" />}
+        )) : <EmptyState description="No hay citas pendientes por recibir." title="Agenda al día" />}
 
-        <SectionHeader action="Ver flujo" onPress={() => navigation.navigate('ReceptionTodayAdmissions')} title="Prioridades de atencion" />
+        <SectionHeader action="Ver flujo" onPress={() => navigation.navigate('ReceptionTodayAdmissions')} title="Prioridades de atención" />
         {priorityAdmissions.length ? priorityAdmissions.map((visit) => (
           <TodayAdmissionCard key={visit.id} onPress={() => navigation.navigate('ReceptionVisitDetail', { visitId: visit.id })} visit={visit} />
         )) : <EmptyState description="No hay pacientes urgentes o atrasados en este momento." title="Sin prioridades" />}

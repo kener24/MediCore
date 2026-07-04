@@ -21,7 +21,7 @@ export function WaitingRoomPatientCard({
 }) {
   const name = item.patient_name ?? item.paciente_nombre ?? item.patient?.full_name ?? item.patient?.nombre_completo ?? 'Paciente';
   const visitId = item.visit_id ?? item.visita_id ?? item.id;
-  const demographic = [item.age ?? item.edad ? `${item.age ?? item.edad} anos` : null, item.gender ?? item.genero]
+  const demographic = [item.age ?? item.edad ? `${item.age ?? item.edad} años` : null, item.gender ?? item.genero]
     .filter(Boolean)
     .join(' - ');
 

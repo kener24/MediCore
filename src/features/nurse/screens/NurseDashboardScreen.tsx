@@ -93,7 +93,7 @@ export function NurseDashboardScreen() {
             description={`${summary?.unreadNotifications ?? 0} notificaciones no leídas.`}
             icon="bell-outline"
             onPress={() => navigation.navigate('NurseNotifications')}
-            title="Notificaciones"
+            title="Notificaciónes"
           />
         </View>
       </ScrollView>

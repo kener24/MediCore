@@ -66,7 +66,7 @@ export function PatientNotificationsScreen() {
       );
       setUnreadCount((current) => Math.max(current - 1, 0));
     } catch (err) {
-      Alert.alert('Notificaciones', err instanceof Error ? err.message : 'No se pudo marcar como leida.');
+      Alert.alert('Notificaciónes', err instanceof Error ? err.message : 'No se pudo marcar como leída.');
     }
   }
 
@@ -78,9 +78,9 @@ export function PatientNotificationsScreen() {
         current.map((item) => ({ ...item, is_read: true, read: true, status: 'read' })),
       );
       setUnreadCount(0);
-      Alert.alert('Notificaciones', 'Todas las notificaciones fueron marcadas como leidas.');
+      Alert.alert('Notificaciónes', 'Todas las notificaciones fueron marcadas como leídas.');
     } catch (err) {
-      Alert.alert('Notificaciones', err instanceof Error ? err.message : 'No se pudieron marcar las notificaciones.');
+      Alert.alert('Notificaciónes', err instanceof Error ? err.message : 'No se pudieron marcar las notificaciones.');
     }
   }
 
@@ -92,7 +92,7 @@ export function PatientNotificationsScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl onRefresh={() => load(true)} refreshing={refreshing} />}
         showsVerticalScrollIndicator={false}>
-        <PatientHeader subtitle="Avisos enviados por tu clinica." title="Notificaciones" />
+        <PatientHeader subtitle="Avisos enviados por tu clínica." title="Notificaciónes" />
         <View style={styles.counterCard}>
           <View>
             <Text style={styles.counterLabel}>No leidas</Text>
@@ -124,7 +124,7 @@ export function PatientNotificationsScreen() {
         ) : (
           <EmptyState
             description={filter === 'unread' ? 'No tienes notificaciones pendientes.' : 'No tienes notificaciones.'}
-            title={filter === 'unread' ? 'Todo al dia' : 'Sin notificaciones'}
+            title={filter === 'unread' ? 'Todo al día' : 'Sin notificaciones'}
           />
         )}
       </ScrollView>

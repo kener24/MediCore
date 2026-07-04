@@ -54,10 +54,10 @@ export function MedicalOrderForm({
 
   async function submit() {
     if (disabled) return;
-    if (!orderType) return Alert.alert('Orden medica', 'Selecciona el tipo de orden.');
-    if (description.trim().length < 5) return Alert.alert('Orden medica', 'Escribe la descripcion de la orden.');
+    if (!orderType) return Alert.alert('Orden médica', 'Selecciona el tipo de orden.');
+    if (description.trim().length < 5) return Alert.alert('Orden médica', 'Escribe la descripcion de la orden.');
     if (priority === 'urgente' && instructions.trim().length < 5) {
-      return Alert.alert('Orden medica', 'Las ordenes urgentes deben incluir instrucciones claras.');
+      return Alert.alert('Orden médica', 'Las Órdenes urgentes deben incluir instrucciones claras.');
     }
     await onSubmit({
       description: description.trim(),
@@ -103,7 +103,7 @@ export function MedicalOrderForm({
       ) : null}
       <AppInput editable={!disabled} label="Instrucciones" multiline onChangeText={setInstructions} value={instructions} />
       <AppInput editable={!disabled} label="Notas" multiline onChangeText={setNotes} value={notes} />
-      <AppButton disabled={disabled} label="Guardar orden medica" loading={submitting} onPress={submit} />
+      <AppButton disabled={disabled} label="Guardar orden médica" loading={submitting} onPress={submit} />
     </AppCard>
   );
 }

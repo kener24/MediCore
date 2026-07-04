@@ -31,7 +31,7 @@ export function PatientMedicalOrdersScreen() {
     try {
       setOrders(await getPatientMedicalOrders());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudieron cargar las ordenes.');
+      setError(err instanceof Error ? err.message : 'No se pudieron cargar las Órdenes.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -50,7 +50,7 @@ export function PatientMedicalOrdersScreen() {
     [filter, orders],
   );
 
-  if (loading) return <LoadingState label="Cargando ordenes..." />;
+  if (loading) return <LoadingState label="Cargando Órdenes..." />;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -58,20 +58,20 @@ export function PatientMedicalOrdersScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl onRefresh={() => load(true)} refreshing={refreshing} />}
         showsVerticalScrollIndicator={false}>
-        <PatientHeader subtitle="Laboratorio, imagenes y solicitudes medicas." title="Ordenes medicas" />
+        <PatientHeader subtitle="Laboratorio, imágenes y solicitudes médicas." title="Órdenes médicas" />
         <View style={styles.filters}>
           <Chip active={filter === 'all'} label="Todas" onPress={() => setFilter('all')} />
           <Chip active={filter === 'pending'} label="Pendientes" onPress={() => setFilter('pending')} />
           <Chip active={filter === 'completed'} label="Finalizadas" onPress={() => setFilter('completed')} />
         </View>
         {error ? (
-          <ErrorState message={error} onRetry={() => load()} title="No se pudieron cargar las ordenes" />
+          <ErrorState message={error} onRetry={() => load()} title="No se pudieron cargar las Órdenes" />
         ) : visibleOrders.length ? (
           visibleOrders.map((order) => (
             <Pressable key={order.id} onPress={() => navigation.navigate('PatientMedicalOrderDetail', { id: order.id })}>
               <AppCard style={styles.card}>
                 <StatusBadge status={order.status} />
-                <Text style={styles.title}>{order.title || order.order_number || 'Orden medica'}</Text>
+                <Text style={styles.title}>{order.title || order.order_number || 'Orden médica'}</Text>
                 <Text style={styles.meta}>{order.order_type || 'Tipo no indicado'} · {order.priority || 'Prioridad normal'}</Text>
                 <Text style={styles.meta}>{formatDate(order.creado_en || order.actualizado_en)}</Text>
                 <Text style={styles.description} numberOfLines={2}>{order.description || order.instructions || 'Sin indicaciones adicionales.'}</Text>
@@ -79,7 +79,7 @@ export function PatientMedicalOrdersScreen() {
             </Pressable>
           ))
         ) : (
-          <EmptyState description="No tienes ordenes medicas registradas." title="Sin ordenes" />
+          <EmptyState description="No tienes Órdenes médicas registradas." title="Sin Órdenes" />
         )}
       </ScrollView>
     </SafeAreaView>

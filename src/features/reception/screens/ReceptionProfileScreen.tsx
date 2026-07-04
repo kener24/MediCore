@@ -39,9 +39,9 @@ export function ReceptionProfileScreen() {
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   async function logout() {
-    Alert.alert('Cerrar sesion', 'Deseas cerrar la sesion?', [
+    Alert.alert('Cerrar sesión', '¿Deseas cerrar la sesión?', [
       { style: 'cancel', text: 'Cancelar' },
-      { style: 'destructive', text: 'Cerrar sesion', onPress: () => void signOut() },
+      { style: 'destructive', text: 'Cerrar sesión', onPress: () => void signOut() },
     ]);
   }
 
@@ -51,20 +51,20 @@ export function ReceptionProfileScreen() {
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl onRefresh={() => void load(true)} refreshing={refreshing} />}>
-        <AppHeader icon="account-cog-outline" subtitle="Perfil operativo de recepcion." title="Perfil" />
+        <AppHeader icon="account-cog-outline" subtitle="Perfil operativo de recepción." title="Perfil" />
         {error ? <ErrorState message={error} onRetry={() => void load()} title="Perfil parcial" /> : null}
         <AppCard style={styles.card}>
-          <Text style={styles.title}>{activeProfile?.nombre_completo ?? 'Recepcion'}</Text>
+          <Text style={styles.title}>{activeProfile?.nombre_completo ?? 'Recepción'}</Text>
           <Info label="Correo" value={activeProfile?.email ?? 'No registrado'} />
           <Info label="Rol" value={String(role ?? activeProfile?.role_nombre ?? 'recepcionista')} />
-          <Info label="Clinica" value={activeProfile?.clinica_nombre ?? (typeof activeProfile?.clinica === 'object' ? activeProfile.clinica?.nombre ?? 'No asignada' : 'No asignada')} />
-          <Info label="Telefono" value={activeProfile?.telefono ?? 'No registrado'} />
+          <Info label="Clínica" value={activeProfile?.clinica_nombre ?? (typeof activeProfile?.clinica === 'object' ? activeProfile.clinica?.nombre ?? 'No asignada' : 'No asignada')} />
+          <Info label="Teléfono" value={activeProfile?.telefono ?? 'No registrado'} />
           <Info label="Estado" value={activeProfile?.is_active ? 'Activo' : 'Inactivo'} />
         </AppCard>
         <AppButton label="Editar perfil" onPress={() => navigation.navigate('ReceptionEditProfile', { profile: activeProfile })} />
-        <AppButton label="Seguridad y configuracion" onPress={() => navigation.navigate('ReceptionSecurity')} variant="secondary" />
-        <AppButton label="Cambiar contrasena" onPress={() => navigation.navigate('ReceptionChangePassword')} variant="secondary" />
-        <AppButton label="Cerrar sesion" onPress={logout} variant="danger" />
+        <AppButton label="Seguridad y configuración" onPress={() => navigation.navigate('ReceptionSecurity')} variant="secondary" />
+        <AppButton label="Cambiar contraseña" onPress={() => navigation.navigate('ReceptionChangePassword')} variant="secondary" />
+        <AppButton label="Cerrar sesión" onPress={logout} variant="danger" />
       </ScrollView>
     </SafeAreaView>
   );

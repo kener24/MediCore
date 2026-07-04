@@ -31,7 +31,7 @@ export function PatientAppointmentDetailScreen() {
     setLoading(true);
     setError('');
     if (!hasValidId) {
-      setError('No se encontro la cita solicitada.');
+      setError('No se encontró la cita solicitada.');
       setLoading(false);
       return;
     }

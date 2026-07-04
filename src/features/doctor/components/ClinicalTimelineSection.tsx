@@ -21,7 +21,7 @@ export function ClinicalTimelineSection({
 
   return (
     <AppCard style={styles.card}>
-      <Text style={styles.title}>Timeline clinico</Text>
+      <Text style={styles.title}>Timeline clínico</Text>
       {items.length ? (
         items.map((item, index) => (
           <View key={`${item.kind}-${item.title}-${index}`} style={styles.item}>
@@ -34,7 +34,7 @@ export function ClinicalTimelineSection({
           </View>
         ))
       ) : (
-        <Text style={styles.empty}>Sin eventos clinicos recientes.</Text>
+        <Text style={styles.empty}>Sin eventos clínicos recientes.</Text>
       )}
     </AppCard>
   );
@@ -43,9 +43,9 @@ export function ClinicalTimelineSection({
 function buildTimeline(summary?: DoctorPatientMedicalSummary | null): TimelineItem[] {
   const diagnoses = (summary?.last_diagnoses ?? []).map((item) => ({
     date: item.date ?? item.fecha,
-    kind: 'Diagnostico',
+    kind: 'Diagnóstico',
     subtitle: item.doctor_name,
-    title: item.diagnosis ?? item.diagnostico ?? 'Diagnostico no indicado',
+    title: item.diagnosis ?? item.diagnostico ?? 'Diagnóstico no indicado',
   }));
   const prescriptions = (summary?.last_prescriptions ?? []).map((item) => ({
     date: item.date ?? item.fecha,

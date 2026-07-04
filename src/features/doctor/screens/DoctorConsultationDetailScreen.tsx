@@ -46,7 +46,7 @@ export function DoctorConsultationDetailScreen() {
   const load = useCallback(async () => {
     if (!params.consultationId) {
       setLoading(false);
-      setError('No se encontro la consulta medica.');
+      setError('No se encontró la consulta médica.');
       return;
     }
     setLoading(true);
@@ -66,8 +66,8 @@ export function DoctorConsultationDetailScreen() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   function confirmFinish() {
-    if (completed) return Alert.alert('Consulta medica', 'Esta consulta ya fue finalizada.');
-    if (!consultationId || !visitId) return Alert.alert('Consulta medica', 'No se encontro la consulta o visita asociada.');
+    if (completed) return Alert.alert('Consulta médica', 'Esta consulta ya fue finalizada.');
+    if (!consultationId || !visitId) return Alert.alert('Consulta médica', 'No se encontró la consulta o visita asociada.');
     const validation = validateConsultationFinish(form, consultation);
     if (validation) return Alert.alert('Finalizar consulta', validation);
     Alert.alert('Finalizar consulta', 'Despues de finalizar no podras editarla desde la app. Deseas continuar?', [
@@ -84,7 +84,7 @@ export function DoctorConsultationDetailScreen() {
       Alert.alert('Consulta finalizada', 'Consulta finalizada correctamente.');
       await load();
     } catch (err) {
-      Alert.alert('Consulta medica', err instanceof Error ? err.message : 'No se pudo finalizar la consulta.');
+      Alert.alert('Consulta médica', err instanceof Error ? err.message : 'No se pudo finalizar la consulta.');
     } finally {
       setFinishing(false);
     }
@@ -106,9 +106,9 @@ export function DoctorConsultationDetailScreen() {
           {completed ? <Text style={styles.readOnly}>Esta consulta ya fue finalizada.</Text> : null}
           <Info label="Motivo principal" value={consultation.chief_complaint || consultation.reason} />
           <Info label="Historia de enfermedad actual" value={consultation.history_present_illness || consultation.symptoms} />
-          <Info label="Examen fisico" value={consultation.physical_examination || consultation.physical_exam} />
-          <Info label="Evaluacion clinica" value={consultation.assessment || consultation.clinical_assessment} />
-          <Info label="Diagnostico" value={consultation.diagnosis_text || consultation.preliminary_diagnosis} />
+          <Info label="Examen físico" value={consultation.physical_examination || consultation.physical_exam} />
+          <Info label="Evaluación clínica" value={consultation.assessment || consultation.clinical_assessment} />
+          <Info label="Diagnóstico" value={consultation.diagnosis_text || consultation.preliminary_diagnosis} />
           <Info label="Plan de tratamiento" value={consultation.plan || consultation.treatment_plan} />
           <Info label="Recomendaciones" value={consultation.recommendations} />
           <Info label="Notas" value={consultation.notes || consultation.private_notes} />
@@ -116,19 +116,19 @@ export function DoctorConsultationDetailScreen() {
 
         <RelatedSection title="Signos vitales y triaje" count={consultation.vital_signs || consultation.triage ? 1 : 0} />
         <RelatedSection title="Recetas medicas" count={related.prescriptions.length} />
-        <RelatedSection title="Ordenes medicas" count={related.medical_orders.length} />
-        <RelatedSection title="Consumos clinicos" count={related.consumptions.length} />
+        <RelatedSection title="Órdenes médicas" count={related.medical_orders.length} />
+        <RelatedSection title="Consumos clínicos" count={related.consumptions.length} />
 
         <AppButton disabled={completed} label="Continuar edicion" onPress={() => navigation.navigate('DoctorConsultation', { consultationId, patientId, visitId })} />
         <AppButton label="Ver resumen" onPress={() => navigation.navigate('DoctorConsultationSummary', { consultationId, patientId, visitId })} variant="secondary" />
         <AppButton
           label="Historial del paciente"
-          onPress={() => patientId ? navigation.navigate('DoctorConsultationHistory', { patientId }) : Alert.alert('Historial', 'No se encontro el paciente.')}
+          onPress={() => patientId ? navigation.navigate('DoctorConsultationHistory', { patientId }) : Alert.alert('Historial', 'No se encontró el paciente.')}
           variant="secondary"
         />
         <AppButton disabled={completed} label="Agregar receta" onPress={() => navigation.navigate('DoctorPrescription', { consultationId, patientId, visitId })} variant="secondary" />
-        <AppButton disabled={completed} label="Agregar orden medica" onPress={() => navigation.navigate('DoctorMedicalOrder', { consultationId, patientId, visitId })} variant="secondary" />
-        <AppButton disabled={completed} label="Agregar consumo clinico" onPress={() => navigation.navigate('DoctorClinicalConsumption', { consultationId, patientId, visitId })} variant="secondary" />
+        <AppButton disabled={completed} label="Agregar orden médica" onPress={() => navigation.navigate('DoctorMedicalOrder', { consultationId, patientId, visitId })} variant="secondary" />
+        <AppButton disabled={completed} label="Agregar consumo clínico" onPress={() => navigation.navigate('DoctorClinicalConsumption', { consultationId, patientId, visitId })} variant="secondary" />
         <AppButton disabled={completed} label={completed ? 'Consulta finalizada' : 'Finalizar consulta'} loading={finishing} onPress={confirmFinish} />
         <AppButton label="Volver" onPress={() => navigation.goBack()} variant="secondary" />
       </ScrollView>

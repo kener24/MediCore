@@ -29,10 +29,10 @@ export function PrescriptionCard({
     <Pressable onPress={onPress} style={({ pressed }) => pressed && styles.pressed}>
       <AppCard>
         <StatusBadge status={prescription.status} />
-        <Text style={styles.title}>{prescription.prescription_number || 'Receta medica'}</Text>
+        <Text style={styles.title}>{prescription.prescription_number || 'Receta médica'}</Text>
         <Text style={styles.meta}>
           {formatDate(prescription.issue_date || prescription.date || prescription.created_at || prescription.creado_en)} ·{' '}
-          {prescription.doctor_nombre || prescription.doctor_name || 'Medico'}
+          {prescription.doctor_nombre || prescription.doctor_name || 'Médico'}
         </Text>
         <Text style={styles.text}>
           {summary || prescription.general_instructions || 'Sin medicamentos registrados'}

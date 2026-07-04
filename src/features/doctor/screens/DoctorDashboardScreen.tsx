@@ -32,7 +32,7 @@ export function DoctorDashboardScreen() {
     try {
       setDashboard(await getDoctorDashboard());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo cargar la informacion.');
+      setError(err instanceof Error ? err.message : 'No se pudo cargar la información.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -80,7 +80,7 @@ export function DoctorDashboardScreen() {
     }
   }
 
-  if (loading) return <LoadingState label="Cargando panel medico..." />;
+  if (loading) return <LoadingState label="Cargando panel médico..." />;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -89,7 +89,7 @@ export function DoctorDashboardScreen() {
         refreshControl={<RefreshControl onRefresh={() => load(true)} refreshing={refreshing} />}
         showsVerticalScrollIndicator={false}>
         {error ? (
-          <ErrorState message={error} onRetry={() => load()} title="No se pudo cargar el panel medico" />
+          <ErrorState message={error} onRetry={() => load()} title="No se pudo cargar el panel médico" />
         ) : dashboard ? (
           <>
             <DoctorHeader

@@ -54,7 +54,7 @@ export function DoctorScheduleScreen() {
     try {
       setAppointments(await getDoctorAppointmentsByDate(date));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'El modulo de agenda aun no esta disponible.');
+      setError(err instanceof Error ? err.message : 'El módulo de agenda aún no está disponible.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -67,7 +67,7 @@ export function DoctorScheduleScreen() {
     const visitId = item.visit_id ?? item.visita_id;
     const patientId = item.patient_id ?? item.patient;
     if (!visitId) {
-      Alert.alert('Agenda medica', 'Esta cita aun no tiene admision registrada. Primero debe pasar por recepcion.');
+      Alert.alert('Agenda médica', 'Esta cita aún no tiene admisión registrada. Primero debe pasar por recepción.');
     }
     navigation.navigate('DoctorPatientDetail', {
       appointment: item,
@@ -85,7 +85,7 @@ export function DoctorScheduleScreen() {
   function attendAppointment(item: DoctorAppointment) {
     const visitId = item.visit_id ?? item.visita_id;
     if (!visitId) {
-      Alert.alert('Agenda medica', 'Esta cita aun no tiene admision registrada. Primero debe pasar por recepcion.');
+      Alert.alert('Agenda médica', 'Esta cita aún no tiene admisión registrada. Primero debe pasar por recepción.');
       return;
     }
     Alert.alert('Iniciar consulta', 'Deseas iniciar la consulta de este paciente?', [
@@ -122,7 +122,7 @@ export function DoctorScheduleScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl onRefresh={() => load(true)} refreshing={refreshing} />}
         showsVerticalScrollIndicator={false}>
-        <DoctorHeader title="Agenda medica" />
+        <DoctorHeader title="Agenda médica" />
         <View style={styles.controls}>
           <AppDateInput label="Fecha seleccionada" onChange={setDate} value={date} />
           <View style={styles.dateButtons}>
@@ -153,7 +153,7 @@ export function DoctorScheduleScreen() {
             />
           ))
         ) : (
-          <EmptyState description="No tienes citas para este dia." title="Agenda vacia" />
+          <EmptyState description="No tienes citas para este día." title="Agenda vacía" />
         )}
       </ScrollView>
     </SafeAreaView>

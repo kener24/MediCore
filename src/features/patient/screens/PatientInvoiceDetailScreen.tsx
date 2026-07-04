@@ -30,7 +30,7 @@ export function PatientInvoiceDetailScreen() {
     setLoading(true);
     setError('');
     if (!hasValidId) {
-      setError('No se encontro la factura solicitada.');
+      setError('No se encontró la factura solicitada.');
       setLoading(false);
       return;
     }
@@ -59,7 +59,7 @@ export function PatientInvoiceDetailScreen() {
   }
 
   if (loading) return <LoadingState label="Cargando factura..." />;
-  if (error || !invoice) return <ErrorState message={error || 'No hay informacion disponible.'} onRetry={load} />;
+  if (error || !invoice) return <ErrorState message={error || 'No hay información disponible.'} onRetry={load} />;
 
   const canRequestFiscalPdf = Boolean(
     invoice.is_fiscal &&
@@ -74,9 +74,9 @@ export function PatientInvoiceDetailScreen() {
           <StatusBadge status={invoice.status} />
           <Text style={styles.title}>{invoice.invoice_number || `Factura #${invoice.id}`}</Text>
           <Text style={styles.meta}>Fecha: {formatDate(invoice.issue_date || invoice.created_at)}</Text>
-          <Text style={styles.meta}>Clinica: {invoice.clinic_name || 'No indicada'}</Text>
+          <Text style={styles.meta}>Clínica: {invoice.clinic_name || 'No indicada'}</Text>
           <Text style={styles.meta}>Paciente: {invoice.patient_name || 'No indicado'}</Text>
-          {invoice.fiscal_number ? <Detail label="Numero fiscal" value={invoice.fiscal_number} /> : null}
+          {invoice.fiscal_number ? <Detail label="Número fiscal" value={invoice.fiscal_number} /> : null}
           {invoice.cai ? <Detail label="CAI" value={invoice.cai} /> : null}
           <Detail label="Subtotal" value={formatCurrency(invoice.subtotal)} />
           <Detail label="Descuentos" value={formatCurrency(invoice.discount_total ?? invoice.discount_amount)} />

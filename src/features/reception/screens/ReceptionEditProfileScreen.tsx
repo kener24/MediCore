@@ -44,8 +44,8 @@ export function ReceptionEditProfileScreen() {
           <AppCard style={styles.card}>
             <AppInput label="Nombre" onChangeText={setFirstName} value={firstName} />
             <AppInput label="Apellido" onChangeText={setLastName} value={lastName} />
-            <AppInput keyboardType="phone-pad" label="Telefono" onChangeText={setPhone} value={phone} />
-            <Text style={styles.hint}>Correo, rol y clinica deben ser actualizados por administracion.</Text>
+            <AppInput keyboardType="phone-pad" label="Teléfono" onChangeText={setPhone} value={phone} />
+            <Text style={styles.hint}>Correo, rol y clínica deben ser actualizados por administración.</Text>
             <AppButton label="Guardar cambios" loading={saving} onPress={submit} />
             <AppButton label="Cancelar" onPress={() => navigation.goBack()} variant="secondary" />
           </AppCard>
@@ -57,7 +57,7 @@ export function ReceptionEditProfileScreen() {
 
 function validate(firstName: string, phone: string) {
   if (!firstName.trim()) return 'El nombre es obligatorio.';
-  if (phone.trim() && !/^[0-9+\-\s()]{7,20}$/.test(phone.trim())) return 'Ingresa un telefono valido.';
+  if (phone.trim() && !/^[0-9+\-\s()]{7,20}$/.test(phone.trim())) return 'Ingresa un teléfono válido.';
   return '';
 }
 

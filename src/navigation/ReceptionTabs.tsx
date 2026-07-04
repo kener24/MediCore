@@ -87,7 +87,7 @@ export function ReceptionTabs() {
       <Tab.Navigator screenOptions={createTabOptions(insets)}>
         <Tab.Screen component={ReceptionHomeStack} name="ReceptionHomeTab" options={{ tabBarIcon: tabIcon('desk'), title: 'Inicio' }} />
         <Tab.Screen component={ReceptionPatientsStack} name="ReceptionPatientsTab" options={{ tabBarIcon: tabIcon('account-search-outline'), title: 'Pacientes' }} />
-        <Tab.Screen component={ReceptionAdmissionsStack} name="ReceptionAdmissionsTab" options={{ tabBarIcon: tabIcon('clipboard-list-outline'), title: 'Admisiones' }} />
+        <Tab.Screen component={ReceptionAdmissionsStack} name="ReceptionAdmissionsTab" options={{ tabBarIcon: tabIcon('clipboard-list-outline'), title: 'Admisi?nes' }} />
         <Tab.Screen component={ReceptionAppointmentsStack} name="ReceptionAppointmentsTab" options={{ tabBarIcon: tabIcon('calendar-check-outline'), title: 'Citas' }} />
         <Tab.Screen component={CashierHomeStack} name="ReceptionCashierTab" options={{ tabBarIcon: tabIcon('cash-register'), title: 'Caja' }} />
         <Tab.Screen component={ReceptionProfileStack} name="ReceptionProfileTab" options={{ tabBarIcon: tabIcon('account-cog-outline'), title: 'Perfil' }} />

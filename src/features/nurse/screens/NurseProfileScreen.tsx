@@ -39,7 +39,7 @@ export function NurseProfileScreen() {
           description="Revisa alertas, avisos y pacientes asignados."
           icon="bell-outline"
           onPress={() => navigation.navigate('NurseNotifications')}
-          title="Notificaciones"
+          title="Notificaciónes"
         />
         <QuickActionCard
           description="Opciones de seguridad de la cuenta."

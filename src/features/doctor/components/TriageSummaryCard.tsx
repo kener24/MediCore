@@ -32,7 +32,7 @@ export function TriageSummaryCard({
       <Info label="Queja principal" value={triage.chief_complaint ?? triage.motivo_consulta} />
       <Info label="Evaluación inicial" value={triage.initial_assessment ?? triage.evaluacion_inicial} />
       <PriorityBadge value={triage.priority ?? triage.prioridad} />
-      <Info label="Notas de enfermeria" value={triage.notes ?? triage.notas} />
+      <Info label="Notas de enfermería" value={triage.notes ?? triage.notas} />
       <Info label="Enfermera" value={triage.nurse_name ?? triage.enfermera_nombre} />
       <Info label="Fecha" value={formatDateTime(triage.created_at ?? triage.creado_en)} />
     </AppCard>

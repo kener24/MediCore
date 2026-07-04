@@ -19,9 +19,9 @@ const fields: {
 }[] = [
   { icon: 'comment-text-outline', key: 'chief_complaint', label: 'Motivo principal', required: true },
   { icon: 'history', key: 'history_present_illness', label: 'Historia de enfermedad actual', minHeight: 96, required: true },
-  { icon: 'stethoscope', key: 'physical_examination', label: 'Examen fisico', minHeight: 96, required: true },
-  { icon: 'clipboard-pulse-outline', key: 'assessment', label: 'Evaluacion clinica', minHeight: 88 },
-  { icon: 'clipboard-text-outline', key: 'diagnosis_text', label: 'Diagnostico', minHeight: 88, required: true },
+  { icon: 'stethoscope', key: 'physical_examination', label: 'Examen físico', minHeight: 96, required: true },
+  { icon: 'clipboard-pulse-outline', key: 'assessment', label: 'Evaluación clínica', minHeight: 88 },
+  { icon: 'clipboard-text-outline', key: 'diagnosis_text', label: 'Diagnóstico', minHeight: 88, required: true },
   { icon: 'clipboard-list-outline', key: 'plan', label: 'Plan de tratamiento', minHeight: 88, required: true },
   { icon: 'hand-heart-outline', key: 'recommendations', label: 'Recomendaciones', minHeight: 88, required: true },
   { icon: 'note-text-outline', key: 'notes', label: 'Notas adicionales', minHeight: 88 },
@@ -50,7 +50,7 @@ export function ConsultationForm({
     <AppCard style={styles.form}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.title}>Formulario clinico</Text>
+          <Text style={styles.title}>Formulario clínico</Text>
           <Text style={styles.subtitle}>
             {progress.completed}/{progress.required} campos criticos completos
           </Text>

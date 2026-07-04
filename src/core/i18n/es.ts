@@ -25,7 +25,7 @@ export const es = {
     documents: 'Documentos',
     invoices: 'Facturas',
     noUpcomingAppointments: 'No tienes citas próximas.',
-    notifications: 'Notificaciones',
+    notifications: 'Notificaciónes',
     prescriptions: 'Recetas',
     profile: 'Perfil',
     requestAppointment: 'Solicitar cita',

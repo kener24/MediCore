@@ -17,7 +17,7 @@ export function RolePlaceholderScreen({ description, title }: RolePlaceholderScr
       <AppCard style={styles.card}>
         <Text style={styles.title}>Listo para integrar APIs</Text>
         <Text style={styles.text}>
-          Esta pantalla queda reservada para conectar datos reales del backend segun permisos.
+          Esta pantalla queda reservada para conectar datos reales del backend según permisos.
         </Text>
       </AppCard>
     </SafeAreaView>

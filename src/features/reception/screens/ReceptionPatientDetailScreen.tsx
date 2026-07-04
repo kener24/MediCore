@@ -34,7 +34,7 @@ export function ReceptionPatientDetailScreen() {
   const load = useCallback(async () => {
     if (!patientId) {
       setPatient(null);
-      setError('No se encontro el paciente.');
+      setError('No se encontró el paciente.');
       setLoading(false);
       return;
     }
@@ -65,7 +65,7 @@ export function ReceptionPatientDetailScreen() {
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content}>
-        <AppHeader icon="account-outline" subtitle="Perfil rapido para recepcion." title="Paciente" />
+        <AppHeader icon="account-outline" subtitle="Perfil rápido para recepción." title="Paciente" />
         {error ? <ErrorState message={error} onRetry={() => void load()} title="No se pudo cargar" /> : null}
         {!error && !patient ? <EmptyState title="Paciente no disponible" /> : null}
         {patient ? (
@@ -77,26 +77,26 @@ export function ReceptionPatientDetailScreen() {
                 </View>
                 <View style={styles.headerCopy}>
                   <Text style={styles.title}>{patientName(patient)}</Text>
-                  <Text style={styles.meta}>{patient.patient_code ?? patient.codigo_paciente ?? patient.medical_record_number ?? 'Sin codigo'}</Text>
+                  <Text style={styles.meta}>{patient.patient_code ?? patient.codigo_paciente ?? patient.medical_record_number ?? 'Sin código'}</Text>
                 </View>
               </View>
               <Info label="Identidad" value={patientIdentity(patient)} />
-              <Info label="Telefono" value={patientPhone(patient)} />
+              <Info label="Teléfono" value={patientPhone(patient)} />
               <Info label="Edad" value={String(patient.age ?? patient.edad ?? 'No registrada')} />
               <Info label="Sexo" value={patient.gender ?? patient.genero ?? 'No registrado'} />
-              <Info label="Direccion" value={patient.address ?? patient.direccion ?? 'No registrada'} />
+              <Info label="Dirección" value={patient.address ?? patient.direccion ?? 'No registrada'} />
               <Info label="Correo" value={patient.email ?? patient.correo ?? 'No registrado'} />
             </AppCard>
 
             {alerts.length ? (
               <AppCard style={styles.card}>
-                <Text style={styles.section}>Alertas para recepcion</Text>
+                <Text style={styles.section}>Alertas para recepción</Text>
                 {alerts.map((alert) => <Text key={alert} style={styles.alert}>{alert}</Text>)}
               </AppCard>
             ) : null}
 
             <View style={styles.actions}>
-              <AppButton label="Crear admision" onPress={() => navigation.navigate('ReceptionCreateAdmission', { patient, patientId: patient.id })} />
+              <AppButton label="Crear admisión" onPress={() => navigation.navigate('ReceptionCreateAdmission', { patient, patientId: patient.id })} />
               <AppButton label="Buscar en caja" onPress={() => navigation.navigate('ReceptionCashierTab', { screen: 'CashierInvoiceSearch' })} variant="secondary" />
               <AppButton label="Admisiones de hoy" onPress={() => navigation.navigate('ReceptionTodayAdmissions', { initialSearch: patientName(patient) })} variant="secondary" />
             </View>
@@ -127,7 +127,7 @@ function buildPatientAlerts(patient: ReceptionPatient, invoices: CashierInvoice[
   if (patient.allergies || patient.alergias) alerts.push(`Alergias: ${patient.allergies ?? patient.alergias}`);
   if (patient.chronic_diseases) alerts.push(`Condiciones cronicas: ${patient.chronic_diseases}`);
   if (patientIdentity(patient) === 'Sin identidad') alerts.push('Identidad pendiente de completar.');
-  if (patientPhone(patient) === 'Sin telefono') alerts.push('Telefono pendiente de completar.');
+  if (patientPhone(patient) === 'Sin teléfono') alerts.push('Teléfono pendiente de completar.');
   if (invoices.length) alerts.push(`Tiene ${invoices.length} factura(s) pendiente(s).`);
   if (visits.length) alerts.push('Ya tiene una visita registrada hoy.');
   return alerts;

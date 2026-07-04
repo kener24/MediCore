@@ -78,9 +78,9 @@ export function CashierPendingInvoicesScreen() {
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl onRefresh={() => void load(true)} refreshing={refreshing} />}>
         <CashierHeader subtitle="Facturas pendientes o parcialmente pagadas." title="Facturas pendientes" />
         <View style={styles.filters}>{filters.map(([value, label]) => <Text key={value} onPress={() => setFilter(value)} style={[styles.filter, filter === value && styles.filterActive]}>{label}</Text>)}</View>
-        <AppInput autoCapitalize="none" label="Buscar factura" onChangeText={setSearch} placeholder="Paciente, identidad, telefono o factura" value={search} />
+        <AppInput autoCapitalize="none" label="Buscar factura" onChangeText={setSearch} placeholder="Paciente, identidad, teléfono o factura" value={search} />
         {error ? <ErrorState message={error} onRetry={() => void load()} title="No se pudieron cargar" /> : null}
-        {!error && visible.length === 0 ? <EmptyState description="Ajusta la busqueda o el filtro para ver mas facturas." title="Sin facturas" /> : null}
+        {!error && visible.length === 0 ? <EmptyState description="Ajusta la búsqueda o el filtro para ver más facturas." title="Sin facturas" /> : null}
         {visible.map((invoice) => (
           <InvoiceCard
             invoice={invoice}

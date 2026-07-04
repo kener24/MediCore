@@ -9,7 +9,7 @@ export function ReceptionStatsGrid({ stats }: { stats: ReceptionStats }) {
     ['Citas hoy', stats.today_appointments ?? 0],
     ['Admisiones', stats.registered_today ?? stats.today_admissions ?? 0],
     ['Esperando triaje', stats.waiting_triage ?? 0],
-    ['Esperando medico', stats.waiting_doctor ?? 0],
+    ['Esperando médico', stats.waiting_doctor ?? 0],
     ['Pendiente cobro', stats.waiting_billing ?? 0],
     ['Canceladas', stats.cancelled ?? 0],
   ];

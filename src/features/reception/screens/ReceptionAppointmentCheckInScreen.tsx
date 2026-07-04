@@ -17,7 +17,7 @@ import { appointmentDoctorName, appointmentPatientName } from '@/features/recept
 import { checkInAppointment, getTodayAppointments, updateAppointmentReceptionStatus } from '@/features/reception/services/receptionAppointmentService';
 import type { ReceptionAppointment } from '@/features/reception/types/receptionAppointment.types';
 
-const filters = [['all', 'Todas'], ['scheduled', 'Pendientes'], ['confirmed', 'Confirmadas'], ['checked_in', 'Con check-in'], ['no_show', 'No asistio'], ['cancelled', 'Canceladas']] as const;
+const filters = [['all', 'Todas'], ['scheduled', 'Pendientes'], ['confirmed', 'Confirmadas'], ['checked_in', 'Con check-in'], ['no_show', 'No asisti?'], ['cancelled', 'Canceladas']] as const;
 
 export function ReceptionAppointmentCheckInScreen() {
   const navigation = useNavigation<any>();
@@ -128,7 +128,7 @@ export function ReceptionAppointmentCheckInScreen() {
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl onRefresh={() => void load(true)} refreshing={refreshing} />}>
-        <AppHeader icon="calendar-check-outline" subtitle="Citas del dia listas para registrar llegada." title="Check-in de cita" />
+        <AppHeader icon="calendar-check-outline" subtitle="Citas del día listas para registrar llegada." title="Check-in de cita" />
         <AppCard style={styles.summary}>
           <Info value={String(summary.total)} label="Citas" />
           <Info value={String(summary.pending)} label="Por recibir" />
@@ -142,9 +142,9 @@ export function ReceptionAppointmentCheckInScreen() {
           {date ? <AppButton label="Hoy" onPress={() => setDate('')} variant="secondary" /> : null}
         </View>
         <View style={styles.filters}>{filters.map(([value, label]) => <Text key={value} onPress={() => setFilter(value)} style={[styles.filter, filter === value && styles.filterActive]}>{label}</Text>)}</View>
-        <AppInput autoCapitalize="none" label="Buscar cita" onChangeText={setSearch} placeholder="Paciente, medico, hora o motivo" value={search} />
+        <AppInput autoCapitalize="none" label="Buscar cita" onChangeText={setSearch} placeholder="Paciente, médico, hora o motivo" value={search} />
         {error ? <ErrorState message={error} onRetry={() => void load()} title="No se pudo cargar" /> : null}
-        {!error && visible.length === 0 ? <EmptyState description="No hay citas para este filtro o busqueda." title="Sin citas" /> : null}
+        {!error && visible.length === 0 ? <EmptyState description="No hay citas para este filtro o búsqueda." title="Sin citas" /> : null}
         {visible.map((appointment) => (
           <AppointmentCheckInCard
             appointment={appointment}
@@ -171,7 +171,7 @@ export function ReceptionAppointmentCheckInScreen() {
       <Modal animationType="fade" transparent visible={Boolean(reasonModal)} onRequestClose={() => setReasonModal(null)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>{reasonModal?.action === 'no_show' ? 'Marcar no asistio' : 'Cancelar cita'}</Text>
+            <Text style={styles.modalTitle}>{reasonModal?.action === 'no_show' ? 'Marcar no asisti?' : 'Cancelar cita'}</Text>
             <Text style={styles.modalText}>Registra un motivo claro para auditoria y seguimiento administrativo.</Text>
             <TextInput
               multiline

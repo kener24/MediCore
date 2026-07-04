@@ -31,7 +31,7 @@ export function SettingsScreen() {
     try {
       setSettings(await getPatientPortalSettings());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo cargar la configuracion.');
+      setError(err instanceof Error ? err.message : 'No se pudo cargar la configuración.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -45,7 +45,7 @@ export function SettingsScreen() {
     await signOut();
   }
 
-  if (loading) return <LoadingState label="Cargando configuracion..." />;
+  if (loading) return <LoadingState label="Cargando configuración..." />;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -53,14 +53,14 @@ export function SettingsScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl onRefresh={() => load(true)} refreshing={refreshing} />}
         showsVerticalScrollIndicator={false}>
-        <PatientHeader subtitle="Gestiona tu cuenta y preferencias." title="Configuracion" />
-        {error ? <ErrorState message={error} onRetry={() => load()} title="No se pudo cargar configuracion" /> : null}
+        <PatientHeader subtitle="Gestiona tu cuenta y preferencias." title="Configuración" />
+        {error ? <ErrorState message={error} onRetry={() => load()} title="No se pudo cargar configuración" /> : null}
 
         <AppCard style={styles.portalCard}>
           <Text style={styles.sectionTitle}>Portal paciente</Text>
           <PortalFlag enabled={settings?.portal?.allow_online_appointments} label="Citas en linea" />
-          <PortalFlag enabled={settings?.portal?.allow_patient_cancellations} label="Cancelacion de citas" />
-          <PortalFlag enabled={settings?.portal?.allow_patient_medical_record_view} label="Historial clinico" />
+          <PortalFlag enabled={settings?.portal?.allow_patient_cancellations} label="Cancelación de citas" />
+          <PortalFlag enabled={settings?.portal?.allow_patient_medical_record_view} label="Historial clínico" />
           <PortalFlag enabled={settings?.portal?.allow_patient_prescription_view} label="Recetas" />
           <PortalFlag enabled={settings?.portal?.allow_patient_invoice_view} label="Facturas y pagos" />
           <Text style={styles.meta}>
@@ -79,27 +79,27 @@ export function SettingsScreen() {
           <SettingsOption
             icon="lock-reset"
             onPress={() => navigation.navigate('ChangePassword')}
-            subtitle="Actualiza tu contrasena"
-            title="Cambiar contrasena"
+            subtitle="Actualiza tu contraseña"
+            title="Cambiar contraseña"
           />
           <SettingsOption
             icon="hospital-building"
             onPress={() => navigation.navigate('ClinicInfo')}
-            subtitle="Telefono, correo y horarios"
-            title="Informacion de clinica"
+            subtitle="Teléfono, correo y horarios"
+            title="Información de clínica"
           />
           <SettingsOption
             icon="bell-outline"
             onPress={() => navigation.navigate('PatientNotifications')}
             subtitle="Avisos y mensajes del portal"
-            title="Notificaciones"
+            title="Notificaciónes"
           />
           <SettingsOption
             danger
             icon="logout"
             onPress={() => setLogoutVisible(true)}
-            subtitle="Finaliza tu sesion en este dispositivo"
-            title="Cerrar sesion"
+            subtitle="Finaliza tu sesión en este dispositivo"
+            title="Cerrar sesión"
           />
         </AppCard>
       </ScrollView>

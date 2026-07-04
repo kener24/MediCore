@@ -14,7 +14,7 @@ import { getTodayAdmissions } from '@/features/reception/services/receptionAdmis
 import { visitDoctorName, visitPatientName } from '@/features/reception/services/receptionMappers';
 import type { ReceptionVisit } from '@/features/reception/types/receptionAdmission.types';
 
-const filters = [['all', 'Todas'], ['waiting_triage', 'Triaje'], ['in_triage', 'En triaje'], ['waiting_doctor', 'Medico'], ['in_consultation', 'Consulta'], ['waiting_billing', 'Caja'], ['completed', 'Finalizadas'], ['cancelled', 'Canceladas']] as const;
+const filters = [['all', 'Todas'], ['waiting_triage', 'Triaje'], ['in_triage', 'En triaje'], ['waiting_doctor', 'Médico'], ['in_consultation', 'Consulta'], ['waiting_billing', 'Caja'], ['completed', 'Finalizadas'], ['cancelled', 'Canceladas']] as const;
 
 export function ReceptionTodayAdmissionsScreen() {
   const navigation = useNavigation<any>();
@@ -74,9 +74,9 @@ export function ReceptionTodayAdmissionsScreen() {
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl onRefresh={() => void load(true)} refreshing={refreshing} />}>
         <AppHeader icon="clipboard-list-outline" subtitle="Visitas y admisiones registradas hoy." title="Admisiones de hoy" />
         <View style={styles.filters}>{filters.map(([value, label]) => <Text key={value} onPress={() => setFilter(value)} style={[styles.filter, filter === value && styles.filterActive]}>{label}</Text>)}</View>
-        <AppInput autoCapitalize="none" label="Buscar admision" onChangeText={setSearch} placeholder="Paciente, medico, motivo o numero" value={search} />
+        <AppInput autoCapitalize="none" label="Buscar admisión" onChangeText={setSearch} placeholder="Paciente, médico, motivo o número" value={search} />
         {error ? <ErrorState message={error} onRetry={() => void load()} title="No se pudo cargar" /> : null}
-        {!error && visible.length === 0 ? <EmptyState description="Ajusta el filtro o registra una nueva admision." title="Sin admisiones" /> : null}
+        {!error && visible.length === 0 ? <EmptyState description="Ajusta el filtro o registra una nueva admisión." title="Sin admisiones" /> : null}
         {visible.map((visit) => <TodayAdmissionCard key={visit.id} onPress={() => navigation.navigate('ReceptionVisitDetail', { visitId: visit.id })} visit={visit} />)}
       </ScrollView>
     </SafeAreaView>

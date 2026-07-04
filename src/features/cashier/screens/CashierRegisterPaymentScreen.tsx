@@ -32,7 +32,7 @@ export function CashierRegisterPaymentScreen() {
 
   const load = useCallback(async () => {
     if (!params.invoiceId) {
-      setError('No se encontro la factura.');
+      setError('No se encontró la factura.');
       setLoading(false);
       return;
     }
@@ -54,7 +54,7 @@ export function CashierRegisterPaymentScreen() {
 
   async function submit() {
     if (saving) return;
-    if (!params.invoiceId || !invoice) return Alert.alert('Pago', 'No se encontro la factura.');
+    if (!params.invoiceId || !invoice) return Alert.alert('Pago', 'No se encontró la factura.');
     const validation = validate();
     if (validation) return Alert.alert('Pago', validation);
     setSaving(true);
@@ -80,7 +80,7 @@ export function CashierRegisterPaymentScreen() {
   function validate() {
     const value = Number(amount);
     const balance = numericValue(invoice?.balance_due ?? invoice?.balance);
-    if (!Number.isFinite(value)) return 'Ingresa un monto valido.';
+    if (!Number.isFinite(value)) return 'Ingresa un monto válido.';
     if (value <= 0) return 'El monto debe ser mayor a 0.';
     if (balance > 0 && value > balance) return 'El monto no puede ser mayor al saldo pendiente.';
     if (!method) return 'Selecciona un metodo de pago.';

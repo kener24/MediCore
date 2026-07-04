@@ -30,7 +30,7 @@ export function AppointmentCheckInCard({
   return (
     <AppCard style={styles.card}>
       <Text style={styles.title}>{appointmentPatientName(appointment)}</Text>
-      <Text style={styles.meta}>Medico: {appointmentDoctorName(appointment)}</Text>
+      <Text style={styles.meta}>Médico: {appointmentDoctorName(appointment)}</Text>
       <Text style={styles.meta}>Hora: {appointment.time ?? appointment.scheduled_time ?? appointment.datetime ?? 'Sin hora'}</Text>
       <Text style={styles.meta}>Modalidad: {appointment.modality ?? 'presencial'}</Text>
       <Text style={[styles.status, state.style]}>{state.label}</Text>
@@ -52,7 +52,7 @@ export function AppointmentCheckInCard({
         ) : null}
         {['scheduled', 'confirmed'].includes(state.key) && onNoShow ? (
           <Pressable disabled={disabled || loading} onPress={onNoShow} style={[styles.smallButton, styles.warningButton]}>
-            <Text style={styles.warningText}>No asistio</Text>
+            <Text style={styles.warningText}>No asisti?</Text>
           </Pressable>
         ) : null}
         {['scheduled', 'confirmed'].includes(state.key) && onCancel ? (
@@ -78,7 +78,7 @@ function appointmentState(appointment: ReceptionAppointment) {
   ) {
     return { key: 'checked_in', label: 'Con check-in', style: styles.statusSuccess };
   }
-  if (status.includes('no_asistio') || status.includes('no show') || status.includes('no_show')) return { key: 'no_show', label: 'No asistio', style: styles.statusDanger };
+  if (status.includes('no_asistio') || status.includes('no show') || status.includes('no_show')) return { key: 'no_show', label: 'No asisti?', style: styles.statusDanger };
   if (status.includes('cancel') || status.includes('anulad')) return { key: 'cancelled', label: 'Cancelada', style: styles.statusDanger };
   if (status.includes('confirm')) return { key: 'confirmed', label: 'Confirmada', style: styles.statusInfo };
   if (status.includes('pend') || status.includes('sched') || status.includes('program')) return { key: 'scheduled', label: 'Pendiente', style: styles.statusWarning };

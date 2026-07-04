@@ -13,31 +13,31 @@ export function ReceptionSecurityScreen() {
   const { role, signOut, user } = useAuth();
 
   function logout() {
-    Alert.alert('Cerrar sesion', 'Deseas cerrar la sesion?', [
+    Alert.alert('Cerrar sesión', '¿Deseas cerrar la sesión?', [
       { style: 'cancel', text: 'Cancelar' },
-      { style: 'destructive', text: 'Cerrar sesion', onPress: () => void signOut() },
+      { style: 'destructive', text: 'Cerrar sesión', onPress: () => void signOut() },
     ]);
   }
 
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content}>
-        <AppHeader icon="shield-lock-outline" subtitle="Sesion, permisos y acciones seguras." title="Seguridad recepcion" />
+        <AppHeader icon="shield-lock-outline" subtitle="Sesión, permisos y acciones seguras." title="Seguridad recepción" />
         <AppCard style={styles.card}>
-          <Text style={styles.title}>Sesion activa</Text>
+          <Text style={styles.title}>Sesión activa</Text>
           <Text style={styles.text}>Correo: {user?.email ?? 'No registrado'}</Text>
           <Text style={styles.text}>Rol: {String(role ?? 'recepcionista')}</Text>
-          <Text style={styles.text}>Clinica: {user?.clinica_nombre ?? (typeof user?.clinica === 'object' ? user.clinica?.nombre ?? 'No asignada' : 'No asignada')}</Text>
+          <Text style={styles.text}>Clínica: {user?.clinica_nombre ?? (typeof user?.clinica === 'object' ? user.clinica?.nombre ?? 'No asignada' : 'No asignada')}</Text>
         </AppCard>
         <AppCard style={styles.card}>
           <Text style={styles.title}>Permisos</Text>
-          <Text style={styles.text}>Recepcion puede buscar pacientes, crear admisiones, hacer check-in y revisar visitas operativas de su clinica.</Text>
-          <Text style={styles.text}>No registra signos vitales, consultas medicas, medicamentos, notas clinicas profundas ni altas hospitalarias.</Text>
-          <Text style={styles.text}>Si el servidor responde 401, se limpia la sesion y se vuelve al login.</Text>
+          <Text style={styles.text}>Recepción puede buscar pacientes, crear admisiones, hacer check-in y revisar visitas operativas de su clínica.</Text>
+          <Text style={styles.text}>No registra signos vitales, consultas médicas, medicamentos, notas clínicas profundas ni altas hospitalarias.</Text>
+          <Text style={styles.text}>Si el servidor responde 401, se limpia la sesión y se vuelve al login.</Text>
         </AppCard>
-        <AppButton label="Cambiar contrasena" onPress={() => navigation.navigate('ReceptionChangePassword')} />
+        <AppButton label="Cambiar contraseña" onPress={() => navigation.navigate('ReceptionChangePassword')} />
         <AppButton label="Volver al perfil" onPress={() => navigation.goBack()} variant="secondary" />
-        <AppButton label="Cerrar sesion" onPress={logout} variant="danger" />
+        <AppButton label="Cerrar sesión" onPress={logout} variant="danger" />
       </ScrollView>
     </SafeAreaView>
   );

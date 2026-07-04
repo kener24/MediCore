@@ -55,13 +55,13 @@ export function PrescriptionForm({
 
   async function submit() {
     if (disabled) return;
-    if (!medications.length) return Alert.alert('Receta medica', 'Agrega al menos un medicamento.');
+    if (!medications.length) return Alert.alert('Receta médica', 'Agrega al menos un medicamento.');
     for (const item of medications) {
-      if (item.medication_name.trim().length < 3) return Alert.alert('Receta medica', 'Escribe el nombre del medicamento.');
-      if (item.dosage.trim().length < 2) return Alert.alert('Receta medica', 'Escribe la dosis.');
-      if (item.frequency.trim().length < 2) return Alert.alert('Receta medica', 'Escribe la frecuencia.');
-      if (item.duration.trim().length < 2) return Alert.alert('Receta medica', 'Escribe la duracion.');
-      if (item.quantity && Number.isNaN(Number(item.quantity))) return Alert.alert('Receta medica', 'La cantidad debe ser numerica.');
+      if (item.medication_name.trim().length < 3) return Alert.alert('Receta médica', 'Escribe el nombre del medicamento.');
+      if (item.dosage.trim().length < 2) return Alert.alert('Receta médica', 'Escribe la dosis.');
+      if (item.frequency.trim().length < 2) return Alert.alert('Receta médica', 'Escribe la frecuencia.');
+      if (item.duration.trim().length < 2) return Alert.alert('Receta médica', 'Escribe la duracion.');
+      if (item.quantity && Number.isNaN(Number(item.quantity))) return Alert.alert('Receta médica', 'La cantidad debe ser numerica.');
     }
     await onSubmit({
       general_instructions: generalInstructions.trim(),

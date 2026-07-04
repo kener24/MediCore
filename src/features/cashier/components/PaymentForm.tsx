@@ -65,7 +65,7 @@ export function PaymentForm({
           </Pressable>
         ))}
       </View>
-      <Text style={styles.hint}>{referenceRequired ? `${selectedMethod} requiere comprobante, autorizacion o numero de referencia.` : 'En efectivo puedes dejar la referencia vacia.'}</Text>
+      <Text style={styles.hint}>{referenceRequired ? `${selectedMethod} requiere comprobante, autorización o número de referencia.` : 'En efectivo puedes dejar la referencia vacía.'}</Text>
       <AppInput autoCapitalize="characters" label={referenceRequired ? 'Referencia obligatoria' : 'Referencia opcional'} onChangeText={onChangeReference} value={reference} />
       <AppInput label="Notas" multiline onChangeText={onChangeNotes} scrollEnabled={false} style={styles.textArea} value={notes} />
       <AppButton label="Registrar pago" loading={loading} onPress={onSubmit} />

@@ -27,7 +27,7 @@ export function PatientDocumentDetailScreen() {
     setLoading(true);
     setError('');
     if (!hasValidId) {
-      setError('No se encontro el documento solicitado.');
+      setError('No se encontró el documento solicitado.');
       setLoading(false);
       return;
     }
@@ -66,7 +66,7 @@ export function PatientDocumentDetailScreen() {
           <Text style={styles.meta}>Fecha: {formatDate(document.created_at || document.creado_en)}</Text>
           <Text style={styles.meta}>Tipo: {document.file_type || document.mime_type || document.file_extension || 'No indicado'}</Text>
           <Text style={styles.meta}>Subido por: {document.uploaded_by_name || 'No indicado'}</Text>
-          <Text style={styles.meta}>Clinica: {document.clinic_name || 'No indicada'}</Text>
+          <Text style={styles.meta}>Clínica: {document.clinic_name || 'No indicada'}</Text>
           {document.description ? <Text style={styles.text}>{document.description}</Text> : null}
           {document.notes ? <Text style={styles.text}>Notas: {document.notes}</Text> : null}
         </AppCard>

@@ -55,8 +55,8 @@ export function CashierInvoiceSearchScreen() {
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <CashierHeader subtitle="Busca por numero, paciente, identidad o telefono." title="Buscar factura" />
-        <AppInput autoCapitalize="none" label="Busqueda" onChangeText={setQuery} onSubmitEditing={submit} placeholder="Factura o paciente" value={query} />
+        <CashierHeader subtitle="Busca por número, paciente, identidad o teléfono." title="Buscar factura" />
+        <AppInput autoCapitalize="none" label="Búsqueda" onChangeText={setQuery} onSubmitEditing={submit} placeholder="Factura o paciente" value={query} />
         <AppButton disabled={!canSearch} label="Buscar" loading={loading} onPress={submit} />
         {error ? <ErrorState message={error} onRetry={submit} title="No se pudo buscar facturas" /> : null}
         {!error && searched && results.length === 0 ? <EmptyState description="No se encontraron facturas." title="Sin resultados" /> : null}

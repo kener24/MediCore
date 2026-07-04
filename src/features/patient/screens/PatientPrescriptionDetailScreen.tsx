@@ -28,7 +28,7 @@ export function PatientPrescriptionDetailScreen() {
     setLoading(true);
     setError('');
     if (!hasValidId) {
-      setError('No se encontro la receta solicitada.');
+      setError('No se encontró la receta solicitada.');
       setLoading(false);
       return;
     }
@@ -54,12 +54,12 @@ export function PatientPrescriptionDetailScreen() {
         <AppButton label="Volver" onPress={() => navigation.goBack()} variant="secondary" />
         <AppCard>
           <StatusBadge status={prescription.status} />
-          <Text style={styles.title}>{prescription.prescription_number || 'Receta medica'}</Text>
+          <Text style={styles.title}>{prescription.prescription_number || 'Receta médica'}</Text>
           <Text style={styles.meta}>{formatDate(prescription.issue_date || prescription.date || prescription.created_at || prescription.creado_en)}</Text>
-          <Text style={styles.meta}>{prescription.doctor_nombre || prescription.doctor_name || 'Medico'}</Text>
-          <Text style={styles.meta}>{prescription.clinic_name || prescription.clinic_nombre || 'Clinica no indicada'}</Text>
+          <Text style={styles.meta}>{prescription.doctor_nombre || prescription.doctor_name || 'Médico'}</Text>
+          <Text style={styles.meta}>{prescription.clinic_name || prescription.clinic_nombre || 'Clínica no indicada'}</Text>
           {prescription.diagnosis || prescription.diagnosis_name ? (
-            <Text style={styles.text}>Diagnostico: {prescription.diagnosis || prescription.diagnosis_name}</Text>
+            <Text style={styles.text}>Diagnóstico: {prescription.diagnosis || prescription.diagnosis_name}</Text>
           ) : null}
         </AppCard>
 
@@ -70,7 +70,7 @@ export function PatientPrescriptionDetailScreen() {
               <Text style={styles.itemTitle}>{item.medication_name || item.name || 'Medicamento'}</Text>
               <Detail label="Dosis" value={item.dosage} />
               <Detail label="Frecuencia" value={item.frequency} />
-              <Detail label="Duracion" value={item.duration} />
+              <Detail label="Duración" value={item.duration} />
               <Detail label="Cantidad" value={item.quantity} />
               <Detail label="Indicaciones" value={item.instructions} />
             </AppCard>

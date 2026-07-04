@@ -15,8 +15,8 @@ export function patientIdentity(patient?: ReceptionPatient | null) {
 }
 
 export function patientPhone(patient?: ReceptionPatient | null) {
-  if (!patient) return 'Sin telefono';
-  return value(patient.phone, patient.telefono) ?? 'Sin telefono';
+  if (!patient) return 'Sin teléfono';
+  return value(patient.phone, patient.telefono) ?? 'Sin teléfono';
 }
 
 export function mapMinimalPatientPayload(payload: MinimalPatientPayload) {
@@ -38,7 +38,7 @@ export function visitPatientName(visit?: ReceptionVisit | null) {
 }
 
 export function visitDoctorName(visit?: ReceptionVisit | null) {
-  return value(visit?.doctor_name, visit?.assigned_doctor_nombre) ?? 'Sin medico asignado';
+  return value(visit?.doctor_name, visit?.assigned_doctor_nombre) ?? 'Sin médico asignado';
 }
 
 export function appointmentPatientName(appointment?: ReceptionAppointment | null) {
@@ -46,5 +46,5 @@ export function appointmentPatientName(appointment?: ReceptionAppointment | null
 }
 
 export function appointmentDoctorName(appointment?: ReceptionAppointment | null) {
-  return value(appointment?.doctor_name, appointment?.doctor_nombre) ?? 'Sin medico asignado';
+  return value(appointment?.doctor_name, appointment?.doctor_nombre) ?? 'Sin médico asignado';
 }

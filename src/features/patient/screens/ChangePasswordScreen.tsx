@@ -20,19 +20,19 @@ export function ChangePasswordScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   function validate() {
-    if (!currentPassword) return 'La contrasena actual es requerida.';
-    if (!newPassword) return 'La nueva contrasena es requerida.';
-    if (!confirmPassword) return 'Confirma la nueva contrasena.';
-    if (newPassword.length < 8) return 'La contrasena debe tener al menos 8 caracteres.';
-    if (newPassword !== confirmPassword) return 'Las contrasenas no coinciden.';
-    if (newPassword === currentPassword) return 'La nueva contrasena debe ser diferente a la actual.';
+    if (!currentPassword) return 'La contraseña actual es requerida.';
+    if (!newPassword) return 'La nueva contraseña es requerida.';
+    if (!confirmPassword) return 'Confirma la nueva contraseña.';
+    if (newPassword.length < 8) return 'La contraseña debe tener al menos 8 caracteres.';
+    if (newPassword !== confirmPassword) return 'Las contraseñas no coinciden.';
+    if (newPassword === currentPassword) return 'La nueva contraseña debe ser diferente a la actual.';
     return '';
   }
 
   async function save() {
     const validation = validate();
     if (validation) {
-      Alert.alert('Contrasena', validation);
+      Alert.alert('Contraseña', validation);
       return;
     }
     setSubmitting(true);
@@ -42,10 +42,10 @@ export function ChangePasswordScreen() {
         current_password: currentPassword,
         new_password: newPassword,
       });
-      Alert.alert('Contrasena', 'Contrasena actualizada correctamente.');
+      Alert.alert('Contraseña', 'Contraseña actualizada correctamente.');
       navigation.goBack();
     } catch (err) {
-      Alert.alert('Contrasena', err instanceof Error ? err.message : 'No se pudo cambiar la contrasena.');
+      Alert.alert('Contraseña', err instanceof Error ? err.message : 'No se pudo cambiar la contraseña.');
     } finally {
       setSubmitting(false);
     }
@@ -53,11 +53,11 @@ export function ChangePasswordScreen() {
 
   return (
     <KeyboardAwareScreen contentContainerStyle={styles.content}>
-      <PatientHeader subtitle="Actualiza tu acceso de forma segura." title="Cambiar contrasena" />
+      <PatientHeader subtitle="Actualiza tu acceso de forma segura." title="Cambiar contraseña" />
       <AppCard style={styles.form}>
         <AppInput
           icon="lock-outline"
-          label="Contrasena actual"
+          label="Contraseña actual"
           onChangeText={setCurrentPassword}
           onPressRightIcon={() => setSecureCurrent((value) => !value)}
           rightIcon={secureCurrent ? 'eye-outline' : 'eye-off-outline'}
@@ -66,7 +66,7 @@ export function ChangePasswordScreen() {
         />
         <AppInput
           icon="lock-plus-outline"
-          label="Nueva contrasena"
+          label="Nueva contraseña"
           onChangeText={setNewPassword}
           onPressRightIcon={() => setSecureNew((value) => !value)}
           rightIcon={secureNew ? 'eye-outline' : 'eye-off-outline'}
@@ -75,7 +75,7 @@ export function ChangePasswordScreen() {
         />
         <AppInput
           icon="lock-check-outline"
-          label="Confirmar contrasena"
+          label="Confirmar contraseña"
           onChangeText={setConfirmPassword}
           onPressRightIcon={() => setSecureConfirm((value) => !value)}
           rightIcon={secureConfirm ? 'eye-outline' : 'eye-off-outline'}

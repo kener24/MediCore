@@ -44,13 +44,13 @@ export function PatientMedicalHistoryScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl onRefresh={() => load(true)} refreshing={refreshing} />}
         showsVerticalScrollIndicator={false}>
-        <PatientHeader subtitle="Resumen clinico visible para paciente." title="Historial clinico" />
+        <PatientHeader subtitle="Resumen clínico visible para paciente." title="Historial clínico" />
         {error ? (
           <ErrorState message={error} onRetry={() => load()} title="No se pudo cargar el expediente" />
         ) : summary ? (
           <>
             <AppCard style={styles.card}>
-              <Text style={styles.title}>{summary.record_number || 'Expediente clinico'}</Text>
+              <Text style={styles.title}>{summary.record_number || 'Expediente clínico'}</Text>
               <Detail label="Tipo de sangre" value={summary.blood_type} />
               <Detail label="Alergias" value={summary.allergies} />
               <Detail label="Enfermedades cronicas" value={summary.chronic_diseases} />
@@ -63,8 +63,8 @@ export function PatientMedicalHistoryScreen() {
                   <AppCard key={item.id}>
                     <Text style={styles.itemTitle}>{formatDate(item.consultation_date)}</Text>
                     <Detail label="Motivo" value={item.chief_complaint} />
-                    <Detail label="Evaluacion" value={item.clinical_assessment} />
-                    <Detail label="Diagnostico" value={item.preliminary_diagnosis} />
+                    <Detail label="Evaluación" value={item.clinical_assessment} />
+                    <Detail label="Diagnóstico" value={item.preliminary_diagnosis} />
                     <Detail label="Plan" value={item.treatment_plan} />
                   </AppCard>
                 ))
@@ -73,16 +73,16 @@ export function PatientMedicalHistoryScreen() {
               )}
             </Section>
 
-            <Section title="Diagnosticos">
+            <Section title="Diagnósticos">
               {summary.diagnoses?.length ? (
                 summary.diagnoses.map((item) => (
                   <AppCard key={item.id}>
-                    <Text style={styles.itemTitle}>{item.name || 'Diagnostico'}</Text>
-                    <Text style={styles.meta}>{item.code || 'Sin codigo'} · {item.diagnosis_type || 'Tipo no indicado'}</Text>
+                    <Text style={styles.itemTitle}>{item.name || 'Diagnóstico'}</Text>
+                    <Text style={styles.meta}>{item.code || 'Sin código'} · {item.diagnosis_type || 'Tipo no indicado'}</Text>
                   </AppCard>
                 ))
               ) : (
-                <EmptyState description="No hay diagnosticos visibles." title="Sin diagnosticos" />
+                <EmptyState description="No hay diagnósticos visibles." title="Sin diagnósticos" />
               )}
             </Section>
           </>

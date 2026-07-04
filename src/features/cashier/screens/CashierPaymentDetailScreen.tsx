@@ -25,7 +25,7 @@ export function CashierPaymentDetailScreen() {
 
   const load = useCallback(async () => {
     if (!params.paymentId) {
-      setError('No se encontro el pago.');
+      setError('No se encontró el pago.');
       setLoading(false);
       return;
     }

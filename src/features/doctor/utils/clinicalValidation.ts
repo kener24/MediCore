@@ -11,18 +11,18 @@ const requiredForFinish: (keyof ConsultationFormValues)[] = [
 ];
 
 const labels: Record<keyof ConsultationFormValues, string> = {
-  assessment: 'evaluacion clinica',
+  assessment: 'evaluación clínica',
   chief_complaint: 'motivo principal',
-  diagnosis_text: 'diagnostico',
+  diagnosis_text: 'diagnóstico',
   history_present_illness: 'historia de enfermedad actual',
   notes: 'notas adicionales',
-  physical_examination: 'examen fisico',
+  physical_examination: 'examen físico',
   plan: 'plan de tratamiento',
   recommendations: 'recomendaciones',
 };
 
 export function validateConsultationDraft(form: ConsultationFormValues) {
-  return Object.values(form).some((value) => value.trim().length > 0) ? '' : 'No hay informacion para guardar.';
+  return Object.values(form).some((value) => value.trim().length > 0) ? '' : 'No hay información para guardar.';
 }
 
 export function validateConsultationSave(form: ConsultationFormValues) {
@@ -30,7 +30,7 @@ export function validateConsultationSave(form: ConsultationFormValues) {
     if (form[field].trim().length < 3) return `Completa ${labels[field]}.`;
   }
   if (form.assessment.trim().length < 3 && form.diagnosis_text.trim().length < 3) {
-    return 'Agrega un diagnostico o evaluacion clinica.';
+    return 'Agrega un diagnóstico o evaluación clínica.';
   }
   return '';
 }

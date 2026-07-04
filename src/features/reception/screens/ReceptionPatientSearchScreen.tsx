@@ -54,12 +54,12 @@ export function ReceptionPatientSearchScreen() {
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <AppHeader icon="account-search-outline" subtitle="Busca por nombre, identidad, telefono o codigo." title="Buscar paciente" />
+        <AppHeader icon="account-search-outline" subtitle="Busca por nombre, identidad, teléfono o código." title="Buscar paciente" />
         <AppInput autoCapitalize="words" label="Paciente" onChangeText={setQuery} onSubmitEditing={() => void runSearch()} placeholder="Ej. Juan Perez" value={query} />
         <AppButton disabled={query.trim().length < 2} label="Buscar" loading={loading} onPress={() => void runSearch()} />
         <AppButton label="Crear paciente nuevo" onPress={() => navigation.navigate('ReceptionPatientCreate')} variant="secondary" />
         {loading ? <LoadingState label="Buscando pacientes..." /> : null}
-        {error ? <ErrorState message={error} onRetry={query.trim().length >= 2 ? () => void runSearch() : undefined} title={query.trim().length < 2 ? 'Busqueda incompleta' : 'No se pudo buscar'} /> : null}
+        {error ? <ErrorState message={error} onRetry={query.trim().length >= 2 ? () => void runSearch() : undefined} title={query.trim().length < 2 ? 'Búsqueda incompleta' : 'No se pudo buscar'} /> : null}
         {!loading && searched && !error && patients.length === 0 ? <EmptyState description="Puedes crear un paciente minimo para continuar." title="No se encontraron pacientes." /> : null}
         {patients.map((patient) => (
           <ReceptionPatientCard

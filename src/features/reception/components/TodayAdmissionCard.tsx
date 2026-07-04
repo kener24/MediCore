@@ -15,7 +15,7 @@ export function TodayAdmissionCard({ onPress, visit }: { onPress?: () => void; v
         <Text style={styles.title}>{visitPatientName(visit)}</Text>
         <Text style={styles.meta}>Motivo: {visit.reason || 'No registrado'}</Text>
         <Text style={styles.meta}>Tipo: {visit.visit_type || 'No registrado'}</Text>
-        <Text style={styles.meta}>Medico: {visitDoctorName(visit)}</Text>
+        <Text style={styles.meta}>Médico: {visitDoctorName(visit)}</Text>
         <Text style={styles.meta}>Llegada: {visit.arrival_time || formatDateTime(visit.creado_en ?? visit.created_at, 'Sin hora')}</Text>
       </AppCard>
     </Pressable>

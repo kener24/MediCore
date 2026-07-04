@@ -27,7 +27,7 @@ export function PatientMedicalOrderDetailScreen() {
     setLoading(true);
     setError('');
     if (!hasValidId) {
-      setError('No se encontro la orden solicitada.');
+      setError('No se encontró la orden solicitada.');
       setLoading(false);
       return;
     }
@@ -43,7 +43,7 @@ export function PatientMedicalOrderDetailScreen() {
   useEffect(() => { load(); }, [load]);
 
   if (loading) return <LoadingState label="Cargando orden..." />;
-  if (error || !order) return <ErrorState message={error || 'No hay informacion disponible.'} onRetry={load} />;
+  if (error || !order) return <ErrorState message={error || 'No hay información disponible.'} onRetry={load} />;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -51,11 +51,11 @@ export function PatientMedicalOrderDetailScreen() {
         <AppButton label="Volver" onPress={() => navigation.goBack()} variant="secondary" />
         <AppCard style={styles.card}>
           <StatusBadge status={order.status} />
-          <Text style={styles.title}>{order.title || order.order_number || 'Orden medica'}</Text>
-          <Detail label="Numero" value={order.order_number} />
+          <Text style={styles.title}>{order.title || order.order_number || 'Orden médica'}</Text>
+          <Detail label="Número" value={order.order_number} />
           <Detail label="Tipo" value={order.order_type} />
           <Detail label="Prioridad" value={order.priority} />
-          <Detail label="Medico" value={order.doctor_nombre} />
+          <Detail label="Médico" value={order.doctor_nombre} />
           <Detail label="Fecha" value={formatDateTime(order.creado_en || order.actualizado_en)} />
         </AppCard>
         <AppCard style={styles.card}>

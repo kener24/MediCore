@@ -28,14 +28,14 @@ export function ClinicalSummaryCard({
 
   return (
     <AppCard style={styles.card}>
-      <Text style={styles.title}>Resumen clinico rapido</Text>
+      <Text style={styles.title}>Resumen clínico rápido</Text>
       <View style={styles.grid}>
         <Info label="Motivo" value={visit?.reason ?? visit?.motivo} />
         <Info label="Prioridad" value={visit?.priority ?? visit?.prioridad} />
         <Info label="Presion arterial" value={bloodPressure} />
         <Info label="Temperatura" value={withSuffix(vitalSigns?.temperature, 'C')} />
         <Info label="Frecuencia cardiaca" value={withSuffix(vitalSigns?.heart_rate, 'lpm')} />
-        <Info label="Saturacion de oxigeno" value={withSuffix(vitalSigns?.oxygen_saturation, '%')} />
+        <Info label="Saturación de oxígeno" value={withSuffix(vitalSigns?.oxygen_saturation, '%')} />
       </View>
       <Info label="Alergias" value={medicalSummary?.allergies ?? medicalSummary?.alergias} />
       <Info

@@ -9,7 +9,7 @@ export function AdminHomeScreen() {
           {
             description: 'Usuarios, roles y permisos de la clínica.',
             icon: 'account-cog-outline',
-            title: 'Administracion',
+            title: 'Administración',
           },
           {
             description: 'Facturacion, caja e indicadores financieros.',
@@ -19,12 +19,12 @@ export function AdminHomeScreen() {
           {
             description: 'Inventario, servicios y configuraciones operativas.',
             icon: 'cog-outline',
-            title: 'Configuracion',
+            title: 'Configuración',
           },
         ]}
         headline="Control móvil de la clínica"
         roleLabel="Administrador"
-        subtitle="Panel preparado para administracion, permisos, reportes y operacion."
+        subtitle="Panel preparado para administración, permisos, reportes y operación."
       />
     </RoleGuard>
   );

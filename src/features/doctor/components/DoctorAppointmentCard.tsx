@@ -25,7 +25,7 @@ export function DoctorAppointmentCard({
   const normalizedStatus = status?.toLowerCase() ?? '';
   const canAttend = Boolean(visitId) && !['completed', 'completada', 'cancelled', 'cancelada', 'no_show'].includes(normalizedStatus);
   const demographic =
-    [appointment.patient_age ? `${appointment.patient_age} anos` : null, appointment.patient_gender].filter(Boolean).join(' - ') ||
+    [appointment.patient_age ? `${appointment.patient_age} años` : null, appointment.patient_gender].filter(Boolean).join(' - ') ||
     'Datos demograficos no indicados';
 
   return (

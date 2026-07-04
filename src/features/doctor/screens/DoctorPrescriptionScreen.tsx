@@ -43,7 +43,7 @@ export function DoctorPrescriptionScreen() {
       setFavorites(await getFavoriteMedications().catch(() => []));
       setCatalog(await getMedicationCatalog().catch(() => []));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'El modulo de recetas aun no esta disponible.');
+      setError(err instanceof Error ? err.message : 'El módulo de recetas aún no está disponible.');
     } finally {
       setLoading(false);
     }
@@ -54,29 +54,29 @@ export function DoctorPrescriptionScreen() {
   }, [load]);
 
   async function submit(payload: CreatePrescriptionPayload) {
-    if (readOnly) return Alert.alert('Receta medica', 'Esta consulta ya fue finalizada.');
-    if (!consultationId) return Alert.alert('Receta medica', 'Primero debes iniciar o guardar la consulta medica.');
+    if (readOnly) return Alert.alert('Receta médica', 'Esta consulta ya fue finalizada.');
+    if (!consultationId) return Alert.alert('Receta médica', 'Primero debes iniciar o guardar la consulta médica.');
     setSubmitting(true);
     try {
       await createPrescription(consultationId, { ...payload, visit: params.visitId });
       await Promise.all(payload.medications.map((item) => rememberMedication(item).catch(() => undefined)));
-      Alert.alert('Receta medica', 'Receta creada correctamente.');
+      Alert.alert('Receta médica', 'Receta creada correctamente.');
       await load();
     } catch (err) {
-      Alert.alert('Receta medica', err instanceof Error ? err.message : 'No se pudo crear la receta.');
+      Alert.alert('Receta médica', err instanceof Error ? err.message : 'No se pudo crear la receta.');
     } finally {
       setSubmitting(false);
     }
   }
 
-  if (loading) return <LoadingState label="Cargando receta medica..." />;
-  if (error) return <ErrorState message={error} onRetry={load} title="No se pudo cargar receta medica" />;
+  if (loading) return <LoadingState label="Cargando receta médica..." />;
+  if (error) return <ErrorState message={error} onRetry={load} title="No se pudo cargar receta médica" />;
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboard}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <DoctorHeader title="Receta medica" />
+          <DoctorHeader title="Receta médica" />
           {readOnly ? <EmptyState description="Puedes consultar recetas existentes, pero no crear nuevas." title="Consulta finalizada" /> : null}
           <PrescriptionPreviewCard
             items={items}

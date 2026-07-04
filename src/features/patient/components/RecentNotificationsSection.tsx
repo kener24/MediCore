@@ -10,7 +10,7 @@ export function RecentNotificationsSection({ items }: { items: PatientNotificati
       emptyDescription="No tienes notificaciones."
       emptyTitle="Sin notificaciones"
       isEmpty={!items.length}
-      title="Notificaciones recientes">
+      title="Notificaciónes recientes">
       <View style={{ gap: 12 }}>
         {items.slice(0, 3).map((item) => (
           <NotificationCard key={item.id} notification={item} />

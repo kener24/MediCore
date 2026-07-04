@@ -28,7 +28,7 @@ export function NotificationCard({
 }) {
   const isRead = isNotificationRead(notification);
   const markRead = onMarkAsRead ?? onMarkRead;
-  const title = notification.title || notification.titulo || 'Notificacion';
+  const title = notification.title || notification.titulo || 'Notificación';
   const message = notification.message || notification.mensaje || notification.body || 'Sin mensaje';
   const meta =
     notification.type ||

@@ -39,9 +39,9 @@ export function RoleDashboardScreen({ description, stats, title }: RoleDashboard
         </View>
 
         <AppCard style={styles.notice}>
-          <Text style={styles.noticeTitle}>Modulo preparado</Text>
+          <Text style={styles.noticeTitle}>Módulo preparado</Text>
           <Text style={styles.noticeText}>
-            Esta seccion ya respeta el login, el rol y la estructura de navegacion. En el
+            Esta sección ya respeta el login, el rol y la estructura de navegación. En el
             siguiente sprint conectaremos los endpoints reales de MediCore.
           </Text>
         </AppCard>

@@ -30,7 +30,7 @@ export function ReceptionVisitDetailScreen() {
   const load = useCallback(async () => {
     if (!visitId) {
       setVisit(null);
-      setError('No se encontro la visita.');
+      setError('No se encontró la visita.');
       setLoading(false);
       return;
     }
@@ -60,7 +60,7 @@ export function ReceptionVisitDetailScreen() {
       }
       if (action === 'doctor') {
         setVisit(await sendToDoctor(visit.id));
-        Alert.alert('Visita', 'Paciente enviado al medico.');
+        Alert.alert('Visita', 'Paciente enviado al médico.');
         return;
       }
       if (action === 'invoice') {
@@ -71,7 +71,7 @@ export function ReceptionVisitDetailScreen() {
         ]);
       }
     } catch (err) {
-      Alert.alert('Visita', err instanceof Error ? err.message : 'Esta accion no esta disponible por el momento.');
+      Alert.alert('Visita', err instanceof Error ? err.message : 'Esta acción no está disponible por el momento.');
     } finally {
       setBusy(false);
     }
@@ -79,16 +79,16 @@ export function ReceptionVisitDetailScreen() {
 
   async function confirmCancel() {
     const reason = cancelReason.trim();
-    if (reason.length < 5) return Alert.alert('Cancelar admision', 'Indica un motivo claro de cancelacion.');
+    if (reason.length < 5) return Alert.alert('Cancelar admisión', 'Indica un motivo claro de cancelación.');
     if (!visit?.id) return;
     try {
       setBusy(true);
       setVisit(await cancelAdmission(visit.id, reason));
       setCancelOpen(false);
       setCancelReason('');
-      Alert.alert('Visita', 'Admision cancelada correctamente.');
+      Alert.alert('Visita', 'Admisión cancelada correctamente.');
     } catch (err) {
-      Alert.alert('Visita', err instanceof Error ? err.message : 'No se pudo cancelar la admision.');
+      Alert.alert('Visita', err instanceof Error ? err.message : 'No se pudo cancelar la admisión.');
     } finally {
       setBusy(false);
     }
@@ -96,7 +96,7 @@ export function ReceptionVisitDetailScreen() {
 
   async function saveNote() {
     if (!visit?.id) return;
-    if (note.trim().length < 3) return Alert.alert('Nota administrativa', 'Escribe una nota mas clara.');
+    if (note.trim().length < 3) return Alert.alert('Nota administrativa', 'Escribe una nota más clara.');
     try {
       setBusy(true);
       setVisit(await updateReceptionVisitNote(visit.id, note));
@@ -118,7 +118,7 @@ export function ReceptionVisitDetailScreen() {
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content}>
-        <AppHeader icon="clipboard-text-outline" subtitle="Informacion operativa de recepcion." title="Detalle de visita" />
+        <AppHeader icon="clipboard-text-outline" subtitle="Información operativa de recepción." title="Detalle de visita" />
         {error ? <ErrorState message={error} onRetry={() => void load()} title="No se pudo cargar" /> : null}
         {!error && !visit ? <EmptyState title="Visita no disponible" /> : null}
         {visit ? (
@@ -129,16 +129,16 @@ export function ReceptionVisitDetailScreen() {
               <Info label="Motivo" value={visit.reason || 'No registrado'} />
               <Info label="Tipo" value={visit.visit_type || 'No registrado'} />
               <Info label="Prioridad" value={visit.priority || 'normal'} />
-              <Info label="Medico" value={visitDoctorName(visit)} />
+              <Info label="Médico" value={visitDoctorName(visit)} />
               <Info label="Llegada" value={visit.arrival_time || visit.creado_en || 'Sin hora'} />
               <Info label="Cita relacionada" value={String(visit.appointment ?? visit.appointment_id ?? 'Sin cita')} />
               <Info label="Factura" value={visit.invoice ? `#${visit.invoice}` : 'Sin factura'} />
-              {visit.updated_at ? <Info label="Ultima actualizacion" value={visit.updated_at} /> : null}
+              {visit.updated_at ? <Info label="Última actualización" value={visit.updated_at} /> : null}
               {visit.updated_by_name ? <Info label="Actualizado por" value={visit.updated_by_name} /> : null}
             </AppCard>
             <AppCard style={styles.card}>
               <Text style={styles.modalTitle}>Nota administrativa</Text>
-              <Text style={styles.modalMeta}>Visible para seguimiento interno de recepcion.</Text>
+              <Text style={styles.modalMeta}>Visible para seguimiento interno de recepción.</Text>
               <TextInput
                 multiline
                 onChangeText={setNote}
@@ -152,9 +152,9 @@ export function ReceptionVisitDetailScreen() {
             {!closed ? (
               <View style={styles.actions}>
                 {canSendTriage ? <AppButton disabled={busy} label="Enviar a triaje" onPress={() => void run('triage')} /> : null}
-                {canSendDoctor ? <AppButton disabled={busy} label="Enviar a medico" onPress={() => void run('doctor')} variant="secondary" /> : null}
+                {canSendDoctor ? <AppButton disabled={busy} label="Enviar a médico" onPress={() => void run('doctor')} variant="secondary" /> : null}
                 {canInvoice ? <AppButton disabled={busy} label="Generar factura" onPress={() => void run('invoice')} /> : null}
-                <AppButton disabled={busy} label="Cancelar admision" onPress={() => setCancelOpen(true)} variant="danger" />
+                <AppButton disabled={busy} label="Cancelar admisión" onPress={() => setCancelOpen(true)} variant="danger" />
               </View>
             ) : null}
             <AppButton label="Volver" onPress={() => navigation.goBack()} variant="secondary" />
@@ -164,8 +164,8 @@ export function ReceptionVisitDetailScreen() {
       <Modal animationType="fade" transparent visible={cancelOpen} onRequestClose={() => setCancelOpen(false)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Cancelar admision</Text>
-            <Text style={styles.modalMeta}>Escribe el motivo. Esta accion quedara auditada.</Text>
+            <Text style={styles.modalTitle}>Cancelar admisión</Text>
+            <Text style={styles.modalMeta}>Escribe el motivo. Esta acción quedará auditada.</Text>
             <TextInput
               multiline
               onChangeText={setCancelReason}

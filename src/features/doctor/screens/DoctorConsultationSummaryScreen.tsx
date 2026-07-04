@@ -74,8 +74,8 @@ export function DoctorConsultationSummaryScreen() {
 
   function confirmFinish() {
     if (completed) return Alert.alert('Finalizar consulta', 'Esta consulta ya fue finalizada.');
-    if (!consultationId) return Alert.alert('Finalizar consulta', 'No se encontro la consulta.');
-    if (!visitId) return Alert.alert('Finalizar consulta', 'No se encontro la visita.');
+    if (!consultationId) return Alert.alert('Finalizar consulta', 'No se encontró la consulta.');
+    if (!visitId) return Alert.alert('Finalizar consulta', 'No se encontró la visita.');
     const validation = validateConsultationFinish(form, consultation);
     if (validation) return Alert.alert('Finalizar consulta', validation);
     Alert.alert('Finalizar consulta', 'Despues de finalizar no podras editarla desde la app. Deseas continuar?', [
@@ -92,7 +92,7 @@ export function DoctorConsultationSummaryScreen() {
       Alert.alert('Consulta finalizada', 'Consulta finalizada correctamente.');
       navigation.getParent()?.navigate('DoctorWaitingRoomTab');
     } catch (err) {
-      Alert.alert('Finalizar consulta', err instanceof Error ? err.message : 'Ocurrio un error en el servidor.');
+      Alert.alert('Finalizar consulta', err instanceof Error ? err.message : 'Ocurrió un error en el servidor.');
     } finally {
       setFinishing(false);
     }
@@ -110,9 +110,9 @@ export function DoctorConsultationSummaryScreen() {
             <Text style={styles.title}>Consulta</Text>
             <ConsultationStatusBadge status={consultation?.status} />
           </View>
-          <Text style={styles.progress}>Checklist clinico: {progress.completed}/{progress.required} ({progress.percent}%)</Text>
+          <Text style={styles.progress}>Checklist clínico: {progress.completed}/{progress.required} ({progress.percent}%)</Text>
           <Info label="Motivo principal" value={consultation?.chief_complaint} />
-          <Info label="Diagnostico" value={consultation?.diagnosis_text ?? consultation?.preliminary_diagnosis} />
+          <Info label="Diagnóstico" value={consultation?.diagnosis_text ?? consultation?.preliminary_diagnosis} />
           <Info label="Plan" value={consultation?.plan ?? consultation?.treatment_plan} />
           <Info label="Recomendaciones" value={consultation?.recommendations} />
         </AppCard>
@@ -126,8 +126,8 @@ export function DoctorConsultationSummaryScreen() {
         />
         <ClinicalConsumptionCard items={consumptions} />
         <AppButton disabled={completed} label={completed ? 'Consulta finalizada' : 'Agregar receta'} onPress={() => navigation.navigate('DoctorPrescription', { consultationId, patientId: params.patientId, visitId })} variant="secondary" />
-        <AppButton disabled={completed} label={completed ? 'Consulta finalizada' : 'Agregar orden medica'} onPress={() => navigation.navigate('DoctorMedicalOrder', { consultationId, patientId: params.patientId, visitId })} variant="secondary" />
-        <AppButton disabled={completed} label={completed ? 'Consulta finalizada' : 'Agregar consumo clinico'} onPress={() => navigation.navigate('DoctorClinicalConsumption', { consultationId, patientId: params.patientId, visitId })} variant="secondary" />
+        <AppButton disabled={completed} label={completed ? 'Consulta finalizada' : 'Agregar orden médica'} onPress={() => navigation.navigate('DoctorMedicalOrder', { consultationId, patientId: params.patientId, visitId })} variant="secondary" />
+        <AppButton disabled={completed} label={completed ? 'Consulta finalizada' : 'Agregar consumo clínico'} onPress={() => navigation.navigate('DoctorClinicalConsumption', { consultationId, patientId: params.patientId, visitId })} variant="secondary" />
         <AppButton label="Volver a consulta" onPress={() => navigation.goBack()} variant="secondary" />
         <AppButton disabled={completed} label={completed ? 'Consulta finalizada' : 'Finalizar consulta'} loading={finishing} onPress={confirmFinish} />
       </ScrollView>

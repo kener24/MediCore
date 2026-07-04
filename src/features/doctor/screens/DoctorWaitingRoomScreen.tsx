@@ -118,7 +118,7 @@ export function DoctorWaitingRoomScreen() {
           icon="magnify"
           label="Buscar paciente"
           onChangeText={setSearch}
-          placeholder="Nombre, codigo o motivo"
+          placeholder="Nombre, código o motivo"
           value={search}
         />
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -146,7 +146,7 @@ export function DoctorWaitingRoomScreen() {
             );
           })
         ) : (
-          <EmptyState description="Ajusta la busqueda o revisa pacientes pendientes de triaje." title="No hay pacientes listos para medico." />
+          <EmptyState description="Ajusta la búsqueda o revisa pacientes pendientes de triaje." title="No hay pacientes listos para médico." />
         )}
       </ScrollView>
     </SafeAreaView>

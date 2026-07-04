@@ -47,13 +47,13 @@ export function PatientQuickActions({
         title="Solicitar cita"
       />
       <QuickActionCard
-        description="Resumen de consultas y diagnosticos."
+        description="Resumen de consultas y diagnósticos."
         icon="clipboard-pulse-outline"
         onPress={() => navigate('history', onHistory)}
         title="Historial"
       />
       <QuickActionCard
-        description="Medicamentos e indicaciones medicas."
+        description="Medicamentos e indicaciones médicas."
         icon="pill"
         onPress={() => navigate('prescriptions', onPrescriptions)}
         title="Recetas"

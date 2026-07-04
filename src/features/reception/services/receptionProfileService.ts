@@ -41,7 +41,7 @@ function mapReceptionProfile(response: unknown): ReceptionProfile {
       stringValue(user.nombre_completo, root.nombre_completo, user.full_name, root.full_name) ??
       joinName(stringValue(user.first_name, root.first_name), stringValue(user.last_name, root.last_name)) ??
       stringValue(user.email, root.email) ??
-      'Recepcion',
+      'Recepción',
     role: normalizeRole(role),
     role_nombre: stringValue(user.role_nombre, root.role_nombre, roleName(role)) ?? 'recepcionista',
     telefono: stringValue(user.telefono, user.phone, root.telefono, root.phone),

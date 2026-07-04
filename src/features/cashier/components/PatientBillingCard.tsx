@@ -10,7 +10,7 @@ export function PatientBillingCard({ invoice }: { invoice: CashierInvoice }) {
       <Text style={styles.title}>Paciente</Text>
       <Text style={styles.text}>{invoice.patient_name ?? 'No indicado'}</Text>
       <Text style={styles.meta}>Identidad: {invoice.patient_identity ?? 'No registrada'}</Text>
-      <Text style={styles.meta}>Telefono: {invoice.patient_phone ?? 'No registrado'}</Text>
+      <Text style={styles.meta}>Teléfono: {invoice.patient_phone ?? 'No registrado'}</Text>
     </AppCard>
   );
 }

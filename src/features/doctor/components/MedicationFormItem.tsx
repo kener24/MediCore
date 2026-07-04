@@ -76,7 +76,7 @@ export function MedicationFormItem({
       ) : null}
       <AppInput editable={!disabled} label="Dosis" onChangeText={(value) => onUpdate('dosage', value)} value={item.dosage} />
       <AppInput editable={!disabled} label="Frecuencia" onChangeText={(value) => onUpdate('frequency', value)} value={item.frequency} />
-      <AppInput editable={!disabled} label="Duracion" onChangeText={(value) => onUpdate('duration', value)} value={item.duration} />
+      <AppInput editable={!disabled} label="Duración" onChangeText={(value) => onUpdate('duration', value)} value={item.duration} />
       <AppInput
         editable={!disabled}
         keyboardType="numeric"

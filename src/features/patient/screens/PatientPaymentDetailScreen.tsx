@@ -28,7 +28,7 @@ export function PatientPaymentDetailScreen() {
     setLoading(true);
     setError('');
     if (!hasValidId) {
-      setError('No se encontro el pago solicitado.');
+      setError('No se encontró el pago solicitado.');
       setLoading(false);
       return;
     }
@@ -44,7 +44,7 @@ export function PatientPaymentDetailScreen() {
   useEffect(() => { load(); }, [load]);
 
   if (loading) return <LoadingState label="Cargando pago..." />;
-  if (error || !payment) return <ErrorState message={error || 'No hay informacion disponible.'} onRetry={load} />;
+  if (error || !payment) return <ErrorState message={error || 'No hay información disponible.'} onRetry={load} />;
 
   return (
     <SafeAreaView style={styles.safeArea}>

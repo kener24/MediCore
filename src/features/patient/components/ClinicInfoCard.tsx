@@ -6,7 +6,7 @@ import { colors } from '@/core/theme/colors';
 import type { PatientClinicInfo } from '@/features/patient/types/patientClinic.types';
 
 export function ClinicInfoCard({ clinic }: { clinic: PatientClinicInfo }) {
-  const name = clinic.name ?? clinic.nombre ?? 'Clinica';
+  const name = clinic.name ?? clinic.nombre ?? 'Clínica';
   const phone = clinic.phone ?? clinic.telefono;
   const email = clinic.email ?? clinic.correo;
   const website = clinic.website ?? clinic.sitio_web;

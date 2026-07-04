@@ -45,11 +45,11 @@ export function ReceptionCreateAdmissionScreen() {
   }, []));
 
   async function submit() {
-    if (!form.patient_id) return Alert.alert('Admision', 'Selecciona un paciente.');
-    if (Number(form.patient_id) <= 0) return Alert.alert('Admision', 'El paciente seleccionado no es valido.');
-    if (form.reason.trim().length < 4) return Alert.alert('Admision', 'El motivo de visita es obligatorio.');
+    if (!form.patient_id) return Alert.alert('Admisión', 'Selecciona un paciente.');
+    if (Number(form.patient_id) <= 0) return Alert.alert('Admisión', 'El paciente seleccionado no es válido.');
+    if (form.reason.trim().length < 4) return Alert.alert('Admisión', 'El motivo de visita es obligatorio.');
     if (form.priority === 'emergency' && !form.doctor_id) {
-      return Alert.alert('Admision urgente', 'Para una emergencia selecciona medico destino o cambia la prioridad.');
+      return Alert.alert('Admisión urgente', 'Para una emergencia selecciona médico destino o cambia la prioridad.');
     }
     setSaving(true);
     try {
@@ -61,12 +61,12 @@ export function ReceptionCreateAdmissionScreen() {
         doctor_id: form.doctor_id ? Number(form.doctor_id) : undefined,
       };
       const visit = await createAdmission(payload);
-      Alert.alert('Admision', 'Admision registrada correctamente.', [
+      Alert.alert('Admisión', 'Admisión registrada correctamente.', [
         { text: 'Ver visita', onPress: () => navigation.navigate('ReceptionVisitDetail', { visitId: visit.id }) },
         { text: 'Admisiones', onPress: () => navigation.navigate('ReceptionTodayAdmissions') },
       ]);
     } catch (err) {
-      Alert.alert('Admision', err instanceof Error ? err.message : 'No se pudo crear la admision.');
+      Alert.alert('Admisión', err instanceof Error ? err.message : 'No se pudo crear la admisión.');
     } finally {
       setSaving(false);
     }
@@ -76,17 +76,17 @@ export function ReceptionCreateAdmissionScreen() {
     <SafeAreaView edges={['top']} style={styles.safe}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboard}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <AppHeader icon="clipboard-plus-outline" subtitle="Registra la llegada del paciente a la clinica." title="Nueva admision" />
+          <AppHeader icon="clipboard-plus-outline" subtitle="Registra la llegada del paciente a la clínica." title="Nueva admisión" />
           <AppCard style={styles.form}>
             {form.patient_id ? (
               <View style={styles.patientBox}>
                 <Text style={styles.patientEyebrow}>Paciente seleccionado</Text>
                 <Text style={styles.patientName}>{selectedPatient ? patientName(selectedPatient) : `Paciente #${form.patient_id}`}</Text>
                 <Text style={styles.patientMeta}>Identidad: {selectedPatient ? identity : 'Pendiente de confirmar'}</Text>
-                <Text style={styles.patientMeta}>Telefono: {selectedPatient ? phone : 'No indicado'}</Text>
+                <Text style={styles.patientMeta}>Teléfono: {selectedPatient ? phone : 'No indicado'}</Text>
                 <View style={styles.checklist}>
                   <ChecklistItem ok={Boolean(selectedPatient && identity !== 'Sin identidad')} text="Identidad validada" />
-                  <ChecklistItem ok={Boolean(selectedPatient && phone !== 'Sin telefono')} text="Contacto disponible" />
+                  <ChecklistItem ok={Boolean(selectedPatient && phone !== 'Sin teléfono')} text="Contacto disponible" />
                   <ChecklistItem ok={Boolean(form.reason.trim().length >= 4)} text="Motivo de visita documentado" />
                 </View>
                 <View style={styles.actions}>
@@ -96,7 +96,7 @@ export function ReceptionCreateAdmissionScreen() {
             ) : (
               <View style={styles.patientBox}>
                 <Text style={styles.patientEyebrow}>Paciente requerido</Text>
-                <Text style={styles.patientName}>Selecciona un paciente antes de crear la admision.</Text>
+                <Text style={styles.patientName}>Selecciona un paciente antes de crear la admisión.</Text>
                 <Text style={styles.patientMeta}>Esto evita errores por ID manual y mantiene el expediente correcto.</Text>
                 <View style={styles.actions}>
                   <AppButton label="Buscar paciente" onPress={() => navigation.navigate('ReceptionPatientSearch')} />
@@ -111,23 +111,23 @@ export function ReceptionCreateAdmissionScreen() {
             <View style={styles.chips}>{priorities.map(([value, label]) => <Chip active={form.priority === value} key={value} label={label} onPress={() => setForm({ ...form, priority: value })} />)}</View>
             {['urgent', 'emergency'].includes(form.priority) ? (
               <View style={styles.warningBox}>
-                <Text style={styles.warningTitle}>Atencion prioritaria</Text>
-                <Text style={styles.warningText}>Confirma que el paciente debe pasar con prioridad y asigna medico cuando sea emergencia.</Text>
+                <Text style={styles.warningTitle}>Atención prioritaria</Text>
+                <Text style={styles.warningText}>Confirma que el paciente debe pasar con prioridad y asigna médico cuando sea emergencia.</Text>
               </View>
             ) : null}
-            <Text style={styles.label}>Medico destino</Text>
+            <Text style={styles.label}>Médico destino</Text>
             <View style={styles.chips}>
               <Chip active={!form.doctor_id} label="Sin asignar" onPress={() => setForm({ ...form, doctor_id: '' })} />
               {doctors.map((doctor) => (
                 <Chip
                   active={form.doctor_id === String(doctor.id)}
                   key={doctor.id}
-                  label={doctor.user_nombre ?? doctor.nombre_completo ?? doctor.full_name ?? `Medico ${doctor.id}`}
+                  label={doctor.user_nombre ?? doctor.nombre_completo ?? doctor.full_name ?? `Médico ${doctor.id}`}
                   onPress={() => setForm({ ...form, doctor_id: String(doctor.id) })}
                 />
               ))}
             </View>
-            <AppButton disabled={!form.patient_id} label="Registrar admision" loading={saving} onPress={submit} />
+            <AppButton disabled={!form.patient_id} label="Registrar admisión" loading={saving} onPress={submit} />
           </AppCard>
         </ScrollView>
       </KeyboardAvoidingView>

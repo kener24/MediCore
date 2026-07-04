@@ -63,7 +63,7 @@ export function DoctorConsultationsScreen() {
     try {
       setItems(await getDoctorConsultations(params));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudieron cargar las consultas medicas.');
+      setError(err instanceof Error ? err.message : 'No se pudieron cargar las consultas médicas.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -96,7 +96,7 @@ export function DoctorConsultationsScreen() {
     });
   }
 
-  if (loading) return <LoadingState label="Cargando consultas medicas..." />;
+  if (loading) return <LoadingState label="Cargando consultas médicas..." />;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -118,7 +118,7 @@ export function DoctorConsultationsScreen() {
           search={search}
         />
         {error ? (
-          <ErrorState message={error} onRetry={() => load()} title="No se pudo cargar el modulo" />
+          <ErrorState message={error} onRetry={() => load()} title="No se pudo cargar el módulo" />
         ) : filteredItems.length ? (
           filteredItems.map((item, index) => (
             <ConsultationCard
@@ -150,8 +150,8 @@ function emptyTitle(filter: ConsultationQuickFilter) {
 }
 
 function emptyDescription(filter: ConsultationQuickFilter) {
-  if (filter === 'completed') return 'Las consultas finalizadas apareceran en modo lectura.';
-  if (filter === 'in_progress') return 'Cuando inicies una atencion medica aparecera aqui.';
+  if (filter === 'completed') return 'Las consultas finalizadas aparecerán en modo lectura.';
+  if (filter === 'in_progress') return 'Cuando inicies una atención médica aparecerá aquí.';
   return 'Ajusta los filtros o intenta refrescar la pantalla.';
 }
 

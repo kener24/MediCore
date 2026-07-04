@@ -28,7 +28,7 @@ import type {
   PatientSpecialty,
 } from '@/features/patient/types/patientAppointments.types';
 
-const onlineDisabledMessage = 'Esta clinica no tiene habilitadas las citas en linea. Puedes solicitar una cita presencial.';
+const onlineDisabledMessage = 'Esta clínica no tiene habilitadas las citas en línea. Puedes solicitar una cita presencial.';
 
 export function RequestAppointmentScreen() {
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
@@ -83,14 +83,14 @@ export function RequestAppointmentScreen() {
     try {
       setDoctors(await getPatientDoctors(nextSpecialty.id));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al cargar medicos.');
+      setError(err instanceof Error ? err.message : 'Error al cargar médicos.');
     }
   }
 
   async function loadAvailability() {
     const validation = validateDate(date);
     if (!doctor) {
-      Alert.alert('Disponibilidad', 'Selecciona un medico.');
+      Alert.alert('Disponibilidad', 'Selecciona un médico.');
       return;
     }
     if (validation) {
@@ -120,7 +120,7 @@ export function RequestAppointmentScreen() {
           setSlots(nextAvailability.slots);
           setAvailabilityMessage(`No habia cupos para ${date.trim()}, pero encontre disponibilidad para ${nextAvailability.date}. Selecciona un horario para continuar.`);
         } else {
-          setAvailabilityMessage(availability.message || 'No hay horarios disponibles en los proximos dias. Prueba otro medico o contacta a la clinica.');
+          setAvailabilityMessage(availability.message || 'No hay horarios disponibles en los próximos días. Prueba otro médico o contacta a la clínica.');
         }
       }
     } catch (err) {
@@ -135,8 +135,8 @@ export function RequestAppointmentScreen() {
 
   async function submit() {
     if (!specialty) return Alert.alert('Solicitud', 'Selecciona una especialidad.');
-    if (!doctor) return Alert.alert('Solicitud', 'Selecciona un medico.');
-    if (!modality) return Alert.alert('Solicitud', 'Selecciona una modalidad valida.');
+    if (!doctor) return Alert.alert('Solicitud', 'Selecciona un médico.');
+    if (!modality) return Alert.alert('Solicitud', 'Selecciona una modalidad válida.');
     const dateValidation = validateDate(date);
     if (dateValidation) return Alert.alert('Solicitud', dateValidation);
     if (!slot) return Alert.alert('Solicitud', 'Selecciona un horario.');
@@ -175,7 +175,7 @@ export function RequestAppointmentScreen() {
   return (
     <KeyboardAwareScreen contentContainerStyle={styles.content}>
       <PatientHeader subtitle="Completa los datos requeridos para enviar tu solicitud." title="Solicitar cita" />
-      {error ? <ErrorState message={error} title="No se pudo cargar informacion" /> : null}
+      {error ? <ErrorState message={error} title="No se pudo cargar información" /> : null}
 
       <Step title="1. Especialidad">
         {specialties.length ? (
@@ -190,17 +190,17 @@ export function RequestAppointmentScreen() {
             ))}
           </View>
         ) : (
-          <EmptyState description="La clinica no tiene especialidades disponibles." title="Sin especialidades" />
+          <EmptyState description="La clínica no tiene especialidades disponibles." title="Sin especialidades" />
         )}
       </Step>
 
-      <Step title="2. Medico">
+      <Step title="2. Médico">
         {doctors.length ? (
           <View style={styles.options}>
             {doctors.map((item) => (
               <AppButton
                 key={item.id}
-                label={item.nombre_completo || item.full_name || item.user_nombre || item.nombre || item.name || `Medico ${item.id}`}
+                label={item.nombre_completo || item.full_name || item.user_nombre || item.nombre || item.name || `Médico ${item.id}`}
                 onPress={() => {
                   setDoctor(item);
                   resetAvailability();
@@ -224,7 +224,7 @@ export function RequestAppointmentScreen() {
         />
         <View style={styles.dateActions}>
           <AppButton label="Manana" onPress={() => updateDate(toISODate(addDays(1)))} style={styles.dateAction} variant="secondary" />
-          <AppButton label="En 7 dias" onPress={() => updateDate(toISODate(addDays(7)))} style={styles.dateAction} variant="secondary" />
+          <AppButton label="En 7 días" onPress={() => updateDate(toISODate(addDays(7)))} style={styles.dateAction} variant="secondary" />
         </View>
       </Step>
 
@@ -246,7 +246,7 @@ export function RequestAppointmentScreen() {
         ) : availabilityChecked ? (
           <Text style={styles.help}>No se encontraron horarios disponibles con los datos seleccionados.</Text>
         ) : (
-          <Text style={styles.help}>Selecciona medico, fecha y modalidad; luego consulta disponibilidad.</Text>
+          <Text style={styles.help}>Selecciona médico, fecha y modalidad; luego consulta disponibilidad.</Text>
         )}
       </Step>
 
@@ -292,9 +292,9 @@ async function findNextAvailability(doctorId: number, fromDate: string, modality
 function validateDate(value: string) {
   const trimmed = value.trim();
   if (!trimmed) return 'Selecciona una fecha.';
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return 'Ingresa una fecha valida en formato YYYY-MM-DD.';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return 'Ingresa una fecha válida en formato YYYY-MM-DD.';
   const parsed = new Date(`${trimmed}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) return 'Ingresa una fecha valida.';
+  if (Number.isNaN(parsed.getTime())) return 'Ingresa una fecha válida.';
   if (isPastISODate(trimmed)) return 'La fecha no puede ser pasada.';
   return '';
 }

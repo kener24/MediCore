@@ -28,7 +28,7 @@ export function DoctorMedicalOrderDetailScreen() {
 
   const load = useCallback(async () => {
     if (!orderId) {
-      setError('No se encontro la orden medica.');
+      setError('No se encontró la orden médica.');
       setLoading(false);
       return;
     }
@@ -42,7 +42,7 @@ export function DoctorMedicalOrderDetailScreen() {
       setOrder(detail);
       setDocuments(docs);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo cargar la orden medica.');
+      setError(err instanceof Error ? err.message : 'No se pudo cargar la orden médica.');
     } finally {
       setLoading(false);
     }
@@ -52,15 +52,15 @@ export function DoctorMedicalOrderDetailScreen() {
     load();
   }, [load]);
 
-  if (loading) return <LoadingState label="Cargando orden medica..." />;
+  if (loading) return <LoadingState label="Cargando orden médica..." />;
   if (error) return <ErrorState message={error} onRetry={load} title="No se pudo cargar la orden" />;
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <DoctorHeader title="Detalle de orden medica" />
+        <DoctorHeader title="Detalle de orden médica" />
         <AppCard style={styles.card}>
-          <Text style={styles.title}>{order?.order_type ?? 'Orden medica'}</Text>
+          <Text style={styles.title}>{order?.order_type ?? 'Orden médica'}</Text>
           <Info label="Estado" value={order?.status ?? 'Registrada'} />
           <Info label="Prioridad" value={order?.priority ?? 'normal'} />
           <Info label="Fecha" value={formatDateTime(order?.created_at)} />
@@ -73,7 +73,7 @@ export function DoctorMedicalOrderDetailScreen() {
           {documents.length ? (
             documents.map((document) => (
               <View key={document.id ?? document.title} style={styles.document}>
-                <Text style={styles.documentTitle}>{document.title ?? document.original_filename ?? 'Documento clinico'}</Text>
+                <Text style={styles.documentTitle}>{document.title ?? document.original_filename ?? 'Documento clínico'}</Text>
                 <Text style={styles.documentMeta}>{document.category_name ?? document.document_type ?? document.file_extension ?? 'Resultado'}</Text>
                 <Text style={styles.documentMeta}>{formatDateTime(document.creado_en ?? document.created_at)}</Text>
                 {document.preview_url || document.download_url ? (
@@ -87,7 +87,7 @@ export function DoctorMedicalOrderDetailScreen() {
               </View>
             ))
           ) : (
-            <EmptyState description="Cuando laboratorio o imagen adjunte resultados apareceran aqui." title="Sin resultados adjuntos" />
+            <EmptyState description="Cuando laboratorio o imagen adjunte resultados aparecerán aquí." title="Sin resultados adjuntos" />
           )}
         </AppCard>
         <AppButton label="Volver" onPress={() => navigation.goBack()} variant="secondary" />

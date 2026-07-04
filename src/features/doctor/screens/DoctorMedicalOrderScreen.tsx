@@ -43,7 +43,7 @@ export function DoctorMedicalOrderScreen() {
       setFavorites(await getFavoriteOrders().catch(() => []));
       setCatalog(await getMedicalOrderCatalog().catch(() => []));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'El modulo de ordenes medicas aun no esta disponible.');
+      setError(err instanceof Error ? err.message : 'El módulo de Órdenes médicas aún no está disponible.');
     } finally {
       setLoading(false);
     }
@@ -54,30 +54,30 @@ export function DoctorMedicalOrderScreen() {
   }, [load]);
 
   async function submit(payload: CreateMedicalOrderPayload) {
-    if (readOnly) return Alert.alert('Orden medica', 'Esta consulta ya fue finalizada.');
-    if (!consultationId) return Alert.alert('Orden medica', 'Primero debes iniciar o guardar la consulta medica.');
+    if (readOnly) return Alert.alert('Orden médica', 'Esta consulta ya fue finalizada.');
+    if (!consultationId) return Alert.alert('Orden médica', 'Primero debes iniciar o guardar la consulta médica.');
     setSubmitting(true);
     try {
       await createMedicalOrder(consultationId, { ...payload, visit: params.visitId });
       await rememberMedicalOrder(payload).catch(() => undefined);
-      Alert.alert('Orden medica', 'Orden medica creada correctamente.');
+      Alert.alert('Orden médica', 'Orden médica creada correctamente.');
       await load();
     } catch (err) {
-      Alert.alert('Orden medica', err instanceof Error ? err.message : 'No se pudo crear la orden medica.');
+      Alert.alert('Orden médica', err instanceof Error ? err.message : 'No se pudo crear la orden médica.');
     } finally {
       setSubmitting(false);
     }
   }
 
-  if (loading) return <LoadingState label="Cargando orden medica..." />;
-  if (error) return <ErrorState message={error} onRetry={load} title="No se pudo cargar orden medica" />;
+  if (loading) return <LoadingState label="Cargando orden médica..." />;
+  if (error) return <ErrorState message={error} onRetry={load} title="No se pudo cargar orden médica" />;
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboard}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <DoctorHeader title="Orden medica" />
-          {readOnly ? <EmptyState description="Puedes consultar ordenes existentes, pero no crear nuevas." title="Consulta finalizada" /> : null}
+          <DoctorHeader title="Orden médica" />
+          {readOnly ? <EmptyState description="Puedes consultar Órdenes existentes, pero no crear nuevas." title="Consulta finalizada" /> : null}
           <MedicalOrderPreviewCard
             items={items}
             onPressItem={(item) => navigation.navigate('DoctorMedicalOrderDetail', { order: item, orderId: item.id })}

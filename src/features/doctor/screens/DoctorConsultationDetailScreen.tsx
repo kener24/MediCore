@@ -18,7 +18,8 @@ import {
   getConsultationRelatedData,
 } from '@/features/doctor/services/doctorConsultationService';
 import { isConsultationFinalized } from '@/features/doctor/types/commonDoctor.types';
-import type { DoctorConsultation } from '@/features/doctor/types/doctorConsultation.types';
+import type { ConsultationFormValues, DoctorConsultation } from '@/features/doctor/types/doctorConsultation.types';
+import { validateConsultationFinish } from '@/features/doctor/utils/clinicalValidation';
 
 type Params = { consultationId?: number; patientId?: number; visitId?: number };
 
@@ -40,11 +41,12 @@ export function DoctorConsultationDetailScreen() {
   const patientId = params.patientId ?? consultation?.patient_id ?? asPatientRecord(consultation?.patient)?.id;
   const visitId = params.visitId ?? consultation?.visit_id ?? consultation?.patient_visit ?? undefined;
   const completed = isConsultationFinalized(consultation?.status);
+  const form = toFormValues(consultation);
 
   const load = useCallback(async () => {
     if (!params.consultationId) {
       setLoading(false);
-      setError('No se encontró la consulta médica.');
+      setError('No se encontro la consulta medica.');
       return;
     }
     setLoading(true);
@@ -64,9 +66,11 @@ export function DoctorConsultationDetailScreen() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   function confirmFinish() {
-    if (completed) return Alert.alert('Consulta médica', 'Esta consulta ya fue finalizada.');
-    if (!consultationId || !visitId) return Alert.alert('Consulta médica', 'No se encontró la consulta o visita asociada.');
-    Alert.alert('Finalizar consulta', '¿Deseas finalizar esta consulta? Después de finalizar no podrás editarla desde la app.', [
+    if (completed) return Alert.alert('Consulta medica', 'Esta consulta ya fue finalizada.');
+    if (!consultationId || !visitId) return Alert.alert('Consulta medica', 'No se encontro la consulta o visita asociada.');
+    const validation = validateConsultationFinish(form, consultation);
+    if (validation) return Alert.alert('Finalizar consulta', validation);
+    Alert.alert('Finalizar consulta', 'Despues de finalizar no podras editarla desde la app. Deseas continuar?', [
       { style: 'cancel', text: 'Cancelar' },
       { onPress: finish, text: 'Finalizar' },
     ]);
@@ -80,7 +84,7 @@ export function DoctorConsultationDetailScreen() {
       Alert.alert('Consulta finalizada', 'Consulta finalizada correctamente.');
       await load();
     } catch (err) {
-      Alert.alert('Consulta médica', err instanceof Error ? err.message : 'No se pudo finalizar la consulta.');
+      Alert.alert('Consulta medica', err instanceof Error ? err.message : 'No se pudo finalizar la consulta.');
     } finally {
       setFinishing(false);
     }
@@ -102,29 +106,29 @@ export function DoctorConsultationDetailScreen() {
           {completed ? <Text style={styles.readOnly}>Esta consulta ya fue finalizada.</Text> : null}
           <Info label="Motivo principal" value={consultation.chief_complaint || consultation.reason} />
           <Info label="Historia de enfermedad actual" value={consultation.history_present_illness || consultation.symptoms} />
-          <Info label="Examen físico" value={consultation.physical_examination || consultation.physical_exam} />
-          <Info label="Evaluación clínica" value={consultation.assessment || consultation.clinical_assessment} />
-          <Info label="Diagnóstico" value={consultation.diagnosis_text || consultation.preliminary_diagnosis} />
+          <Info label="Examen fisico" value={consultation.physical_examination || consultation.physical_exam} />
+          <Info label="Evaluacion clinica" value={consultation.assessment || consultation.clinical_assessment} />
+          <Info label="Diagnostico" value={consultation.diagnosis_text || consultation.preliminary_diagnosis} />
           <Info label="Plan de tratamiento" value={consultation.plan || consultation.treatment_plan} />
           <Info label="Recomendaciones" value={consultation.recommendations} />
           <Info label="Notas" value={consultation.notes || consultation.private_notes} />
         </AppCard>
 
         <RelatedSection title="Signos vitales y triaje" count={consultation.vital_signs || consultation.triage ? 1 : 0} />
-        <RelatedSection title="Recetas médicas" count={related.prescriptions.length} />
-        <RelatedSection title="Órdenes médicas" count={related.medical_orders.length} />
-        <RelatedSection title="Consumos clínicos" count={related.consumptions.length} />
+        <RelatedSection title="Recetas medicas" count={related.prescriptions.length} />
+        <RelatedSection title="Ordenes medicas" count={related.medical_orders.length} />
+        <RelatedSection title="Consumos clinicos" count={related.consumptions.length} />
 
-        <AppButton disabled={completed} label="Continuar edición" onPress={() => navigation.navigate('DoctorConsultation', { consultationId, patientId, visitId })} />
+        <AppButton disabled={completed} label="Continuar edicion" onPress={() => navigation.navigate('DoctorConsultation', { consultationId, patientId, visitId })} />
         <AppButton label="Ver resumen" onPress={() => navigation.navigate('DoctorConsultationSummary', { consultationId, patientId, visitId })} variant="secondary" />
         <AppButton
           label="Historial del paciente"
-          onPress={() => patientId ? navigation.navigate('DoctorConsultationHistory', { patientId }) : Alert.alert('Historial', 'No se encontró el paciente.')}
+          onPress={() => patientId ? navigation.navigate('DoctorConsultationHistory', { patientId }) : Alert.alert('Historial', 'No se encontro el paciente.')}
           variant="secondary"
         />
-        <AppButton label={completed ? 'Ver recetas' : 'Agregar receta'} onPress={() => navigation.navigate('DoctorPrescription', { consultationId, patientId, visitId })} variant="secondary" />
-        <AppButton label={completed ? 'Ver órdenes médicas' : 'Agregar orden médica'} onPress={() => navigation.navigate('DoctorMedicalOrder', { consultationId, patientId, visitId })} variant="secondary" />
-        <AppButton label={completed ? 'Ver consumos clínicos' : 'Agregar consumo clínico'} onPress={() => navigation.navigate('DoctorClinicalConsumption', { consultationId, patientId, visitId })} variant="secondary" />
+        <AppButton disabled={completed} label="Agregar receta" onPress={() => navigation.navigate('DoctorPrescription', { consultationId, patientId, visitId })} variant="secondary" />
+        <AppButton disabled={completed} label="Agregar orden medica" onPress={() => navigation.navigate('DoctorMedicalOrder', { consultationId, patientId, visitId })} variant="secondary" />
+        <AppButton disabled={completed} label="Agregar consumo clinico" onPress={() => navigation.navigate('DoctorClinicalConsumption', { consultationId, patientId, visitId })} variant="secondary" />
         <AppButton disabled={completed} label={completed ? 'Consulta finalizada' : 'Finalizar consulta'} loading={finishing} onPress={confirmFinish} />
         <AppButton label="Volver" onPress={() => navigation.goBack()} variant="secondary" />
       </ScrollView>
@@ -160,6 +164,19 @@ function patientName(consultation: DoctorConsultation) {
 
 function asPatientRecord(value: DoctorConsultation['patient']) {
   return value && typeof value === 'object' ? value : null;
+}
+
+function toFormValues(consultation?: DoctorConsultation | null): ConsultationFormValues {
+  return {
+    assessment: consultation?.assessment ?? consultation?.clinical_assessment ?? '',
+    chief_complaint: consultation?.chief_complaint ?? '',
+    diagnosis_text: consultation?.diagnosis_text ?? consultation?.preliminary_diagnosis ?? '',
+    history_present_illness: consultation?.history_present_illness ?? consultation?.symptoms ?? '',
+    notes: consultation?.notes ?? consultation?.private_notes ?? '',
+    physical_examination: consultation?.physical_examination ?? consultation?.physical_exam ?? '',
+    plan: consultation?.plan ?? consultation?.treatment_plan ?? '',
+    recommendations: consultation?.recommendations ?? '',
+  };
 }
 
 const styles = StyleSheet.create({

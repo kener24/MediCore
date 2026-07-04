@@ -63,7 +63,7 @@ export function DoctorConsultationsScreen() {
     try {
       setItems(await getDoctorConsultations(params));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudieron cargar las consultas médicas.');
+      setError(err instanceof Error ? err.message : 'No se pudieron cargar las consultas medicas.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -96,7 +96,7 @@ export function DoctorConsultationsScreen() {
     });
   }
 
-  if (loading) return <LoadingState label="Cargando consultas médicas..." />;
+  if (loading) return <LoadingState label="Cargando consultas medicas..." />;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -104,7 +104,7 @@ export function DoctorConsultationsScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl onRefresh={() => load(true)} refreshing={refreshing} />}
         showsVerticalScrollIndicator={false}>
-        <DoctorHeader title="Consultas médicas" />
+        <DoctorHeader title="Consultas medicas" />
         <AppCard style={styles.summaryCard}>
           <Text style={styles.summaryNumber}>{items.length}</Text>
           <Text style={styles.summaryText}>consultas encontradas</Text>
@@ -118,7 +118,7 @@ export function DoctorConsultationsScreen() {
           search={search}
         />
         {error ? (
-          <ErrorState message={error} onRetry={() => load()} title="No se pudo cargar el módulo" />
+          <ErrorState message={error} onRetry={() => load()} title="No se pudo cargar el modulo" />
         ) : filteredItems.length ? (
           filteredItems.map((item, index) => (
             <ConsultationCard
@@ -150,8 +150,8 @@ function emptyTitle(filter: ConsultationQuickFilter) {
 }
 
 function emptyDescription(filter: ConsultationQuickFilter) {
-  if (filter === 'completed') return 'Las consultas finalizadas aparecerán en modo lectura.';
-  if (filter === 'in_progress') return 'Cuando inicies una atención médica aparecerá aquí.';
+  if (filter === 'completed') return 'Las consultas finalizadas apareceran en modo lectura.';
+  if (filter === 'in_progress') return 'Cuando inicies una atencion medica aparecera aqui.';
   return 'Ajusta los filtros o intenta refrescar la pantalla.';
 }
 

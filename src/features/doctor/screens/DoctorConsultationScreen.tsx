@@ -9,6 +9,7 @@ import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
 import { ClinicalSummaryCard } from '@/features/doctor/components/ClinicalSummaryCard';
+import { ClinicalRiskBanner } from '@/features/doctor/components/ClinicalRiskBanner';
 import { ConsultationActionBar } from '@/features/doctor/components/ConsultationActionBar';
 import { ConsultationForm } from '@/features/doctor/components/ConsultationForm';
 import { ConsultationStatusBadge } from '@/features/doctor/components/ConsultationStatusBadge';
@@ -25,6 +26,11 @@ import {
   startConsultation,
   updateConsultation,
 } from '@/features/doctor/services/doctorConsultationService';
+import {
+  clearDoctorConsultationDraft,
+  getDoctorConsultationDraft,
+  saveDoctorConsultationDraft,
+} from '@/features/doctor/services/doctorLocalDraftService';
 import {
   getPatientMedicalSummary,
   getPatientSummary,
@@ -99,6 +105,7 @@ export function DoctorConsultationScreen() {
     visit?.paciente_id;
   const completed = isConsultationFinalized(consultation?.status);
   const busy = saving || savingDraft || finishing;
+  const localDraftKey = visitId ?? consultationId;
 
   const load = useCallback(async () => {
     if (!params.visitId && !params.consultationId) {
@@ -170,7 +177,9 @@ export function DoctorConsultationScreen() {
           patient_code: consultationData?.patient_codigo,
         }),
       );
-      setForm(toFormValues(consultationData));
+      const serverForm = toFormValues(consultationData);
+      const localDraft = initialVisitId ? await getDoctorConsultationDraft(initialVisitId).catch(() => null) : null;
+      setForm(hasFormContent(serverForm) ? serverForm : localDraft?.values ?? serverForm);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ocurrio un error en el servidor.');
     } finally {
@@ -183,7 +192,11 @@ export function DoctorConsultationScreen() {
   }, [load]);
 
   function updateField(field: keyof ConsultationFormValues, value: string) {
-    setForm((current) => ({ ...current, [field]: value }));
+    setForm((current) => {
+      const next = { ...current, [field]: value };
+      if (localDraftKey && !completed) saveDoctorConsultationDraft(localDraftKey, next).catch(() => undefined);
+      return next;
+    });
   }
 
   async function handleSaveDraft() {
@@ -213,6 +226,7 @@ export function DoctorConsultationScreen() {
         : await createConsultation(payload);
       setConsultation(saved);
       setForm(toFormValues(saved));
+      if (localDraftKey) await clearDoctorConsultationDraft(localDraftKey).catch(() => undefined);
       Alert.alert('Consulta medica', status === 'draft' ? 'Borrador guardado correctamente.' : 'Consulta guardada correctamente.');
     } catch (err) {
       Alert.alert('Consulta medica', err instanceof Error ? err.message : 'No se pudo guardar la consulta.');
@@ -251,6 +265,10 @@ export function DoctorConsultationScreen() {
       await completeConsultation(visitId, { status: 'completed' }).catch(() =>
         completeConsultationById(currentConsultationId, { status: 'completed' }),
       );
+      await Promise.all([
+        clearDoctorConsultationDraft(visitId).catch(() => undefined),
+        currentConsultationId ? clearDoctorConsultationDraft(currentConsultationId).catch(() => undefined) : Promise.resolve(),
+      ]);
       setConsultation({ ...saved, status: 'completed' });
       Alert.alert('Consulta finalizada', 'Consulta finalizada correctamente.', [
         { onPress: () => navigation.getParent()?.navigate('DoctorWaitingRoomTab'), text: 'Aceptar' },
@@ -283,6 +301,7 @@ export function DoctorConsultationScreen() {
           {completed ? <EmptyState description="No puedes editarla desde la app." title="Consulta en modo lectura" /> : null}
           <PatientSummaryCard patient={patient} />
           <VisitInfoCard visit={visit} />
+          <ClinicalRiskBanner medicalSummary={medicalSummary} />
           <ClinicalSummaryCard medicalSummary={medicalSummary} triage={triage} visit={visit} vitalSigns={vitalSigns} />
           <ConsultationForm
             disabled={completed}
@@ -349,6 +368,10 @@ function buildPayload(
     treatment_plan: form.plan.trim(),
     visit: visitId,
   };
+}
+
+function hasFormContent(form: ConsultationFormValues) {
+  return Object.values(form).some((value) => value.trim().length > 0);
 }
 
 function mergePatient(...values: (DoctorPatientBasicInfo | null | undefined)[]): DoctorPatientBasicInfo | null {

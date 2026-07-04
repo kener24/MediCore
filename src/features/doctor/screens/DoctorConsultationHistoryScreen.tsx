@@ -29,7 +29,7 @@ export function DoctorConsultationHistoryScreen() {
   const load = useCallback(async (refresh = false) => {
     if (!params.patientId) {
       setLoading(false);
-      setError('No se encontró el paciente.');
+      setError('No se encontro el paciente.');
       return;
     }
     if (refresh) setRefreshing(true);
@@ -55,7 +55,7 @@ export function DoctorConsultationHistoryScreen() {
     });
   }
 
-  if (loading) return <LoadingState label="Cargando historial clínico..." />;
+  if (loading) return <LoadingState label="Cargando historial clinico..." />;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -82,8 +82,8 @@ export function DoctorConsultationHistoryScreen() {
           ))
         ) : (
           <EmptyState
-            description="Cuando el paciente tenga atenciones previas aparecerán aquí."
-            title="Este paciente aún no tiene consultas registradas."
+            description="Cuando el paciente tenga atenciones previas apareceran aqui."
+            title="Este paciente aun no tiene consultas registradas."
           />
         )}
       </ScrollView>

@@ -26,17 +26,17 @@ export class ApiClientError extends Error {
 
 function extractErrorMessage(error: AxiosError) {
   if (!error.response) {
-    return 'No se pudo conectar con el servidor. Revisa tu conexión.';
+    return 'No se pudo conectar con el servidor. Revisa tu conexion.';
   }
 
   const status = error.response.status;
   const payload = error.response.data;
 
   if (status === 400) return extractValidationMessage(payload);
-  if (status === 401) return 'Tu sesión expiró. Inicia sesión nuevamente.';
-  if (status === 403) return 'No tienes permiso para realizar esta acción.';
-  if (status === 404) return 'No se encontró la información solicitada.';
-  if (status >= 500) return 'Ocurrió un error en el servidor.';
+  if (status === 401) return 'Tu sesion expiro. Inicia sesion nuevamente.';
+  if (status === 403) return 'No tienes permiso para realizar esta accion.';
+  if (status === 404) return 'No se encontro la informacion solicitada.';
+  if (status >= 500) return 'Ocurrio un error en el servidor.';
 
   return extractPayloadMessage(payload) || 'No se pudo completar la solicitud.';
 }

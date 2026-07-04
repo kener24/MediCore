@@ -9,6 +9,7 @@ import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
 import { DoctorHeader } from '@/features/doctor/components/DoctorHeader';
+import { ClinicalRiskBanner } from '@/features/doctor/components/ClinicalRiskBanner';
 import { MedicalBackgroundCard } from '@/features/doctor/components/MedicalBackgroundCard';
 import { PatientSummaryCard } from '@/features/doctor/components/PatientSummaryCard';
 import { RecentClinicalInfoSection } from '@/features/doctor/components/RecentClinicalInfoSection';
@@ -201,6 +202,7 @@ export function DoctorPatientDetailScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <DoctorHeader title="Detalle del paciente" />
         <PatientSummaryCard patient={patient} />
+        <ClinicalRiskBanner medicalSummary={medicalSummary} />
         <VisitInfoCard visit={visit} />
         <VitalSignsCard vitalSigns={vitalSigns} />
         <TriageSummaryCard triage={triage} visit={visit} />

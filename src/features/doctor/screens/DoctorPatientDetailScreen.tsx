@@ -10,6 +10,7 @@ import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
 import { DoctorHeader } from '@/features/doctor/components/DoctorHeader';
 import { ClinicalRiskBanner } from '@/features/doctor/components/ClinicalRiskBanner';
+import { ClinicalTimelineSection } from '@/features/doctor/components/ClinicalTimelineSection';
 import { MedicalBackgroundCard } from '@/features/doctor/components/MedicalBackgroundCard';
 import { PatientSummaryCard } from '@/features/doctor/components/PatientSummaryCard';
 import { RecentClinicalInfoSection } from '@/features/doctor/components/RecentClinicalInfoSection';
@@ -207,6 +208,7 @@ export function DoctorPatientDetailScreen() {
         <VitalSignsCard vitalSigns={vitalSigns} />
         <TriageSummaryCard triage={triage} visit={visit} />
         <MedicalBackgroundCard medicalSummary={medicalSummary} />
+        <ClinicalTimelineSection medicalSummary={medicalSummary} />
         <RecentClinicalInfoSection medicalSummary={medicalSummary} />
         <AppButton
           label="Ver triaje completo"

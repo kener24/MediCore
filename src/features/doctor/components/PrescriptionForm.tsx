@@ -5,6 +5,7 @@ import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { AppInput } from '@/components/AppInput';
 import { MedicationFormItem } from '@/features/doctor/components/MedicationFormItem';
+import type { InventoryItem } from '@/features/doctor/types/doctorClinicalConsumption.types';
 import type {
   CreatePrescriptionPayload,
   PrescriptionMedicationPayload,
@@ -21,10 +22,16 @@ const emptyMedication: PrescriptionMedicationPayload = {
 
 export function PrescriptionForm({
   disabled,
+  favoriteMedications,
+  medicationCatalog,
+  onSearchMedication,
   onSubmit,
   submitting,
 }: {
   disabled?: boolean;
+  favoriteMedications?: PrescriptionMedicationPayload[];
+  medicationCatalog?: InventoryItem[];
+  onSearchMedication?: (value: string) => void;
   onSubmit: (payload: CreatePrescriptionPayload) => Promise<void>;
   submitting?: boolean;
 }) {
@@ -40,6 +47,10 @@ export function PrescriptionForm({
 
   function removeMedication(index: number) {
     setMedications((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  }
+
+  function applyMedication(index: number, values: Partial<PrescriptionMedicationPayload>) {
+    setMedications((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, ...values } : item)));
   }
 
   async function submit() {
@@ -71,10 +82,15 @@ export function PrescriptionForm({
       {medications.map((item, index) => (
         <MedicationFormItem
           disabled={disabled}
+          catalogItems={medicationCatalog}
+          favoriteItems={favoriteMedications}
           index={index}
           item={item}
           key={index}
           onRemove={() => removeMedication(index)}
+          onSearchMedication={onSearchMedication}
+          onSelectCatalogItem={(catalogItem) => applyMedication(index, { medication_name: catalogItem.name ?? catalogItem.nombre ?? '' })}
+          onSelectFavorite={(favorite) => applyMedication(index, favorite)}
           onUpdate={(field, value) => updateMedication(index, field, value)}
           removable={medications.length > 1}
         />

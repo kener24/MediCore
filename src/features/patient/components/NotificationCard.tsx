@@ -11,7 +11,7 @@ export function isNotificationRead(notification: PatientNotification) {
   if (typeof notification.is_read === 'boolean') return notification.is_read;
   if (typeof notification.read === 'boolean') return notification.read;
   if (notification.read_at) return true;
-  if (status) return ['read', 'leída', 'leido', 'leído', 'leida'].includes(status);
+  if (status) return ['read', 'leida', 'leido'].includes(status);
   return false;
 }
 
@@ -52,12 +52,12 @@ export function NotificationCard({
         <View style={styles.metaRow}>
           <MaterialCommunityIcons color={colors.muted} name="bell-outline" size={16} />
           <Text style={styles.meta}>
-            {meta} · {formatDate(notification.created_at || notification.creado_en)}
+            {meta} - {formatDate(notification.created_at || notification.creado_en)}
           </Text>
         </View>
         {!isRead && markRead ? (
           <Pressable onPress={markRead} style={styles.action}>
-            <Text style={styles.actionText}>Marcar como leída</Text>
+            <Text style={styles.actionText}>Marcar como leida</Text>
           </Pressable>
         ) : null}
       </AppCard>

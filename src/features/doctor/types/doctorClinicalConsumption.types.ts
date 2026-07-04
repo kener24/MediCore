@@ -4,9 +4,12 @@ export type InventoryItem = {
   nombre?: string;
   sku?: string;
   stock?: number | string;
+  stock_current?: number | string;
   unit?: string;
   unidad?: string;
   category_name?: string;
+  item_type?: string;
+  description?: string;
   price?: number | string;
 };
 

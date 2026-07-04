@@ -10,6 +10,7 @@ import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
 import { ClinicalSummaryCard } from '@/features/doctor/components/ClinicalSummaryCard';
 import { ClinicalRiskBanner } from '@/features/doctor/components/ClinicalRiskBanner';
+import { ClinicalTimelineSection } from '@/features/doctor/components/ClinicalTimelineSection';
 import { ConsultationActionBar } from '@/features/doctor/components/ConsultationActionBar';
 import { ConsultationForm } from '@/features/doctor/components/ConsultationForm';
 import { ConsultationStatusBadge } from '@/features/doctor/components/ConsultationStatusBadge';
@@ -303,6 +304,7 @@ export function DoctorConsultationScreen() {
           <VisitInfoCard visit={visit} />
           <ClinicalRiskBanner medicalSummary={medicalSummary} />
           <ClinicalSummaryCard medicalSummary={medicalSummary} triage={triage} visit={visit} vitalSigns={vitalSigns} />
+          <ClinicalTimelineSection medicalSummary={medicalSummary} />
           <ConsultationForm
             disabled={completed}
             initialValues={form}

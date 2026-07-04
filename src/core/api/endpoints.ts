@@ -75,6 +75,7 @@ export const endpoints = {
     prescriptions: '/prescriptions/',
     consultationMedicalOrders: (id: number | string) => `/consultations/${id}/medical-orders/`,
     medicalOrders: '/medical-orders/',
+    medicalOrderDocuments: (id: number | string) => `/medical-orders/${id}/documents/`,
     consultationConsumptions: (id: number | string) => `/consultations/${id}/consumptions/`,
     clinicalConsumptions: '/clinical-consumptions/',
     inventoryItems: '/inventory/items/',

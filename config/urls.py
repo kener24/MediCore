@@ -23,7 +23,7 @@ from apps.appointments.views import AppointmentViewSet
 from apps.medical_records.views import ClinicalConsultationViewSet, ClinicalSupplyUsageViewSet, MedicalRecordViewSet
 from apps.hospitalization.views import HospitalBedViewSet, HospitalRoomViewSet, HospitalizationDashboardView, HospitalizationViewSet, MedicationAdministrationViewSet, PendingMedicationsView
 from apps.prescriptions.views import DiagnosisViewSet, MedicalOrderViewSet, PrescriptionViewSet
-from apps.billing.views import BillableServiceViewSet, BillingStatsViewSet, CashSessionViewSet, ClinicFiscalProfileViewSet, FiscalDocumentRangeViewSet, InvoiceViewSet, PaymentViewSet
+from apps.billing.views import BillableServiceViewSet, BillingStatsViewSet, CashSessionViewSet, ClinicFiscalProfileViewSet, FiscalDocumentRangeViewSet, FiscalReadinessView, InvoiceViewSet, PaymentViewSet
 from apps.inventory.views import InventoryAlertViewSet, InventoryCategoryViewSet, InventoryItemViewSet, InventoryLotViewSet, InventoryMovementViewSet, InventoryStatsViewSet
 from apps.purchases.views import PurchaseItemHistoryViewSet, PurchaseOrderViewSet, PurchaseReceiptViewSet, PurchaseStatsViewSet, SupplierViewSet
 from apps.reports.views import (
@@ -195,6 +195,7 @@ urlpatterns = [
     path("api/cashier/pending-billing/", PatientVisitViewSet.as_view({"get": "pending_billing"}), name="cashier-pending-billing"),
     path("api/cashier/visits/<int:pk>/generate-invoice/", PatientVisitViewSet.as_view({"post": "generate_invoice"}), name="cashier-generate-invoice-from-visit"),
     path("api/billing/fiscal-profile/", ClinicFiscalProfileViewSet.as_view({"get": "list", "patch": "partial_update"}), name="billing-fiscal-profile"),
+    path("api/billing/fiscal-readiness/", FiscalReadinessView.as_view(), name="billing-fiscal-readiness"),
     path("api/billing/visits/<int:pk>/generate-invoice/", PatientVisitViewSet.as_view({"post": "generate_invoice"}), name="billing-generate-invoice-from-visit"),
     path("api/billing/pending-consumptions/", InvoiceViewSet.as_view({"get": "pending_consumptions"}), name="billing-pending-consumptions"),
     path("api/inventory/alerts/expiring-soon/", InventoryAlertViewSet.as_view({"get": "expiring_soon"}), name="inventory-expiring-soon"),

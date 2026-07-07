@@ -61,6 +61,11 @@ class BillingModuleTests(APITestCase):
             is_active=True,
         )
 
+    def other_invoice(self):
+        inv = Invoice.objects.create(patient=self.other_patient)
+        InvoiceItem.objects.create(invoice=inv, description="Consulta", quantity=1, unit_price=Decimal("300.00"))
+        return inv
+
     def test_admin_crea_servicio(self):
         self.auth(self.admin)
         res = self.client.post("/api/billing/services/", {"name": "Consulta", "price": "500.00"}, format="json")
@@ -276,6 +281,51 @@ class BillingModuleTests(APITestCase):
         again = self.client.post(f"/api/billing/invoices/{inv.id}/issue-fiscal/", {}, format="json")
         self.assertEqual(again.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(again.data["detail"], "La factura fiscal ya fue emitida.")
+
+    def test_fiscal_readiness_reporta_estado_por_clinica(self):
+        self.auth(self.rec)
+        missing = self.client.get("/api/billing/fiscal-readiness/")
+        self.assertEqual(missing.status_code, status.HTTP_200_OK)
+        self.assertFalse(missing.data["ready"])
+        self.assertEqual(missing.data["status"], "missing_profile")
+
+        self.fiscal_profile()
+        no_range = self.client.get("/api/billing/fiscal-readiness/")
+        self.assertEqual(no_range.status_code, status.HTTP_200_OK)
+        self.assertFalse(no_range.data["ready"])
+        self.assertEqual(no_range.data["status"], "missing_range")
+
+        self.fiscal_range()
+        ready = self.client.get("/api/billing/fiscal-readiness/")
+        self.assertEqual(ready.status_code, status.HTTP_200_OK)
+        self.assertTrue(ready.data["ready"])
+        self.assertEqual(ready.data["status"], "ready")
+        self.assertEqual(ready.data["active_range"]["full_start_number"], "000-001-01-00000001")
+
+    def test_no_emitir_factura_fiscal_de_otra_clinica(self):
+        self.fiscal_profile()
+        self.fiscal_range()
+        inv = self.other_invoice()
+        self.auth(self.rec)
+        res = self.client.post(f"/api/billing/invoices/{inv.id}/issue-fiscal/", {}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_pdf_fiscal_requiere_emision_y_respeta_clinica(self):
+        self.fiscal_profile()
+        self.fiscal_range()
+        inv = self.invoice()
+        self.auth(self.rec)
+        draft_pdf = self.client.get(f"/api/billing/invoices/{inv.id}/fiscal-pdf/")
+        self.assertEqual(draft_pdf.status_code, status.HTTP_400_BAD_REQUEST)
+
+        self.client.post(f"/api/billing/invoices/{inv.id}/issue-fiscal/", {}, format="json")
+        issued_pdf = self.client.get(f"/api/billing/invoices/{inv.id}/fiscal-pdf/")
+        self.assertEqual(issued_pdf.status_code, status.HTTP_200_OK)
+        self.assertEqual(issued_pdf["Content-Type"], "application/pdf")
+
+        foreign = self.other_invoice()
+        foreign_pdf = self.client.get(f"/api/billing/invoices/{foreign.id}/fiscal-pdf/")
+        self.assertEqual(foreign_pdf.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_factura_fiscal_emitida_no_se_edita_ni_borra(self):
         self.fiscal_profile()

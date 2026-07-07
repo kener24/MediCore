@@ -1,5 +1,5 @@
 import api from "./axios";
-import type { BillableService, BillingStats, CashMovement, CashSession, ClinicFiscalProfile, FiscalDocumentRange, Invoice, InvoiceItem, InvoicePrintData, Payment, TodayInvoiceSummary } from "../types/billing";
+import type { BillableService, BillingStats, CashMovement, CashSession, ClinicFiscalProfile, FiscalDocumentRange, FiscalReadiness, Invoice, InvoiceItem, InvoicePrintData, Payment, TodayInvoiceSummary } from "../types/billing";
 import type { ClinicalSupplyUsage } from "../types/medicalRecord";
 
 export async function getBillableServices(filters?: Record<string, string>) { const { data } = await api.get<BillableService[]>("/billing/services/", { params: filters }); return data; }
@@ -39,6 +39,7 @@ export async function closeCashSession(id: number | string, payload: { closing_a
 export async function createCashMovement(id: number | string, payload: Partial<CashMovement>) { const { data } = await api.post<CashMovement>(`/billing/cash-sessions/${id}/movements/`, payload); return data; }
 
 export async function getBillingStats(filters?: Record<string, string>) { const { data } = await api.get<BillingStats>("/billing/stats/", { params: filters }); return data; }
+export async function getFiscalReadiness() { const { data } = await api.get<FiscalReadiness>("/billing/fiscal-readiness/"); return data; }
 export async function getFiscalProfile() { const { data } = await api.get<ClinicFiscalProfile>("/billing/fiscal-profile/"); return data; }
 export async function updateFiscalProfile(payload: Partial<ClinicFiscalProfile>) { const { data } = await api.patch<ClinicFiscalProfile>("/billing/fiscal-profile/", payload); return data; }
 export async function getFiscalRanges(filters?: Record<string, string>) { const { data } = await api.get<FiscalDocumentRange[]>("/billing/fiscal-ranges/", { params: filters }); return data; }

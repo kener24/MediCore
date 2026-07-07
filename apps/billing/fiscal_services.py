@@ -8,6 +8,17 @@ from django.utils import timezone
 from apps.billing.models import ClinicFiscalProfile, FiscalDocumentRange, Invoice, InvoiceItem, clean_rtn, format_fiscal_number, money
 
 
+READINESS_MESSAGES = {
+    "disabled": "La facturacion fiscal no esta habilitada para esta clinica.",
+    "missing_profile": "La clinica no tiene configuracion fiscal.",
+    "incomplete_profile": "La configuracion fiscal de la clinica esta incompleta.",
+    "missing_range": "No hay un rango fiscal CAI activo para emitir facturas.",
+    "expired_range": "El rango fiscal esta vencido.",
+    "exhausted_range": "El rango fiscal esta agotado.",
+    "ready": "La clinica esta lista para emitir facturas fiscales.",
+}
+
+
 def amount_to_lempiras(value):
     value = Decimal(value or 0).quantize(Decimal("0.01"))
     integer = int(value)
@@ -43,6 +54,39 @@ def validate_fiscal_profile(profile):
         raise ValidationError("La clinica no tiene facturacion fiscal habilitada.")
     if not profile.legal_name or not profile.address or len(clean_rtn(profile.rtn)) != 14:
         raise ValidationError("El perfil fiscal de la clinica esta incompleto.")
+
+
+def validate_fiscal_invoice_readiness(clinic, document_type=FiscalDocumentRange.DocumentType.INVOICE):
+    missing_fields = []
+    profile = ClinicFiscalProfile.objects.filter(clinic=clinic).first()
+    if not profile:
+        return {"ready": False, "status": "missing_profile", "missing_fields": ["fiscal_profile"], "active_range": None, "message": READINESS_MESSAGES["missing_profile"]}
+    if not profile.is_fiscal_billing_enabled:
+        return {"ready": False, "status": "disabled", "missing_fields": [], "active_range": None, "message": READINESS_MESSAGES["disabled"]}
+    if not profile.legal_name:
+        missing_fields.append("legal_name")
+    if len(clean_rtn(profile.rtn)) != 14:
+        missing_fields.append("rtn")
+    if not profile.address:
+        missing_fields.append("address")
+    if missing_fields:
+        return {"ready": False, "status": "incomplete_profile", "missing_fields": missing_fields, "active_range": None, "message": READINESS_MESSAGES["incomplete_profile"]}
+
+    today = timezone.localdate()
+    active_range = (
+        FiscalDocumentRange.objects.filter(clinic=clinic, document_type=document_type, is_active=True)
+        .order_by("expiration_date", "id")
+        .first()
+    )
+    if not active_range:
+        return {"ready": False, "status": "missing_range", "missing_fields": ["active_range"], "active_range": None, "message": READINESS_MESSAGES["missing_range"]}
+    if not active_range.cai:
+        return {"ready": False, "status": "incomplete_range", "missing_fields": ["cai"], "active_range": active_range, "message": "El rango fiscal activo no tiene CAI."}
+    if active_range.expiration_date < today:
+        return {"ready": False, "status": "expired_range", "missing_fields": [], "active_range": active_range, "message": READINESS_MESSAGES["expired_range"]}
+    if active_range.is_exhausted or active_range.current_number > active_range.end_number:
+        return {"ready": False, "status": "exhausted_range", "missing_fields": [], "active_range": active_range, "message": READINESS_MESSAGES["exhausted_range"]}
+    return {"ready": True, "status": "ready", "missing_fields": [], "active_range": active_range, "message": READINESS_MESSAGES["ready"]}
 
 
 def get_next_fiscal_number(clinic, document_type=FiscalDocumentRange.DocumentType.INVOICE):

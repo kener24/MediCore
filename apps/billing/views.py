@@ -6,13 +6,13 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Q, Sum
 from django.http import HttpResponse
 from django.utils import timezone
-from rest_framework import status, viewsets
+from rest_framework import status, views, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.accounts.permissions import get_role_name
-from apps.billing.fiscal_services import cancel_fiscal_invoice, issue_fiscal_invoice
+from apps.billing.fiscal_services import cancel_fiscal_invoice, issue_fiscal_invoice, validate_fiscal_invoice_readiness
 from apps.billing.models import BillableService, CashMovement, CashSession, ClinicFiscalProfile, FiscalDocumentRange, Invoice, InvoiceItem, Payment
 from apps.billing.serializers import (
     BillableServiceSerializer,
@@ -49,7 +49,7 @@ from apps.notifications.services import create_notification
 
 MANAGE_ROLES = ["admin", "recepcionista", "cajero", "recepcionista_caja"]
 FISCAL_CONFIG_ROLES = ["superadmin", "admin"]
-FISCAL_ISSUE_ROLES = ["admin", "recepcionista"]
+FISCAL_ISSUE_ROLES = ["admin", "recepcionista", "recepcionista_caja", "cajero"]
 
 
 def scope(request, queryset):
@@ -83,6 +83,43 @@ def fiscal_profile_defaults(clinic):
         "phone": getattr(clinic, "telefono", "") or "",
         "email": getattr(clinic, "correo", "") or "",
     }
+
+
+def serialize_fiscal_readiness(readiness):
+    active_range = readiness.get("active_range")
+    data = {
+        "ready": readiness["ready"],
+        "status": readiness["status"],
+        "missing_fields": readiness["missing_fields"],
+        "message": readiness["message"],
+        "active_range": None,
+    }
+    if active_range:
+        data["active_range"] = FiscalDocumentRangeSerializer(active_range).data
+    return data
+
+
+class FiscalReadinessView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_clinic(self, request):
+        role = get_role_name(request.user)
+        if role == "superadmin" or request.user.is_superuser:
+            clinic_id = request.query_params.get("clinic")
+            if not clinic_id:
+                return None
+            from apps.clinics.models import Clinic
+            return Clinic.objects.filter(id=clinic_id).first()
+        return getattr(request.user, "clinica", None)
+
+    def get(self, request):
+        if not can_issue_fiscal(request.user) and not can_config_fiscal(request.user):
+            return Response({"detail": "No tienes permiso para consultar el estado fiscal."}, status=status.HTTP_403_FORBIDDEN)
+        clinic = self.get_clinic(request)
+        if not clinic:
+            return Response({"detail": "No hay clinica disponible para validar facturacion fiscal."}, status=status.HTTP_404_NOT_FOUND)
+        readiness = validate_fiscal_invoice_readiness(clinic)
+        return Response(serialize_fiscal_readiness(readiness))
 
 
 class ClinicFiscalProfileViewSet(viewsets.ViewSet):
@@ -545,7 +582,11 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             log_audit_event(request=request, clinic=invoice.clinic, action=AuditLog.Action.INVOICE, module=AuditLog.Module.BILLING, model_name="Invoice", object_id=invoice.id, object_repr=invoice.invoice_number, description=f"Error al emitir factura fiscal: {message}", status=AuditLog.Status.FAILED, severity=severity)
             return Response({"detail": message}, status=status.HTTP_400_BAD_REQUEST)
         log_audit_event(request=request, clinic=invoice.clinic, action=AuditLog.Action.INVOICE, module=AuditLog.Module.BILLING, model_name="Invoice", object_id=invoice.id, object_repr=invoice.fiscal_number, description="Factura fiscal emitida.", new_values={"fiscal_number": invoice.fiscal_number, "cai": invoice.cai, "total": str(invoice.total_amount)})
-        return Response(InvoiceDetailSerializer(invoice).data)
+        data = InvoiceDetailSerializer(invoice).data
+        data["success"] = True
+        data["invoice_id"] = invoice.id
+        data["message"] = "Factura fiscal emitida correctamente."
+        return Response(data)
 
     @action(detail=True, methods=["post"], url_path="cancel-fiscal")
     def cancel_fiscal(self, request, pk=None):

@@ -3,7 +3,7 @@ import { ArrowLeft, DollarSign, Plus, Printer, Trash2 } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
-import { addConsumptionToInvoice, addInventoryItemToInvoice, cancelFiscalInvoice, createBillableService, createCashMovement, createFiscalRange, createInvoice, createPayment, downloadBlob, getBillableServices, getBillingStats, getCashSessions, getCurrentCashSession, getFiscalInvoicePdf, getFiscalProfile, getFiscalRanges, getInvoice, getInvoicePayments, getInvoicePrintData, getInvoices, getMyInvoices, getMyPayments, getPayments, getPendingConsumptions, getTodayInvoiceSummary, getTodayInvoices, issueFiscalInvoice, openCashSession, closeCashSession, updateFiscalProfile, updateFiscalRange, voidInvoice } from "../../api/billingApi";
+import { addConsumptionToInvoice, addInventoryItemToInvoice, cancelFiscalInvoice, createBillableService, createCashMovement, createFiscalRange, createInvoice, createPayment, downloadBlob, getBillableServices, getBillingStats, getCashSessions, getCurrentCashSession, getFiscalInvoicePdf, getFiscalProfile, getFiscalRanges, getFiscalReadiness, getInvoice, getInvoicePayments, getInvoicePrintData, getInvoices, getMyInvoices, getMyPayments, getPayments, getPendingConsumptions, getTodayInvoiceSummary, getTodayInvoices, issueFiscalInvoice, openCashSession, closeCashSession, updateFiscalProfile, updateFiscalRange, voidInvoice } from "../../api/billingApi";
 import { getInventoryItems } from "../../api/inventoryApi";
 import { getErrorMessage } from "../../api/axios";
 import { getPatients } from "../../api/patientsApi";
@@ -805,11 +805,21 @@ export function InvoiceDetailPage() {
 
   async function issueFiscal() {
     if (!invoice) return;
+    try {
+      const readiness = await getFiscalReadiness();
+      if (!readiness.ready) {
+        toast.error(readiness.message || "La clinica no esta lista para emitir facturas fiscales.");
+        return;
+      }
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+      return;
+    }
     if (!window.confirm("Despues de emitir la factura fiscal no podras modificarla. Deseas continuar?")) return;
     try {
       const updated = await issueFiscalInvoice(invoice.id);
       setInvoice(updated);
-      toast.success("Factura fiscal emitida correctamente.");
+      toast.success(updated.message || "Factura fiscal emitida correctamente.");
     } catch (e) {
       toast.error(getErrorMessage(e));
     }

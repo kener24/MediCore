@@ -4,16 +4,25 @@ Fecha: 2026-07-07
 
 Este roadmap se basa en la auditoria real del codigo actual. La regla general para todos los sprints es no duplicar modulos, no cambiar rutas/modelos sin necesidad y mantener compatibilidad con `http://kp-software.tech/api/` y luego `https://kp-software.tech/api/`.
 
-## Sprint 1 - Cierre fiscal y nota de credito
+## Sprint 1A - Cierre fiscal base
 
-- Objetivo: completar facturacion fiscal Honduras para uso controlado.
+- Objetivo: dejar funcional la base fiscal Honduras para uso controlado.
 - Modulos tocados: billing, fiscal profile, fiscal ranges, invoice, PDF fiscal, reportes fiscales.
-- Backend: implementar nota de credito fiscal real, validaciones de CAI/rango, relacion con factura original, anulacion y auditoria.
-- Web: acciones para emitir/anular/nota de credito, estados claros, mensajes de error controlados.
+- Backend: validar perfil fiscal, CAI, rango autorizado, fecha limite, correlativo, permisos, multi-clinica, PDF y auditoria.
+- Web: acciones para emitir/anular fiscal, estados claros, readiness fiscal y mensajes de error controlados.
 - Movil: solo lectura/visualizacion si aplica para paciente/caja; no crear flujo fiscal complejo inicialmente.
-- Pruebas: CAI vencido, rango agotado, correlativo unico, nota de credito, anulacion, PDF.
+- Pruebas: perfil faltante, CAI/rango faltante, rango vencido, rango agotado, correlativo unico, multi-clinica, anulacion, PDF.
 - Despliegue: migraciones y seed demo separados de produccion.
 - Riesgo: alto, requiere validacion con contador/SAR.
+
+## Sprint 1B - Nota de credito fiscal
+
+- Objetivo: implementar nota de credito fiscal real cuando el flujo sea validado por contador.
+- Modulos tocados: billing, PDF fiscal, reportes fiscales y auditoria.
+- Backend: relacion con factura original, rango CAI de nota de credito, emision segura, no reutilizar correlativos.
+- Web: accion de nota de credito, confirmaciones, PDF y estados claros.
+- Pruebas: nota de credito parcial/total, factura original, rango vencido, rango agotado y auditoria.
+- Riesgo: alto legal/fiscal; no iniciar sin validacion de contador.
 
 ## Sprint 2 - Auditoria real de acciones criticas
 
@@ -168,4 +177,3 @@ Este roadmap se basa en la auditoria real del codigo actual. La regla general pa
 - Pruebas: carga concurrente, tiempos de respuesta, errores 5xx, DB indexes.
 - Despliegue: monitoreo, logs y rollback.
 - Riesgo: alto si no se ejecuta antes de clientes reales.
-

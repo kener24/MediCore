@@ -3,7 +3,7 @@ import { ArrowLeft, DollarSign, Plus, Printer, Trash2 } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
-import { addConsumptionToInvoice, addInventoryItemToInvoice, cancelFiscalInvoice, createBillableService, createCashMovement, createFiscalRange, createInvoice, createPayment, downloadBlob, getBillableServices, getBillingStats, getCashSessions, getCurrentCashSession, getFiscalInvoicePdf, getFiscalProfile, getFiscalRanges, getFiscalReadiness, getInvoice, getInvoicePayments, getInvoicePrintData, getInvoices, getMyInvoices, getMyPayments, getPayments, getPendingConsumptions, getTodayInvoiceSummary, getTodayInvoices, issueFiscalInvoice, openCashSession, closeCashSession, updateFiscalProfile, updateFiscalRange, voidInvoice } from "../../api/billingApi";
+import { addConsumptionToInvoice, addInventoryItemToInvoice, createBillableService, createCashMovement, createFiscalRange, createInvoice, createPayment, downloadBlob, getBillableServices, getBillingStats, getCashSessions, getCreditNotePdf, getCreditNotes, getCurrentCashSession, getFiscalInvoicePdf, getFiscalProfile, getFiscalRanges, getFiscalReadiness, getInvoice, getInvoicePayments, getInvoicePrintData, getInvoices, getMyInvoices, getMyPayments, getPayments, getPendingConsumptions, getTodayInvoiceSummary, getTodayInvoices, issueFiscalInvoice, openCashSession, closeCashSession, updateFiscalProfile, updateFiscalRange, voidFiscalInvoice, voidInvoice } from "../../api/billingApi";
 import { getInventoryItems } from "../../api/inventoryApi";
 import { getErrorMessage } from "../../api/axios";
 import { getPatients } from "../../api/patientsApi";
@@ -16,7 +16,7 @@ import { Modal, ModalCloseButton } from "../../components/ui/Modal";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { StatCard } from "../../components/ui/StatCard";
 import { Table } from "../../components/ui/Table";
-import type { BillableService, BillingStats, CashSession, ClinicFiscalProfile, FiscalDocumentRange, Invoice, InvoicePrintData, Payment, TodayInvoiceSummary } from "../../types/billing";
+import type { BillableService, BillingStats, CashSession, ClinicFiscalProfile, CreditNote, FiscalDocumentRange, Invoice, InvoicePrintData, Payment, TodayInvoiceSummary } from "../../types/billing";
 import type { Patient } from "../../types/patient";
 import type { InventoryItem } from "../../types/inventory";
 import type { ClinicalSupplyUsage } from "../../types/medicalRecord";
@@ -249,6 +249,7 @@ export function FiscalSettingsPage() {
       </Card>
       <Card title="Crear rango CAI">
         <form className="grid gap-3 md:grid-cols-4" onSubmit={saveRange}>
+          <label className="block space-y-1.5"><span className="text-sm font-medium text-slate-700">Documento</span><select className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm" value={rangeForm.document_type} onChange={(e) => setRangeForm({ ...rangeForm, document_type: e.target.value, document_type_code: e.target.value === "credit_note" ? "04" : "01" })}><option value="invoice">Factura</option><option value="credit_note">Nota de credito</option><option value="debit_note">Nota de debito</option><option value="receipt">Recibo</option></select></label>
           <FiscalInput label="CAI" value={rangeForm.cai} onChange={(v) => setRangeForm({ ...rangeForm, cai: v })} />
           <FiscalInput label="Establecimiento" value={rangeForm.establishment_code} onChange={(v) => setRangeForm({ ...rangeForm, establishment_code: v.replace(/\D/g, "").slice(0, 3) })} />
           <FiscalInput label="Punto emision" value={rangeForm.emission_point_code} onChange={(v) => setRangeForm({ ...rangeForm, emission_point_code: v.replace(/\D/g, "").slice(0, 3) })} />
@@ -277,6 +278,63 @@ export function FiscalSettingsPage() {
 
 function FiscalInput({ label, value, onChange, type = "text" }: { label: string; value: string | number | null | undefined; onChange: (value: string) => void; type?: string }) {
   return <label className="block space-y-1.5"><span className="text-sm font-medium text-slate-700">{label}</span><input className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm" type={type} value={value ?? ""} onChange={(e) => onChange(e.target.value)} /></label>;
+}
+
+export function CreditNotesPage() {
+  const [items, setItems] = useState<CreditNote[]>([]);
+  const [filters, setFilters] = useState({ search: "", date_from: "", date_to: "", status: "" });
+
+  async function load() {
+    try {
+      const params = Object.fromEntries(Object.entries(filters).filter(([, value]) => value));
+      setItems(await getCreditNotes(params));
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+    }
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function downloadPdf(note: CreditNote) {
+    try {
+      const blob = await getCreditNotePdf(note.id);
+      downloadBlob(blob, `nota-credito-${note.fiscal_number}.pdf`);
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Notas de credito" description="Documentos fiscales relacionados con anulaciones de facturas." />
+      <Card>
+        <form className="grid gap-3 md:grid-cols-[1fr_160px_160px_160px_auto]" onSubmit={(e) => { e.preventDefault(); load(); }}>
+          <input className="h-10 rounded-md border px-3 text-sm" placeholder="Buscar numero, factura o paciente" value={filters.search} onChange={(e) => setFilters({ ...filters, search: e.target.value })} />
+          <input className="h-10 rounded-md border px-3 text-sm" type="date" value={filters.date_from} onChange={(e) => setFilters({ ...filters, date_from: e.target.value })} />
+          <input className="h-10 rounded-md border px-3 text-sm" type="date" value={filters.date_to} onChange={(e) => setFilters({ ...filters, date_to: e.target.value })} />
+          <select className="h-10 rounded-md border px-3 text-sm" value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
+            <option value="">Todos</option>
+            <option value="issued">Emitida</option>
+            <option value="cancelled">Anulada</option>
+            <option value="voided">Void</option>
+          </select>
+          <Button>Filtrar</Button>
+        </form>
+      </Card>
+      <Card title="Listado">
+        <Table data={items} columns={[
+          { key: "number", header: "Numero", render: (i) => i.fiscal_number },
+          { key: "invoice", header: "Factura", render: (i) => i.original_invoice_fiscal_number || i.original_invoice_number || "-" },
+          { key: "patient", header: "Paciente", render: (i) => i.patient_nombre || "-" },
+          { key: "date", header: "Fecha", render: (i) => i.issue_date },
+          { key: "total", header: "Total", render: (i) => money(i.total_amount) },
+          { key: "status", header: "Estado", render: (i) => i.status },
+          { key: "user", header: "Emitida por", render: (i) => i.issued_by_nombre || "-" },
+          { key: "actions", header: "Acciones", render: (i) => <Button variant="outline" onClick={() => downloadPdf(i)}>PDF</Button> },
+        ]} />
+      </Card>
+    </div>
+  );
 }
 
 export function InvoicesPage({ patientOnly = false }: { patientOnly?: boolean }) {
@@ -754,6 +812,8 @@ export function InvoiceDetailPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [error, setError] = useState("");
   const [paying, setPaying] = useState(false);
+  const [voidingFiscal, setVoidingFiscal] = useState(false);
+  const [voidReason, setVoidReason] = useState("");
   const [payment, setPayment] = useState({ amount: "", method: "efectivo", reference: "", notes: "" });
   const navigate = useNavigate();
 
@@ -825,14 +885,21 @@ export function InvoiceDetailPage() {
     }
   }
 
-  async function cancelFiscal() {
+  async function cancelFiscal(e?: FormEvent) {
+    e?.preventDefault();
     if (!invoice) return;
-    const reason = window.prompt("Motivo de anulacion fiscal");
-    if (!reason) return;
+    const reason = voidReason.trim();
+    if (!reason) {
+      toast.error("El motivo de anulacion fiscal es obligatorio.");
+      return;
+    }
     try {
-      const updated = await cancelFiscalInvoice(invoice.id, reason);
+      const updated = await voidFiscalInvoice(invoice.id, reason);
       setInvoice(updated);
-      toast.success("Factura fiscal anulada correctamente.");
+      setVoidingFiscal(false);
+      setVoidReason("");
+      toast.success(updated.message || "Factura fiscal anulada correctamente.");
+      if (updated.payment_warning) toast.warning(updated.payment_warning);
     } catch (e) {
       toast.error(getErrorMessage(e));
     }
@@ -848,12 +915,23 @@ export function InvoiceDetailPage() {
     }
   }
 
+  async function creditNotePdf() {
+    const note = invoice?.related_credit_note;
+    if (!note) return;
+    try {
+      const blob = await getCreditNotePdf(note.id);
+      downloadBlob(blob, `nota-credito-${note.fiscal_number}.pdf`);
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+    }
+  }
+
   if (error) return <EmptyState title="No se pudo cargar la factura." description={error} />;
   if (!invoice) return <Loader label="Cargando factura..." />;
 
   return (
     <div className="space-y-6">
-      <PageHeader title={`Factura ${invoice.invoice_number}`} description={invoice.patient_nombre || "Detalle de factura"} actions={<div className="flex flex-wrap gap-2"><Link className="inline-flex h-10 items-center rounded-md border px-4 text-sm font-semibold text-slate-700" to="/clinic/billing/invoices">Volver</Link><Link className="inline-flex h-10 items-center rounded-md border px-4 text-sm font-semibold text-slate-700" to={`/clinic/billing/invoices/${invoice.id}/print`}>Imprimir</Link>{invoice.fiscal_status === "issued" ? <Button variant="outline" onClick={fiscalPdf}>PDF fiscal</Button> : null}{invoice.fiscal_status === "draft" ? <Button onClick={issueFiscal}>Emitir fiscal</Button> : null}{invoice.fiscal_status === "issued" ? <Button variant="danger" onClick={cancelFiscal}>Anular fiscal</Button> : null}{Number(invoice.balance_due) > 0 && invoice.status !== "anulada" ? <Button onClick={() => { setPaying(true); setPayment({ amount: invoice.balance_due, method: "efectivo", reference: "", notes: "" }); }}>Registrar pago</Button> : null}</div>} />
+      <PageHeader title={`Factura ${invoice.invoice_number}`} description={invoice.patient_nombre || "Detalle de factura"} actions={<div className="flex flex-wrap gap-2"><Link className="inline-flex h-10 items-center rounded-md border px-4 text-sm font-semibold text-slate-700" to="/clinic/billing/invoices">Volver</Link><Link className="inline-flex h-10 items-center rounded-md border px-4 text-sm font-semibold text-slate-700" to={`/clinic/billing/invoices/${invoice.id}/print`}>Imprimir</Link>{invoice.fiscal_status === "issued" ? <Button variant="outline" onClick={fiscalPdf}>PDF fiscal</Button> : null}{invoice.related_credit_note ? <Button variant="outline" onClick={creditNotePdf}>PDF nota de credito</Button> : null}{invoice.fiscal_status === "draft" ? <Button onClick={issueFiscal}>Emitir fiscal</Button> : null}{invoice.fiscal_status === "issued" ? <Button variant="danger" onClick={() => setVoidingFiscal(true)}>Anular fiscal</Button> : null}{Number(invoice.balance_due) > 0 && invoice.status !== "anulada" ? <Button onClick={() => { setPaying(true); setPayment({ amount: invoice.balance_due, method: "efectivo", reference: "", notes: "" }); }}>Registrar pago</Button> : null}</div>} />
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard label="Total" value={money(invoice.total_amount)} icon={<DollarSign className="h-5 w-5" />} />
         <StatCard label="Pagado" value={money(invoice.paid_amount)} icon={<DollarSign className="h-5 w-5" />} />
@@ -868,7 +946,9 @@ export function InvoiceDetailPage() {
           <p><b>CAI:</b> {invoice.cai || "-"}</p>
           <p><b>Rango:</b> {invoice.fiscal_range_start ? `${invoice.fiscal_range_start} a ${invoice.fiscal_range_end}` : "-"}</p>
           <p><b>Fecha limite:</b> {invoice.fiscal_expiration_date || "-"}</p>
+          {invoice.related_credit_note ? <p><b>Nota de credito:</b> {invoice.related_credit_note.fiscal_number}</p> : null}
         </div>
+        {invoice.related_credit_note ? <p className="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-800">Factura anulada fiscalmente mediante nota de credito. La factura original se conserva para trazabilidad.</p> : null}
       </Card>
       <Card title="Datos de factura" actions={invoice.status !== "anulada" && Number(invoice.paid_amount) <= 0 ? <Button variant="danger" onClick={cancelInvoice}>Anular</Button> : null}>
         <div className="grid gap-3 text-sm md:grid-cols-3">
@@ -894,6 +974,13 @@ export function InvoiceDetailPage() {
           <label className="block space-y-1.5"><span className="text-sm font-medium text-slate-700">Metodo</span><select className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm" required value={payment.method} onChange={(e) => setPayment({ ...payment, method: e.target.value })}><option value="efectivo">Efectivo</option><option value="tarjeta">Tarjeta</option><option value="transferencia">Transferencia</option><option value="deposito">Deposito</option><option value="cheque">Cheque</option><option value="otro">Otro</option></select></label>
           <label className="block space-y-1.5"><span className="text-sm font-medium text-slate-700">Referencia</span><input className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm" value={payment.reference} onChange={(e) => setPayment({ ...payment, reference: e.target.value })} /></label>
           <label className="block space-y-1.5"><span className="text-sm font-medium text-slate-700">Notas</span><textarea className="min-h-24 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" value={payment.notes} onChange={(e) => setPayment({ ...payment, notes: e.target.value })} /></label>
+        </form>
+      </Modal>
+      <Modal open={voidingFiscal} title="Anular factura fiscal" onClose={() => setVoidingFiscal(false)} actions={<><ModalCloseButton onClick={() => setVoidingFiscal(false)} /><Button form="invoice-fiscal-void-form" type="submit" variant="danger">Generar nota de credito</Button></>}>
+        <form id="invoice-fiscal-void-form" className="space-y-4" onSubmit={cancelFiscal}>
+          <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">Esta accion no elimina la factura original. Se generara una nota de credito relacionada y no se reutilizara el numero fiscal.</p>
+          {Number(invoice.paid_amount) > 0 ? <p className="rounded-md bg-rose-50 p-3 text-sm text-rose-700">La factura tiene pagos aplicados. La devolucion debe gestionarse manualmente.</p> : null}
+          <label className="block space-y-1.5"><span className="text-sm font-medium text-slate-700">Motivo de anulacion</span><textarea className="min-h-28 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" required value={voidReason} onChange={(e) => setVoidReason(e.target.value)} /></label>
         </form>
       </Modal>
     </div>

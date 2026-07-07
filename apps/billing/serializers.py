@@ -6,7 +6,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from apps.accounts.permissions import get_role_name
-from apps.billing.models import BillableService, CashMovement, CashSession, ClinicFiscalProfile, FiscalDocumentRange, Invoice, InvoiceItem, Payment, clean_rtn
+from apps.billing.models import BillableService, CashMovement, CashSession, ClinicFiscalProfile, CreditNote, FiscalDocumentRange, Invoice, InvoiceItem, Payment, clean_rtn
 from apps.inventory.models import InventoryItem, InventoryLot, InventoryMovement
 from apps.medical_records.models import ClinicalSupplyUsage
 
@@ -114,13 +114,70 @@ class PaymentListSerializer(serializers.ModelSerializer):
         fields = ["id", "clinic", "invoice", "invoice_number", "patient", "patient_nombre", "cash_session", "payment_number", "payment_date", "amount", "method", "reference", "notes", "status", "received_by", "received_by_nombre", "active", "creado_en", "actualizado_en"]
 
 
+class CreditNoteSerializer(serializers.ModelSerializer):
+    clinic_nombre = serializers.CharField(source="clinic.nombre", read_only=True)
+    original_invoice_number = serializers.CharField(source="original_invoice.invoice_number", read_only=True)
+    original_invoice_fiscal_number = serializers.CharField(source="original_invoice.fiscal_number", read_only=True)
+    patient = serializers.IntegerField(source="original_invoice.patient_id", read_only=True)
+    patient_nombre = serializers.CharField(source="original_invoice.patient.nombre_completo", read_only=True)
+    issued_by_nombre = serializers.CharField(source="issued_by.nombre_completo", read_only=True)
+
+    class Meta:
+        model = CreditNote
+        fields = [
+            "id",
+            "clinic",
+            "clinic_nombre",
+            "original_invoice",
+            "original_invoice_number",
+            "original_invoice_fiscal_number",
+            "patient",
+            "patient_nombre",
+            "credit_note_number",
+            "fiscal_number",
+            "cai",
+            "fiscal_range_start",
+            "fiscal_range_end",
+            "fiscal_expiration_date",
+            "issue_date",
+            "issue_datetime",
+            "reason",
+            "subtotal",
+            "discount_amount",
+            "tax_amount",
+            "total_amount",
+            "subtotal_exempt",
+            "subtotal_exonerated",
+            "subtotal_taxed_15",
+            "subtotal_taxed_18",
+            "isv_15",
+            "isv_18",
+            "amount_in_words",
+            "status",
+            "issued_by",
+            "issued_by_nombre",
+            "cancelled_by",
+            "cancelled_at",
+            "notes",
+            "active",
+            "creado_en",
+            "actualizado_en",
+        ]
+        read_only_fields = fields
+
+
 class InvoiceDetailSerializer(InvoiceListSerializer):
     items = InvoiceItemSerializer(many=True, read_only=True)
     payments = PaymentListSerializer(many=True, read_only=True)
+    related_credit_note = serializers.SerializerMethodField()
     created_by_nombre = serializers.CharField(source="created_by.nombre_completo", read_only=True)
 
     class Meta(InvoiceListSerializer.Meta):
-        fields = InvoiceListSerializer.Meta.fields + ["notes", "created_by", "created_by_nombre", "cancelled_by", "cancelled_at", "cancellation_reason", "fiscal_range_start", "fiscal_range_end", "emitter_rtn", "emitter_legal_name", "emitter_commercial_name", "emitter_address", "customer_name", "customer_rtn", "customer_address", "issue_datetime", "total", "amount_in_words", "items", "payments"]
+        fields = InvoiceListSerializer.Meta.fields + ["notes", "created_by", "created_by_nombre", "cancelled_by", "cancelled_at", "cancellation_reason", "fiscal_range_start", "fiscal_range_end", "emitter_rtn", "emitter_legal_name", "emitter_commercial_name", "emitter_address", "customer_name", "customer_rtn", "customer_address", "issue_datetime", "total", "amount_in_words", "related_credit_note", "items", "payments"]
+
+    def get_related_credit_note(self, obj):
+        note = obj.credit_notes.filter(active=True).order_by("-issue_datetime").first()
+        return CreditNoteSerializer(note).data if note else None
 
 
 class InvoiceCreateSerializer(serializers.ModelSerializer):

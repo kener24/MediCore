@@ -44,6 +44,6 @@ Esta implementacion es una base tecnica. Antes de usarla para facturacion real d
 
 ## Pendiente Sprint 1B
 
-- Nota de credito fiscal.
 - Politica final de anulacion segun asesor fiscal.
+- Flujo formal de reembolso o saldo a favor.
 - Validacion de formatos fiscales finales por contador.

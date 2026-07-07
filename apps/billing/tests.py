@@ -20,6 +20,7 @@ class BillingModuleTests(APITestCase):
         self.other_clinic = Clinic.objects.create(nombre="Otra")
         self.admin = User.objects.create_user(email="admin@x.com", password="x", role=self.roles["admin"], clinica=self.clinic)
         self.rec = User.objects.create_user(email="rec@x.com", password="x", role=self.roles["recepcionista"], clinica=self.clinic)
+        self.doctor_user = User.objects.create_user(email="doc@x.com", password="x", role=self.roles["medico"], clinica=self.clinic)
         self.patient_user = User.objects.create_user(email="pat@x.com", password="x", role=self.roles["paciente"], clinica=self.clinic)
         self.other_patient_user = User.objects.create_user(email="pat2@x.com", password="x", role=self.roles["paciente"], clinica=self.other_clinic)
         self.patient = Patient.objects.create(clinic=self.clinic, user=self.patient_user, nombres="Juan", apellidos="Perez")
@@ -45,14 +46,14 @@ class BillingModuleTests(APITestCase):
             is_fiscal_billing_enabled=True,
         )
 
-    def fiscal_range(self, start=1, end=10, current=1, expiration=None):
+    def fiscal_range(self, start=1, end=10, current=1, expiration=None, document_type=FiscalDocumentRange.DocumentType.INVOICE, document_type_code="01"):
         return FiscalDocumentRange.objects.create(
             clinic=self.clinic,
-            document_type=FiscalDocumentRange.DocumentType.INVOICE,
+            document_type=document_type,
             cai="DEMO-CAI-NO-VALIDO",
             establishment_code="000",
             emission_point_code="001",
-            document_type_code="01",
+            document_type_code=document_type_code,
             start_number=start,
             end_number=end,
             current_number=current,
@@ -60,6 +61,9 @@ class BillingModuleTests(APITestCase):
             expiration_date=expiration or timezone.localdate() + timedelta(days=30),
             is_active=True,
         )
+
+    def credit_note_range(self, start=1, end=10, current=1, expiration=None):
+        return self.fiscal_range(start=start, end=end, current=current, expiration=expiration, document_type=FiscalDocumentRange.DocumentType.CREDIT_NOTE, document_type_code="04")
 
     def other_invoice(self):
         inv = Invoice.objects.create(patient=self.other_patient)
@@ -361,6 +365,7 @@ class BillingModuleTests(APITestCase):
     def test_anular_factura_fiscal_no_reutiliza_numero(self):
         self.fiscal_profile()
         self.fiscal_range()
+        self.credit_note_range()
         inv = self.invoice()
         self.auth(self.rec)
         self.client.post(f"/api/billing/invoices/{inv.id}/issue-fiscal/", {}, format="json")
@@ -369,6 +374,98 @@ class BillingModuleTests(APITestCase):
         new_inv = self.invoice()
         issue = self.client.post(f"/api/billing/invoices/{new_inv.id}/issue-fiscal/", {}, format="json")
         self.assertEqual(issue.data["fiscal_number"], "000-001-01-00000002")
+
+    def test_void_fiscal_genera_nota_credito_y_mantiene_factura_original(self):
+        self.fiscal_profile()
+        invoice_range = self.fiscal_range()
+        credit_range = self.credit_note_range()
+        inv = self.invoice()
+        self.auth(self.rec)
+        self.client.post(f"/api/billing/invoices/{inv.id}/issue-fiscal/", {}, format="json")
+        inv.refresh_from_db()
+        original_number = inv.fiscal_number
+        original_cai = inv.cai
+        res = self.client.post(f"/api/billing/invoices/{inv.id}/void-fiscal/", {"reason": "Error en datos del cliente"}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["credit_note_number"], "000-001-04-00000001")
+        inv.refresh_from_db()
+        invoice_range.refresh_from_db()
+        credit_range.refresh_from_db()
+        note = inv.credit_notes.get()
+        self.assertEqual(inv.fiscal_status, Invoice.FiscalStatus.CANCELLED)
+        self.assertEqual(inv.fiscal_number, original_number)
+        self.assertEqual(inv.cai, original_cai)
+        self.assertEqual(note.fiscal_number, "000-001-04-00000001")
+        self.assertEqual(note.total_amount, inv.total_amount)
+        self.assertEqual(invoice_range.current_number, 2)
+        self.assertEqual(credit_range.current_number, 2)
+
+    def test_void_fiscal_valida_motivo_estado_permiso_y_rango_credito(self):
+        self.fiscal_profile()
+        self.fiscal_range()
+        inv = self.invoice()
+        self.auth(self.rec)
+        non_fiscal = self.client.post(f"/api/billing/invoices/{inv.id}/void-fiscal/", {"reason": "x"}, format="json")
+        self.assertEqual(non_fiscal.status_code, status.HTTP_400_BAD_REQUEST)
+        self.client.post(f"/api/billing/invoices/{inv.id}/issue-fiscal/", {}, format="json")
+        no_reason = self.client.post(f"/api/billing/invoices/{inv.id}/void-fiscal/", {"reason": ""}, format="json")
+        self.assertEqual(no_reason.status_code, status.HTTP_400_BAD_REQUEST)
+        no_range = self.client.post(f"/api/billing/invoices/{inv.id}/void-fiscal/", {"reason": "Error"}, format="json")
+        self.assertEqual(no_range.status_code, status.HTTP_400_BAD_REQUEST)
+        self.credit_note_range(expiration=timezone.localdate() - timedelta(days=1))
+        expired = self.client.post(f"/api/billing/invoices/{inv.id}/void-fiscal/", {"reason": "Error"}, format="json")
+        self.assertEqual(expired.status_code, status.HTTP_400_BAD_REQUEST)
+        FiscalDocumentRange.objects.filter(document_type=FiscalDocumentRange.DocumentType.CREDIT_NOTE).delete()
+        self.credit_note_range(start=1, end=1, current=1)
+        ok = self.client.post(f"/api/billing/invoices/{inv.id}/void-fiscal/", {"reason": "Error"}, format="json")
+        self.assertEqual(ok.status_code, status.HTTP_200_OK)
+        again = self.client.post(f"/api/billing/invoices/{inv.id}/void-fiscal/", {"reason": "Otra"}, format="json")
+        self.assertEqual(again.status_code, status.HTTP_400_BAD_REQUEST)
+
+        second = self.invoice()
+        self.client.post(f"/api/billing/invoices/{second.id}/issue-fiscal/", {}, format="json")
+        exhausted = self.client.post(f"/api/billing/invoices/{second.id}/void-fiscal/", {"reason": "Error"}, format="json")
+        self.assertEqual(exhausted.status_code, status.HTTP_400_BAD_REQUEST)
+
+        self.auth(self.doctor_user)
+        denied = self.client.post(f"/api/billing/invoices/{second.id}/void-fiscal/", {"reason": "Error"}, format="json")
+        self.assertEqual(denied.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_void_fiscal_no_cruza_clinicas_y_no_borra_pagos(self):
+        self.fiscal_profile()
+        self.fiscal_range()
+        self.credit_note_range()
+        inv = self.invoice()
+        Payment.objects.create(invoice=inv, amount=Decimal("100.00"), received_by=self.rec)
+        self.auth(self.rec)
+        self.client.post(f"/api/billing/invoices/{inv.id}/issue-fiscal/", {}, format="json")
+        res = self.client.post(f"/api/billing/invoices/{inv.id}/void-fiscal/", {"reason": "Error"}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn("payment_warning", res.data)
+        self.assertEqual(inv.payments.filter(active=True).count(), 1)
+
+        other = self.other_invoice()
+        foreign = self.client.post(f"/api/billing/invoices/{other.id}/void-fiscal/", {"reason": "Error"}, format="json")
+        self.assertEqual(foreign.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_credit_note_listado_y_pdf_respetan_clinica(self):
+        self.fiscal_profile()
+        self.fiscal_range()
+        self.credit_note_range()
+        inv = self.invoice()
+        self.auth(self.rec)
+        self.client.post(f"/api/billing/invoices/{inv.id}/issue-fiscal/", {}, format="json")
+        response = self.client.post(f"/api/billing/invoices/{inv.id}/void-fiscal/", {"reason": "Error"}, format="json")
+        note_id = response.data["credit_note_id"]
+        listing = self.client.get("/api/billing/credit-notes/")
+        self.assertEqual(listing.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(listing.data), 1)
+        pdf = self.client.get(f"/api/billing/credit-notes/{note_id}/pdf/")
+        self.assertEqual(pdf.status_code, status.HTTP_200_OK)
+        self.assertEqual(pdf["Content-Type"], "application/pdf")
+
+        other_note_pdf = self.client.get("/api/billing/credit-notes/9999/pdf/")
+        self.assertEqual(other_note_pdf.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_caja_abrir_doble_y_cerrar(self):
         self.auth(self.rec)

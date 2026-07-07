@@ -58,5 +58,32 @@ No se crearon modelos duplicados.
 
 - La configuracion fiscal debe ser validada por contador o asesor fiscal hondureno antes de uso real.
 - Los textos fiscales/leyendas deben configurarse por clinica; el sistema no inventa textos legales.
-- Sprint 1B queda para nota de credito/anulacion fiscal avanzada si el contador la solicita.
 - Se recomienda probar en MySQL productivo con concurrencia real antes de operar facturacion fiscal masiva.
+
+## Estado de anulacion fiscal y nota de credito
+
+Sprint 1B agrego un flujo controlado de anulacion fiscal mediante nota de credito.
+
+Existe:
+
+- `Invoice` conserva numero fiscal, CAI, rango y fecha original.
+- `FiscalDocumentRange` ya soportaba `credit_note`, por lo que se reutilizo para correlativos de nota de credito.
+- `CreditNote` registra documento fiscal relacionado con la factura original.
+- `POST /api/billing/invoices/{id}/void-fiscal/` anula fiscalmente y genera nota de credito.
+- `GET /api/billing/credit-notes/` lista notas de credito por clinica.
+- `GET /api/billing/credit-notes/{id}/pdf/` descarga PDF seguro.
+- Portal paciente expone estado de factura anulada y PDF seguro de la nota.
+
+Decisiones tecnicas:
+
+- No se borra la factura original.
+- No se modifica el numero fiscal ni CAI original.
+- La nota de credito usa rango fiscal `credit_note`.
+- La anulacion requiere motivo obligatorio.
+- Pagos aplicados se conservan; la devolucion queda como gestion manual pendiente.
+- `cancel-fiscal` se mantiene como alias compatible, pero usa el flujo nuevo con nota de credito.
+
+Riesgos:
+
+- El flujo debe revisarse con contador hondureno antes de uso fiscal real.
+- Queda pendiente un modulo formal de devoluciones/saldos a favor.

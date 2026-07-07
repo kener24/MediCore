@@ -1,5 +1,5 @@
 import api from "./axios";
-import type { BillableService, BillingStats, CashMovement, CashSession, ClinicFiscalProfile, FiscalDocumentRange, FiscalReadiness, Invoice, InvoiceItem, InvoicePrintData, Payment, TodayInvoiceSummary } from "../types/billing";
+import type { BillableService, BillingStats, CashMovement, CashSession, ClinicFiscalProfile, CreditNote, FiscalDocumentRange, FiscalReadiness, Invoice, InvoiceItem, InvoicePrintData, Payment, TodayInvoiceSummary } from "../types/billing";
 import type { ClinicalSupplyUsage } from "../types/medicalRecord";
 
 export async function getBillableServices(filters?: Record<string, string>) { const { data } = await api.get<BillableService[]>("/billing/services/", { params: filters }); return data; }
@@ -20,6 +20,10 @@ export async function updateInvoice(id: number | string, payload: Partial<Invoic
 export async function voidInvoice(id: number | string, reason: string) { const { data } = await api.patch<Invoice>(`/billing/invoices/${id}/void/`, { reason }); return data; }
 export async function issueFiscalInvoice(id: number | string) { const { data } = await api.post<Invoice>(`/billing/invoices/${id}/issue-fiscal/`, { confirm: true }); return data; }
 export async function cancelFiscalInvoice(id: number | string, reason: string) { const { data } = await api.post<Invoice>(`/billing/invoices/${id}/cancel-fiscal/`, { reason }); return data; }
+export async function voidFiscalInvoice(id: number | string, reason: string) { const { data } = await api.post<Invoice>(`/billing/invoices/${id}/void-fiscal/`, { reason }); return data; }
+export async function getCreditNotes(filters?: Record<string, string>) { const { data } = await api.get<CreditNote[]>("/billing/credit-notes/", { params: filters }); return data; }
+export async function getCreditNote(id: number | string) { const { data } = await api.get<CreditNote>(`/billing/credit-notes/${id}/`); return data; }
+export async function getCreditNotePdf(id: number | string) { const { data } = await api.get<Blob>(`/billing/credit-notes/${id}/pdf/`, { responseType: "blob" }); return data; }
 export async function createInvoiceItem(invoiceId: number | string, payload: Partial<InvoiceItem>) { const { data } = await api.post<InvoiceItem>(`/billing/invoices/${invoiceId}/items/`, payload); return data; }
 export async function getInvoicePayments(invoiceId: number | string) { const { data } = await api.get<Payment[]>(`/billing/invoices/${invoiceId}/payments/`); return data; }
 export async function getPendingConsumptions(filters?: Record<string, string>) { const { data } = await api.get<ClinicalSupplyUsage[]>("/billing/pending-consumptions/", { params: filters }); return data; }

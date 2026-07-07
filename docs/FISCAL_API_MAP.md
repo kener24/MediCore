@@ -18,9 +18,19 @@ Fecha: 2026-07-07
 | Metodo | Endpoint | Uso |
 | --- | --- | --- |
 | POST | `/api/billing/invoices/{id}/issue-fiscal/` | Emitir factura fiscal. |
-| POST | `/api/billing/invoices/{id}/cancel-fiscal/` | Anular factura fiscal emitida. |
+| POST | `/api/billing/invoices/{id}/void-fiscal/` | Anular factura fiscal emitida mediante nota de credito. |
+| POST | `/api/billing/invoices/{id}/cancel-fiscal/` | Alias compatible para anulacion fiscal mediante nota de credito. |
 | GET | `/api/billing/invoices/{id}/fiscal-print-data/` | Obtener datos fiscales para impresion. |
 | GET | `/api/billing/invoices/{id}/fiscal-pdf/` | Descargar PDF fiscal. |
+
+## Notas de credito
+
+| Metodo | Endpoint | Uso |
+| --- | --- | --- |
+| GET | `/api/billing/credit-notes/` | Listar notas de credito de la clinica. |
+| GET | `/api/billing/credit-notes/{id}/` | Ver detalle de nota de credito. |
+| GET | `/api/billing/credit-notes/{id}/pdf/` | Descargar PDF de nota de credito. |
+| GET | `/api/patient-portal/credit-notes/{id}/pdf/` | Descargar PDF de nota de credito del paciente autenticado. |
 
 ## Respuesta de readiness
 

@@ -11,8 +11,9 @@ from rest_framework.views import APIView
 from apps.accounts.permissions import get_role_name
 from apps.appointments.models import Appointment
 from apps.appointments.serializers import AppointmentDetailSerializer, AppointmentListSerializer, build_availability
-from apps.billing.models import Invoice, Payment
+from apps.billing.models import CreditNote, Invoice, Payment
 from apps.billing.serializers import InvoiceDetailSerializer, InvoiceListSerializer, PaymentDetailSerializer, PaymentListSerializer
+from apps.billing.views import render_credit_note_pdf
 from apps.clinic_settings.models import get_or_create_clinic_settings
 from apps.doctors.models import DoctorProfile, MedicalSpecialty
 from apps.medical_records.models import ClinicalConsultation, MedicalRecord
@@ -293,16 +294,33 @@ class PatientPortalMedicalOrdersView(PatientPortalBaseView):
 class PatientPortalInvoicesView(PatientPortalBaseView):
     serializer_class = InvoiceListSerializer
 
+    def add_credit_note_status(self, item):
+        note = item.credit_notes.filter(active=True).order_by("-issue_datetime").first()
+        return {
+            "is_voided": item.fiscal_status == Invoice.FiscalStatus.CANCELLED,
+            "related_credit_note_id": note.id if note else None,
+            "related_credit_note_number": note.fiscal_number if note else None,
+            "void_reason": item.cancellation_reason if item.fiscal_status == Invoice.FiscalStatus.CANCELLED else "",
+            "credit_note_pdf_url": f"/api/patient-portal/credit-notes/{note.id}/pdf/" if note else "",
+        }
+
     def get(self, request, invoice_id=None):
         if not self.clinic_settings.allow_patient_invoice_view:
             return portal_denied()
-        qs = Invoice.objects.filter(patient=self.patient, active=True).select_related("clinic", "patient")
+        qs = Invoice.objects.filter(patient=self.patient, active=True).select_related("clinic", "patient").prefetch_related("credit_notes")
         if invoice_id:
             item = qs.filter(id=invoice_id).first()
             if not item:
                 return Response({"detail": "Factura no encontrada."}, status=status.HTTP_404_NOT_FOUND)
-            return Response(InvoiceDetailSerializer(item).data)
-        return Response(InvoiceListSerializer(qs, many=True).data)
+            data = InvoiceDetailSerializer(item).data
+            data.update(self.add_credit_note_status(item))
+            return Response(data)
+        data = []
+        for item in qs:
+            serialized = InvoiceListSerializer(item).data
+            serialized.update(self.add_credit_note_status(item))
+            data.append(serialized)
+        return Response(data)
 
 
 class PatientPortalPaymentsView(PatientPortalBaseView):
@@ -374,6 +392,23 @@ class PatientPortalInvoiceFiscalPdfView(PatientPortalBaseView):
         doc.build(story)
         response = HttpResponse(stream.getvalue(), content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="factura-fiscal-{invoice.fiscal_number}.pdf"'
+        return response
+
+
+class PatientPortalCreditNotePdfView(PatientPortalBaseView):
+    def get(self, request, credit_note_id):
+        if not self.clinic_settings.allow_patient_invoice_view:
+            return portal_denied()
+        credit_note = (
+            CreditNote.objects.filter(id=credit_note_id, original_invoice__patient=self.patient, active=True)
+            .select_related("clinic", "original_invoice__patient", "issued_by")
+            .prefetch_related("original_invoice__items")
+            .first()
+        )
+        if not credit_note:
+            return Response({"detail": "Nota de credito no encontrada."}, status=status.HTTP_404_NOT_FOUND)
+        response = HttpResponse(render_credit_note_pdf(credit_note, request), content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="nota-credito-{credit_note.fiscal_number}.pdf"'
         return response
 
 

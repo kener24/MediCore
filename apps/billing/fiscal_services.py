@@ -5,7 +5,8 @@ from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
 
-from apps.billing.models import ClinicFiscalProfile, FiscalDocumentRange, Invoice, InvoiceItem, clean_rtn, format_fiscal_number, money
+from apps.billing.models import ClinicFiscalProfile, CreditNote, FiscalDocumentRange, Invoice, InvoiceItem, clean_rtn, format_fiscal_number, money
+from apps.clinic_settings.utils import clinic_prefix, next_sequence_number
 
 
 READINESS_MESSAGES = {
@@ -203,14 +204,63 @@ def issue_fiscal_invoice(invoice, user):
 
 @transaction.atomic
 def cancel_fiscal_invoice(invoice, user, reason):
-    invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
+    credit_note = void_fiscal_invoice_with_credit_note(invoice, user, reason)
+    return credit_note.original_invoice
+
+
+@transaction.atomic
+def void_fiscal_invoice_with_credit_note(invoice, user, reason):
+    reason = (reason or "").strip()
+    if not reason:
+        raise ValidationError("El motivo de anulacion fiscal es obligatorio.")
+
+    invoice = (
+        Invoice.objects.select_for_update()
+        .select_related("clinic", "patient")
+        .prefetch_related("items", "payments")
+        .get(pk=invoice.pk)
+    )
+    if not invoice.is_fiscal or not invoice.fiscal_number:
+        raise ValidationError("Solo se pueden anular fiscalmente facturas fiscales emitidas.")
     if invoice.fiscal_status != Invoice.FiscalStatus.ISSUED:
-        raise ValidationError("Solo se pueden anular facturas fiscales emitidas.")
+        raise ValidationError("La factura fiscal ya fue anulada o no esta emitida.")
+    if CreditNote.objects.select_for_update().filter(original_invoice=invoice, active=True, status=CreditNote.Status.ISSUED).exists():
+        raise ValidationError("La factura ya tiene una nota de credito activa.")
+
+    fiscal_range, fiscal_number = get_next_fiscal_number(invoice.clinic, FiscalDocumentRange.DocumentType.CREDIT_NOTE)
+    credit_note_number = next_sequence_number(CreditNote, invoice.clinic, "credit_note_number", clinic_prefix(invoice.clinic, "credit_note_prefix", "NC"))
+    credit_note = CreditNote.objects.create(
+        clinic=invoice.clinic,
+        original_invoice=invoice,
+        credit_note_number=credit_note_number,
+        fiscal_number=fiscal_number,
+        cai=fiscal_range.cai,
+        fiscal_range_start=fiscal_range.full_start_number,
+        fiscal_range_end=fiscal_range.full_end_number,
+        fiscal_expiration_date=fiscal_range.expiration_date,
+        issue_date=timezone.localdate(),
+        issue_datetime=timezone.now(),
+        reason=reason,
+        subtotal=invoice.subtotal,
+        discount_amount=invoice.discount_amount,
+        tax_amount=invoice.tax_amount,
+        total_amount=invoice.total_amount,
+        subtotal_exempt=invoice.subtotal_exempt,
+        subtotal_exonerated=invoice.subtotal_exonerated,
+        subtotal_taxed_15=invoice.subtotal_taxed_15,
+        subtotal_taxed_18=invoice.subtotal_taxed_18,
+        isv_15=invoice.isv_15,
+        isv_18=invoice.isv_18,
+        amount_in_words=invoice.amount_in_words or amount_to_lempiras(invoice.total_amount),
+        issued_by=user,
+        notes="Factura fiscal anulada mediante nota de credito.",
+    )
+
     invoice.fiscal_status = Invoice.FiscalStatus.CANCELLED
     invoice.status = Invoice.Status.ANULADA
-    invoice.active = False
     invoice.cancelled_by = user
-    invoice.cancelled_at = timezone.now()
+    invoice.cancelled_at = credit_note.issue_datetime
     invoice.cancellation_reason = reason
-    invoice.save(update_fields=["fiscal_status", "status", "active", "cancelled_by", "cancelled_at", "cancellation_reason", "actualizado_en"])
-    return invoice
+    invoice.balance_due = Decimal("0.00")
+    invoice.save(update_fields=["fiscal_status", "status", "cancelled_by", "cancelled_at", "cancellation_reason", "balance_due", "actualizado_en"])
+    return credit_note

@@ -12,14 +12,15 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.accounts.permissions import get_role_name
-from apps.billing.fiscal_services import cancel_fiscal_invoice, issue_fiscal_invoice, validate_fiscal_invoice_readiness
-from apps.billing.models import BillableService, CashMovement, CashSession, ClinicFiscalProfile, FiscalDocumentRange, Invoice, InvoiceItem, Payment
+from apps.billing.fiscal_services import issue_fiscal_invoice, validate_fiscal_invoice_readiness, void_fiscal_invoice_with_credit_note
+from apps.billing.models import BillableService, CashMovement, CashSession, ClinicFiscalProfile, CreditNote, FiscalDocumentRange, Invoice, InvoiceItem, Payment
 from apps.billing.serializers import (
     BillableServiceSerializer,
     AddConsumptionToInvoiceSerializer,
     AddInventoryItemToInvoiceSerializer,
     BillingStatsSerializer,
     ClinicFiscalProfileSerializer,
+    CreditNoteSerializer,
     CashMovementSerializer,
     CashSessionCloseSerializer,
     CashSessionDetailSerializer,
@@ -59,6 +60,8 @@ def scope(request, queryset):
     if role in ["admin", "recepcionista", "cajero", "recepcionista_caja", "medico", "enfermera"] and request.user.clinica_id:
         return queryset.filter(clinic_id=request.user.clinica_id)
     if role == "paciente":
+        if queryset.model is CreditNote:
+            return queryset.filter(original_invoice__patient__user=request.user)
         return queryset.filter(patient__user=request.user)
     return queryset.none()
 
@@ -193,6 +196,88 @@ class FiscalDocumentRangeViewSet(viewsets.ModelViewSet):
         fiscal_range = self.get_object()
         response = super().partial_update(request, *args, **kwargs)
         log_audit_event(request=request, clinic=fiscal_range.clinic, action=AuditLog.Action.UPDATE, module=AuditLog.Module.BILLING, model_name="FiscalDocumentRange", object_id=fiscal_range.id, object_repr=fiscal_range.full_start_number, description="Rango fiscal CAI actualizado.", new_values=request.data)
+        return response
+
+
+def render_credit_note_pdf(credit_note, request=None):
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table as PdfTable
+
+    invoice = credit_note.original_invoice
+    stream = BytesIO()
+    doc = SimpleDocTemplate(stream, pagesize=letter, rightMargin=32, leftMargin=32, topMargin=32, bottomMargin=32)
+    styles = getSampleStyleSheet()
+    story = [
+        Paragraph(invoice.emitter_legal_name or credit_note.clinic.nombre, styles["Title"]),
+        Paragraph(f"RTN: {invoice.emitter_rtn or '-'}", styles["Normal"]),
+        Paragraph(invoice.emitter_address or credit_note.clinic.direccion or "", styles["Normal"]),
+        Paragraph(f"Telefono: {getattr(credit_note.clinic, 'telefono', '') or '-'}", styles["Normal"]),
+        Paragraph(f"Correo: {getattr(credit_note.clinic, 'correo', '') or '-'}", styles["Normal"]),
+        Spacer(1, 8),
+        Paragraph(f"NOTA DE CREDITO: {credit_note.fiscal_number}", styles["Heading2"]),
+        Paragraph(f"CAI: {credit_note.cai}", styles["Normal"]),
+        Paragraph(f"Rango autorizado: {credit_note.fiscal_range_start} a {credit_note.fiscal_range_end}", styles["Normal"]),
+        Paragraph(f"Fecha limite de emision: {credit_note.fiscal_expiration_date}", styles["Normal"]),
+        Paragraph(f"Fecha de emision: {credit_note.issue_datetime:%Y-%m-%d %H:%M}", styles["Normal"]),
+        Spacer(1, 8),
+        Paragraph(f"Factura original: {invoice.invoice_number}", styles["Normal"]),
+        Paragraph(f"Numero fiscal original: {invoice.fiscal_number}", styles["Normal"]),
+        Paragraph(f"Cliente: {invoice.customer_name or invoice.patient.nombre_completo}", styles["Normal"]),
+        Paragraph(f"RTN cliente: {invoice.customer_rtn or '-'}", styles["Normal"]),
+        Paragraph(f"Motivo: {credit_note.reason}", styles["Normal"]),
+    ]
+    rows = [["Cant.", "Descripcion", "Precio", "Desc.", "ISV", "Total"]]
+    for item in invoice.items.filter(active=True):
+        rows.append([str(item.quantity), item.description, str(item.unit_price), str(item.discount_amount), str(item.tax_amount), str(item.line_total)])
+    story.extend([Spacer(1, 10), PdfTable(rows), Spacer(1, 10)])
+    totals = [
+        ["Importe exento", credit_note.subtotal_exempt],
+        ["Importe exonerado", credit_note.subtotal_exonerated],
+        ["Importe gravado 15%", credit_note.subtotal_taxed_15],
+        ["Importe gravado 18%", credit_note.subtotal_taxed_18],
+        ["ISV 15%", credit_note.isv_15],
+        ["ISV 18%", credit_note.isv_18],
+        ["Total nota de credito", credit_note.total_amount],
+    ]
+    story.append(PdfTable([[label, f"L {value}"] for label, value in totals]))
+    story.append(Spacer(1, 8))
+    story.append(Paragraph(credit_note.amount_in_words or "", styles["Normal"]))
+    if credit_note.issued_by:
+        story.append(Paragraph(f"Emitida por: {credit_note.issued_by.nombre_completo or credit_note.issued_by.email}", styles["Normal"]))
+    if credit_note.notes:
+        story.append(Paragraph(f"Observaciones: {credit_note.notes}", styles["Normal"]))
+    doc.build(story)
+    return stream.getvalue()
+
+
+class CreditNoteViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = CreditNote.objects.select_related("clinic", "original_invoice__patient", "issued_by").prefetch_related("original_invoice__items")
+    serializer_class = CreditNoteSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = scope(self.request, super().get_queryset())
+        p = self.request.query_params
+        if p.get("status"):
+            queryset = queryset.filter(status=p["status"])
+        if p.get("patient"):
+            queryset = queryset.filter(original_invoice__patient_id=p["patient"])
+        if p.get("date_from"):
+            queryset = queryset.filter(issue_date__gte=p["date_from"])
+        if p.get("date_to"):
+            queryset = queryset.filter(issue_date__lte=p["date_to"])
+        if p.get("search"):
+            search = p["search"]
+            queryset = queryset.filter(Q(credit_note_number__icontains=search) | Q(fiscal_number__icontains=search) | Q(original_invoice__invoice_number__icontains=search) | Q(original_invoice__patient__nombre_completo__icontains=search))
+        return queryset
+
+    @action(detail=True, methods=["get"], url_path="pdf")
+    def pdf(self, request, pk=None):
+        credit_note = self.get_object()
+        log_audit_event(request=request, clinic=credit_note.clinic, action=AuditLog.Action.DOWNLOAD, module=AuditLog.Module.BILLING, model_name="CreditNote", object_id=credit_note.id, object_repr=credit_note.fiscal_number, description="PDF de nota de credito descargado.")
+        response = HttpResponse(render_credit_note_pdf(credit_note, request), content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="nota-credito-{credit_note.fiscal_number}.pdf"'
         return response
 
 
@@ -590,17 +675,35 @@ class InvoiceViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="cancel-fiscal")
     def cancel_fiscal(self, request, pk=None):
+        return self.void_fiscal(request, pk)
+
+    @action(detail=True, methods=["post"], url_path="void-fiscal")
+    def void_fiscal(self, request, pk=None):
         if not can_issue_fiscal(request.user):
             return Response({"detail": "No tienes permiso para anular facturas fiscales."}, status=status.HTTP_403_FORBIDDEN)
         serializer = FiscalCancelSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         invoice = self.get_object()
+        has_payments = invoice.payments.filter(active=True, status=Payment.Status.APLICADO).exists()
+        old_values = {"fiscal_status": invoice.fiscal_status, "status": invoice.status, "balance_due": str(invoice.balance_due)}
         try:
-            invoice = cancel_fiscal_invoice(invoice, request.user, serializer.validated_data["reason"])
+            credit_note = void_fiscal_invoice_with_credit_note(invoice, request.user, serializer.validated_data["reason"])
         except DjangoValidationError as exc:
-            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
-        log_audit_event(request=request, clinic=invoice.clinic, action=AuditLog.Action.CANCEL, module=AuditLog.Module.BILLING, model_name="Invoice", object_id=invoice.id, object_repr=invoice.fiscal_number, description="Factura fiscal anulada.", new_values={"reason": invoice.cancellation_reason})
-        return Response(InvoiceDetailSerializer(invoice).data)
+            message = exc.messages[0]
+            log_audit_event(request=request, clinic=invoice.clinic, action=AuditLog.Action.CANCEL, module=AuditLog.Module.BILLING, model_name="Invoice", object_id=invoice.id, object_repr=invoice.fiscal_number or invoice.invoice_number, description=f"Error al anular factura fiscal: {message}", status=AuditLog.Status.FAILED, severity=AuditLog.Severity.WARNING)
+            return Response({"detail": message}, status=status.HTTP_400_BAD_REQUEST)
+        invoice = credit_note.original_invoice
+        log_audit_event(request=request, clinic=invoice.clinic, action=AuditLog.Action.CANCEL, module=AuditLog.Module.BILLING, model_name="Invoice", object_id=invoice.id, object_repr=invoice.fiscal_number, description="Factura fiscal anulada mediante nota de credito.", old_values=old_values, new_values={"reason": invoice.cancellation_reason, "credit_note": credit_note.id, "credit_note_fiscal_number": credit_note.fiscal_number})
+        log_audit_event(request=request, clinic=credit_note.clinic, action=AuditLog.Action.ISSUE, module=AuditLog.Module.BILLING, model_name="CreditNote", object_id=credit_note.id, object_repr=credit_note.fiscal_number, description="Nota de credito fiscal emitida.", new_values={"original_invoice": invoice.id, "total": str(credit_note.total_amount)})
+        data = InvoiceDetailSerializer(invoice).data
+        data["success"] = True
+        data["invoice_id"] = invoice.id
+        data["credit_note_id"] = credit_note.id
+        data["credit_note_number"] = credit_note.fiscal_number
+        data["message"] = "Factura fiscal anulada correctamente mediante nota de credito."
+        if has_payments:
+            data["payment_warning"] = "La factura tiene pagos aplicados. La anulacion genero nota de credito, pero la devolucion debe gestionarse manualmente."
+        return Response(data)
 
     @action(detail=True, methods=["get"], url_path="fiscal-print-data")
     def fiscal_print_data(self, request, pk=None):

@@ -47,7 +47,7 @@ import { MedicalRecordDetailsPage } from "../features/medicalRecords/MedicalReco
 import { MedicalRecordsPage } from "../features/medicalRecords/MedicalRecordsPage";
 import { PatientMedicalRecordPage } from "../features/medicalRecords/PatientMedicalRecordPage";
 import { DiagnosesPage, MedicalOrdersPage, PrescriptionsPage } from "../features/prescriptions/ClinicalDataPages";
-import { BillableServicesPage, BillingDashboardPage, CashPage, FiscalSettingsPage, InvoiceDetailPage, InvoicePrintPage, InvoicesPage, PaymentsPage } from "../features/billing/BillingPages";
+import { BillableServicesPage, BillingDashboardPage, CashPage, CreditNotesPage, FiscalSettingsPage, InvoiceDetailPage, InvoicePrintPage, InvoicesPage, PaymentsPage } from "../features/billing/BillingPages";
 import { InventoryAlertsPage, InventoryCategoriesPage, InventoryDashboardPage, InventoryItemsPage, InventoryLotsPage, InventoryMovementsPage } from "../features/inventory/InventoryPages";
 import { PurchaseOrderDetailsPage, PurchaseOrderFormPage, PurchaseOrdersPage, PurchaseReceiptDetailsPage, PurchaseReceiptsPage, PurchaseReceivePage, PurchasesDashboardPage, SupplierDetailsPage, SuppliersPage } from "../features/purchases/PurchasePages";
 import { AppointmentsReportPage, CashReportPage, ClinicDashboardAnalyticsPage, ConsultationsReportPage, DoctorDashboardAnalyticsPage, DoctorsReportPage, FinancialReportPage, InventoryReportPage, PatientsReportPage, PurchasesReportPage, ReceptionDashboardPage, ReportsHomePage, SuperAdminReportsPage } from "../features/reports/ReportsPages";
@@ -201,6 +201,7 @@ export const router = createBrowserRouter([
               { path: "/clinic/billing/invoices/new", element: <InvoicesPage /> },
               { path: "/clinic/billing/invoices/:id", element: <InvoiceDetailPage /> },
               { path: "/clinic/billing/invoices/:id/print", element: <InvoicePrintPage /> },
+              { path: "/clinic/billing/credit-notes", element: <CreditNotesPage /> },
               { path: "/clinic/billing/payments", element: <PaymentsPage /> },
               { path: "/clinic/billing/cash", element: <CashPage /> },
               { path: "/clinic/billing/pending", element: <PendingBillingVisitsPage /> },

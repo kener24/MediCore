@@ -297,6 +297,65 @@ class Invoice(TimeStampedModel):
         self.save(update_fields=["subtotal", "discount_amount", "tax_amount", "total_amount", "total", "paid_amount", "balance_due", "status", "actualizado_en"])
 
 
+class CreditNote(TimeStampedModel):
+    class Status(models.TextChoices):
+        ISSUED = "issued", "Emitida"
+        CANCELLED = "cancelled", "Anulada"
+        VOIDED = "voided", "Void"
+
+    clinic = models.ForeignKey("clinics.Clinic", on_delete=models.PROTECT, related_name="credit_notes")
+    original_invoice = models.ForeignKey(Invoice, on_delete=models.PROTECT, related_name="credit_notes")
+    credit_note_number = models.CharField(max_length=30)
+    fiscal_number = models.CharField(max_length=30)
+    cai = models.CharField(max_length=80)
+    fiscal_range_start = models.CharField(max_length=30)
+    fiscal_range_end = models.CharField(max_length=30)
+    fiscal_expiration_date = models.DateField()
+    issue_date = models.DateField(default=timezone.localdate)
+    issue_datetime = models.DateTimeField(default=timezone.now)
+    reason = models.TextField()
+    subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    discount_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    tax_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    subtotal_exempt = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    subtotal_exonerated = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    subtotal_taxed_15 = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    subtotal_taxed_18 = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    isv_15 = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    isv_18 = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    amount_in_words = models.CharField(max_length=300, blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ISSUED)
+    issued_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="credit_notes_issued")
+    cancelled_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="credit_notes_cancelled")
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+    active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["-issue_datetime"]
+        constraints = [
+            models.UniqueConstraint(fields=["clinic", "credit_note_number"], name="unique_credit_note_number_per_clinic"),
+            models.UniqueConstraint(fields=["clinic", "fiscal_number"], name="unique_credit_note_fiscal_number_per_clinic"),
+            models.UniqueConstraint(fields=["original_invoice"], condition=models.Q(active=True, status="issued"), name="unique_active_credit_note_per_invoice"),
+        ]
+
+    def clean(self):
+        if self.original_invoice_id:
+            if self.original_invoice.clinic_id != self.clinic_id:
+                raise ValidationError("La nota de credito debe pertenecer a la misma clinica de la factura.")
+            if not self.original_invoice.is_fiscal or self.original_invoice.fiscal_status != Invoice.FiscalStatus.ISSUED:
+                raise ValidationError("Solo se puede crear nota de credito sobre una factura fiscal emitida.")
+        if not self.reason or not self.reason.strip():
+            raise ValidationError("El motivo de anulacion es obligatorio.")
+
+    def save(self, *args, **kwargs):
+        if self.original_invoice_id and not self.clinic_id:
+            self.clinic = self.original_invoice.clinic
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
 class InvoiceItem(TimeStampedModel):
     class Type(models.TextChoices):
         SERVICE = "service", "Servicio"

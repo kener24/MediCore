@@ -23,7 +23,7 @@ from apps.appointments.views import AppointmentViewSet
 from apps.medical_records.views import ClinicalConsultationViewSet, ClinicalSupplyUsageViewSet, MedicalRecordViewSet
 from apps.hospitalization.views import HospitalBedViewSet, HospitalRoomViewSet, HospitalizationDashboardView, HospitalizationViewSet, MedicationAdministrationViewSet, PendingMedicationsView
 from apps.prescriptions.views import DiagnosisViewSet, MedicalOrderViewSet, PrescriptionViewSet
-from apps.billing.views import BillableServiceViewSet, BillingStatsViewSet, CashSessionViewSet, ClinicFiscalProfileViewSet, FiscalDocumentRangeViewSet, FiscalReadinessView, InvoiceViewSet, PaymentViewSet
+from apps.billing.views import BillableServiceViewSet, BillingStatsViewSet, CashSessionViewSet, ClinicFiscalProfileViewSet, CreditNoteViewSet, FiscalDocumentRangeViewSet, FiscalReadinessView, InvoiceViewSet, PaymentViewSet
 from apps.inventory.views import InventoryAlertViewSet, InventoryCategoryViewSet, InventoryItemViewSet, InventoryLotViewSet, InventoryMovementViewSet, InventoryStatsViewSet
 from apps.purchases.views import PurchaseItemHistoryViewSet, PurchaseOrderViewSet, PurchaseReceiptViewSet, PurchaseStatsViewSet, SupplierViewSet
 from apps.reports.views import (
@@ -62,6 +62,7 @@ from apps.patient_portal.views import (
     PatientPortalAppointmentRequestView,
     PatientPortalAppointmentsView,
     PatientPortalClinicInfoView,
+    PatientPortalCreditNotePdfView,
     PatientPortalDashboardView,
     PatientPortalDoctorAvailabilityView,
     PatientPortalDoctorsView,
@@ -121,6 +122,7 @@ router.register("prescriptions", PrescriptionViewSet, basename="prescriptions")
 router.register("medical-orders", MedicalOrderViewSet, basename="medical-orders")
 router.register("billing/services", BillableServiceViewSet, basename="billing-services")
 router.register("billing/fiscal-ranges", FiscalDocumentRangeViewSet, basename="billing-fiscal-ranges")
+router.register("billing/credit-notes", CreditNoteViewSet, basename="billing-credit-notes")
 router.register("billing/invoices", InvoiceViewSet, basename="billing-invoices")
 router.register("billing/payments", PaymentViewSet, basename="billing-payments")
 router.register("billing/cash-sessions", CashSessionViewSet, basename="billing-cash-sessions")
@@ -244,6 +246,7 @@ urlpatterns = [
     path("api/patient-portal/invoices/", PatientPortalInvoicesView.as_view(), name="patient-portal-invoices"),
     path("api/patient-portal/invoices/<int:invoice_id>/", PatientPortalInvoicesView.as_view(), name="patient-portal-invoice-detail"),
     path("api/patient-portal/invoices/<int:invoice_id>/fiscal-pdf/", PatientPortalInvoiceFiscalPdfView.as_view(), name="patient-portal-invoice-fiscal-pdf"),
+    path("api/patient-portal/credit-notes/<int:credit_note_id>/pdf/", PatientPortalCreditNotePdfView.as_view(), name="patient-portal-credit-note-pdf"),
     path("api/patient-portal/payments/", PatientPortalPaymentsView.as_view(), name="patient-portal-payments"),
     path("api/patient-portal/payments/<int:payment_id>/", PatientPortalPaymentsView.as_view(), name="patient-portal-payment-detail"),
     path("api/patient-portal/medical-record-summary/", PatientPortalMedicalRecordSummaryView.as_view(), name="patient-portal-medical-record-summary"),

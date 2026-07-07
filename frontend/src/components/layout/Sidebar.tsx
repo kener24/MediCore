@@ -87,6 +87,7 @@ const adminGroups: NavGroup[] = [
       { label: "Resumen", path: "/clinic/billing" },
       { label: "Pendientes de cobro", path: "/clinic/billing/pending" },
       { label: "Facturas", path: "/clinic/billing/invoices" },
+      { label: "Notas de credito", path: "/clinic/billing/credit-notes" },
       { label: "Pagos", path: "/clinic/billing/payments" },
       { label: "Caja", path: "/clinic/billing/cash" },
       { label: "Servicios", path: "/clinic/billing/services" },

@@ -9,7 +9,7 @@ export function HeaderBackButton() {
   if (!navigation.canGoBack()) return null;
 
   return (
-    <Pressable accessibilityLabel="Volver atras" hitSlop={10} onPress={() => navigation.goBack()} style={styles.button}>
+    <Pressable accessibilityLabel="Volver atrás" hitSlop={10} onPress={() => navigation.goBack()} style={styles.button}>
       <MaterialCommunityIcons color={colors.primaryDark} name="chevron-left" size={28} />
     </Pressable>
   );

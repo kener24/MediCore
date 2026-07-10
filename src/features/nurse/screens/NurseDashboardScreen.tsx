@@ -42,6 +42,27 @@ export function NurseDashboardScreen() {
 
   if (loading) return <LoadingState label="Cargando enfermería..." />;
 
+  const goTabStack = (tab: string, screen: string) => {
+    const parent = navigation.getParent?.();
+    if (parent) {
+      parent.navigate(tab, { screen });
+      return;
+    }
+    navigation.navigate(tab, { screen });
+  };
+
+  const goHomeStack = (screen: string) => {
+    goTabStack('NurseHomeTab', screen);
+  };
+
+  const goTriageStack = (screen: string) => {
+    goTabStack('NurseTriageTab', screen);
+  };
+
+  const goHospitalizationStack = (screen: string) => {
+    goTabStack('NurseHospitalizationTab', screen);
+  };
+
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
       <ScrollView
@@ -68,31 +89,31 @@ export function NurseDashboardScreen() {
           <QuickActionCard
             description="Seguimiento de pacientes internados, signos hospitalarios y notas."
             icon="hospital-building"
-            onPress={() => navigation.navigate('NurseHospitalizationDashboard')}
+            onPress={() => goHospitalizationStack('NurseHospitalizationDashboard')}
             title="Hospitalización"
           />
           <QuickActionCard
             description="Pacientes pendientes de evaluación inicial."
             icon="clipboard-account-outline"
-            onPress={() => navigation.navigate('NurseTriageQueue')}
+            onPress={() => goTriageStack('NurseTriageQueue')}
             title="Cola de triaje"
           />
           <QuickActionCard
             description="Registrar signos vitales desde el detalle del paciente."
             icon="heart-pulse"
-            onPress={() => navigation.navigate('NursePatientsInTriage')}
+            onPress={() => goTriageStack('NursePatientsInTriage')}
             title="Registrar signos vitales"
           />
           <QuickActionCard
             description="Revisar triajes finalizados recientemente."
             icon="format-list-checks"
-            onPress={() => navigation.navigate('NurseCompletedTriages')}
+            onPress={() => goHomeStack('NurseCompletedTriages')}
             title="Triajes realizados"
           />
           <QuickActionCard
             description={`${summary?.unreadNotifications ?? 0} notificaciones no leídas.`}
             icon="bell-outline"
-            onPress={() => navigation.navigate('NurseNotifications')}
+            onPress={() => goHomeStack('NurseNotifications')}
             title="Notificaciones"
           />
         </View>

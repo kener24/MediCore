@@ -8,6 +8,7 @@ from rest_framework.test import APITestCase
 from apps.accounts.models import Role, User
 from apps.admissions.models import PatientVisit
 from apps.appointments.models import Appointment
+from apps.audit.models import AuditLog
 from apps.clinics.models import Clinic
 from apps.doctors.models import DoctorProfile, DoctorSchedule, MedicalSpecialty
 from apps.inventory.models import InventoryCategory, InventoryItem
@@ -94,6 +95,9 @@ class AdmissionsFlowTests(APITestCase):
         done = self.client.patch(f"/api/admissions/visits/{visit.id}/complete-triage/")
         self.assertEqual(done.status_code, status.HTTP_200_OK)
         self.assertEqual(done.data["status"], PatientVisit.Status.WAITING_DOCTOR)
+        self.assertTrue(AuditLog.objects.filter(module=AuditLog.Module.ADMISSIONS, action=AuditLog.Action.UPDATE, object_id=str(visit.id), description="Triaje iniciado.").exists())
+        self.assertTrue(AuditLog.objects.filter(module=AuditLog.Module.MEDICAL_RECORDS, action=AuditLog.Action.CREATE, object_id=str(signs.data["id"]), description="Signos vitales registrados.").exists())
+        self.assertTrue(AuditLog.objects.filter(module=AuditLog.Module.ADMISSIONS, action=AuditLog.Action.FINALIZE, object_id=str(visit.id), description="Triaje finalizado.").exists())
 
     def test_medico_sala_inicia_consulta_y_finaliza_a_caja(self):
         visit = self.register_visit()

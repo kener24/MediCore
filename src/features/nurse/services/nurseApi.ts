@@ -13,10 +13,10 @@ import type {
 import { normalizeListResponse } from '@/features/nurse/types/nurse.types';
 import { mapDashboard, mapNotification, mapNursePatient, mapTriage, mapVitalSigns } from '@/features/nurse/utils/nurseMappers';
 
-const queueEndpoints = ['/nurse/triage/queue/', '/triage/queue/', '/clinic/triage/queue/', '/visits/triage-queue/', endpoints.doctor.visits];
-const inTriageEndpoints = ['/nurse/triage/in-progress/', '/triage/in-progress/', '/visits/?status=in_triage'];
-const completedEndpoints = ['/nurse/triage/completed/', '/triage/completed/', '/triages/?status=completed'];
-const dashboardEndpoints = ['/nurse/dashboard/', '/triage/dashboard/', '/clinic/nurse/dashboard/'];
+const queueEndpoints = ['/nursing/triage-queue/', '/admissions/triage-queue/', '/admissions/visits/triage-queue/', '/nurse/triage/queue/', '/triage/queue/'];
+const inTriageEndpoints = ['/admissions/visits/?status=in_triage', '/nursing/triage-queue/', '/admissions/triage-queue/', '/nurse/triage/in-progress/', '/triage/in-progress/'];
+const completedEndpoints = ['/admissions/visits/?status=waiting_doctor', '/admissions/visits/?status=in_consultation', '/nurse/triage/completed/', '/triage/completed/', '/triages/?status=completed'];
+const dashboardEndpoints = ['/nursing/dashboard/', '/nurse/dashboard/', '/triage/dashboard/', '/clinic/nurse/dashboard/'];
 const notificationEndpoints = ['/notifications/', '/nurse/notifications/'];
 const unreadEndpoints = ['/notifications/unread-count/', '/nurse/notifications/unread-count/'];
 
@@ -56,15 +56,16 @@ export async function getCompletedTriages(): Promise<NurseTriage[]> {
 }
 
 export async function getNursePatientDetail(visitId: number | string): Promise<NursePatientSummary> {
-  const data = await getFirstAvailable([`/nurse/triage/queue/${visitId}/`, `/triage/queue/${visitId}/`, endpoints.doctor.visit(visitId), `/visits/${visitId}/`, `/admissions/${visitId}/`]);
+  const data = await getFirstAvailable([endpoints.doctor.visit(visitId), `/nursing/visits/${visitId}/`, `/nurse/triage/queue/${visitId}/`, `/triage/queue/${visitId}/`, `/visits/${visitId}/`, `/admissions/${visitId}/`]);
   return mapNursePatient(data);
 }
 
 export async function getLatestVitalSigns(visitId: number | string): Promise<NurseVitalSigns | null> {
   const data = await getFirstAvailable<ApiListResponse<unknown> | unknown[]>([
+    `/nursing/visits/${visitId}/vital-signs/`,
+    endpoints.doctor.vitalSigns(visitId),
     `/nurse/triage/${visitId}/vital-signs/`,
     `/triage/${visitId}/vital-signs/`,
-    endpoints.doctor.vitalSigns(visitId),
     `/vital-signs/?visit=${visitId}`,
     `/clinical/vital-signs/?visit=${visitId}`,
   ]);
@@ -73,25 +74,43 @@ export async function getLatestVitalSigns(visitId: number | string): Promise<Nur
 }
 
 export async function startTriage(visitId: number | string): Promise<NursePatientSummary> {
-  const data = await postFirstAvailable([`/nurse/triage/${visitId}/start/`, `/triage/${visitId}/start/`, `/visits/${visitId}/start-triage/`]);
+  const data = await postFirstAvailable([`/nursing/visits/${visitId}/start-triage/`, `/admissions/visits/${visitId}/start-triage/`, `/nurse/triage/${visitId}/start/`, `/triage/${visitId}/start/`, `/visits/${visitId}/start-triage/`]);
   return mapNursePatient(data);
 }
 
+function normalizeVitalSignsPayload(payload: VitalSignsPayload) {
+  const heightInput = payload.height_cm;
+  const height = heightInput ? (heightInput > 3 ? Number((heightInput / 100).toFixed(2)) : heightInput) : undefined;
+  return {
+    temperature: payload.temperature,
+    heart_rate: payload.heart_rate,
+    respiratory_rate: payload.respiratory_rate,
+    blood_pressure_systolic: payload.systolic_pressure,
+    blood_pressure_diastolic: payload.diastolic_pressure,
+    oxygen_saturation: payload.oxygen_saturation,
+    weight: payload.weight_kg,
+    height,
+    glucose: payload.glucose,
+    pain_scale: payload.pain_scale,
+    notes: payload.notes?.trim() ?? '',
+  };
+}
+
 export async function createVitalSigns(payload: VitalSignsPayload): Promise<NurseVitalSigns> {
-  const data = await postFirstAvailable([endpoints.doctor.vitalSigns(payload.visit), '/nurse/vital-signs/', '/triage/vital-signs/', '/vital-signs/', '/clinical/vital-signs/'], payload);
+  const data = await postFirstAvailable([`/nursing/visits/${payload.visit}/vital-signs/`, endpoints.doctor.vitalSigns(payload.visit), '/nurse/vital-signs/', '/triage/vital-signs/', '/vital-signs/', '/clinical/vital-signs/'], normalizeVitalSignsPayload(payload));
   return mapVitalSigns(data);
 }
 
 export async function completeTriage(payload: CompleteTriagePayload): Promise<NurseTriage> {
   const data = await postFirstAvailable(
-    [`/nurse/triage/${payload.visit}/complete/`, `/triage/${payload.visit}/complete/`, endpoints.doctor.triage(payload.visit), `/visits/${payload.visit}/complete-triage/`, '/triages/'],
+    [`/nursing/visits/${payload.visit}/complete-triage/`, `/admissions/visits/${payload.visit}/complete-triage/`, `/nurse/triage/${payload.visit}/complete/`, `/triage/${payload.visit}/complete/`, endpoints.doctor.triage(payload.visit), `/visits/${payload.visit}/complete-triage/`, '/triages/'],
     payload,
   );
   return mapTriage(data);
 }
 
 export async function getTriageDetail(triageId: number | string): Promise<NurseTriage> {
-  const data = await getFirstAvailable([`/nurse/triage/${triageId}/`, `/triage/${triageId}/`, `/triages/${triageId}/`]);
+  const data = await getFirstAvailable([endpoints.doctor.visit(triageId), `/nursing/visits/${triageId}/`, `/nurse/triage/${triageId}/`, `/triage/${triageId}/`, `/triages/${triageId}/`]);
   return mapTriage(data);
 }
 

@@ -80,7 +80,7 @@ export function NurseDashboardScreen() {
           <QuickActionCard
             description="Registrar signos vitales desde el detalle del paciente."
             icon="heart-pulse"
-            onPress={() => navigation.navigate('NurseTriageQueue')}
+            onPress={() => navigation.navigate('NursePatientsInTriage')}
             title="Registrar signos vitales"
           />
           <QuickActionCard

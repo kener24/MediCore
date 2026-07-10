@@ -17,9 +17,15 @@ export function NurseSecurityScreen() {
           </Text>
         </AppCard>
         <AppCard>
-          <Text style={styles.title}>Alcance clínico</Text>
+          <Text style={styles.title}>Alcance clínico activo</Text>
           <Text style={styles.body}>
-            Este sprint cubre triaje inicial. Hospitalización, rondas de enfermería y administración de medicamentos quedan preparados para próximos módulos web y móvil.
+            Puedes gestionar cola de triaje, signos vitales, evaluación inicial, pacientes internados, notas, rondas y administración de medicamentos desde los módulos habilitados.
+          </Text>
+        </AppCard>
+        <AppCard>
+          <Text style={styles.title}>Buenas prácticas</Text>
+          <Text style={styles.body}>
+            Cierra sesión al terminar turno, confirma siempre el paciente antes de guardar signos vitales y evita compartir tu usuario con otro miembro del equipo.
           </Text>
         </AppCard>
       </ScrollView>

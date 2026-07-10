@@ -21,6 +21,7 @@ import { NurseNursingRoundsScreen } from '@/features/nurse/hospitalization/scree
 import { NursePendingMedicationsScreen } from '@/features/nurse/hospitalization/screens/NursePendingMedicationsScreen';
 import { NurseNotificationsScreen } from '@/features/nurse/screens/NurseNotificationsScreen';
 import { NursePatientDetailScreen } from '@/features/nurse/screens/NursePatientDetailScreen';
+import { NursePatientsInTriageScreen } from '@/features/nurse/screens/NursePatientsInTriageScreen';
 import { NurseProfileScreen } from '@/features/nurse/screens/NurseProfileScreen';
 import { NurseSecurityScreen } from '@/features/nurse/screens/NurseSecurityScreen';
 import { NurseTriageDetailScreen } from '@/features/nurse/screens/NurseTriageDetailScreen';
@@ -53,6 +54,7 @@ function NurseHomeStack() {
       <Stack.Screen component={NurseBedStatusScreen} name="NurseBedStatus" />
       <Stack.Screen component={NurseNotificationsScreen} name="NurseNotifications" />
       <Stack.Screen component={NursePatientDetailScreen} name="NursePatientDetail" />
+      <Stack.Screen component={NursePatientsInTriageScreen} name="NursePatientsInTriage" />
       <Stack.Screen component={NurseVitalSignsFormScreen} name="NurseVitalSignsForm" />
       <Stack.Screen component={NurseTriageFormScreen} name="NurseTriageForm" />
       <Stack.Screen component={NurseCompletedTriagesScreen} name="NurseCompletedTriages" />
@@ -65,6 +67,7 @@ function NurseTriageStack() {
   return (
     <Stack.Navigator screenOptions={stackOptions}>
       <Stack.Screen component={NurseTriageQueueScreen} name="NurseTriageQueue" />
+      <Stack.Screen component={NursePatientsInTriageScreen} name="NursePatientsInTriage" />
       <Stack.Screen component={NursePatientDetailScreen} name="NursePatientDetail" />
       <Stack.Screen component={NurseVitalSignsFormScreen} name="NurseVitalSignsForm" />
       <Stack.Screen component={NurseTriageFormScreen} name="NurseTriageForm" />

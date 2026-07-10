@@ -26,8 +26,8 @@ export function NurseDashboardScreen() {
     try {
       setError(null);
       setSummary(await getNurseDashboard());
-    } catch {
-      setError('Este módulo aún no está disponible.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Este módulo aún no está disponible.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -86,6 +86,12 @@ export function NurseDashboardScreen() {
         )}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Acciones rápidas</Text>
+          <QuickActionCard
+            description="Pendientes, medicamentos y puntos críticos del turno actual."
+            icon="clipboard-text-clock-outline"
+            onPress={() => goHomeStack('NurseShiftSummary')}
+            title="Resumen de turno"
+          />
           <QuickActionCard
             description="Seguimiento de pacientes internados, signos hospitalarios y notas."
             icon="hospital-building"

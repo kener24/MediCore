@@ -1,6 +1,6 @@
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { useCallback, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/AppHeader';
@@ -8,13 +8,39 @@ import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
+import { SearchAndFilters } from '@/features/nurse/components/NurseListTools';
 import { PatientQueueCard } from '@/features/nurse/components/NurseCards';
 import { getTriageQueue } from '@/features/nurse/services/nurseApi';
 import type { NursePatientSummary } from '@/features/nurse/types/nurse.types';
 
+type QueueFilter = 'all' | 'urgent' | 'normal' | 'low';
+
+const filters: { label: string; value: QueueFilter }[] = [
+  { label: 'Todos', value: 'all' },
+  { label: 'Urgentes', value: 'urgent' },
+  { label: 'Normales', value: 'normal' },
+  { label: 'Baja', value: 'low' },
+];
+
+function matchesFilter(patient: NursePatientSummary, filter: QueueFilter) {
+  const priority = String(patient.priority ?? '').toLowerCase();
+  if (filter === 'all') return true;
+  if (filter === 'urgent') return ['critical', 'urgent', 'critica', 'urgente', 'priority', 'prioritario'].includes(priority);
+  if (filter === 'normal') return !priority || priority === 'normal' || priority === 'preferential' || priority === 'preferente';
+  return priority === 'low' || priority === 'baja';
+}
+
+function matchesSearch(patient: NursePatientSummary, search: string) {
+  const term = search.trim().toLowerCase();
+  if (!term) return true;
+  return [patient.name, patient.document, patient.reason, patient.doctorName, patient.phone].filter(Boolean).join(' ').toLowerCase().includes(term);
+}
+
 export function NurseTriageQueueScreen() {
   const navigation = useNavigation<any>();
   const [patients, setPatients] = useState<NursePatientSummary[]>([]);
+  const [filter, setFilter] = useState<QueueFilter>('all');
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,8 +49,8 @@ export function NurseTriageQueueScreen() {
     try {
       setError(null);
       setPatients(await getTriageQueue());
-    } catch {
-      setError('No se pudo cargar la cola de triaje.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo cargar la cola de triaje.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -32,6 +58,11 @@ export function NurseTriageQueueScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
+
+  const filtered = useMemo(
+    () => patients.filter((patient) => matchesFilter(patient, filter) && matchesSearch(patient, search)),
+    [filter, patients, search],
+  );
 
   if (loading) return <LoadingState label="Cargando cola de triaje..." />;
 
@@ -41,9 +72,11 @@ export function NurseTriageQueueScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl onRefresh={() => { setRefreshing(true); void load(); }} refreshing={refreshing} />}>
         <AppHeader icon="clipboard-account-outline" subtitle="Pacientes esperando evaluación inicial." title="Cola de triaje" />
+        <Text style={styles.counter}>{filtered.length} de {patients.length} pacientes</Text>
+        <SearchAndFilters filters={filters} onFilterChange={setFilter} onSearchChange={setSearch} search={search} searchLabel="Buscar por paciente, documento, motivo o médico" selectedFilter={filter} />
         {error ? <ErrorState message={error} onRetry={() => void load()} title="Triaje no disponible" /> : null}
-        {!error && patients.length === 0 ? <EmptyState description="No hay pacientes esperando triaje." title="Cola vacía" /> : null}
-        {patients.map((patient) => (
+        {!error && filtered.length === 0 ? <EmptyState description="No hay pacientes que coincidan con la búsqueda o filtro." title="Cola vacía" /> : null}
+        {filtered.map((patient) => (
           <PatientQueueCard
             key={`${patient.visitId ?? patient.id}`}
             onPress={() => navigation.navigate('NursePatientDetail', { patient, visitId: patient.visitId ?? patient.id })}
@@ -60,6 +93,11 @@ const styles = StyleSheet.create({
     gap: 14,
     padding: 18,
     paddingBottom: 110,
+  },
+  counter: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: '800',
   },
   safe: {
     backgroundColor: colors.background,

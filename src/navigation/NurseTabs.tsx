@@ -1,5 +1,6 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useCallback, useEffect, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RoleGuard } from '@/components/RoleGuard';
@@ -24,10 +25,13 @@ import { NursePatientDetailScreen } from '@/features/nurse/screens/NursePatientD
 import { NursePatientsInTriageScreen } from '@/features/nurse/screens/NursePatientsInTriageScreen';
 import { NurseProfileScreen } from '@/features/nurse/screens/NurseProfileScreen';
 import { NurseSecurityScreen } from '@/features/nurse/screens/NurseSecurityScreen';
+import { NurseShiftSummaryScreen } from '@/features/nurse/screens/NurseShiftSummaryScreen';
 import { NurseTriageDetailScreen } from '@/features/nurse/screens/NurseTriageDetailScreen';
 import { NurseTriageFormScreen } from '@/features/nurse/screens/NurseTriageFormScreen';
 import { NurseTriageQueueScreen } from '@/features/nurse/screens/NurseTriageQueueScreen';
 import { NurseVitalSignsFormScreen } from '@/features/nurse/screens/NurseVitalSignsFormScreen';
+import { getPendingMedications } from '@/features/nurse/hospitalization/services/nurseHospitalizationService';
+import { getNurseDashboard } from '@/features/nurse/services/nurseApi';
 import { createTabOptions, tabIcon } from '@/navigation/tabOptions';
 
 const Tab = createBottomTabNavigator();
@@ -38,6 +42,7 @@ function NurseHomeStack() {
   return (
     <Stack.Navigator screenOptions={stackOptions}>
       <Stack.Screen component={NurseDashboardScreen} name="NurseDashboard" />
+      <Stack.Screen component={NurseShiftSummaryScreen} name="NurseShiftSummary" />
       <Stack.Screen component={NurseHospitalizationDashboardScreen} name="NurseHospitalizationDashboard" />
       <Stack.Screen component={NurseInpatientsScreen} name="NurseInpatients" />
       <Stack.Screen component={NurseHospitalizationDetailScreen} name="NurseHospitalizationDetail" />
@@ -128,12 +133,31 @@ function NurseProfileStack() {
 
 export function NurseTabs() {
   const insets = useSafeAreaInsets();
+  const [triageBadge, setTriageBadge] = useState<number | undefined>();
+  const [medicationBadge, setMedicationBadge] = useState<number | undefined>();
+
+  const loadBadges = useCallback(async () => {
+    const [dashboard, medications] = await Promise.all([
+      getNurseDashboard().catch(() => null),
+      getPendingMedications().catch(() => []),
+    ]);
+    const triageCount = (dashboard?.waitingCount ?? 0) + (dashboard?.inTriageCount ?? 0);
+    setTriageBadge(triageCount > 0 ? triageCount : undefined);
+    setMedicationBadge(medications.length > 0 ? medications.length : undefined);
+  }, []);
+
+  useEffect(() => {
+    void loadBadges();
+    const timer = setInterval(() => void loadBadges(), 60000);
+    return () => clearInterval(timer);
+  }, [loadBadges]);
+
   return (
     <RoleGuard roles={['enfermera']}>
       <Tab.Navigator screenOptions={createTabOptions(insets)}>
         <Tab.Screen component={NurseHomeStack} name="NurseHomeTab" options={{ tabBarIcon: tabIcon('heart-pulse'), title: 'Inicio' }} />
-        <Tab.Screen component={NurseTriageStack} name="NurseTriageTab" options={{ tabBarIcon: tabIcon('clipboard-account-outline'), title: 'Triaje' }} />
-        <Tab.Screen component={NursePatientsStack} name="NurseHospitalizationTab" options={{ tabBarIcon: tabIcon('hospital-building'), title: 'Internados' }} />
+        <Tab.Screen component={NurseTriageStack} name="NurseTriageTab" options={{ tabBarBadge: triageBadge, tabBarIcon: tabIcon('clipboard-account-outline'), title: 'Triaje' }} />
+        <Tab.Screen component={NursePatientsStack} name="NurseHospitalizationTab" options={{ tabBarBadge: medicationBadge, tabBarIcon: tabIcon('hospital-building'), title: 'Internados' }} />
         <Tab.Screen component={NurseNotesStack} name="NurseNotesTab" options={{ tabBarIcon: tabIcon('notebook-outline'), title: 'Notas' }} />
         <Tab.Screen component={NurseProfileStack} name="NurseProfileTab" options={{ tabBarIcon: tabIcon('account-heart-outline'), title: 'Perfil' }} />
       </Tab.Navigator>

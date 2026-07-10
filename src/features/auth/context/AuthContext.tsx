@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setSessionExpiredHandler(() => {
       setUser(null);
-      Alert.alert('Sesión expirada', 'Tu sesión expiró. Inicia sesión nuevamente.');
+      Alert.alert('Sesión expirada', 'Tu sesión expiró por seguridad. Inicia sesión nuevamente para continuar.');
     });
 
     let mounted = true;

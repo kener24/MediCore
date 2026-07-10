@@ -16,6 +16,7 @@ import type {
   NursingNotePayload,
 } from '@/features/nurse/hospitalization/types/nurseHospitalization.types';
 import { normalizeListResponse } from '@/features/nurse/types/nurse.types';
+import { readNurseCache, saveNurseCache } from '@/features/nurse/utils/nurseCache';
 
 const unavailableMessage = 'Hospitalización no disponible por el momento.';
 
@@ -118,8 +119,16 @@ export async function getHospitalizationDashboard(): Promise<NurseHospitalizatio
 
 export async function getActiveInpatients(params?: QueryParams): Promise<NurseHospitalizationListItem[]> {
   const query = params ?? { active: true };
-  const data = await getOrUnavailable<NurseHospitalizationListItem[] | { results?: NurseHospitalizationListItem[] }>('/hospitalization/admissions/', query);
-  return normalizeListResponse<NurseHospitalizationListItem>(data);
+  try {
+    const data = await getOrUnavailable<NurseHospitalizationListItem[] | { results?: NurseHospitalizationListItem[] }>('/hospitalization/admissions/', query);
+    const rows = normalizeListResponse<NurseHospitalizationListItem>(data);
+    await saveNurseCache(`inpatients.${JSON.stringify(query)}`, rows);
+    return rows;
+  } catch (error) {
+    const cached = await readNurseCache<NurseHospitalizationListItem[]>(`inpatients.${JSON.stringify(query)}`);
+    if (cached) return cached.value;
+    throw error;
+  }
 }
 
 export async function getHospitalizationDetail(hospitalizationId: number): Promise<NurseHospitalizationDetail> {
@@ -188,8 +197,16 @@ export async function createMedicationAdministration(hospitalizationId: number, 
 }
 
 export async function getPendingMedications(): Promise<MedicationAdministration[]> {
-  const data = await getOrUnavailable<MedicationAdministration[] | { results?: MedicationAdministration[] }>('/hospitalization/medications/pending/');
-  return normalizeListResponse<MedicationAdministration>(data);
+  try {
+    const data = await getOrUnavailable<MedicationAdministration[] | { results?: MedicationAdministration[] }>('/hospitalization/medications/pending/');
+    const rows = normalizeListResponse<MedicationAdministration>(data);
+    await saveNurseCache('pendingMedications', rows);
+    return rows;
+  } catch (error) {
+    const cached = await readNurseCache<MedicationAdministration[]>('pendingMedications');
+    if (cached) return cached.value;
+    throw error;
+  }
 }
 
 export async function administerMedication(id: number, payload?: { notes?: string }): Promise<MedicationAdministration> {

@@ -11,6 +11,7 @@ import type {
   VitalSignsPayload,
 } from '@/features/nurse/types/nurse.types';
 import { normalizeListResponse } from '@/features/nurse/types/nurse.types';
+import { readNurseCache, saveNurseCache } from '@/features/nurse/utils/nurseCache';
 import { mapDashboard, mapNotification, mapNursePatient, mapTriage, mapVitalSigns } from '@/features/nurse/utils/nurseMappers';
 
 const queueEndpoints = ['/nursing/triage-queue/', '/admissions/triage-queue/', '/admissions/visits/triage-queue/', '/nurse/triage/queue/', '/triage/queue/'];
@@ -41,18 +42,42 @@ export async function getNurseDashboard(): Promise<NurseDashboardSummary> {
 }
 
 export async function getTriageQueue(): Promise<NursePatientSummary[]> {
-  const data = await getFirstAvailable<ApiListResponse<unknown> | unknown[]>(queueEndpoints);
-  return normalizeListResponse(data).map(mapNursePatient);
+  try {
+    const data = await getFirstAvailable<ApiListResponse<unknown> | unknown[]>(queueEndpoints);
+    const rows = normalizeListResponse(data).map(mapNursePatient);
+    await saveNurseCache('triageQueue', rows);
+    return rows;
+  } catch (error) {
+    const cached = await readNurseCache<NursePatientSummary[]>('triageQueue');
+    if (cached) return cached.value;
+    throw error;
+  }
 }
 
 export async function getPatientsInTriage(): Promise<NursePatientSummary[]> {
-  const data = await getFirstAvailable<ApiListResponse<unknown> | unknown[]>(inTriageEndpoints);
-  return normalizeListResponse(data).map(mapNursePatient);
+  try {
+    const data = await getFirstAvailable<ApiListResponse<unknown> | unknown[]>(inTriageEndpoints);
+    const rows = normalizeListResponse(data).map(mapNursePatient);
+    await saveNurseCache('patientsInTriage', rows);
+    return rows;
+  } catch (error) {
+    const cached = await readNurseCache<NursePatientSummary[]>('patientsInTriage');
+    if (cached) return cached.value;
+    throw error;
+  }
 }
 
 export async function getCompletedTriages(): Promise<NurseTriage[]> {
-  const data = await getFirstAvailable<ApiListResponse<unknown> | unknown[]>(completedEndpoints);
-  return normalizeListResponse(data).map(mapTriage);
+  try {
+    const data = await getFirstAvailable<ApiListResponse<unknown> | unknown[]>(completedEndpoints);
+    const rows = normalizeListResponse(data).map(mapTriage);
+    await saveNurseCache('completedTriages', rows);
+    return rows;
+  } catch (error) {
+    const cached = await readNurseCache<NurseTriage[]>('completedTriages');
+    if (cached) return cached.value;
+    throw error;
+  }
 }
 
 export async function getNursePatientDetail(visitId: number | string): Promise<NursePatientSummary> {

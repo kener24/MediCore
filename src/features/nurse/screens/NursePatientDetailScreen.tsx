@@ -1,5 +1,5 @@
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -24,6 +24,8 @@ export function NursePatientDetailScreen() {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isInTriage = useMemo(() => ['in_triage', 'waiting_doctor', 'waiting_payment'].includes(String(patient?.status ?? '')), [patient?.status]);
+
   const load = useCallback(async () => {
     if (!visitId) {
       setError('No se encontró la visita del paciente.');
@@ -38,8 +40,8 @@ export function NursePatientDetailScreen() {
       ]);
       if (detail) setPatient(detail);
       setVitalSigns(vitals);
-    } catch {
-      setError('No se pudo cargar el detalle del paciente.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo cargar el detalle del paciente.');
     } finally {
       setLoading(false);
     }
@@ -54,14 +56,21 @@ export function NursePatientDetailScreen() {
       Alert.alert('Visita no encontrada', 'No se encontró la visita del paciente.');
       return;
     }
-    if (starting) return;
+    if (starting || isInTriage) return;
+    Alert.alert('Iniciar triaje', '¿Confirmas que iniciarás el triaje de este paciente?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Iniciar', onPress: () => void start() },
+    ]);
+  }
+
+  async function start() {
     try {
       setStarting(true);
       const updated = await startTriage(visitId);
       setPatient(updated);
       Alert.alert('Triaje iniciado', 'Puedes registrar signos vitales y completar la evaluación.');
-    } catch {
-      Alert.alert('Triaje', 'No se pudo iniciar el triaje en este momento.');
+    } catch (err) {
+      Alert.alert('Triaje', err instanceof Error ? err.message : 'No se pudo iniciar el triaje en este momento.');
     } finally {
       setStarting(false);
     }
@@ -82,9 +91,11 @@ export function NursePatientDetailScreen() {
           <Text style={styles.body}>{patient?.reason || 'Sin motivo registrado.'}</Text>
           <Text style={styles.label}>Teléfono</Text>
           <Text style={styles.body}>{patient?.phone || 'No registrado'}</Text>
+          <Text style={styles.label}>Médico asignado</Text>
+          <Text style={styles.body}>{patient?.doctorName || 'No asignado'}</Text>
         </AppCard>
         <VitalSignsSummary vitalSigns={vitalSigns} />
-        <AppButton disabled={!visitId || starting} label="Iniciar triaje" loading={starting} onPress={handleStart} />
+        <AppButton disabled={!visitId || starting || isInTriage} label={isInTriage ? 'Triaje iniciado' : 'Iniciar triaje'} loading={starting} onPress={handleStart} />
         <AppButton disabled={!visitId} label="Registrar signos vitales" onPress={() => navigation.navigate('NurseVitalSignsForm', { patient, visitId })} variant="secondary" />
         <AppButton disabled={!visitId} label="Completar triaje" onPress={() => navigation.navigate('NurseTriageForm', { patient, visitId, vitalSigns })} variant="secondary" />
       </ScrollView>

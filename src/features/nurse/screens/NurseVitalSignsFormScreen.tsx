@@ -4,26 +4,26 @@ import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, Te
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
-import { ErrorState } from '@/components/ErrorState';
 import { AppHeader } from '@/components/AppHeader';
 import { AppInput } from '@/components/AppInput';
+import { ErrorState } from '@/components/ErrorState';
 import { colors } from '@/core/theme/colors';
 import { createVitalSigns } from '@/features/nurse/services/nurseApi';
 import type { VitalSignsPayload } from '@/features/nurse/types/nurse.types';
-import { calculateBmi, onlyNumericText, parseOptionalNumber, validateVitalSigns } from '@/features/nurse/utils/nurseValidation';
+import { calculateBmi, getVitalSignAlerts, onlyNumericText, parseOptionalNumber, validateVitalSigns } from '@/features/nurse/utils/nurseValidation';
 
 const initialForm = {
-  temperature: '',
+  diastolicPressure: '',
+  glucose: '',
   heartRate: '',
+  heightCm: '',
+  notes: '',
+  oxygenSaturation: '',
+  painScale: '',
   respiratoryRate: '',
   systolicPressure: '',
-  diastolicPressure: '',
-  oxygenSaturation: '',
+  temperature: '',
   weightKg: '',
-  heightCm: '',
-  painScale: '',
-  glucose: '',
-  notes: '',
 };
 
 export function NurseVitalSignsFormScreen() {
@@ -45,31 +45,43 @@ export function NurseVitalSignsFormScreen() {
       return;
     }
     const payload: VitalSignsPayload = {
-      visit: visitId,
-      temperature: parseOptionalNumber(form.temperature),
+      bmi,
+      diastolic_pressure: parseOptionalNumber(form.diastolicPressure),
+      glucose: parseOptionalNumber(form.glucose),
       heart_rate: parseOptionalNumber(form.heartRate),
+      height_cm: parseOptionalNumber(form.heightCm),
+      notes: form.notes.trim() || undefined,
+      oxygen_saturation: parseOptionalNumber(form.oxygenSaturation),
+      pain_scale: parseOptionalNumber(form.painScale),
       respiratory_rate: parseOptionalNumber(form.respiratoryRate),
       systolic_pressure: parseOptionalNumber(form.systolicPressure),
-      diastolic_pressure: parseOptionalNumber(form.diastolicPressure),
-      oxygen_saturation: parseOptionalNumber(form.oxygenSaturation),
+      temperature: parseOptionalNumber(form.temperature),
+      visit: visitId,
       weight_kg: parseOptionalNumber(form.weightKg),
-      height_cm: parseOptionalNumber(form.heightCm),
-      bmi,
-      pain_scale: parseOptionalNumber(form.painScale),
-      glucose: parseOptionalNumber(form.glucose),
-      notes: form.notes.trim() || undefined,
     };
     const errors = validateVitalSigns(payload);
     if (errors.length) {
       Alert.alert('Revisa los signos vitales', errors.join('\n'));
       return;
     }
+    const alerts = getVitalSignAlerts(payload);
+    if (alerts.length) {
+      Alert.alert('Alertas clínicas', `${alerts.join('\n')}\n\n¿Deseas guardar de todas formas?`, [
+        { text: 'Revisar', style: 'cancel' },
+        { text: 'Guardar', onPress: () => void submitPayload(payload) },
+      ]);
+      return;
+    }
+    await submitPayload(payload);
+  }
+
+  async function submitPayload(payload: VitalSignsPayload) {
     try {
       setSaving(true);
       await createVitalSigns(payload);
       Alert.alert('Listo', 'Signos vitales registrados correctamente.', [{ text: 'Aceptar', onPress: () => navigation.goBack() }]);
-    } catch {
-      Alert.alert('No se pudo guardar', 'No se pudieron registrar los signos vitales.');
+    } catch (err) {
+      Alert.alert('No se pudo guardar', err instanceof Error ? err.message : 'No se pudieron registrar los signos vitales.');
     } finally {
       setSaving(false);
     }

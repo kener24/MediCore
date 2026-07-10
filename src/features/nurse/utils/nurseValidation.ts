@@ -1,4 +1,4 @@
-import type { CompleteTriagePayload, TriagePriority, VitalSignsPayload } from '@/features/nurse/types/nurse.types';
+import type { CompleteTriagePayload, NurseVitalSigns, TriagePriority, VitalSignsPayload } from '@/features/nurse/types/nurse.types';
 
 export const priorityOptions: { label: string; value: TriagePriority }[] = [
   { label: 'Crítica', value: 'critical' },
@@ -80,10 +80,40 @@ export function validateVitalSigns(payload: VitalSignsPayload) {
   return errors;
 }
 
+export function getVitalSignAlerts(vitalSigns?: NurseVitalSigns | VitalSignsPayload | null) {
+  if (!vitalSigns) return [];
+  const get = (camel: keyof NurseVitalSigns, snake: keyof VitalSignsPayload) => {
+    const source = vitalSigns as NurseVitalSigns & VitalSignsPayload;
+    return source[camel] ?? source[snake];
+  };
+  const alerts: string[] = [];
+  const temperature = get('temperature', 'temperature');
+  const systolic = get('systolicPressure', 'systolic_pressure');
+  const diastolic = get('diastolicPressure', 'diastolic_pressure');
+  const oxygen = get('oxygenSaturation', 'oxygen_saturation');
+  const heart = get('heartRate', 'heart_rate');
+  const respiratory = get('respiratoryRate', 'respiratory_rate');
+  const pain = get('painScale', 'pain_scale');
+  const glucose = get('glucose', 'glucose');
+
+  if (typeof temperature === 'number' && temperature >= 38) alerts.push('Fiebre o temperatura elevada.');
+  if (typeof temperature === 'number' && temperature < 35) alerts.push('Temperatura baja. Verifica medición.');
+  if (typeof oxygen === 'number' && oxygen < 92) alerts.push('Saturación de oxígeno baja.');
+  if (typeof heart === 'number' && (heart < 50 || heart > 120)) alerts.push('Frecuencia cardíaca fuera de rango habitual.');
+  if (typeof respiratory === 'number' && (respiratory < 10 || respiratory > 24)) alerts.push('Frecuencia respiratoria fuera de rango habitual.');
+  if (typeof systolic === 'number' && typeof diastolic === 'number' && (systolic >= 180 || diastolic >= 120)) alerts.push('Presión arterial en rango crítico.');
+  if (typeof systolic === 'number' && systolic < 90) alerts.push('Presión sistólica baja.');
+  if (typeof pain === 'number' && pain >= 8) alerts.push('Dolor severo reportado.');
+  if (typeof glucose === 'number' && (glucose < 70 || glucose > 250)) alerts.push('Glucosa fuera de rango habitual.');
+  return alerts;
+}
+
 export function validateTriage(payload: CompleteTriagePayload) {
   const errors: string[] = [];
   if (!payload.chief_complaint.trim()) errors.push('La queja principal es requerida.');
+  if (payload.chief_complaint.trim().length < 5) errors.push('La queja principal debe tener al menos 5 caracteres.');
   if (!payload.initial_assessment.trim()) errors.push('La evaluación inicial es requerida.');
+  if (payload.initial_assessment.trim().length < 10) errors.push('La evaluación inicial debe tener al menos 10 caracteres.');
   if (!payload.priority) errors.push('Selecciona la prioridad del paciente.');
   return errors;
 }

@@ -5,6 +5,7 @@ import { AppCard } from '@/components/AppCard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { colors } from '@/core/theme/colors';
 import type { NursePatientSummary, NurseTriage, NurseVitalSigns } from '@/features/nurse/types/nurse.types';
+import { getVitalSignAlerts } from '@/features/nurse/utils/nurseValidation';
 
 export function priorityLabel(priority?: string) {
   const labels: Record<string, string> = {
@@ -45,6 +46,22 @@ export function PatientQueueCard({ onPress, patient }: { onPress?: () => void; p
   );
 }
 
+export function ClinicalAlerts({ vitalSigns }: { vitalSigns?: NurseVitalSigns | null }) {
+  const alerts = getVitalSignAlerts(vitalSigns);
+  if (!alerts.length) return null;
+  return (
+    <View style={styles.alertBox}>
+      <View style={styles.alertHeader}>
+        <MaterialCommunityIcons color={colors.danger} name="alert-circle-outline" size={20} />
+        <Text style={styles.alertTitle}>Alertas clínicas</Text>
+      </View>
+      {alerts.map((alert) => (
+        <Text key={alert} style={styles.alertText}>- {alert}</Text>
+      ))}
+    </View>
+  );
+}
+
 export function VitalSignsSummary({ vitalSigns }: { vitalSigns?: NurseVitalSigns | null }) {
   if (!vitalSigns) {
     return (
@@ -75,6 +92,7 @@ export function VitalSignsSummary({ vitalSigns }: { vitalSigns?: NurseVitalSigns
           </View>
         ))}
       </View>
+      <ClinicalAlerts vitalSigns={vitalSigns} />
       {vitalSigns.notes ? <Text style={styles.description}>{vitalSigns.notes}</Text> : null}
     </AppCard>
   );
@@ -99,6 +117,31 @@ export function TriageCard({ onPress, triage }: { onPress?: () => void; triage: 
 }
 
 const styles = StyleSheet.create({
+  alertBox: {
+    backgroundColor: '#fff1f2',
+    borderColor: '#fecdd3',
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 5,
+    marginTop: 12,
+    padding: 12,
+  },
+  alertHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  alertText: {
+    color: colors.danger,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 18,
+  },
+  alertTitle: {
+    color: colors.danger,
+    fontSize: 14,
+    fontWeight: '900',
+  },
   avatar: {
     alignItems: 'center',
     backgroundColor: colors.palePrimary,

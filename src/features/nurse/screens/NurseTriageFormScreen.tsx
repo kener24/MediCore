@@ -4,8 +4,8 @@ import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleShee
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
-import { ErrorState } from '@/components/ErrorState';
 import { AppHeader } from '@/components/AppHeader';
+import { ErrorState } from '@/components/ErrorState';
 import { colors } from '@/core/theme/colors';
 import { VitalSignsSummary } from '@/features/nurse/components/NurseCards';
 import { completeTriage, getLatestVitalSigns } from '@/features/nurse/services/nurseApi';
@@ -47,7 +47,7 @@ export function NurseTriageFormScreen() {
       ]);
       return;
     }
-    Alert.alert('Completar triaje', 'El paciente será enviado a la cola médica. ¿Deseas continuar?', [
+    Alert.alert('Completar triaje', 'El paciente será enviado a la cola médica y esta evaluación quedará registrada. ¿Deseas continuar?', [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Completar', onPress: () => void save() },
     ]);
@@ -60,11 +60,11 @@ export function NurseTriageFormScreen() {
       return;
     }
     const payload: CompleteTriagePayload = {
-      visit: visitId,
       chief_complaint: chiefComplaint.trim(),
       initial_assessment: initialAssessment.trim(),
-      priority,
       notes: notes.trim() || undefined,
+      priority,
+      visit: visitId,
     };
     const errors = validateTriage(payload);
     if (errors.length) {
@@ -77,8 +77,8 @@ export function NurseTriageFormScreen() {
       Alert.alert('Triaje completado', 'El paciente fue enviado al médico correctamente.', [
         { text: 'Aceptar', onPress: () => navigation.navigate('NurseCompletedTriages') },
       ]);
-    } catch {
-      Alert.alert('No se pudo completar', 'No se pudo completar el triaje en este momento.');
+    } catch (err) {
+      Alert.alert('No se pudo completar', err instanceof Error ? err.message : 'No se pudo completar el triaje en este momento.');
     } finally {
       setSaving(false);
     }

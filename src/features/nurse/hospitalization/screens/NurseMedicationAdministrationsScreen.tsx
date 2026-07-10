@@ -16,50 +16,81 @@ import { formatDateTime } from '@/core/utils/dateUtils';
 import { administerMedication, delayMedication, getMedicationAdministrations, omitMedication } from '@/features/nurse/hospitalization/services/nurseHospitalizationService';
 import type { MedicationAdministration } from '@/features/nurse/hospitalization/types/nurseHospitalization.types';
 
+type MedicationAction = 'omit' | 'delay';
+
 export function NurseMedicationAdministrationsScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const hospitalizationId = Number(route.params?.hospitalizationId);
   const [items, setItems] = useState<MedicationAdministration[]>([]);
   const [selected, setSelected] = useState<MedicationAdministration | null>(null);
-  const [action, setAction] = useState<'omit' | 'delay' | null>(null);
+  const [action, setAction] = useState<MedicationAction | null>(null);
   const [actionText, setActionText] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [workingId, setWorkingId] = useState<number | string | null>(null);
 
   const load = useCallback(async (refresh = false) => {
+    if (!hospitalizationId) {
+      setError('No se encontró el internamiento.');
+      setLoading(false);
+      return;
+    }
     if (refresh) setRefreshing(true);
     else setLoading(true);
     setError('');
-    try { setItems(await getMedicationAdministrations(hospitalizationId)); }
-    catch (err) { setError(err instanceof Error ? err.message : 'No se pudieron cargar los medicamentos.'); }
-    finally { setLoading(false); setRefreshing(false); }
+    try {
+      setItems(await getMedicationAdministrations(hospitalizationId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudieron cargar los medicamentos.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, [hospitalizationId]);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   async function administer(item: MedicationAdministration) {
-    if (!item.id) return;
-    Alert.alert('Administrar medicamento', '¿Confirmas que administraste este medicamento?', [
+    if (!item.id || workingId) return;
+    Alert.alert('Administrar medicamento', 'Confirma esta acción solo si el medicamento ya fue administrado al paciente.', [
       { style: 'cancel', text: 'Cancelar' },
-      { text: 'Confirmar', onPress: async () => { await administerMedication(item.id!); await load(true); } },
+      {
+        text: 'Confirmar',
+        onPress: async () => {
+          try {
+            setWorkingId(item.id!);
+            await administerMedication(item.id!);
+            await load(true);
+          } catch (err) {
+            Alert.alert('Medicamento', err instanceof Error ? err.message : 'No se pudo administrar el medicamento.');
+          } finally {
+            setWorkingId(null);
+          }
+        },
+      },
     ]);
   }
 
   async function submitAction() {
-    if (!selected?.id || !action) return;
-    if (action === 'omit' && actionText.trim().length < 3) {
-      Alert.alert('Medicamento', 'El motivo de omisión es obligatorio.');
+    if (!selected?.id || !action || workingId) return;
+    if (action === 'omit' && actionText.trim().length < 5) {
+      Alert.alert('Medicamento', 'El motivo de omisión es obligatorio y debe tener al menos 5 caracteres.');
       return;
     }
     try {
+      setWorkingId(selected.id);
       if (action === 'omit') await omitMedication(selected.id, { reason: actionText.trim() });
-      if (action === 'delay') await delayMedication(selected.id, { notes: actionText.trim() });
-      setSelected(null); setAction(null); setActionText('');
+      if (action === 'delay') await delayMedication(selected.id, { notes: actionText.trim() || 'Retrasado desde app de enfermería.' });
+      setSelected(null);
+      setAction(null);
+      setActionText('');
       await load(true);
     } catch (err) {
       Alert.alert('Medicamento', err instanceof Error ? err.message : 'No se pudo actualizar el medicamento.');
+    } finally {
+      setWorkingId(null);
     }
   }
 
@@ -69,15 +100,29 @@ export function NurseMedicationAdministrationsScreen() {
     <SafeAreaView edges={['top']} style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl onRefresh={() => void load(true)} refreshing={refreshing} />}>
         <AppHeader icon="pill" subtitle="Administración hospitalaria de medicamentos." title="Medicamentos" />
-        <AppButton label="Programar medicamento" onPress={() => navigation.navigate('NurseMedicationAdministrationForm', { hospitalizationId })} />
+        <AppButton disabled={!hospitalizationId} label="Programar medicamento" onPress={() => navigation.navigate('NurseMedicationAdministrationForm', { hospitalizationId })} />
         {error ? <ErrorState message={error} onRetry={() => void load()} title="No se pudieron cargar medicamentos" /> : null}
         {!error && items.length === 0 ? <EmptyState description="No hay medicamentos programados." title="Sin medicamentos" /> : null}
-        {items.map((item) => <MedicationCard item={item} key={item.id ?? item.medication_name} onAdminister={() => administer(item)} onDelay={() => { setSelected(item); setAction('delay'); }} onOmit={() => { setSelected(item); setAction('omit'); }} />)}
+        {items.map((item) => (
+          <MedicationCard
+            disabled={Boolean(workingId)}
+            item={item}
+            key={item.id ?? item.medication_name}
+            loading={workingId === item.id}
+            onAdminister={() => administer(item)}
+            onDelay={() => { setSelected(item); setAction('delay'); setActionText(''); }}
+            onOmit={() => { setSelected(item); setAction('omit'); setActionText(''); }}
+          />
+        ))}
         {selected && action ? (
           <AppCard style={styles.card}>
             <Text style={styles.title}>{action === 'omit' ? 'Motivo de omisión' : 'Nota de retraso'}</Text>
+            <Text style={styles.description}>{selected.medication_name}</Text>
             <AppInput label={action === 'omit' ? 'Motivo obligatorio' : 'Nota'} onChangeText={setActionText} value={actionText} />
-            <AppButton label={action === 'omit' ? 'Omitir medicamento' : 'Retrasar medicamento'} onPress={submitAction} variant={action === 'omit' ? 'danger' : 'secondary'} />
+            <View style={styles.actions}>
+              <AppButton disabled={Boolean(workingId)} label="Cancelar" onPress={() => { setSelected(null); setAction(null); setActionText(''); }} variant="secondary" />
+              <AppButton disabled={Boolean(workingId)} label={action === 'omit' ? 'Omitir medicamento' : 'Retrasar medicamento'} loading={workingId === selected.id} onPress={submitAction} variant={action === 'omit' ? 'danger' : 'secondary'} />
+            </View>
           </AppCard>
         ) : null}
       </ScrollView>
@@ -85,7 +130,21 @@ export function NurseMedicationAdministrationsScreen() {
   );
 }
 
-export function MedicationCard({ item, onAdminister, onDelay, onOmit }: { item: MedicationAdministration; onAdminister?: () => void; onDelay?: () => void; onOmit?: () => void }) {
+export function MedicationCard({
+  disabled,
+  item,
+  loading,
+  onAdminister,
+  onDelay,
+  onOmit,
+}: {
+  disabled?: boolean;
+  item: MedicationAdministration;
+  loading?: boolean;
+  onAdminister?: () => void;
+  onDelay?: () => void;
+  onOmit?: () => void;
+}) {
   const locked = ['administered', 'omitted', 'cancelled'].includes(String(item.status));
   return (
     <AppCard style={styles.card}>
@@ -98,7 +157,13 @@ export function MedicationCard({ item, onAdminister, onDelay, onOmit }: { item: 
       {item.administered_by_name ? <Text style={styles.description}>Enfermera: {item.administered_by_name}</Text> : null}
       {item.notes ? <Text style={styles.description}>{item.notes}</Text> : null}
       {item.omission_reason ? <Text style={styles.description}>Omisión: {item.omission_reason}</Text> : null}
-      {!locked ? <View style={styles.actions}><AppButton label="Administrar" onPress={onAdminister} /><AppButton label="Retrasar" onPress={onDelay} variant="secondary" /><AppButton label="Omitir" onPress={onOmit} variant="danger" /></View> : null}
+      {!locked && onAdminister ? (
+        <View style={styles.actions}>
+          <AppButton disabled={disabled} label="Administrar" loading={loading} onPress={onAdminister} />
+          <AppButton disabled={disabled} label="Retrasar" onPress={onDelay} variant="secondary" />
+          <AppButton disabled={disabled} label="Omitir" onPress={onOmit} variant="danger" />
+        </View>
+      ) : null}
     </AppCard>
   );
 }

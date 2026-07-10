@@ -558,16 +558,18 @@ class Command(BaseCommand):
             "patient": ("Cita confirmada", "Tu clinica tiene datos demo disponibles para pruebas."),
         }
         for key, (title, message) in messages.items():
-            Notification.objects.update_or_create(
-                clinic=clinic,
-                recipient=users[key],
-                title=title,
-                defaults={
-                    "message": message,
-                    "notification_type": Notification.Type.INFO,
-                    "module": Notification.Module.SYSTEM,
-                    "priority": Notification.Priority.NORMAL,
-                    "status": Notification.Status.UNREAD,
-                    "metadata": {"seed": "mobile_test_data"},
-                },
-            )
+            defaults = {
+                "message": message,
+                "notification_type": Notification.Type.INFO,
+                "module": Notification.Module.SYSTEM,
+                "priority": Notification.Priority.NORMAL,
+                "status": Notification.Status.UNREAD,
+                "metadata": {"seed": "mobile_test_data"},
+            }
+            notification = Notification.objects.filter(clinic=clinic, recipient=users[key], title=title).order_by("id").first()
+            if notification:
+                for field, value in defaults.items():
+                    setattr(notification, field, value)
+                notification.save()
+            else:
+                Notification.objects.create(clinic=clinic, recipient=users[key], title=title, **defaults)

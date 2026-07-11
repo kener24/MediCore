@@ -1,5 +1,5 @@
 import { endpoints } from '@/core/api/endpoints';
-import { getFirstAvailable, normalizeAdminList, type AdminQueryParams } from '@/features/admin/services/adminApiHelpers';
+import { getFirstAvailable, normalizeAdminList, postFirstAvailable, type AdminQueryParams } from '@/features/admin/services/adminApiHelpers';
 import type {
   AdminAuditLog,
   AdminClinic,
@@ -7,9 +7,12 @@ import type {
   AdminFiscalRange,
   AdminFiscalReadiness,
   AdminReportSummary,
+  AdminSpecialty,
   AdminSubscription,
   AdminUsage,
   AdminUser,
+  CreateClinicUserPayload,
+  CreateDoctorProfilePayload,
 } from '@/features/admin/types/admin.types';
 
 export async function getAdminDashboard(): Promise<AdminDashboard> {
@@ -23,6 +26,26 @@ export async function getAdminClinic(): Promise<AdminClinic> {
 export async function getAdminUsers(params?: AdminQueryParams): Promise<AdminUser[]> {
   const data = await getFirstAvailable<unknown>([endpoints.clinicAdmin.users, '/users/'], params);
   return normalizeAdminList<AdminUser>(data);
+}
+
+export async function getAdminSpecialties(): Promise<AdminSpecialty[]> {
+  const data = await getFirstAvailable<unknown>([endpoints.clinicAdmin.specialties], { is_active: true });
+  return normalizeAdminList<AdminSpecialty>(data);
+}
+
+export async function createClinicUser(payload: CreateClinicUserPayload): Promise<AdminUser> {
+  return postFirstAvailable<AdminUser>([endpoints.clinicAdmin.users], payload);
+}
+
+export async function createDoctorProfile(payload: CreateDoctorProfilePayload) {
+  return postFirstAvailable([endpoints.clinicAdmin.doctors], payload);
+}
+
+export async function createClinicStaff(payload: CreateClinicUserPayload, doctorProfile?: Omit<CreateDoctorProfilePayload, 'user'>): Promise<AdminUser> {
+  return postFirstAvailable<AdminUser>([endpoints.clinicAdmin.createStaff], {
+    ...payload,
+    doctor_profile: doctorProfile,
+  });
 }
 
 export async function getAdminClinicReport(params?: AdminQueryParams): Promise<AdminReportSummary> {
@@ -76,4 +99,3 @@ export function clinicEmail(clinic?: AdminClinic | null) {
 export function clinicPhone(clinic?: AdminClinic | null) {
   return clinic?.telefono ?? clinic?.phone ?? 'Sin teléfono registrado';
 }
-

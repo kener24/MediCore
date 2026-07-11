@@ -45,6 +45,7 @@ export const endpoints = {
   },
   clinicAdmin: {
     dashboard: '/clinic-admin/dashboard/',
+    createStaff: '/clinic-admin/users/create-staff/',
     myClinic: '/clinic-admin/my-clinic/',
     users: '/clinic-admin/users/',
     user: (id: number | string) => `/clinic-admin/users/${id}/`,
@@ -57,6 +58,9 @@ export const endpoints = {
     fiscalRanges: '/billing/fiscal-ranges/',
     auditLogs: '/audit/logs/',
     auditSummary: '/audit/summary/',
+    doctors: '/doctors/',
+    roles: '/roles/',
+    specialties: '/specialties/',
     subscription: '/subscriptions/my-subscription/',
     usage: '/subscriptions/usage/',
   },

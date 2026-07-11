@@ -1,9 +1,10 @@
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppCard } from '@/components/AppCard';
+import { AppButton } from '@/components/AppButton';
 import { AppHeader } from '@/components/AppHeader';
 import { AppInput } from '@/components/AppInput';
 import { EmptyState } from '@/components/EmptyState';
@@ -15,6 +16,7 @@ import { adminUserName, adminUserRole, getAdminUsers } from '@/features/admin/se
 import type { AdminUser } from '@/features/admin/types/admin.types';
 
 export function AdminUsersScreen() {
+  const navigation = useNavigation<any>();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -51,6 +53,7 @@ export function AdminUsersScreen() {
         <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl onRefresh={() => void load(true)} refreshing={refreshing} />}>
           <AppHeader icon="account-cog-outline" subtitle="Consulta accesos y roles de la clínica." title="Equipo y permisos" />
           {error ? <ErrorState message={error} onRetry={() => void load()} title="Usuarios no disponibles" /> : null}
+          <AppButton label="Crear enfermero, recepción o doctor" onPress={() => navigation.navigate('AdminCreateStaff')} />
           <AppInput icon="magnify" label="Buscar usuario" onChangeText={setSearch} placeholder="Nombre, correo o rol" value={search} />
           <Text style={styles.counter}>{filtered.length} de {users.length} usuarios</Text>
           {!error && filtered.length === 0 ? <EmptyState description="No hay usuarios que coincidan con la búsqueda." title="Sin resultados" /> : null}
@@ -149,4 +152,3 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
-

@@ -29,3 +29,16 @@ export async function getFirstAvailable<T>(urls: string[], params?: AdminQueryPa
   throw lastError instanceof Error ? lastError : new Error(unavailableAdminAction);
 }
 
+export async function postFirstAvailable<T>(urls: string[], payload?: unknown): Promise<T> {
+  let lastError: unknown;
+  for (const url of urls) {
+    try {
+      const { data } = await apiClient.post<T>(url, payload ?? {});
+      return data;
+    } catch (error) {
+      lastError = error;
+      if (error instanceof ApiClientError && error.status && ![404, 405].includes(error.status)) throw error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(unavailableAdminAction);
+}

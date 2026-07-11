@@ -102,5 +102,32 @@ export type AdminUsage = {
   [key: string]: unknown;
 };
 
-export type AdminListResponse<T> = T[] | { results?: T[]; data?: T[]; items?: T[]; count?: number };
+export type AdminSpecialty = {
+  id: number;
+  nombre?: string;
+  name?: string;
+  descripcion?: string;
+  activo?: boolean;
+};
 
+export type CreateClinicUserPayload = {
+  email: string;
+  is_active?: boolean;
+  nombre_completo: string;
+  password: string;
+  role: 'medico' | 'enfermera' | 'recepcionista';
+  telefono?: string;
+};
+
+export type CreateDoctorProfilePayload = {
+  atiende_presencial?: boolean;
+  atiende_virtual?: boolean;
+  duracion_consulta_minutos?: number;
+  numero_colegiacion: string;
+  specialty: number;
+  tarifa_consulta?: string;
+  titulo_profesional?: string;
+  user: number;
+};
+
+export type AdminListResponse<T> = T[] | { results?: T[]; data?: T[]; items?: T[]; count?: number };

@@ -9,6 +9,7 @@ import { AdminHomeScreen } from '@/features/admin/screens/AdminHomeScreen';
 import { AdminProfileScreen } from '@/features/admin/screens/AdminProfileScreen';
 import { AdminReportsScreen } from '@/features/admin/screens/AdminReportsScreen';
 import { AdminUsersScreen } from '@/features/admin/screens/AdminUsersScreen';
+import { BirthdayExamScreen } from '@/features/birthdayExam/screens/BirthdayExamScreen';
 import { createTabOptions, tabIcon } from '@/navigation/tabOptions';
 
 const Tab = createBottomTabNavigator();
@@ -20,6 +21,7 @@ function AdminHomeStack() {
     <Stack.Navigator screenOptions={stackOptions}>
       <Stack.Screen component={AdminHomeScreen} name="AdminHomeMain" />
       <Stack.Screen component={AdminProfileScreen} name="AdminProfile" />
+      <Stack.Screen component={BirthdayExamScreen} name="BirthdayExam" />
     </Stack.Navigator>
   );
 }

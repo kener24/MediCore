@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RoleGuard } from '@/components/RoleGuard';
 import { CashierHomeStack } from '@/navigation/CashierTabs';
+import { BirthdayExamScreen } from '@/features/birthdayExam/screens/BirthdayExamScreen';
 import { ReceptionAppointmentCheckInScreen } from '@/features/reception/screens/ReceptionAppointmentCheckInScreen';
 import { ReceptionChangePasswordScreen } from '@/features/reception/screens/ReceptionChangePasswordScreen';
 import { ReceptionCreateAdmissionScreen } from '@/features/reception/screens/ReceptionCreateAdmissionScreen';
@@ -33,6 +34,7 @@ function ReceptionHomeStack() {
       <Stack.Screen component={ReceptionAppointmentCheckInScreen} name="ReceptionAppointmentCheckIn" />
       <Stack.Screen component={ReceptionTodayAdmissionsScreen} name="ReceptionTodayAdmissions" />
       <Stack.Screen component={ReceptionVisitDetailScreen} name="ReceptionVisitDetail" />
+      <Stack.Screen component={BirthdayExamScreen} name="BirthdayExam" />
     </Stack.Navigator>
   );
 }

@@ -6,8 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from '@/components/AppHeader';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
-import { StatCard } from '@/components/StatCard';
 import { RoleGuard } from '@/components/RoleGuard';
+import { StatCard } from '@/components/StatCard';
 import { colors } from '@/core/theme/colors';
 import { AdminActionCard } from '@/features/admin/components/AdminCards';
 import { clinicName, getAdminDashboard } from '@/features/admin/services/adminService';
@@ -76,6 +76,12 @@ export function AdminHomeScreen() {
               icon="chart-box-outline"
               onPress={() => navigation.navigate('AdminReports')}
               title="Reportes y control"
+            />
+            <AdminActionCard
+              description="CRUD temporal de examen con nombre, fecha de cumpleaños y teléfono."
+              icon="cake-variant-outline"
+              onPress={() => navigation.navigate('BirthdayExam')}
+              title="Cumpleaños"
             />
             <AdminActionCard
               description="Consulta tu sesión actual y cierra sesión con seguridad."

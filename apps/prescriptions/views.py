@@ -183,7 +183,7 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
             return Response(PrescriptionItemSerializer(prescription.items.filter(activo=True), many=True).data)
         if get_role_name(request.user) != "medico" or prescription.doctor.user_id != request.user.id:
             return Response({"detail": "No tienes permiso para agregar medicamentos."}, status=status.HTTP_403_FORBIDDEN)
-        serializer = PrescriptionItemSerializer(data=request.data)
+        serializer = PrescriptionItemSerializer(data=request.data, context={"prescription": prescription})
         serializer.is_valid(raise_exception=True)
         serializer.save(prescription=prescription)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -200,7 +200,7 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
             item.activo = False
             item.save(update_fields=["activo"])
             return Response(status=status.HTTP_204_NO_CONTENT)
-        serializer = PrescriptionItemSerializer(item, data=request.data, partial=True)
+        serializer = PrescriptionItemSerializer(item, data=request.data, partial=True, context={"prescription": prescription})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)

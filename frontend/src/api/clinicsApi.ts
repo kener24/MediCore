@@ -26,12 +26,12 @@ export async function updateClinic(id: string | number, payload: Partial<ClinicP
   return data;
 }
 
-export async function activateClinic(id: string | number) {
-  const { data } = await api.patch<Clinic>(`/clinics/${id}/activate/`);
+export async function activateClinic(id: string | number, reason: string) {
+  const { data } = await api.patch<Clinic>(`/clinics/${id}/activate/`, { reason });
   return data;
 }
 
-export async function deactivateClinic(id: string | number) {
-  const { data } = await api.patch<Clinic>(`/clinics/${id}/deactivate/`);
+export async function deactivateClinic(id: string | number, reason: string) {
+  const { data } = await api.patch<Clinic>(`/clinics/${id}/deactivate/`, { reason });
   return data;
 }

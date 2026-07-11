@@ -1,4 +1,7 @@
-from django.core.exceptions import ValidationError
+import re
+import unicodedata
+
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import models
 from django.utils import timezone
 
@@ -14,6 +17,50 @@ def validate_consultation_links(consultation, patient, doctor, clinic):
         raise ValidationError("Paciente y medico deben coincidir con la consulta.")
     if clinic.id != consultation.clinic_id or patient.clinic_id != clinic.id or doctor.clinic_id != clinic.id:
         raise ValidationError("Consulta, paciente y medico deben pertenecer a la misma clinica.")
+
+
+ALLERGY_NEGATIONS = {"", "no", "ninguna", "ninguno", "n/a", "na", "sin alergias", "no refiere", "desconocido"}
+ALLERGY_STOPWORDS = {"alergia", "alergias", "alergico", "alergica", "a", "al", "la", "el", "los", "las", "de", "del", "por", "medicamento", "medicamentos", "refiere"}
+ALLERGY_ALIASES = {
+    "penicilina": {"penicilina", "amoxicilina", "ampicilina", "dicloxacilina"},
+    "aines": {"ibuprofeno", "naproxeno", "diclofenaco", "ketorolaco", "aspirina"},
+}
+
+
+def normalize_medical_text(value):
+    normalized = unicodedata.normalize("NFKD", str(value or "").lower())
+    without_accents = "".join(char for char in normalized if not unicodedata.combining(char))
+    return re.sub(r"[^a-z0-9]+", " ", without_accents).strip()
+
+
+def allergy_terms(allergy_text):
+    normalized = normalize_medical_text(allergy_text)
+    if normalized in ALLERGY_NEGATIONS:
+        return set()
+    terms = {part.strip() for part in re.split(r"[,;|/\n]+", allergy_text or "") if part.strip()}
+    words = normalize_medical_text(allergy_text).split()
+    terms.update(word for word in words if len(word) >= 4 and word not in ALLERGY_STOPWORDS)
+    return {normalize_medical_text(term) for term in terms if normalize_medical_text(term) not in ALLERGY_NEGATIONS}
+
+
+def find_allergy_conflicts(patient, medication_name):
+    medication = normalize_medical_text(medication_name)
+    if not patient or not medication:
+        return []
+    try:
+        record = getattr(patient, "medical_record", None)
+    except ObjectDoesNotExist:
+        record = None
+    raw_allergies = " ".join(filter(None, [getattr(patient, "alergias", ""), getattr(record, "allergies", "")]))
+    conflicts = []
+    for term in allergy_terms(raw_allergies):
+        aliases = ALLERGY_ALIASES.get(term, {term})
+        for alias in aliases:
+            normalized_alias = normalize_medical_text(alias)
+            if normalized_alias and (normalized_alias in medication or medication in normalized_alias):
+                conflicts.append(term)
+                break
+    return sorted(set(conflicts))
 
 
 class Diagnosis(TimeStampedModel):
@@ -117,6 +164,11 @@ class Prescription(TimeStampedModel):
             raise ValidationError("No se puede emitir una receta anulada.")
         if not self.items.filter(activo=True).exists():
             raise ValidationError("No puedes emitir una receta sin medicamentos.")
+        conflicts = []
+        for item in self.items.filter(activo=True):
+            conflicts.extend(find_allergy_conflicts(self.patient, item.medication_name))
+        if conflicts:
+            raise ValidationError(f"No se puede emitir la receta: el paciente registra alergia relacionada con {', '.join(sorted(set(conflicts)))}.")
         self.status = self.Status.EMITIDA
         self.issue_date = timezone.localdate()
         self.save(update_fields=["status", "issue_date", "actualizado_en"])
@@ -157,6 +209,10 @@ class PrescriptionItem(TimeStampedModel):
             raise ValidationError("Medicamento, dosis y frecuencia son obligatorios.")
         if self.prescription_id and self.prescription.status == Prescription.Status.EMITIDA:
             raise ValidationError("No puedes modificar medicamentos de una receta emitida.")
+        if self.prescription_id:
+            conflicts = find_allergy_conflicts(self.prescription.patient, self.medication_name)
+            if conflicts:
+                raise ValidationError(f"El paciente registra alergia relacionada con {', '.join(conflicts)}. Revisa antes de recetar.")
 
     def save(self, *args, **kwargs):
         self.full_clean()

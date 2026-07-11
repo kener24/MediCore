@@ -38,6 +38,8 @@ class LoginSerializer(TokenObtainPairSerializer):
             lock = active_lock(candidate)
             if lock:
                 raise serializers.ValidationError({"detail": f"Cuenta bloqueada temporalmente hasta {lock.locked_until}."})
+            if candidate.clinica_id and not candidate.clinica.activo:
+                raise serializers.ValidationError({"detail": "La clínica asociada está inactiva. Contacta al administrador del sistema."})
         data = super().validate(attrs)
         data["user"] = MeSerializer(self.user).data
         return data

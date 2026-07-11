@@ -96,6 +96,29 @@ class PrescriptionItemSerializer(serializers.ModelSerializer):
         fields = ["id", "prescription", "medication_name", "presentation", "dosage", "frequency", "duration", "quantity", "route", "instructions", "activo", "creado_en", "actualizado_en"]
         read_only_fields = ["id", "prescription", "creado_en", "actualizado_en"]
 
+    def validate(self, attrs):
+        prescription = self.context.get("prescription") or getattr(self.instance, "prescription", None)
+        if not prescription:
+            return attrs
+        instance = PrescriptionItem(
+            id=getattr(self.instance, "id", None),
+            prescription=prescription,
+            medication_name=attrs.get("medication_name", getattr(self.instance, "medication_name", "")),
+            presentation=attrs.get("presentation", getattr(self.instance, "presentation", "")),
+            dosage=attrs.get("dosage", getattr(self.instance, "dosage", "")),
+            frequency=attrs.get("frequency", getattr(self.instance, "frequency", "")),
+            duration=attrs.get("duration", getattr(self.instance, "duration", "")),
+            quantity=attrs.get("quantity", getattr(self.instance, "quantity", "")),
+            route=attrs.get("route", getattr(self.instance, "route", PrescriptionItem.Route.ORAL)),
+            instructions=attrs.get("instructions", getattr(self.instance, "instructions", "")),
+            activo=attrs.get("activo", getattr(self.instance, "activo", True)),
+        )
+        try:
+            instance.clean()
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.message_dict if hasattr(exc, "message_dict") else exc.messages)
+        return attrs
+
 
 class PrescriptionListSerializer(serializers.ModelSerializer):
     clinic_nombre = serializers.CharField(source="clinic.nombre", read_only=True)

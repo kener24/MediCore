@@ -22,6 +22,7 @@ export function SuperAdminClinicsPage() {
   const [clinics, setClinics] = useState<Clinic[]>([]);
   const [selectedClinic, setSelectedClinic] = useState<Clinic | null>(null);
   const [confirmClinic, setConfirmClinic] = useState<Clinic | null>(null);
+  const [statusReason, setStatusReason] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -67,16 +68,22 @@ export function SuperAdminClinicsPage() {
 
   async function toggleClinic() {
     if (!confirmClinic) return;
+    const reason = statusReason.trim();
+    if (reason.length < 5) {
+      toast.error("Indica un motivo claro para auditar esta acción.");
+      return;
+    }
     setSaving(true);
     try {
       if (confirmClinic.activo) {
-        await deactivateClinic(confirmClinic.id);
-        toast.success("Clinica desactivada correctamente.");
+        await deactivateClinic(confirmClinic.id, reason);
+        toast.success("Clínica desactivada correctamente.");
       } else {
-        await activateClinic(confirmClinic.id);
-        toast.success("Clinica activada correctamente.");
+        await activateClinic(confirmClinic.id, reason);
+        toast.success("Clínica activada correctamente.");
       }
       setConfirmClinic(null);
+      setStatusReason("");
       await load();
     } catch (error) {
       toast.error(getErrorMessage(error));
@@ -142,7 +149,10 @@ export function SuperAdminClinicsPage() {
                     </Link>
                     <button
                       className="rounded-md border border-slate-200 p-2 text-slate-600 hover:bg-slate-50"
-                      onClick={() => setConfirmClinic(clinic)}
+                      onClick={() => {
+                        setStatusReason("");
+                        setConfirmClinic(clinic);
+                      }}
                       type="button"
                       title={clinic.activo ? "Desactivar" : "Activar"}
                     >
@@ -172,9 +182,23 @@ export function SuperAdminClinicsPage() {
         confirmLabel={confirmClinic?.activo ? "Desactivar" : "Activar"}
         tone={confirmClinic?.activo ? "danger" : "primary"}
         isLoading={saving}
-        onClose={() => setConfirmClinic(null)}
+        onClose={() => {
+          setConfirmClinic(null);
+          setStatusReason("");
+        }}
         onConfirm={toggleClinic}
-      />
+      >
+        <label className="mt-4 block space-y-1.5">
+          <span className="text-sm font-medium text-slate-700">Motivo obligatorio</span>
+          <textarea
+            className="min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-100"
+            placeholder="Ej. Suspensión por mora, reactivación autorizada por contrato, cierre temporal solicitado..."
+            value={statusReason}
+            onChange={(event) => setStatusReason(event.target.value)}
+          />
+          <p className="text-xs text-slate-500">Este motivo queda registrado en auditoría y, al desactivar, se cierran las sesiones activas de la clínica.</p>
+        </label>
+      </ConfirmModal>
     </div>
   );
 }

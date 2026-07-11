@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { Button } from "./Button";
 import { Modal } from "./Modal";
 
@@ -8,6 +10,7 @@ interface ConfirmModalProps {
   confirmLabel?: string;
   isLoading?: boolean;
   tone?: "primary" | "danger";
+  children?: ReactNode;
   onConfirm: () => void;
   onClose: () => void;
 }
@@ -19,6 +22,7 @@ export function ConfirmModal({
   confirmLabel = "Confirmar",
   isLoading,
   tone = "primary",
+  children,
   onConfirm,
   onClose,
 }: ConfirmModalProps) {
@@ -39,6 +43,7 @@ export function ConfirmModal({
       }
     >
       <p className="text-sm leading-6 text-slate-600">{description}</p>
+      {children}
     </Modal>
   );
 }

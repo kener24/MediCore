@@ -76,6 +76,25 @@ class PrescriptionsModuleTests(APITestCase):
         response = self.client.post(f"/api/prescriptions/{prescription.id}/items/", {"medication_name": "Ibuprofeno", "dosage": "400mg", "frequency": "cada 12 horas"}, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
+    def test_bloquea_medicamento_si_paciente_tiene_alergia(self):
+        self.patient.alergias = "Alergia a ibuprofeno"
+        self.patient.save(update_fields=["alergias"])
+        prescription = Prescription.objects.create(consultation=self.consultation)
+        self.auth(self.doctor_user)
+        response = self.client.post(f"/api/prescriptions/{prescription.id}/items/", {"medication_name": "Ibuprofeno", "dosage": "400mg", "frequency": "cada 12 horas"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("alergia", str(response.data).lower())
+
+    def test_emitir_receta_valida_alergias_actualizadas(self):
+        prescription = Prescription.objects.create(consultation=self.consultation)
+        prescription.items.create(medication_name="Acetaminofen", dosage="500mg", frequency="cada 8 horas")
+        self.patient.alergias = "acetaminofen"
+        self.patient.save(update_fields=["alergias"])
+        self.auth(self.doctor_user)
+        response = self.client.patch(f"/api/prescriptions/{prescription.id}/issue/")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("alergia", response.data["detail"].lower())
+
     def test_no_medicamento_vacio(self):
         prescription = Prescription.objects.create(consultation=self.consultation)
         self.auth(self.doctor_user)

@@ -4,6 +4,8 @@ from rest_framework.test import APITestCase
 from apps.accounts.models import Role, User
 from apps.clinics.models import Clinic
 from apps.doctors.models import DoctorProfile, MedicalSpecialty
+from apps.security.models import UserSession
+from django.utils import timezone
 
 
 class AuthAndUsersTests(APITestCase):
@@ -86,6 +88,40 @@ class AuthAndUsersTests(APITestCase):
         response = self.client.get("/api/clinics/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 2)
+
+    def test_superadmin_debe_indicar_motivo_para_desactivar_clinica(self):
+        self.authenticate(self.superadmin)
+        response = self.client.patch(f"/api/clinics/{self.clinic.id}/deactivate/", {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.clinic.refresh_from_db()
+        self.assertTrue(self.clinic.activo)
+
+    def test_desactivar_clinica_revoca_sesiones_y_bloquea_login(self):
+        session = UserSession.objects.create(
+            user=self.normal_user,
+            session_key="clinica-activa",
+            ip_address="127.0.0.1",
+            user_agent="test",
+            device_name="test",
+            last_activity_at=timezone.now(),
+            expires_at=timezone.now() + timezone.timedelta(days=1),
+        )
+        self.authenticate(self.superadmin)
+        response = self.client.patch(f"/api/clinics/{self.clinic.id}/deactivate/", {"reason": "Cierre temporal solicitado"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        session.refresh_from_db()
+        self.assertFalse(session.active)
+        login = self.client.post("/api/auth/login/", {"email": self.normal_user.email, "password": "Medico12345*"}, format="json")
+        self.assertEqual(login.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_superadmin_debe_indicar_motivo_para_activar_clinica(self):
+        self.clinic.activo = False
+        self.clinic.save(update_fields=["activo"])
+        self.authenticate(self.superadmin)
+        response = self.client.patch(f"/api/clinics/{self.clinic.id}/activate/", {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        response = self.client.patch(f"/api/clinics/{self.clinic.id}/activate/", {"reason": "Reactivacion autorizada"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_admin_solo_ve_su_clinica(self):
         self.authenticate(self.clinic_admin)

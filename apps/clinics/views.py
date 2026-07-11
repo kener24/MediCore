@@ -4,10 +4,19 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from apps.accounts.permissions import IsSuperAdmin, get_role_name
+from apps.accounts.models import User
 from apps.audit.models import AuditLog
 from apps.audit.services import get_object_audit_data, log_audit_event
 from apps.clinics.models import Clinic
 from apps.clinics.serializers import ClinicSerializer
+from apps.security.services import revoke_all_user_sessions
+
+
+def action_reason(request):
+    reason = str(request.data.get("reason") or request.data.get("motivo") or "").strip()
+    if len(reason) < 5:
+        return ""
+    return reason
 
 
 class ClinicViewSet(
@@ -62,16 +71,25 @@ class ClinicViewSet(
 
     @action(detail=True, methods=["patch"])
     def activate(self, request, pk=None):
+        reason = action_reason(request)
+        if not reason:
+            return Response({"reason": "El motivo es obligatorio y debe ser claro."}, status=400)
         clinic = self.get_object()
         clinic.activo = True
         clinic.save(update_fields=["activo"])
-        log_audit_event(request=request, clinic=clinic, action=AuditLog.Action.ACTIVATE, module=AuditLog.Module.CLINICS, model_name="Clinic", object_id=clinic.id, object_repr=clinic.nombre, description="Clinica activada.", new_values={"activo": True})
+        log_audit_event(request=request, clinic=clinic, action=AuditLog.Action.ACTIVATE, module=AuditLog.Module.CLINICS, model_name="Clinic", object_id=clinic.id, object_repr=clinic.nombre, description="Clinica activada.", new_values={"activo": True, "reason": reason})
         return Response(self.get_serializer(clinic).data)
 
     @action(detail=True, methods=["patch"])
     def deactivate(self, request, pk=None):
+        reason = action_reason(request)
+        if not reason:
+            return Response({"reason": "El motivo es obligatorio y debe ser claro."}, status=400)
         clinic = self.get_object()
         clinic.activo = False
         clinic.save(update_fields=["activo"])
-        log_audit_event(request=request, clinic=clinic, action=AuditLog.Action.DEACTIVATE, module=AuditLog.Module.CLINICS, model_name="Clinic", object_id=clinic.id, object_repr=clinic.nombre, description="Clinica desactivada.", new_values={"activo": False})
+        users = User.objects.filter(clinica=clinic, is_active=True)
+        for user in users:
+            revoke_all_user_sessions(user, revoked_by=request.user)
+        log_audit_event(request=request, clinic=clinic, action=AuditLog.Action.DEACTIVATE, module=AuditLog.Module.CLINICS, model_name="Clinic", object_id=clinic.id, object_repr=clinic.nombre, description="Clinica desactivada y sesiones revocadas.", new_values={"activo": False, "reason": reason, "sessions_revoked_for_users": users.count()})
         return Response(self.get_serializer(clinic).data)

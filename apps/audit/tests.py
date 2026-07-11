@@ -1,6 +1,7 @@
 from datetime import date, time
 from decimal import Decimal
 
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
@@ -113,6 +114,14 @@ class AuditTests(APITestCase):
         stats = self.client.get("/api/audit/stats/").json()
         self.assertEqual(stats["total_logs"], 2)
         self.assertEqual(stats["errors"], 1)
+
+    def test_audit_log_is_append_only_at_model_level(self):
+        log = AuditLog.objects.create(clinic=self.clinic, user=self.admin, action="create", module="patients", severity="info", description="Evento")
+        log.description = "Alterado"
+        with self.assertRaises(ValidationError):
+            log.save()
+        with self.assertRaises(ValidationError):
+            log.delete()
 
     def test_unauthenticated_cannot_access(self):
         self.assertEqual(self.client.get("/api/audit/logs/").status_code, 401)

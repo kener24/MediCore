@@ -3,6 +3,7 @@ from rest_framework.test import APITestCase
 
 from apps.accounts.models import Role, User
 from apps.clinics.models import Clinic
+from apps.doctors.models import DoctorProfile, MedicalSpecialty
 
 
 class AuthAndUsersTests(APITestCase):
@@ -10,7 +11,10 @@ class AuthAndUsersTests(APITestCase):
         self.superadmin_role = Role.objects.create(nombre="superadmin")
         self.admin_role = Role.objects.create(nombre="admin")
         self.medico_role = Role.objects.create(nombre="medico")
+        self.enfermera_role = Role.objects.create(nombre="enfermera")
+        self.recepcionista_role = Role.objects.create(nombre="recepcionista")
         self.paciente_role = Role.objects.create(nombre="paciente")
+        self.specialty = MedicalSpecialty.objects.create(nombre="Medicina General")
         self.clinic = Clinic.objects.create(nombre="Clinica Demo", correo="demo@medicore.com")
         self.other_clinic = Clinic.objects.create(nombre="Clinica Norte", correo="norte@medicore.com")
         self.superadmin = User.objects.create_user(
@@ -205,6 +209,72 @@ class AuthAndUsersTests(APITestCase):
         created = User.objects.get(email="nuevo-medico@medicore.com")
         self.assertEqual(created.clinica_id, self.clinic.id)
 
+    def test_admin_puede_crear_staff_clinico_desde_endpoint_atomico(self):
+        self.authenticate(self.clinic_admin)
+        response = self.client.post(
+            "/api/clinic-admin/users/create-staff/",
+            {
+                "email": "enfermera-nueva@medicore.com",
+                "password": "Enfermera12345*",
+                "nombre_completo": "Enfermera Nueva",
+                "telefono": "9999-1111",
+                "role": "enfermera",
+                "is_active": True,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        created = User.objects.get(email="enfermera-nueva@medicore.com")
+        self.assertEqual(created.clinica_id, self.clinic.id)
+        self.assertEqual(created.role.nombre, "enfermera")
+
+    def test_admin_puede_crear_medico_con_perfil_desde_endpoint_atomico(self):
+        self.authenticate(self.clinic_admin)
+        response = self.client.post(
+            "/api/clinic-admin/users/create-staff/",
+            {
+                "email": "doctor-nuevo@medicore.com",
+                "password": "Doctor12345*",
+                "nombre_completo": "Doctor Nuevo",
+                "telefono": "9999-2222",
+                "role": "medico",
+                "is_active": True,
+                "doctor_profile": {
+                    "specialty": self.specialty.id,
+                    "numero_colegiacion": "COL-NEW-1",
+                    "titulo_profesional": "Medico general",
+                    "duracion_consulta_minutos": 30,
+                    "atiende_presencial": True,
+                    "atiende_virtual": False,
+                },
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        created = User.objects.get(email="doctor-nuevo@medicore.com")
+        self.assertTrue(DoctorProfile.objects.filter(user=created, clinic=self.clinic, numero_colegiacion="COL-NEW-1").exists())
+
+    def test_creacion_atomica_no_deja_medico_sin_perfil_si_falla(self):
+        self.authenticate(self.clinic_admin)
+        response = self.client.post(
+            "/api/clinic-admin/users/create-staff/",
+            {
+                "email": "doctor-invalido@medicore.com",
+                "password": "Doctor12345*",
+                "nombre_completo": "Doctor Invalido",
+                "role": "medico",
+                "is_active": True,
+                "doctor_profile": {
+                    "specialty": self.specialty.id,
+                    "numero_colegiacion": "",
+                    "duracion_consulta_minutos": 0,
+                },
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(User.objects.filter(email="doctor-invalido@medicore.com").exists())
+
     def test_admin_no_puede_crear_superadmin_en_panel_clinica(self):
         self.authenticate(self.clinic_admin)
         response = self.client.post(
@@ -226,12 +296,11 @@ class AuthAndUsersTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_recepcionista_no_puede_acceder_panel_admin_clinica(self):
-        recepcionista_role = Role.objects.create(nombre="recepcionista")
         recepcionista = User.objects.create_user(
             email="recepcion@medicore.com",
             password="Recepcion12345*",
             nombre_completo="Recepcionista",
-            role=recepcionista_role,
+            role=self.recepcionista_role,
             clinica=self.clinic,
         )
         self.authenticate(recepcionista)

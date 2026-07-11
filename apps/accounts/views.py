@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.db.models import Count, Q
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
@@ -24,6 +25,7 @@ from apps.accounts.serializers import (
 )
 from apps.clinics.models import Clinic
 from apps.audit.models import AuditLog
+from apps.doctors.serializers import DoctorProfileCreateSerializer, DoctorProfileDetailSerializer
 from apps.audit.services import get_object_audit_data, log_audit_event
 from apps.security.services import active_lock, create_user_session, record_login_attempt, register_failed_login, revoke_all_user_sessions
 
@@ -375,6 +377,35 @@ class ClinicAdminUserViewSet(viewsets.ModelViewSet):
             created = User.objects.filter(id=response.data.get("id")).select_related("role", "clinica").first()
             log_audit_event(request=request, clinic=getattr(created, "clinica", None), action=AuditLog.Action.CREATE, module=AuditLog.Module.USERS, model_name="User", object_id=response.data.get("id"), object_repr=response.data.get("email", ""), description="Usuario de clinica creado.", new_values=request.data)
         return response
+
+    @action(detail=False, methods=["post"], url_path="create-staff")
+    def create_staff(self, request):
+        with transaction.atomic():
+            user_serializer = ClinicAdminUserCreateSerializer(data=request.data, context=self.get_serializer_context())
+            user_serializer.is_valid(raise_exception=True)
+            user = user_serializer.save()
+            doctor_profile = None
+            if user.role and user.role.nombre == "medico":
+                profile_payload = dict(request.data.get("doctor_profile") or {})
+                profile_payload["user"] = user.id
+                doctor_serializer = DoctorProfileCreateSerializer(data=profile_payload, context={"request": request})
+                doctor_serializer.is_valid(raise_exception=True)
+                doctor_profile = doctor_serializer.save()
+            log_audit_event(
+                request=request,
+                clinic=getattr(user, "clinica", None),
+                action=AuditLog.Action.CREATE,
+                module=AuditLog.Module.USERS,
+                model_name="User",
+                object_id=user.id,
+                object_repr=user.email,
+                description="Personal de clinica creado desde modulo admin.",
+                new_values={"role": getattr(user.role, "nombre", ""), "doctor_profile": getattr(doctor_profile, "id", None)},
+            )
+            data = UserDetailSerializer(user).data
+            if doctor_profile:
+                data["doctor_profile"] = DoctorProfileDetailSerializer(doctor_profile).data
+            return Response(data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
         target = self.get_object()

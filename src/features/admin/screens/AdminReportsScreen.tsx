@@ -1,8 +1,9 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { AppHeader } from '@/components/AppHeader';
 import { EmptyState } from '@/components/EmptyState';
@@ -20,6 +21,7 @@ import {
 } from '@/features/admin/services/adminService';
 import type { AdminAuditLog, AdminReportSummary, AdminSubscription, AdminUsage } from '@/features/admin/types/admin.types';
 import { formatCurrency, formatDateTime } from '@/features/cashier/types/commonCashier.types';
+import { getManagedSessions, revokeManagedSession, type ManagedSession } from '@/features/security/services/sessionService';
 
 export function AdminReportsScreen() {
   const [clinicReport, setClinicReport] = useState<AdminReportSummary | null>(null);
@@ -27,6 +29,7 @@ export function AdminReportsScreen() {
   const [auditLogs, setAuditLogs] = useState<AdminAuditLog[]>([]);
   const [subscription, setSubscription] = useState<AdminSubscription | null>(null);
   const [usage, setUsage] = useState<AdminUsage | null>(null);
+  const [sessions, setSessions] = useState<ManagedSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -36,18 +39,20 @@ export function AdminReportsScreen() {
     else setLoading(true);
     setError('');
     try {
-      const [clinic, financial, audit, sub, planUsage] = await Promise.all([
+      const [clinic, financial, audit, sub, planUsage, activeSessions] = await Promise.all([
         getAdminClinicReport().catch(() => null),
         getAdminFinancialReport().catch(() => null),
         getAdminAuditLogs().catch(() => []),
         getAdminSubscription(),
         getAdminUsage(),
+        getManagedSessions().catch(() => []),
       ]);
       setClinicReport(clinic);
       setFinancialReport(financial);
       setAuditLogs(audit);
       setSubscription(sub);
       setUsage(planUsage);
+      setSessions(activeSessions);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudieron cargar reportes administrativos.');
     } finally {
@@ -58,13 +63,26 @@ export function AdminReportsScreen() {
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
+  const confirmRevoke = useCallback((session: ManagedSession) => {
+    Alert.alert('Cerrar sesión remota', `¿Deseas cerrar la sesión de ${session.user_email ?? session.user_nombre ?? 'este usuario'}?`, [
+      { style: 'cancel', text: 'Cancelar' },
+      {
+        style: 'destructive',
+        text: 'Cerrar sesión',
+        onPress: () => void revokeManagedSession(session.id)
+          .then(() => load(true))
+          .catch((err) => Alert.alert('No se pudo cerrar', err instanceof Error ? err.message : 'Intenta nuevamente.')),
+      },
+    ]);
+  }, [load]);
+
   if (loading) return <LoadingState label="Cargando reportes..." />;
 
   return (
     <RoleGuard roles={['admin']}>
       <SafeAreaView edges={['top']} style={styles.safe}>
         <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl onRefresh={() => void load(true)} refreshing={refreshing} />}>
-          <AppHeader icon="chart-box-outline" subtitle="Finanzas, auditoría y uso del sistema." title="Reportes y control" />
+          <AppHeader icon="chart-box-outline" subtitle="Finanzas, auditoría, sesiones y uso del sistema." title="Reportes y control" />
           {error ? <ErrorState message={error} onRetry={() => void load()} title="Reportes no disponibles" /> : null}
 
           <View style={styles.stats}>
@@ -79,6 +97,19 @@ export function AdminReportsScreen() {
             <Text style={styles.meta}>Estado: {subscription?.status ?? 'No disponible'}</Text>
             <Text style={styles.meta}>Vence: {subscription?.current_period_end ?? subscription?.ends_at ?? 'No disponible'}</Text>
           </AppCard>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Sesiones activas</Text>
+            {sessions.length === 0 ? <EmptyState description="No hay sesiones activas en la clínica." title="Sin sesiones activas" /> : null}
+            {sessions.slice(0, 8).map((session) => (
+              <AppCard key={session.id} style={styles.auditCard}>
+                <Text style={styles.auditTitle}>{session.user_nombre || session.user_email || 'Usuario'}</Text>
+                <Text style={styles.meta}>{session.device_name || 'Dispositivo'} · {session.ip_address || 'sin IP'}</Text>
+                <Text style={styles.meta}>Última actividad: {formatDateTime(session.last_activity_at)}</Text>
+                <AppButton disabled={!session.active || session.current} label={session.current ? 'Sesión actual' : 'Cerrar sesión'} onPress={() => confirmRevoke(session)} variant="danger" />
+              </AppCard>
+            ))}
+          </View>
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Última actividad auditada</Text>
@@ -99,7 +130,7 @@ export function AdminReportsScreen() {
 
 const styles = StyleSheet.create({
   auditCard: {
-    gap: 5,
+    gap: 8,
   },
   auditTitle: {
     color: colors.ink,
@@ -142,4 +173,3 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
 });
-

@@ -45,8 +45,8 @@ export async function createSuperAdminClinic(payload: CreateClinicPayload) {
   return data;
 }
 
-export async function setClinicActive(id: number | string, active: boolean) {
-  return patch<SuperAdminClinic>(active ? endpoints.superAdmin.activateClinic(id) : endpoints.superAdmin.deactivateClinic(id));
+export async function setClinicActive(id: number | string, active: boolean, reason: string) {
+  return patch<SuperAdminClinic>(active ? endpoints.superAdmin.activateClinic(id) : endpoints.superAdmin.deactivateClinic(id), { reason });
 }
 
 export async function getSuperAdminUsers(params?: QueryParams) {
@@ -86,4 +86,3 @@ export function userRole(user: SuperAdminUser) {
   if (typeof user.role === 'object') return user.role.nombre || user.role_nombre || 'Sin rol';
   return user.role_nombre || 'Sin rol';
 }
-

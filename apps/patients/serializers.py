@@ -161,3 +161,13 @@ class PatientStatsSerializer(serializers.Serializer):
     male_patients = serializers.IntegerField()
     female_patients = serializers.IntegerField()
     other_patients = serializers.IntegerField()
+
+
+class BirthdayExamSerializer(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+    nombre = serializers.CharField(max_length=120)
+    fecha_cumpleanos = serializers.DateField()
+    telefono = serializers.CharField(max_length=30, allow_blank=True, required=False)
+
+    def validate_telefono(self, value):
+        return validate_phone(value)

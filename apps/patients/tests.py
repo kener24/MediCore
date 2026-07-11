@@ -92,6 +92,36 @@ class PatientsModuleTests(APITestCase):
         response = self.client.patch(f"/api/patients/{self.patient.id}/activate/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_crud_temporal_cumpleanos_usa_pacientes_sin_tocar_registros_normales(self):
+        self.auth(self.recepcion)
+        create = self.client.post(
+            "/api/patients/birthday-exam/",
+            {"nombre": "Carlos Examen", "fecha_cumpleanos": "1994-07-11", "telefono": "8888-0000"},
+            format="json",
+        )
+        self.assertEqual(create.status_code, status.HTTP_201_CREATED)
+        record_id = create.data["id"]
+
+        listing = self.client.get("/api/patients/birthday-exam/")
+        self.assertEqual(listing.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(listing.data), 1)
+        self.assertEqual(listing.data[0]["nombre"], "Carlos Examen")
+
+        detail = self.client.get(f"/api/patients/birthday-exam/{record_id}/")
+        self.assertEqual(detail.status_code, status.HTTP_200_OK)
+        self.assertEqual(detail.data["fecha_cumpleanos"], "1994-07-11")
+
+        update = self.client.patch(f"/api/patients/birthday-exam/{record_id}/", {"telefono": "9999-1111"}, format="json")
+        self.assertEqual(update.status_code, status.HTTP_200_OK)
+        self.assertEqual(update.data["telefono"], "9999-1111")
+
+        hidden_normal_patient = self.client.get(f"/api/patients/birthday-exam/{self.patient.id}/")
+        self.assertEqual(hidden_normal_patient.status_code, status.HTTP_404_NOT_FOUND)
+
+        delete = self.client.delete(f"/api/patients/birthday-exam/{record_id}/")
+        self.assertEqual(delete.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Patient.objects.filter(id=record_id).exists())
+
     def test_sin_autenticacion_no_accede(self):
         response = self.client.get("/api/patients/")
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

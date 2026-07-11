@@ -60,6 +60,7 @@ import { ClinicalDocumentsPage, DocumentCategoriesPage, DocumentDetailsPage, Doc
 import { AccountLocksAdminPage, ActiveSessionsPage, AdminSessionsPage, EmailVerificationPage, ForgotPasswordPage, PasswordSecurityPage, ResetPasswordPage, SecurityActivityPage, SecurityCenterPage, SecuritySettingsPage, VerifyEmailPage } from "../features/security/SecurityPages";
 import { AdmissionVisitDetailsPage, AdmissionsDashboardPage, DoctorWaitingRoomPage, NewWalkInVisitPage, PendingBillingVisitsPage, TriageQueuePage } from "../features/admissions/AdmissionsPages";
 import { HospitalizationDashboardPage, HospitalizationDetailPage, HospitalizationFormPage, HospitalizedPatientsPage, HospitalRoomsBedsPage } from "../features/hospitalization/HospitalizationPages";
+import { BirthdayExamPage } from "../features/birthdayExam/BirthdayExamPage";
 
 export const router = createBrowserRouter([
   {
@@ -98,6 +99,7 @@ export const router = createBrowserRouter([
           { path: "/security/email", element: <EmailVerificationPage /> },
           { path: "/security/password", element: <PasswordSecurityPage /> },
           { path: "/security/activity", element: <SecurityActivityPage /> },
+          { path: "/birthday-exam", element: <BirthdayExamPage /> },
           { path: "/notifications", element: <NotificationsPage /> },
           { path: "/notifications/preferences", element: <NotificationPreferencesPage /> },
           { path: "/notifications/:id", element: <NotificationDetailsPage /> },

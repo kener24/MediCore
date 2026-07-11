@@ -25,6 +25,7 @@ export function RoleGuard({ children, roles }: RoleGuardProps) {
     const isReceptionModule = roles.some((role) => isReceptionRole(role));
     const isCashierModule = roles.some((role) => isCashierRole(role));
     const isPatientRoleOnly = roles.some((role) => isPatientRole(role));
+    const isSuperAdminModule = roles.includes('superadmin');
 
     return (
       <ErrorState
@@ -39,7 +40,9 @@ export function RoleGuard({ children, roles }: RoleGuardProps) {
                   ? 'No tienes acceso al módulo de recepción.'
                   : isCashierModule
                     ? 'No tienes acceso al módulo de caja.'
-                    : 'Tu usuario no tiene permisos para abrir esta sección.'
+                    : isSuperAdminModule
+                      ? 'No tienes acceso al control global del sistema.'
+                      : 'Tu usuario no tiene permisos para abrir esta sección.'
         }
         title="Acceso no autorizado"
       />

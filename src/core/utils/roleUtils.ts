@@ -31,6 +31,7 @@ export function isCashierRole(role?: RoleName | null, permissions?: string[] | n
 
 export function resolveSupportedAppRole(role?: RoleName | null, permissions?: string[] | null): AppRole | null {
   const normalized = normalizeRole(role);
+  if (normalized === 'superadmin') return 'superadmin';
   if (isPatientRole(normalized)) return 'paciente';
   if (normalized === 'doctor') return 'medico';
   if (isNurseRole(normalized)) return 'enfermera';

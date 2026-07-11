@@ -6,6 +6,7 @@ import { DoctorTabs } from '@/navigation/DoctorTabs';
 import { NurseTabs } from '@/navigation/NurseTabs';
 import { PatientTabs } from '@/navigation/PatientTabs';
 import { ReceptionTabs } from '@/navigation/ReceptionTabs';
+import { SuperAdminTabs } from '@/navigation/SuperAdminTabs';
 
 export function RoleNavigator() {
   const { appRole } = useAuth();
@@ -23,6 +24,8 @@ export function RoleNavigator() {
       return <NurseTabs />;
     case 'admin':
       return <AdminTabs />;
+    case 'superadmin':
+      return <SuperAdminTabs />;
     default:
       return <UnsupportedRoleScreen />;
   }

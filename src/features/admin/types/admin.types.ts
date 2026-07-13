@@ -102,6 +102,8 @@ export type AdminUsage = {
   [key: string]: unknown;
 };
 
+export type AdminRolePermissions = Record<string, Record<string, string[]>>;
+
 export type AdminSpecialty = {
   id: number;
   nombre?: string;

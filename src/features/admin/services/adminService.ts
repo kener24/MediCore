@@ -7,6 +7,7 @@ import type {
   AdminFiscalRange,
   AdminFiscalReadiness,
   AdminReportSummary,
+  AdminRolePermissions,
   AdminSpecialty,
   AdminSubscription,
   AdminUsage,
@@ -26,6 +27,10 @@ export async function getAdminClinic(): Promise<AdminClinic> {
 export async function getAdminUsers(params?: AdminQueryParams): Promise<AdminUser[]> {
   const data = await getFirstAvailable<unknown>([endpoints.clinicAdmin.users, '/users/'], params);
   return normalizeAdminList<AdminUser>(data);
+}
+
+export async function getAdminRolePermissions(): Promise<AdminRolePermissions> {
+  return getFirstAvailable<AdminRolePermissions>(['/roles/permissions/']);
 }
 
 export async function getAdminSpecialties(): Promise<AdminSpecialty[]> {

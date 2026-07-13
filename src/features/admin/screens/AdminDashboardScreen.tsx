@@ -11,13 +11,14 @@ import { RoleGuard } from '@/components/RoleGuard';
 import { StatCard } from '@/components/StatCard';
 import { colors } from '@/core/theme/colors';
 import { AdminStatusCard } from '@/features/admin/components/AdminCards';
-import { getAdminDashboard, getAdminFiscalReadiness, getAdminFiscalRanges } from '@/features/admin/services/adminService';
-import type { AdminDashboard, AdminFiscalRange, AdminFiscalReadiness } from '@/features/admin/types/admin.types';
+import { getAdminDashboard, getAdminFiscalRanges, getAdminFiscalReadiness, getAdminRolePermissions } from '@/features/admin/services/adminService';
+import type { AdminDashboard, AdminFiscalRange, AdminFiscalReadiness, AdminRolePermissions } from '@/features/admin/types/admin.types';
 
 export function AdminDashboardScreen() {
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
   const [readiness, setReadiness] = useState<AdminFiscalReadiness | null>(null);
   const [ranges, setRanges] = useState<AdminFiscalRange[]>([]);
+  const [permissions, setPermissions] = useState<AdminRolePermissions | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -27,14 +28,16 @@ export function AdminDashboardScreen() {
     else setLoading(true);
     setError('');
     try {
-      const [nextDashboard, nextReadiness, nextRanges] = await Promise.all([
+      const [nextDashboard, nextReadiness, nextRanges, rolePermissions] = await Promise.all([
         getAdminDashboard(),
         getAdminFiscalReadiness().catch(() => null),
         getAdminFiscalRanges().catch(() => []),
+        getAdminRolePermissions().catch(() => null),
       ]);
       setDashboard(nextDashboard);
       setReadiness(nextReadiness);
       setRanges(nextRanges);
+      setPermissions(rolePermissions);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar el resumen administrativo.');
     } finally {
@@ -49,12 +52,13 @@ export function AdminDashboardScreen() {
 
   const fiscalReady = Boolean(readiness?.ready ?? readiness?.is_ready ?? (readiness?.profile_complete && readiness?.has_active_range));
   const activeRanges = ranges.filter((item) => item.is_active && !item.is_exhausted).length;
+  const adminGroups = Object.entries(permissions?.admin ?? {}).slice(0, 3);
 
   return (
     <RoleGuard roles={['admin']}>
       <SafeAreaView edges={['top']} style={styles.safe}>
         <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl onRefresh={() => void load(true)} refreshing={refreshing} />}>
-          <AppHeader icon="view-dashboard-outline" subtitle="Indicadores de gestión y riesgos visibles." title="Dashboard ejecutivo" />
+          <AppHeader icon="view-dashboard-outline" subtitle="Indicadores de gestión, riesgos y permisos visibles." title="Dashboard ejecutivo" />
           {error ? <ErrorState message={error} onRetry={() => void load()} title="Resumen no disponible" /> : null}
 
           <View style={styles.stats}>
@@ -77,6 +81,16 @@ export function AdminDashboardScreen() {
             <Text style={styles.line}>Inactivos: {dashboard?.inactive_users ?? 0}</Text>
             <Text style={styles.line}>Pacientes con acceso: {dashboard?.total_pacientes ?? 0}</Text>
           </AppCard>
+
+          <AppCard style={styles.card}>
+            <Text style={styles.title}>Permisos clave del administrador</Text>
+            {adminGroups.length ? adminGroups.map(([group, values]) => (
+              <View key={group} style={styles.permissionGroup}>
+                <Text style={styles.permissionTitle}>{group}</Text>
+                {values.slice(0, 4).map((permission) => <Text key={permission} style={styles.line}>• {permission}</Text>)}
+              </View>
+            )) : <Text style={styles.line}>No se pudo cargar el catálogo de permisos.</Text>}
+          </AppCard>
         </ScrollView>
       </SafeAreaView>
     </RoleGuard>
@@ -96,6 +110,18 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 14,
     fontWeight: '700',
+    lineHeight: 20,
+  },
+  permissionGroup: {
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+    gap: 5,
+    paddingTop: 10,
+  },
+  permissionTitle: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: '900',
   },
   safe: {
     backgroundColor: colors.background,
@@ -112,4 +138,3 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
 });
-

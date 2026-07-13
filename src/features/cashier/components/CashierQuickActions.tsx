@@ -4,8 +4,9 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { AppCard } from '@/components/AppCard';
 import { colors } from '@/core/theme/colors';
 
-export function CashierQuickActions({ onHistory, onPending, onProfile, onSearch }: { onHistory: () => void; onPending: () => void; onProfile: () => void; onSearch: () => void }) {
+export function CashierQuickActions({ onCashSession, onHistory, onPending, onProfile, onSearch }: { onCashSession: () => void; onHistory: () => void; onPending: () => void; onProfile: () => void; onSearch: () => void }) {
   const actions = [
+    { icon: 'cash-register' as const, label: 'Caja', onPress: onCashSession },
     { icon: 'file-clock-outline' as const, label: 'Pendientes', onPress: onPending },
     { icon: 'file-search-outline' as const, label: 'Buscar', onPress: onSearch },
     { icon: 'cash-check' as const, label: 'Pagos', onPress: onHistory },

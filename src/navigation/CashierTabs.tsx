@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RoleGuard } from '@/components/RoleGuard';
+import { CashierCashSessionScreen } from '@/features/cashier/screens/CashierCashSessionScreen';
 import { CashierChangePasswordScreen } from '@/features/cashier/screens/CashierChangePasswordScreen';
 import { CashierDashboardScreen } from '@/features/cashier/screens/CashierDashboardScreen';
 import { CashierInvoiceDetailScreen } from '@/features/cashier/screens/CashierInvoiceDetailScreen';
@@ -23,6 +24,7 @@ export function CashierHomeStack() {
   return (
     <Stack.Navigator screenOptions={stackOptions}>
       <Stack.Screen component={CashierDashboardScreen} name="CashierDashboard" />
+      <Stack.Screen component={CashierCashSessionScreen} name="CashierCashSession" />
       <Stack.Screen component={CashierPendingInvoicesScreen} name="CashierPendingInvoices" />
       <Stack.Screen component={CashierInvoiceSearchScreen} name="CashierInvoiceSearch" />
       <Stack.Screen component={CashierInvoiceDetailScreen} name="CashierInvoiceDetail" />
@@ -40,6 +42,7 @@ function CashierPendingStack() {
   return (
     <Stack.Navigator screenOptions={stackOptions}>
       <Stack.Screen component={CashierPendingInvoicesScreen} name="CashierPendingInvoices" />
+      <Stack.Screen component={CashierCashSessionScreen} name="CashierCashSession" />
       <Stack.Screen component={CashierInvoiceDetailScreen} name="CashierInvoiceDetail" />
       <Stack.Screen component={CashierRegisterPaymentScreen} name="CashierRegisterPayment" />
       <Stack.Screen component={CashierPaymentDetailScreen} name="CashierPaymentDetail" />
@@ -51,6 +54,7 @@ function CashierSearchStack() {
   return (
     <Stack.Navigator screenOptions={stackOptions}>
       <Stack.Screen component={CashierInvoiceSearchScreen} name="CashierInvoiceSearch" />
+      <Stack.Screen component={CashierCashSessionScreen} name="CashierCashSession" />
       <Stack.Screen component={CashierInvoiceDetailScreen} name="CashierInvoiceDetail" />
       <Stack.Screen component={CashierRegisterPaymentScreen} name="CashierRegisterPayment" />
       <Stack.Screen component={CashierPaymentDetailScreen} name="CashierPaymentDetail" />
@@ -62,6 +66,7 @@ function CashierPaymentsStack() {
   return (
     <Stack.Navigator screenOptions={stackOptions}>
       <Stack.Screen component={CashierPaymentsHistoryScreen} name="CashierPaymentsHistory" />
+      <Stack.Screen component={CashierCashSessionScreen} name="CashierCashSession" />
       <Stack.Screen component={CashierPaymentDetailScreen} name="CashierPaymentDetail" />
       <Stack.Screen component={CashierInvoiceDetailScreen} name="CashierInvoiceDetail" />
     </Stack.Navigator>

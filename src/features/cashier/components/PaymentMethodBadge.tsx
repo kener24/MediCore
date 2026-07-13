@@ -4,11 +4,12 @@ import { colors } from '@/core/theme/colors';
 
 export function paymentMethodLabel(method?: string) {
   const value = String(method ?? '').toLowerCase();
-  if (value === 'cash') return 'Efectivo';
-  if (value === 'card') return 'Tarjeta';
-  if (value === 'transfer') return 'Transferencia';
-  if (value === 'mobile_money') return 'Dinero móvil';
-  if (value === 'check') return 'Cheque';
+  if (['cash', 'efectivo'].includes(value)) return 'Efectivo';
+  if (['card', 'tarjeta'].includes(value)) return 'Tarjeta';
+  if (['transfer', 'bank_transfer', 'mobile_money', 'transferencia'].includes(value)) return 'Transferencia';
+  if (['deposit', 'deposito'].includes(value)) return 'Depósito';
+  if (['check', 'cheque'].includes(value)) return 'Cheque';
+  if (['other', 'otro'].includes(value)) return 'Otro';
   return method ? 'Otro' : 'Sin método';
 }
 

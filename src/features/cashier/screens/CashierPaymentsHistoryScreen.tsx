@@ -84,7 +84,7 @@ export function CashierPaymentsHistoryScreen() {
           </View>
           {date ? <AppButton label="Limpiar" onPress={() => setDate('')} variant="secondary" /> : null}
         </View>
-        <Text style={styles.label}>Metodo</Text>
+        <Text style={styles.label}>Método</Text>
         <View style={styles.filters}>
           <Text onPress={() => setMethodFilter('all')} style={[styles.filter, methodFilter === 'all' && styles.filterActive]}>Todos</Text>
           {paymentMethods.map((item) => (

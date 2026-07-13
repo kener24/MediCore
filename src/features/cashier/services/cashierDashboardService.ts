@@ -12,7 +12,13 @@ export type CashierDashboard = {
 
 export async function getCashierDashboard(): Promise<CashierDashboard> {
   try {
-    return await getFirstAvailable<CashierDashboard>(['/billing/dashboard/', '/cashier/dashboard/', '/payments/dashboard/']);
+    const stats = await getFirstAvailable<Record<string, number | string>>(['/billing/stats/', '/billing/dashboard/', '/cashier/dashboard/', '/payments/dashboard/']);
+    return {
+      paid_invoices_today: Number(stats.paid_invoices ?? stats.paid_invoices_today ?? 0),
+      payments_today: Number(stats.payments_today ?? 0),
+      pending_invoices: Number(stats.pending_invoices ?? 0),
+      total_collected_today: stats.today_payments ?? stats.total_collected_today ?? 0,
+    };
   } catch {
     return getTodayCashierStats();
   }
@@ -20,8 +26,8 @@ export async function getCashierDashboard(): Promise<CashierDashboard> {
 
 export async function getTodayCashierStats(): Promise<CashierDashboard> {
   const [pending, paid, payments] = await Promise.all([
-    getInvoices({ status: 'pending' }).catch(() => []),
-    getInvoices({ status: 'paid', today: true }).catch(() => []),
+    getInvoices({ status: 'pendiente' }).catch(() => []),
+    getInvoices({ status: 'pagada', today: true }).catch(() => []),
     getPaymentsHistory({ today: true }).catch(() => []),
   ]);
   return {

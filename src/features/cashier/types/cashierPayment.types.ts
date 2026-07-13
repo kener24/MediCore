@@ -1,4 +1,4 @@
-export type PaymentMethod = 'cash' | 'card' | 'transfer' | 'mobile_money' | 'check' | 'other' | string;
+export type PaymentMethod = 'efectivo' | 'tarjeta' | 'transferencia' | 'deposito' | 'cheque' | 'otro' | string;
 
 export type PaymentStatus = 'pending' | 'confirmed' | 'cancelled' | 'failed' | string;
 
@@ -25,4 +25,5 @@ export type RegisterPaymentPayload = {
   method: PaymentMethod;
   reference?: string;
   notes?: string;
+  cash_session?: number;
 };

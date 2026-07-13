@@ -11,8 +11,10 @@ import { colors } from '@/core/theme/colors';
 import { CashierHeader } from '@/features/cashier/components/CashierHeader';
 import { InvoiceTotalsCard } from '@/features/cashier/components/InvoiceTotalsCard';
 import { PaymentForm } from '@/features/cashier/components/PaymentForm';
+import { getCurrentCashSession } from '@/features/cashier/services/cashierCashService';
 import { getInvoiceDetail } from '@/features/cashier/services/cashierInvoiceService';
 import { registerPayment } from '@/features/cashier/services/cashierPaymentService';
+import type { CashSession } from '@/features/cashier/types/cashierCash.types';
 import type { CashierInvoiceDetail } from '@/features/cashier/types/cashierInvoice.types';
 import type { PaymentMethod } from '@/features/cashier/types/cashierPayment.types';
 import { formatCurrency, numericValue } from '@/features/cashier/types/commonCashier.types';
@@ -22,8 +24,9 @@ export function CashierRegisterPaymentScreen() {
   const route = useRoute();
   const params = useMemo(() => (route.params ?? {}) as { invoiceId?: number }, [route.params]);
   const [invoice, setInvoice] = useState<CashierInvoiceDetail | null>(null);
+  const [cashSession, setCashSession] = useState<CashSession | null>(null);
   const [amount, setAmount] = useState('');
-  const [method, setMethod] = useState<PaymentMethod>('cash');
+  const [method, setMethod] = useState<PaymentMethod>('efectivo');
   const [reference, setReference] = useState('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(true);
@@ -39,8 +42,9 @@ export function CashierRegisterPaymentScreen() {
     setLoading(true);
     setError('');
     try {
-      const data = await getInvoiceDetail(params.invoiceId);
+      const [data, session] = await Promise.all([getInvoiceDetail(params.invoiceId), getCurrentCashSession()]);
       setInvoice(data);
+      setCashSession(session);
       const balance = numericValue(data.balance_due ?? data.balance);
       setAmount(balance > 0 ? balance.toFixed(2) : '');
     } catch (err) {
@@ -61,6 +65,7 @@ export function CashierRegisterPaymentScreen() {
     try {
       const payment = await registerPayment(params.invoiceId, {
         amount: Number(amount),
+        cash_session: method === 'efectivo' ? cashSession?.id : undefined,
         invoice_id: params.invoiceId,
         method,
         notes: notes.trim(),
@@ -83,8 +88,9 @@ export function CashierRegisterPaymentScreen() {
     if (!Number.isFinite(value)) return 'Ingresa un monto válido.';
     if (value <= 0) return 'El monto debe ser mayor a 0.';
     if (balance > 0 && value > balance) return 'El monto no puede ser mayor al saldo pendiente.';
-    if (!method) return 'Selecciona un metodo de pago.';
-    if (method !== 'cash' && !reference.trim()) return 'La referencia es requerida para este metodo.';
+    if (!method) return 'Selecciona un método de pago.';
+    if (method === 'efectivo' && !cashSession?.id) return 'Debes abrir caja antes de registrar pagos en efectivo.';
+    if (method !== 'efectivo' && !reference.trim()) return 'La referencia es requerida para este método.';
     return '';
   }
 
@@ -110,14 +116,14 @@ export function CashierRegisterPaymentScreen() {
               onChangeAmount={setAmount}
               onChangeMethod={(value) => {
                 setMethod(value);
-                if (value === 'cash') setReference('');
+                if (value === 'efectivo') setReference('');
               }}
               onChangeNotes={setNotes}
               onChangeReference={setReference}
               onFillBalance={() => setAmount(balance > 0 ? balance.toFixed(2) : '')}
               onSubmit={submit}
               reference={reference}
-              referenceRequired={method !== 'cash'}
+              referenceRequired={method !== 'efectivo'}
             />
           </AppCard>
           <AppButton label="Cancelar" onPress={() => navigation.goBack()} variant="secondary" />

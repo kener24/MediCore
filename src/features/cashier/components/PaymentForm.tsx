@@ -6,12 +6,12 @@ import { colors } from '@/core/theme/colors';
 import type { PaymentMethod } from '@/features/cashier/types/cashierPayment.types';
 
 export const paymentMethods: { label: string; value: PaymentMethod }[] = [
-  { label: 'Efectivo', value: 'cash' },
-  { label: 'Tarjeta', value: 'card' },
-  { label: 'Transferencia', value: 'transfer' },
-  { label: 'Dinero movil', value: 'mobile_money' },
-  { label: 'Cheque', value: 'check' },
-  { label: 'Otro', value: 'other' },
+  { label: 'Efectivo', value: 'efectivo' },
+  { label: 'Tarjeta', value: 'tarjeta' },
+  { label: 'Transferencia', value: 'transferencia' },
+  { label: 'Depósito', value: 'deposito' },
+  { label: 'Cheque', value: 'cheque' },
+  { label: 'Otro', value: 'otro' },
 ];
 
 type PaymentFormProps = {
@@ -45,7 +45,7 @@ export function PaymentForm({
   reference,
   referenceRequired,
 }: PaymentFormProps) {
-  const selectedMethod = paymentMethods.find((item) => item.value === method)?.label ?? 'Metodo seleccionado';
+  const selectedMethod = paymentMethods.find((item) => item.value === method)?.label ?? 'Método seleccionado';
 
   return (
     <View style={styles.form}>
@@ -57,7 +57,7 @@ export function PaymentForm({
         {onFillBalance ? <Text onPress={onFillBalance} style={styles.fullBalance}>Pagar saldo</Text> : null}
       </View>
       <AppInput keyboardType="decimal-pad" label="Monto a registrar" onChangeText={(value) => onChangeAmount(normalizeMoney(value))} value={amount} />
-      <Text style={styles.label}>Metodo de pago</Text>
+      <Text style={styles.label}>Método de pago</Text>
       <View style={styles.methods}>
         {paymentMethods.map((item) => (
           <Pressable key={item.value} onPress={() => onChangeMethod(item.value)} style={[styles.method, method === item.value && styles.methodActive]}>

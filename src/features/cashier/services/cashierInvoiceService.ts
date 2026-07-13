@@ -3,8 +3,8 @@ import { normalizeListResponse, type ApiListResponse, type QueryParams } from '@
 import type { CashierInvoice, CashierInvoiceDetail } from '@/features/cashier/types/cashierInvoice.types';
 
 export async function getPendingInvoices(params?: QueryParams): Promise<CashierInvoice[]> {
-  const pending = await getFirstAvailable<ApiListResponse<CashierInvoice>>(['/billing/invoices/', '/invoices/'], { status: 'pending', ...(params ?? {}) });
-  const partial = await getFirstAvailable<ApiListResponse<CashierInvoice>>(['/billing/invoices/', '/invoices/'], { status: 'partial', ...(params ?? {}) }).catch(() => []);
+  const pending = await getFirstAvailable<ApiListResponse<CashierInvoice>>(['/billing/invoices/', '/invoices/'], { status: 'pendiente', ...(params ?? {}) });
+  const partial = await getFirstAvailable<ApiListResponse<CashierInvoice>>(['/billing/invoices/', '/invoices/'], { status: 'parcial', ...(params ?? {}) }).catch(() => []);
   return [...normalizeListResponse(pending), ...normalizeListResponse(partial)];
 }
 

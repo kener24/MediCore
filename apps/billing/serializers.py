@@ -282,11 +282,28 @@ class InvoiceUpdateSerializer(serializers.ModelSerializer):
 
 
 class PaymentCreateSerializer(serializers.ModelSerializer):
+    METHOD_ALIASES = {
+        "cash": Payment.Method.EFECTIVO,
+        "card": Payment.Method.TARJETA,
+        "transfer": Payment.Method.TRANSFERENCIA,
+        "bank_transfer": Payment.Method.TRANSFERENCIA,
+        "mobile_money": Payment.Method.TRANSFERENCIA,
+        "check": Payment.Method.CHEQUE,
+        "other": Payment.Method.OTRO,
+    }
+
     class Meta:
         model = Payment
         fields = ["id", "invoice", "cash_session", "payment_number", "payment_date", "amount", "method", "reference", "notes"]
         read_only_fields = ["id"]
         extra_kwargs = {"payment_number": {"required": False}}
+
+    def to_internal_value(self, data):
+        mutable = data.copy() if hasattr(data, "copy") else dict(data)
+        method = str(mutable.get("method", "")).strip().lower()
+        if method in self.METHOD_ALIASES:
+            mutable["method"] = self.METHOD_ALIASES[method]
+        return super().to_internal_value(mutable)
 
     def validate(self, attrs):
         request = self.context["request"]
@@ -299,12 +316,18 @@ class PaymentCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"invoice": "No se puede pagar una factura anulada."})
         if invoice.status == Invoice.Status.PAGADA or invoice.balance_due <= 0:
             raise serializers.ValidationError({"invoice": "La factura ya esta pagada."})
+        method = attrs.get("method", Payment.Method.EFECTIVO)
         cash_session = attrs.get("cash_session")
         if cash_session:
             if cash_session.clinic_id != invoice.clinic_id:
                 raise serializers.ValidationError({"cash_session": "La caja debe pertenecer a la misma clinica."})
             if cash_session.status != CashSession.Status.ABIERTA:
                 raise serializers.ValidationError({"cash_session": "La caja seleccionada esta cerrada."})
+        elif method == Payment.Method.EFECTIVO:
+            cash_session = CashSession.objects.filter(clinic=invoice.clinic, opened_by=request.user, status=CashSession.Status.ABIERTA).first()
+            if not cash_session:
+                raise serializers.ValidationError({"cash_session": "Debes abrir caja antes de registrar pagos en efectivo."})
+            attrs["cash_session"] = cash_session
         amount = attrs.get("amount")
         if amount is None or amount <= 0:
             raise serializers.ValidationError({"amount": "El monto debe ser mayor que cero."})
@@ -385,10 +408,32 @@ class CashMovementSerializer(serializers.ModelSerializer):
 
 class CashSessionListSerializer(serializers.ModelSerializer):
     opened_by_nombre = serializers.CharField(source="opened_by.nombre_completo", read_only=True)
+    cash_total = serializers.SerializerMethodField()
+    income_total = serializers.SerializerMethodField()
+    expense_total = serializers.SerializerMethodField()
+    expected_amount_live = serializers.SerializerMethodField()
 
     class Meta:
         model = CashSession
-        fields = ["id", "clinic", "opened_by", "opened_by_nombre", "opening_datetime", "closing_datetime", "opening_amount", "closing_amount", "expected_amount", "difference_amount", "status", "notes", "active", "creado_en", "actualizado_en"]
+        fields = ["id", "clinic", "opened_by", "opened_by_nombre", "opening_datetime", "closing_datetime", "opening_amount", "closing_amount", "expected_amount", "expected_amount_live", "difference_amount", "cash_total", "income_total", "expense_total", "status", "notes", "active", "creado_en", "actualizado_en"]
+
+    def _totals(self, obj):
+        if not hasattr(obj, "_serializer_totals"):
+            obj._serializer_totals = obj.totals()
+        return obj._serializer_totals
+
+    def get_cash_total(self, obj):
+        return self._totals(obj)[0]
+
+    def get_income_total(self, obj):
+        return self._totals(obj)[1]
+
+    def get_expense_total(self, obj):
+        return self._totals(obj)[2]
+
+    def get_expected_amount_live(self, obj):
+        cash, income, expense = self._totals(obj)
+        return obj.opening_amount + cash + income - expense
 
 
 class CashSessionDetailSerializer(CashSessionListSerializer):

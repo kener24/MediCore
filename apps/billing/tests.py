@@ -483,6 +483,30 @@ class BillingModuleTests(APITestCase):
         res = self.client.post(f"/api/billing/cash-sessions/{session.id}/movements/", {"movement_type": "ingreso", "amount": "10.00", "reason": "x"}, format="json")
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_pago_efectivo_requiere_caja_abierta(self):
+        inv = self.invoice()
+        self.auth(self.rec)
+        res = self.client.post("/api/billing/payments/", {"invoice": inv.id, "amount": "100.00", "method": "efectivo"}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("cash_session", res.data)
+
+    def test_pago_movil_cash_adjunta_caja_abierta(self):
+        inv = self.invoice()
+        session = CashSession.objects.create(clinic=self.clinic, opened_by=self.rec, opening_amount=Decimal("50.00"))
+        self.auth(self.rec)
+        res = self.client.post(f"/api/billing/invoices/{inv.id}/payments/", {"amount": "100.00", "method": "cash"}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        payment = Payment.objects.get(id=res.data["id"])
+        self.assertEqual(payment.method, Payment.Method.EFECTIVO)
+        self.assertEqual(payment.cash_session_id, session.id)
+
+    def test_pago_tarjeta_acepta_alias_movil_sin_caja(self):
+        inv = self.invoice()
+        self.auth(self.rec)
+        res = self.client.post("/api/billing/payments/", {"invoice": inv.id, "amount": "100.00", "method": "card", "reference": "AUTH-1"}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.data["method"], Payment.Method.TARJETA)
+
     def test_sin_auth(self):
         res = self.client.get("/api/billing/invoices/")
         self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)

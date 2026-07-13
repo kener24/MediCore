@@ -3,6 +3,7 @@ from decimal import Decimal
 from io import BytesIO
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from django.db.models import Q, Sum
 from django.http import HttpResponse
 from django.utils import timezone
@@ -451,13 +452,33 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         serializer.save(invoice=invoice)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-    @action(detail=True, methods=["get"], url_path="payments")
+    @action(detail=True, methods=["get", "post"], url_path="payments")
     def payments(self, request, pk=None):
         invoice = self.get_object()
+        if request.method == "GET":
+            queryset = invoice.payments.filter(active=True)
+            return Response(PaymentListSerializer(queryset, many=True).data)
+        if not can_manage_billing(request.user):
+            return Response({"detail": "No tienes permiso para registrar pagos."}, status=status.HTTP_403_FORBIDDEN)
         if invoice.fiscal_status == Invoice.FiscalStatus.ISSUED:
             return Response({"detail": "No puedes modificar una factura fiscal emitida."}, status=status.HTTP_400_BAD_REQUEST)
-        queryset = invoice.payments.filter(active=True)
-        return Response(PaymentListSerializer(queryset, many=True).data)
+        payload = request.data.copy()
+        payload["invoice"] = invoice.id
+        try:
+            with transaction.atomic():
+                locked_invoice = scope(request, Invoice.objects.select_for_update()).get(pk=invoice.id)
+                payload["invoice"] = locked_invoice.id
+                serializer = PaymentCreateSerializer(data=payload, context={"request": request})
+                serializer.is_valid(raise_exception=True)
+                payment = serializer.save()
+        except Invoice.DoesNotExist:
+            return Response({"detail": "Factura no encontrada."}, status=status.HTTP_404_NOT_FOUND)
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+        log_audit_event(request=request, clinic=payment.clinic, action=AuditLog.Action.PAYMENT, module=AuditLog.Module.PAYMENTS, model_name="Payment", object_id=payment.id, object_repr=payment.payment_number, description="Pago registrado.", new_values={"amount": str(payment.amount), "method": payment.method, "invoice": payment.invoice_id})
+        if payment.patient.user:
+            create_notification(payment.patient.user, "Pago registrado", f"Se registro un pago por L {payment.amount}.", clinic=payment.clinic, notification_type=Notification.Type.SUCCESS, module=Notification.Module.PAYMENTS, priority=Notification.Priority.NORMAL, related_model="Payment", related_object_id=payment.id, action_url="/patient/payments")
+        return Response(PaymentDetailSerializer(payment).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"], url_path="add-consumption")
     def add_consumption(self, request, pk=None):
@@ -811,10 +832,18 @@ class PaymentViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         if not can_manage_billing(request.user):
             return Response({"detail": "No tienes permiso para registrar pagos."}, status=status.HTTP_403_FORBIDDEN)
-        serializer = PaymentCreateSerializer(data=request.data, context={"request": request})
-        serializer.is_valid(raise_exception=True)
         try:
-            payment = serializer.save()
+            payload = request.data.copy()
+            invoice_id = kwargs.get("invoice_pk") or payload.get("invoice") or payload.get("invoice_id")
+            with transaction.atomic():
+                if invoice_id:
+                    invoice = scope(request, Invoice.objects.select_for_update()).get(pk=invoice_id)
+                    payload["invoice"] = invoice.id
+                serializer = PaymentCreateSerializer(data=payload, context={"request": request})
+                serializer.is_valid(raise_exception=True)
+                payment = serializer.save()
+        except Invoice.DoesNotExist:
+            return Response({"detail": "Factura no encontrada."}, status=status.HTTP_404_NOT_FOUND)
         except DjangoValidationError as exc:
             return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
         log_audit_event(request=request, clinic=payment.clinic, action=AuditLog.Action.PAYMENT, module=AuditLog.Module.PAYMENTS, model_name="Payment", object_id=payment.id, object_repr=payment.payment_number, description="Pago registrado.", new_values={"amount": str(payment.amount), "method": payment.method, "invoice": payment.invoice_id})

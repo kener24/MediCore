@@ -9,7 +9,6 @@ from rest_framework.response import Response
 from apps.accounts.permissions import get_role_name
 from apps.patients.models import Patient
 from apps.patients.serializers import (
-    BirthdayExamSerializer,
     PatientCreateSerializer,
     PatientDetailSerializer,
     PatientListSerializer,
@@ -24,21 +23,10 @@ from apps.audit.services import log_audit_event
 CLINIC_VIEW_ROLES = ["superadmin", "admin", "medico", "enfermera", "recepcionista"]
 PATIENT_WRITE_ROLES = ["admin", "enfermera", "recepcionista"]
 PATIENT_DEACTIVATE_ROLES = ["admin"]
-BIRTHDAY_EXAM_MARKER = "[birthday-exam-temp]"
-BIRTHDAY_EXAM_ROLES = ["admin", "enfermera", "recepcionista"]
 
 
 def normalized_role(user):
     return str(get_role_name(user) or "").lower()
-
-
-def birthday_exam_payload(patient):
-    return {
-        "id": patient.id,
-        "nombre": patient.nombres,
-        "fecha_cumpleanos": patient.fecha_nacimiento.isoformat() if patient.fecha_nacimiento else None,
-        "telefono": patient.telefono,
-    }
 
 
 class PatientViewSet(viewsets.ModelViewSet):
@@ -158,53 +146,6 @@ class PatientViewSet(viewsets.ModelViewSet):
             "other_patients": queryset.filter(genero__in=["otro", "no_especificado"]).count(),
         }
         return Response(PatientStatsSerializer(data).data)
-
-    def birthday_exam_queryset(self):
-        return self.get_queryset().filter(observaciones__icontains=BIRTHDAY_EXAM_MARKER)
-
-    @action(detail=False, methods=["get", "post"], url_path="birthday-exam")
-    def birthday_exam(self, request):
-        role = normalized_role(request.user)
-        if role not in BIRTHDAY_EXAM_ROLES:
-            return Response({"detail": "No tienes permiso para gestionar cumpleaños de examen."}, status=status.HTTP_403_FORBIDDEN)
-        if request.method == "GET":
-            records = [birthday_exam_payload(patient) for patient in self.birthday_exam_queryset().order_by("fecha_nacimiento", "nombres")]
-            return Response(records)
-
-        serializer = BirthdayExamSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        patient = Patient.objects.create(
-            clinic=request.user.clinica,
-            nombres=serializer.validated_data["nombre"],
-            apellidos="Registro examen",
-            fecha_nacimiento=serializer.validated_data["fecha_cumpleanos"],
-            telefono=serializer.validated_data.get("telefono", ""),
-            observaciones=BIRTHDAY_EXAM_MARKER,
-        )
-        return Response(birthday_exam_payload(patient), status=status.HTTP_201_CREATED)
-
-    @action(detail=False, methods=["get", "patch", "delete"], url_path=r"birthday-exam/(?P<record_id>[^/.]+)")
-    def birthday_exam_detail(self, request, record_id=None):
-        role = normalized_role(request.user)
-        if role not in BIRTHDAY_EXAM_ROLES:
-            return Response({"detail": "No tienes permiso para gestionar cumpleaños de examen."}, status=status.HTTP_403_FORBIDDEN)
-        patient = self.birthday_exam_queryset().filter(id=record_id).first()
-        if not patient:
-            return Response({"detail": "Registro no encontrado."}, status=status.HTTP_404_NOT_FOUND)
-        if request.method == "GET":
-            return Response(birthday_exam_payload(patient))
-        if request.method == "DELETE":
-            patient.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-
-        serializer = BirthdayExamSerializer(data={**birthday_exam_payload(patient), **request.data}, partial=True)
-        serializer.is_valid(raise_exception=True)
-        patient.nombres = serializer.validated_data.get("nombre", patient.nombres)
-        patient.fecha_nacimiento = serializer.validated_data.get("fecha_cumpleanos", patient.fecha_nacimiento)
-        patient.telefono = serializer.validated_data.get("telefono", patient.telefono)
-        patient.observaciones = BIRTHDAY_EXAM_MARKER
-        patient.save(update_fields=["nombres", "nombre_completo", "fecha_nacimiento", "telefono", "observaciones", "actualizado_en"])
-        return Response(birthday_exam_payload(patient))
 
     @action(detail=True, methods=["patch"])
     def activate(self, request, pk=None):

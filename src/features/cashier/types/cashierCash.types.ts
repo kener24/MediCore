@@ -25,9 +25,27 @@ export type CashSession = {
   cash_total?: number | string;
   income_total?: number | string;
   expense_total?: number | string;
+  payments_count?: number;
+  movements_count?: number;
+  payment_method_totals?: Record<string, number | string>;
   status?: CashSessionStatus;
   notes?: string;
   movements?: CashMovement[];
+};
+
+export type CashSummary = {
+  date?: string;
+  open_sessions?: number;
+  closed_sessions?: number;
+  opening_total?: number | string;
+  closing_total?: number | string;
+  difference_total?: number | string;
+  cash_payments?: number | string;
+  card_payments?: number | string;
+  transfer_payments?: number | string;
+  other_payments?: number | string;
+  manual_income?: number | string;
+  manual_expense?: number | string;
 };
 
 export type OpenCashSessionPayload = {

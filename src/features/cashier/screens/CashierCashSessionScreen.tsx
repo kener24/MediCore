@@ -11,8 +11,8 @@ import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
 import { CashierHeader } from '@/features/cashier/components/CashierHeader';
-import { closeCashSession, createCashMovement, getCashSessions, getCurrentCashSession, openCashSession } from '@/features/cashier/services/cashierCashService';
-import type { CashMovementType, CashSession } from '@/features/cashier/types/cashierCash.types';
+import { closeCashSession, createCashMovement, getCashSessions, getCashSummary, getCurrentCashSession, openCashSession } from '@/features/cashier/services/cashierCashService';
+import type { CashMovementType, CashSession, CashSummary } from '@/features/cashier/types/cashierCash.types';
 import { formatCurrency, formatDateTime, numericValue } from '@/features/cashier/types/commonCashier.types';
 
 type Mode = 'open' | 'close' | 'ingreso' | 'egreso';
@@ -20,6 +20,7 @@ type Mode = 'open' | 'close' | 'ingreso' | 'egreso';
 export function CashierCashSessionScreen() {
   const navigation = useNavigation<any>();
   const [current, setCurrent] = useState<CashSession | null>(null);
+  const [summary, setSummary] = useState<CashSummary | null>(null);
   const [sessions, setSessions] = useState<CashSession[]>([]);
   const [mode, setMode] = useState<Mode>('open');
   const [amount, setAmount] = useState('0.00');
@@ -35,8 +36,9 @@ export function CashierCashSessionScreen() {
     else setLoading(true);
     setError('');
     try {
-      const [session, history] = await Promise.all([getCurrentCashSession(), getCashSessions().catch(() => [])]);
+      const [session, history, daySummary] = await Promise.all([getCurrentCashSession(), getCashSessions().catch(() => []), getCashSummary().catch(() => null)]);
       setCurrent(session);
+      setSummary(daySummary);
       setSessions(history.slice(0, 8));
       if (session) {
         setMode('close');
@@ -58,9 +60,14 @@ export function CashierCashSessionScreen() {
   async function submit() {
     if (saving) return;
     const value = Number(amount);
+    const expected = numericValue(current?.expected_amount_live ?? current?.expected_amount);
+    const difference = mode === 'close' ? value - expected : 0;
     if (!Number.isFinite(value) || value < 0) return Alert.alert('Caja', 'Ingresa un monto válido.');
     if ((mode === 'ingreso' || mode === 'egreso') && (!current?.id || value <= 0 || !reason.trim())) {
       return Alert.alert('Caja', 'Para registrar movimientos debes indicar monto mayor a 0 y razón.');
+    }
+    if (mode === 'close' && difference !== 0 && !notes.trim()) {
+      return Alert.alert('Caja', 'Debes agregar una nota cuando el arqueo tenga diferencia.');
     }
     setSaving(true);
     try {
@@ -110,6 +117,14 @@ export function CashierCashSessionScreen() {
             <Text style={styles.statusTitle}>{current ? 'Caja abierta' : 'Sin caja abierta'}</Text>
             {current ? <Text style={styles.meta}>Apertura: {formatDateTime(current.opening_datetime)}</Text> : <Text style={styles.meta}>Abre caja para poder registrar pagos en efectivo.</Text>}
           </AppCard>
+          {summary ? (
+            <View style={styles.statsGrid}>
+              <MiniStat label="Abiertas" value={String(summary.open_sessions ?? 0)} />
+              <MiniStat label="Efectivo hoy" value={formatCurrency(summary.cash_payments)} />
+              <MiniStat label="Tarj./transf." value={formatCurrency(numericValue(summary.card_payments) + numericValue(summary.transfer_payments))} />
+              <MiniStat label="Dif. cierres" value={formatCurrency(summary.difference_total)} />
+            </View>
+          ) : null}
           {current ? (
             <View style={styles.statsGrid}>
               <MiniStat label="Apertura" value={formatCurrency(current.opening_amount)} />
@@ -126,7 +141,7 @@ export function CashierCashSessionScreen() {
               {current ? <ModeButton active={mode === 'ingreso'} label="Ingreso" onPress={() => selectMode('ingreso')} /> : null}
               {current ? <ModeButton active={mode === 'egreso'} label="Egreso" onPress={() => selectMode('egreso')} /> : null}
             </View>
-            {mode === 'close' ? <Text style={styles.hint}>Monto esperado: {formatCurrency(expected)}. Diferencia actual: {formatCurrency(difference)}</Text> : null}
+            {mode === 'close' ? <Text style={[styles.hint, difference !== 0 && styles.warning]}>Monto esperado: {formatCurrency(expected)}. Diferencia actual: {formatCurrency(difference)}{difference !== 0 ? '. Nota obligatoria.' : ''}</Text> : null}
             <AppInput keyboardType="decimal-pad" label={mode === 'open' ? 'Monto de apertura' : mode === 'close' ? 'Monto contado' : 'Monto'} onChangeText={(value) => setAmount(normalizeMoney(value))} value={amount} />
             {mode === 'ingreso' || mode === 'egreso' ? <AppInput label="Razón" onChangeText={setReason} value={reason} /> : null}
             <AppInput label="Notas" multiline onChangeText={setNotes} scrollEnabled={false} style={styles.textArea} value={notes} />
@@ -216,4 +231,5 @@ const styles = StyleSheet.create({
   statusLabel: { color: colors.primaryDark, fontSize: 12, fontWeight: '900', textTransform: 'uppercase' },
   statusTitle: { color: colors.ink, fontSize: 20, fontWeight: '900' },
   textArea: { minHeight: 88, textAlignVertical: 'top' },
+  warning: { color: colors.danger },
 });

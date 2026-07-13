@@ -108,7 +108,6 @@ export function ReceptionDashboardScreen() {
           <QuickActionCard description="Registra un paciente mínimo para atención inmediata." icon="account-plus-outline" onPress={() => navigation.navigate('ReceptionPatientCreate')} title="Crear paciente" />
           <QuickActionCard description="Crea una visita sin cita y asigna prioridad/médico." icon="clipboard-plus-outline" onPress={() => navigation.navigate('ReceptionCreateAdmission')} title="Nueva admisión" />
           <QuickActionCard description="Recibe pacientes con cita y crea la visita operativa." icon="calendar-check-outline" onPress={() => navigation.navigate('ReceptionAppointmentCheckIn')} title="Check-in de cita" />
-          <QuickActionCard description="CRUD temporal de examen con nombre, fecha de cumpleaños y teléfono." icon="cake-variant-outline" onPress={() => navigation.navigate('BirthdayExam')} title="Cumpleaños" />
         </View>
 
         <SectionHeader action="Ver agenda" onPress={() => navigation.navigate('ReceptionAppointmentCheckIn')} title="Proximas citas" />

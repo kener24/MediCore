@@ -78,12 +78,6 @@ export function AdminHomeScreen() {
               title="Reportes y control"
             />
             <AdminActionCard
-              description="CRUD temporal de examen con nombre, fecha de cumpleaños y teléfono."
-              icon="cake-variant-outline"
-              onPress={() => navigation.navigate('BirthdayExam')}
-              title="Cumpleaños"
-            />
-            <AdminActionCard
               description="Consulta tu sesión actual y cierra sesión con seguridad."
               icon="account-lock-outline"
               onPress={() => navigation.navigate('AdminProfile')}

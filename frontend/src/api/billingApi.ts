@@ -1,5 +1,5 @@
 import api from "./axios";
-import type { BillableService, BillingStats, CashMovement, CashSession, ClinicFiscalProfile, CreditNote, FiscalDocumentRange, FiscalReadiness, Invoice, InvoiceItem, InvoicePrintData, Payment, TodayInvoiceSummary } from "../types/billing";
+import type { BillableService, BillingStats, CashMovement, CashSession, CashSummary, ClinicFiscalProfile, CreditNote, FiscalDocumentRange, FiscalReadiness, Invoice, InvoiceItem, InvoicePrintData, Payment, TodayInvoiceSummary } from "../types/billing";
 import type { ClinicalSupplyUsage } from "../types/medicalRecord";
 
 export async function getBillableServices(filters?: Record<string, string>) { const { data } = await api.get<BillableService[]>("/billing/services/", { params: filters }); return data; }
@@ -38,6 +38,7 @@ export async function getMyPayments() { const { data } = await api.get<Payment[]
 
 export async function getCashSessions() { const { data } = await api.get<CashSession[]>("/billing/cash-sessions/"); return data; }
 export async function getCurrentCashSession() { const { data } = await api.get<CashSession>("/billing/cash-sessions/current/"); return data; }
+export async function getCashSummary(date?: string) { const { data } = await api.get<CashSummary>("/billing/cash-sessions/summary/", { params: date ? { date } : undefined }); return data; }
 export async function openCashSession(payload: { opening_amount: string; notes?: string }) { const { data } = await api.post<CashSession>("/billing/cash-sessions/open/", payload); return data; }
 export async function closeCashSession(id: number | string, payload: { closing_amount: string; notes?: string }) { const { data } = await api.patch<CashSession>(`/billing/cash-sessions/${id}/close/`, payload); return data; }
 export async function createCashMovement(id: number | string, payload: Partial<CashMovement>) { const { data } = await api.post<CashMovement>(`/billing/cash-sessions/${id}/movements/`, payload); return data; }

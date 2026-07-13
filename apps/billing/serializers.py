@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
+from django.db.models import Sum
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -328,6 +329,8 @@ class PaymentCreateSerializer(serializers.ModelSerializer):
             if not cash_session:
                 raise serializers.ValidationError({"cash_session": "Debes abrir caja antes de registrar pagos en efectivo."})
             attrs["cash_session"] = cash_session
+        elif not str(attrs.get("reference", "")).strip():
+            raise serializers.ValidationError({"reference": "La referencia es obligatoria para pagos que no son en efectivo."})
         amount = attrs.get("amount")
         if amount is None or amount <= 0:
             raise serializers.ValidationError({"amount": "El monto debe ser mayor que cero."})
@@ -412,10 +415,13 @@ class CashSessionListSerializer(serializers.ModelSerializer):
     income_total = serializers.SerializerMethodField()
     expense_total = serializers.SerializerMethodField()
     expected_amount_live = serializers.SerializerMethodField()
+    payments_count = serializers.SerializerMethodField()
+    movements_count = serializers.SerializerMethodField()
+    payment_method_totals = serializers.SerializerMethodField()
 
     class Meta:
         model = CashSession
-        fields = ["id", "clinic", "opened_by", "opened_by_nombre", "opening_datetime", "closing_datetime", "opening_amount", "closing_amount", "expected_amount", "expected_amount_live", "difference_amount", "cash_total", "income_total", "expense_total", "status", "notes", "active", "creado_en", "actualizado_en"]
+        fields = ["id", "clinic", "opened_by", "opened_by_nombre", "opening_datetime", "closing_datetime", "opening_amount", "closing_amount", "expected_amount", "expected_amount_live", "difference_amount", "cash_total", "income_total", "expense_total", "payments_count", "movements_count", "payment_method_totals", "status", "notes", "active", "creado_en", "actualizado_en"]
 
     def _totals(self, obj):
         if not hasattr(obj, "_serializer_totals"):
@@ -434,6 +440,16 @@ class CashSessionListSerializer(serializers.ModelSerializer):
     def get_expected_amount_live(self, obj):
         cash, income, expense = self._totals(obj)
         return obj.opening_amount + cash + income - expense
+
+    def get_payments_count(self, obj):
+        return obj.payments.filter(active=True, status=Payment.Status.APLICADO).count()
+
+    def get_movements_count(self, obj):
+        return obj.movements.filter(active=True).count()
+
+    def get_payment_method_totals(self, obj):
+        rows = obj.payments.filter(active=True, status=Payment.Status.APLICADO).values("method").annotate(total=Sum("amount"))
+        return {row["method"]: row["total"] for row in rows}
 
 
 class CashSessionDetailSerializer(CashSessionListSerializer):

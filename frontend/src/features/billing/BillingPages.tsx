@@ -3,7 +3,7 @@ import { ArrowLeft, DollarSign, Plus, Printer, Trash2 } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
-import { addConsumptionToInvoice, addInventoryItemToInvoice, createBillableService, createCashMovement, createFiscalRange, createInvoice, createPayment, downloadBlob, getBillableServices, getBillingStats, getCashSessions, getCreditNotePdf, getCreditNotes, getCurrentCashSession, getFiscalInvoicePdf, getFiscalProfile, getFiscalRanges, getFiscalReadiness, getInvoice, getInvoicePayments, getInvoicePrintData, getInvoices, getMyInvoices, getMyPayments, getPayments, getPendingConsumptions, getTodayInvoiceSummary, getTodayInvoices, issueFiscalInvoice, openCashSession, closeCashSession, updateFiscalProfile, updateFiscalRange, voidFiscalInvoice, voidInvoice } from "../../api/billingApi";
+import { addConsumptionToInvoice, addInventoryItemToInvoice, createBillableService, createCashMovement, createFiscalRange, createInvoice, createPayment, downloadBlob, getBillableServices, getBillingStats, getCashSessions, getCashSummary, getCreditNotePdf, getCreditNotes, getCurrentCashSession, getFiscalInvoicePdf, getFiscalProfile, getFiscalRanges, getFiscalReadiness, getInvoice, getInvoicePayments, getInvoicePrintData, getInvoices, getMyInvoices, getMyPayments, getPayments, getPendingConsumptions, getTodayInvoiceSummary, getTodayInvoices, issueFiscalInvoice, openCashSession, closeCashSession, updateFiscalProfile, updateFiscalRange, voidFiscalInvoice, voidInvoice } from "../../api/billingApi";
 import { getInventoryItems } from "../../api/inventoryApi";
 import { getErrorMessage } from "../../api/axios";
 import { getPatients } from "../../api/patientsApi";
@@ -16,7 +16,7 @@ import { Modal, ModalCloseButton } from "../../components/ui/Modal";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { StatCard } from "../../components/ui/StatCard";
 import { Table } from "../../components/ui/Table";
-import type { BillableService, BillingStats, CashSession, ClinicFiscalProfile, CreditNote, FiscalDocumentRange, Invoice, InvoicePrintData, Payment, TodayInvoiceSummary } from "../../types/billing";
+import type { BillableService, BillingStats, CashSession, CashSummary, ClinicFiscalProfile, CreditNote, FiscalDocumentRange, Invoice, InvoicePrintData, Payment, TodayInvoiceSummary } from "../../types/billing";
 import type { Patient } from "../../types/patient";
 import type { InventoryItem } from "../../types/inventory";
 import type { ClinicalSupplyUsage } from "../../types/medicalRecord";
@@ -996,9 +996,15 @@ export function PaymentsPage({ patientOnly = false }: { patientOnly?: boolean })
 export function CashPage() {
   const [sessions, setSessions] = useState<CashSession[]>([]);
   const [current, setCurrent] = useState<CashSession | null>(null);
+  const [summary, setSummary] = useState<CashSummary | null>(null);
   const [cashModal, setCashModal] = useState<"open" | "close" | "movement" | null>(null);
   const [cashForm, setCashForm] = useState({ opening_amount: "0.00", closing_amount: "0.00", movement_type: "ingreso", amount: "0.00", reason: "", notes: "" });
-  async function load() { setSessions(await getCashSessions()); try { setCurrent(await getCurrentCashSession()); } catch { setCurrent(null); } }
+  async function load() {
+    const [sessionList, daySummary] = await Promise.all([getCashSessions(), getCashSummary()]);
+    setSessions(sessionList);
+    setSummary(daySummary);
+    try { setCurrent(await getCurrentCashSession()); } catch { setCurrent(null); }
+  }
   useEffect(() => { load().catch((e) => toast.error(getErrorMessage(e))); }, []);
   function showOpen() { setCashForm({ opening_amount: "0.00", closing_amount: "0.00", movement_type: "ingreso", amount: "0.00", reason: "", notes: "" }); setCashModal("open"); }
   function showClose() { setCashForm({ opening_amount: "0.00", closing_amount: current?.expected_amount_live ?? current?.expected_amount ?? "0.00", movement_type: "ingreso", amount: "0.00", reason: "", notes: "" }); setCashModal("close"); }
@@ -1016,5 +1022,48 @@ export function CashPage() {
       toast.error(getErrorMessage(e));
     }
   }
-  return <div className="space-y-6"><PageHeader title="Caja" description="Apertura, cierre y movimientos." actions={current ? <Button variant="danger" onClick={showClose}>Cerrar caja</Button> : <Button onClick={showOpen}>Abrir caja</Button>} />{current ? <Card title="Caja actual" actions={<div className="flex gap-2"><Button variant="outline" onClick={() => showMovement("ingreso")}>Ingreso</Button><Button variant="outline" onClick={() => showMovement("egreso")}>Egreso</Button></div>}><div className="grid gap-4 md:grid-cols-3"><StatCard label="Apertura" value={money(current.opening_amount)} icon={<DollarSign className="h-5 w-5" />} /><StatCard label="Esperado" value={money(current.expected_amount_live ?? current.expected_amount)} icon={<DollarSign className="h-5 w-5" />} /><StatCard label="Movimientos" value={current.movements?.length ?? 0} icon={<DollarSign className="h-5 w-5" />} /></div></Card> : null}<Card title="Sesiones"><Table data={sessions} columns={[{ key: "id", header: "ID", render: (i) => i.id }, { key: "user", header: "Usuario", render: (i) => i.opened_by_nombre }, { key: "open", header: "Apertura", render: (i) => money(i.opening_amount) }, { key: "expected", header: "Esperado", render: (i) => money(i.expected_amount_live ?? i.expected_amount) }, { key: "diff", header: "Diferencia", render: (i) => money(i.difference_amount) }, { key: "status", header: "Estado", render: (i) => <CashStatusBadge status={i.status} /> }]} /></Card><Modal open={Boolean(cashModal)} title={cashModal === "open" ? "Abrir caja" : cashModal === "close" ? "Cerrar caja" : "Registrar movimiento"} onClose={() => setCashModal(null)} actions={<><ModalCloseButton onClick={() => setCashModal(null)} /><Button form="cash-form" type="submit">{cashModal === "open" ? "Abrir" : cashModal === "close" ? "Cerrar" : "Registrar"}</Button></>}><form id="cash-form" className="grid gap-4" onSubmit={submitCash}>{cashModal === "open" ? <label className="block space-y-1.5"><span className="text-sm font-medium text-slate-700">Monto de apertura</span><input className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm" min="0" required step="0.01" value={cashForm.opening_amount} onChange={(e) => setCashForm({ ...cashForm, opening_amount: cleanDecimal(e.target.value) })} /></label> : null}{cashModal === "close" ? <><p className="text-sm text-slate-600">Monto esperado: <b>{money(current?.expected_amount_live ?? current?.expected_amount)}</b></p><label className="block space-y-1.5"><span className="text-sm font-medium text-slate-700">Monto de cierre</span><input className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm" min="0" required step="0.01" value={cashForm.closing_amount} onChange={(e) => setCashForm({ ...cashForm, closing_amount: cleanDecimal(e.target.value) })} /></label><label className="block space-y-1.5"><span className="text-sm font-medium text-slate-700">Notas</span><textarea className="min-h-24 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" value={cashForm.notes} onChange={(e) => setCashForm({ ...cashForm, notes: e.target.value })} /></label></> : null}{cashModal === "movement" ? <><label className="block space-y-1.5"><span className="text-sm font-medium text-slate-700">Tipo</span><select className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm" value={cashForm.movement_type} onChange={(e) => setCashForm({ ...cashForm, movement_type: e.target.value })}><option value="ingreso">Ingreso</option><option value="egreso">Egreso</option></select></label><label className="block space-y-1.5"><span className="text-sm font-medium text-slate-700">Monto</span><input className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm" min="0.01" required step="0.01" value={cashForm.amount} onChange={(e) => setCashForm({ ...cashForm, amount: cleanDecimal(e.target.value) })} /></label><label className="block space-y-1.5"><span className="text-sm font-medium text-slate-700">Razon</span><input className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm" required value={cashForm.reason} onChange={(e) => setCashForm({ ...cashForm, reason: e.target.value })} /></label><label className="block space-y-1.5"><span className="text-sm font-medium text-slate-700">Notas</span><textarea className="min-h-24 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" value={cashForm.notes} onChange={(e) => setCashForm({ ...cashForm, notes: e.target.value })} /></label></> : null}</form></Modal></div>;
+  const expected = current?.expected_amount_live ?? current?.expected_amount ?? "0.00";
+  const closeDifference = Number(cashForm.closing_amount || 0) - Number(expected || 0);
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Caja" description="Apertura, cierre, arqueo y movimientos." actions={current ? <Button variant="danger" onClick={showClose}>Cerrar caja</Button> : <Button onClick={showOpen}>Abrir caja</Button>} />
+      {summary ? (
+        <div className="grid gap-4 md:grid-cols-4">
+          <StatCard label="Cajas abiertas" value={summary.open_sessions} icon={<DollarSign className="h-5 w-5" />} />
+          <StatCard label="Efectivo hoy" value={money(summary.cash_payments)} icon={<DollarSign className="h-5 w-5" />} />
+          <StatCard label="Tarjeta/transferencia" value={money(Number(summary.card_payments) + Number(summary.transfer_payments))} icon={<DollarSign className="h-5 w-5" />} />
+          <StatCard label="Diferencia cierres" value={money(summary.difference_total)} icon={<DollarSign className="h-5 w-5" />} />
+        </div>
+      ) : null}
+      {current ? (
+        <Card title="Caja actual" actions={<div className="flex gap-2"><Button variant="outline" onClick={() => showMovement("ingreso")}>Ingreso</Button><Button variant="outline" onClick={() => showMovement("egreso")}>Egreso</Button></div>}>
+          <div className="grid gap-4 md:grid-cols-5">
+            <StatCard label="Apertura" value={money(current.opening_amount)} icon={<DollarSign className="h-5 w-5" />} />
+            <StatCard label="Efectivo cobrado" value={money(current.cash_total)} icon={<DollarSign className="h-5 w-5" />} />
+            <StatCard label="Ingresos manuales" value={money(current.income_total)} icon={<DollarSign className="h-5 w-5" />} />
+            <StatCard label="Egresos manuales" value={money(current.expense_total)} icon={<DollarSign className="h-5 w-5" />} />
+            <StatCard label="Esperado" value={money(expected)} icon={<DollarSign className="h-5 w-5" />} />
+          </div>
+        </Card>
+      ) : <EmptyState title="No tienes caja abierta." description="Abre caja antes de registrar pagos en efectivo." />}
+      <Card title="Sesiones">
+        <Table data={sessions} columns={[
+          { key: "id", header: "ID", render: (i) => i.id },
+          { key: "user", header: "Usuario", render: (i) => i.opened_by_nombre },
+          { key: "open", header: "Apertura", render: (i) => money(i.opening_amount) },
+          { key: "payments", header: "Pagos", render: (i) => i.payments_count ?? 0 },
+          { key: "expected", header: "Esperado", render: (i) => money(i.expected_amount_live ?? i.expected_amount) },
+          { key: "diff", header: "Diferencia", render: (i) => money(i.difference_amount) },
+          { key: "status", header: "Estado", render: (i) => <CashStatusBadge status={i.status} /> },
+        ]} />
+      </Card>
+      <Modal open={Boolean(cashModal)} title={cashModal === "open" ? "Abrir caja" : cashModal === "close" ? "Cerrar caja" : "Registrar movimiento"} onClose={() => setCashModal(null)} actions={<><ModalCloseButton onClick={() => setCashModal(null)} /><Button form="cash-form" type="submit">{cashModal === "open" ? "Abrir" : cashModal === "close" ? "Cerrar" : "Registrar"}</Button></>}>
+        <form id="cash-form" className="grid gap-4" onSubmit={submitCash}>
+          {cashModal === "open" ? <label className="block space-y-1.5"><span className="text-sm font-medium text-slate-700">Monto de apertura</span><input className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm" min="0" required step="0.01" value={cashForm.opening_amount} onChange={(e) => setCashForm({ ...cashForm, opening_amount: cleanDecimal(e.target.value) })} /></label> : null}
+          {cashModal === "close" ? <><p className="text-sm text-slate-600">Monto esperado: <b>{money(expected)}</b></p><p className={closeDifference === 0 ? "text-sm text-emerald-700" : "text-sm text-rose-700"}>Diferencia: <b>{money(closeDifference)}</b>{closeDifference !== 0 ? " · agrega una nota obligatoria." : ""}</p><label className="block space-y-1.5"><span className="text-sm font-medium text-slate-700">Monto contado</span><input className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm" min="0" required step="0.01" value={cashForm.closing_amount} onChange={(e) => setCashForm({ ...cashForm, closing_amount: cleanDecimal(e.target.value) })} /></label><label className="block space-y-1.5"><span className="text-sm font-medium text-slate-700">Notas de cierre</span><textarea className="min-h-24 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" required={closeDifference !== 0} value={cashForm.notes} onChange={(e) => setCashForm({ ...cashForm, notes: e.target.value })} /></label></> : null}
+          {cashModal === "movement" ? <><label className="block space-y-1.5"><span className="text-sm font-medium text-slate-700">Tipo</span><select className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm" value={cashForm.movement_type} onChange={(e) => setCashForm({ ...cashForm, movement_type: e.target.value })}><option value="ingreso">Ingreso</option><option value="egreso">Egreso</option></select></label><label className="block space-y-1.5"><span className="text-sm font-medium text-slate-700">Monto</span><input className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm" min="0.01" required step="0.01" value={cashForm.amount} onChange={(e) => setCashForm({ ...cashForm, amount: cleanDecimal(e.target.value) })} /></label><label className="block space-y-1.5"><span className="text-sm font-medium text-slate-700">Razón</span><input className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm" required value={cashForm.reason} onChange={(e) => setCashForm({ ...cashForm, reason: e.target.value })} /></label><label className="block space-y-1.5"><span className="text-sm font-medium text-slate-700">Notas</span><textarea className="min-h-24 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" value={cashForm.notes} onChange={(e) => setCashForm({ ...cashForm, notes: e.target.value })} /></label></> : null}
+        </form>
+      </Modal>
+    </div>
+  );
 }

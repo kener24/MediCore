@@ -856,6 +856,10 @@ class PaymentViewSet(viewsets.ModelViewSet):
         if not can_manage_billing(request.user):
             return Response({"detail": "No tienes permiso para anular pagos."}, status=status.HTTP_403_FORBIDDEN)
         payment = self.get_object()
+        if payment.status == Payment.Status.ANULADO or not payment.active:
+            return Response({"detail": "El pago ya esta anulado."}, status=status.HTTP_400_BAD_REQUEST)
+        if payment.cash_session_id and payment.cash_session.status == CashSession.Status.CERRADA:
+            return Response({"detail": "No puedes anular un pago asociado a una caja cerrada. Registra un ajuste autorizado en una caja abierta."}, status=status.HTTP_400_BAD_REQUEST)
         serializer = PaymentVoidSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         payment.status = Payment.Status.ANULADO
@@ -892,7 +896,10 @@ class CashSessionViewSet(viewsets.ReadOnlyModelViewSet):
         serializer = CashSessionOpenSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            session = CashSession.objects.create(clinic=request.user.clinica, opened_by=request.user, **serializer.validated_data)
+            with transaction.atomic():
+                if CashSession.objects.select_for_update().filter(clinic=request.user.clinica, opened_by=request.user, status=CashSession.Status.ABIERTA).exists():
+                    return Response({"detail": "Ya tienes una caja abierta."}, status=status.HTTP_400_BAD_REQUEST)
+                session = CashSession.objects.create(clinic=request.user.clinica, opened_by=request.user, **serializer.validated_data)
         except DjangoValidationError as exc:
             return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
         log_audit_event(request=request, clinic=session.clinic, action=AuditLog.Action.CREATE, module=AuditLog.Module.CASH, model_name="CashSession", object_id=session.id, object_repr=f"Caja {session.id}", description="Caja abierta.", new_values=serializer.validated_data)
@@ -913,7 +920,15 @@ class CashSessionViewSet(viewsets.ReadOnlyModelViewSet):
         serializer = CashSessionCloseSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            session.close(request.user, serializer.validated_data["closing_amount"], serializer.validated_data.get("notes", ""))
+            with transaction.atomic():
+                session = CashSession.objects.select_for_update().get(pk=session.pk)
+                cash, income, expense = session.totals()
+                expected = session.opening_amount + cash + income - expense
+                difference = serializer.validated_data["closing_amount"] - expected
+                notes = serializer.validated_data.get("notes", "")
+                if difference != 0 and not notes.strip():
+                    return Response({"notes": ["Debes agregar una nota cuando el arqueo tenga diferencia."]}, status=status.HTTP_400_BAD_REQUEST)
+                session.close(request.user, serializer.validated_data["closing_amount"], notes)
         except DjangoValidationError as exc:
             return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
         log_audit_event(request=request, clinic=session.clinic, action=AuditLog.Action.UPDATE, module=AuditLog.Module.CASH, model_name="CashSession", object_id=session.id, object_repr=f"Caja {session.id}", description="Caja cerrada.", new_values=serializer.validated_data)
@@ -934,6 +949,29 @@ class CashSessionViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
         log_audit_event(request=request, clinic=movement.clinic, action=AuditLog.Action.CREATE, module=AuditLog.Module.CASH, model_name="CashMovement", object_id=movement.id, object_repr=movement.reason, description="Movimiento de caja registrado.", new_values=serializer.validated_data)
         return Response(CashMovementSerializer(movement).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["get"])
+    def summary(self, request):
+        date = request.query_params.get("date") or timezone.localdate().isoformat()
+        sessions = self.get_queryset().filter(opening_datetime__date=date)
+        payments = scope(request, Payment.objects.filter(active=True, status=Payment.Status.APLICADO, payment_date=date))
+        movements = scope(request, CashMovement.objects.filter(active=True, creado_en__date=date))
+        return Response(
+            {
+                "date": date,
+                "open_sessions": self.get_queryset().filter(status=CashSession.Status.ABIERTA).count(),
+                "closed_sessions": sessions.filter(status=CashSession.Status.CERRADA).count(),
+                "opening_total": sessions.aggregate(v=Sum("opening_amount"))["v"] or Decimal("0.00"),
+                "closing_total": sessions.filter(status=CashSession.Status.CERRADA).aggregate(v=Sum("closing_amount"))["v"] or Decimal("0.00"),
+                "difference_total": sessions.filter(status=CashSession.Status.CERRADA).aggregate(v=Sum("difference_amount"))["v"] or Decimal("0.00"),
+                "cash_payments": payments.filter(method=Payment.Method.EFECTIVO).aggregate(v=Sum("amount"))["v"] or Decimal("0.00"),
+                "card_payments": payments.filter(method=Payment.Method.TARJETA).aggregate(v=Sum("amount"))["v"] or Decimal("0.00"),
+                "transfer_payments": payments.filter(method=Payment.Method.TRANSFERENCIA).aggregate(v=Sum("amount"))["v"] or Decimal("0.00"),
+                "other_payments": payments.exclude(method__in=[Payment.Method.EFECTIVO, Payment.Method.TARJETA, Payment.Method.TRANSFERENCIA]).aggregate(v=Sum("amount"))["v"] or Decimal("0.00"),
+                "manual_income": movements.filter(movement_type=CashMovement.Type.INGRESO).aggregate(v=Sum("amount"))["v"] or Decimal("0.00"),
+                "manual_expense": movements.filter(movement_type=CashMovement.Type.EGRESO).aggregate(v=Sum("amount"))["v"] or Decimal("0.00"),
+            }
+        )
 
 
 class BillingStatsViewSet(viewsets.ViewSet):

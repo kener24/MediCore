@@ -507,6 +507,43 @@ class BillingModuleTests(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         self.assertEqual(res.data["method"], Payment.Method.TARJETA)
 
+    def test_pago_no_efectivo_requiere_referencia(self):
+        inv = self.invoice()
+        self.auth(self.rec)
+        res = self.client.post("/api/billing/payments/", {"invoice": inv.id, "amount": "100.00", "method": "tarjeta"}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("reference", res.data)
+
+    def test_cierre_con_diferencia_requiere_nota(self):
+        session = CashSession.objects.create(clinic=self.clinic, opened_by=self.rec, opening_amount=Decimal("100.00"))
+        self.auth(self.rec)
+        res = self.client.patch(f"/api/billing/cash-sessions/{session.id}/close/", {"closing_amount": "90.00"}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("notes", res.data)
+        ok = self.client.patch(f"/api/billing/cash-sessions/{session.id}/close/", {"closing_amount": "90.00", "notes": "Faltante en arqueo"}, format="json")
+        self.assertEqual(ok.status_code, status.HTTP_200_OK)
+
+    def test_no_anular_pago_de_caja_cerrada(self):
+        inv = self.invoice()
+        session = CashSession.objects.create(clinic=self.clinic, opened_by=self.rec, opening_amount=Decimal("0.00"))
+        self.auth(self.rec)
+        payment_res = self.client.post("/api/billing/payments/", {"invoice": inv.id, "amount": "100.00", "method": "efectivo"}, format="json")
+        self.assertEqual(payment_res.status_code, status.HTTP_201_CREATED)
+        session.refresh_from_db()
+        session.close(self.rec, Decimal("100.00"))
+        void = self.client.patch(f"/api/billing/payments/{payment_res.data['id']}/void/", {"reason": "Error"}, format="json")
+        self.assertEqual(void.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_resumen_caja_diario(self):
+        inv = self.invoice()
+        CashSession.objects.create(clinic=self.clinic, opened_by=self.rec, opening_amount=Decimal("25.00"))
+        self.auth(self.rec)
+        self.client.post("/api/billing/payments/", {"invoice": inv.id, "amount": "100.00", "method": "efectivo"}, format="json")
+        res = self.client.get("/api/billing/cash-sessions/summary/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["open_sessions"], 1)
+        self.assertEqual(res.data["cash_payments"], Decimal("100.00"))
+
     def test_sin_auth(self):
         res = self.client.get("/api/billing/invoices/")
         self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)

@@ -3,6 +3,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from apps.accounts.models import Role, User
+from apps.accounts.role_permissions import permissions_for_role
 from apps.clinics.models import Clinic
 from apps.core.validators import validate_digits_identifier, validate_phone
 from apps.security.services import validate_password_policy
@@ -10,10 +11,19 @@ from apps.subscriptions.services import ensure_can_create_user
 
 
 class RoleSerializer(serializers.ModelSerializer):
+    permissions = serializers.SerializerMethodField()
+    permission_groups = serializers.SerializerMethodField()
+
     class Meta:
         model = Role
-        fields = ["id", "nombre", "descripcion", "activo", "creado_en", "actualizado_en"]
+        fields = ["id", "nombre", "descripcion", "activo", "permissions", "permission_groups", "creado_en", "actualizado_en"]
         read_only_fields = fields
+
+    def get_permissions(self, obj):
+        return permissions_for_role(obj.nombre)["permissions"]
+
+    def get_permission_groups(self, obj):
+        return permissions_for_role(obj.nombre)["groups"]
 
 
 class UserListSerializer(serializers.ModelSerializer):

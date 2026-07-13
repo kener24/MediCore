@@ -10,6 +10,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 
 from apps.accounts.models import Role, User
 from apps.accounts.permissions import CanManageClinicUsers, IsClinicAdmin, IsOwnerOrAdmin, IsSuperAdmin, get_role_name
+from apps.accounts.role_permissions import ROLE_PERMISSION_GROUPS
 from apps.accounts.serializers import (
     ChangePasswordSerializer,
     ClinicAdminUserCreateSerializer,
@@ -247,6 +248,10 @@ class UserViewSet(viewsets.ModelViewSet):
 class RoleViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Role.objects.filter(activo=True)
     serializer_class = RoleSerializer
+
+    @action(detail=False, methods=["get"])
+    def permissions(self, request):
+        return Response(ROLE_PERMISSION_GROUPS)
 
 
 class ClinicAdminDashboardView(APIView):

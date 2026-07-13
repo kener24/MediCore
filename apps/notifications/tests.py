@@ -6,9 +6,10 @@ from rest_framework.test import APITestCase
 
 from apps.accounts.models import Role, User
 from apps.appointments.models import Appointment
+from apps.billing.models import CashSession, FiscalDocumentRange, Invoice
 from apps.doctors.models import DoctorProfile, DoctorSchedule, MedicalSpecialty
 from apps.inventory.models import InventoryCategory, InventoryItem
-from apps.notifications.generators import generate_inventory_alerts
+from apps.notifications.generators import generate_billing_alerts, generate_cash_alerts, generate_fiscal_range_alerts, generate_inventory_alerts
 from apps.notifications.models import Notification, NotificationPreference
 from apps.notifications.services import create_notification
 from apps.patients.models import Patient
@@ -24,8 +25,10 @@ class NotificationTests(APITestCase):
         self.role_admin = Role.objects.create(nombre="admin")
         self.role_doctor = Role.objects.create(nombre="medico")
         self.role_patient = Role.objects.create(nombre="paciente")
+        self.role_reception = Role.objects.create(nombre="recepcionista")
         self.clinic = Clinic.objects.create(nombre="Demo", correo="demo@test.com", telefono="1", direccion="Demo")
         self.admin = User.objects.create_user(email="admin@test.com", password="x", nombre_completo="Admin", role=self.role_admin, clinica=self.clinic)
+        self.reception = User.objects.create_user(email="recepcion@test.com", password="x", nombre_completo="Recepcion", role=self.role_reception, clinica=self.clinic)
         self.doctor_user = User.objects.create_user(email="doctor@test.com", password="x", nombre_completo="Doctor", role=self.role_doctor, clinica=self.clinic)
         self.patient_user = User.objects.create_user(email="patient@test.com", password="x", nombre_completo="Patient", role=self.role_patient, clinica=self.clinic)
         self.other_user = User.objects.create_user(email="other@test.com", password="x", nombre_completo="Other", role=self.role_admin, clinica=self.clinic)
@@ -104,6 +107,55 @@ class NotificationTests(APITestCase):
         created = generate_inventory_alerts()
         self.assertGreaterEqual(created, 1)
         self.assertTrue(Notification.objects.filter(recipient=self.admin, module="inventory").exists())
+        self.assertEqual(generate_inventory_alerts(), 0)
+
+    def test_billing_alerts_notify_patient_and_staff_without_duplicates(self):
+        invoice = Invoice.objects.create(
+            clinic=self.clinic,
+            patient=self.patient,
+            invoice_number="FAC-TEST-1",
+            total_amount=Decimal("150.00"),
+            balance_due=Decimal("150.00"),
+            status=Invoice.Status.PENDIENTE,
+        )
+        created = generate_billing_alerts()
+        self.assertGreaterEqual(created, 3)
+        self.assertTrue(Notification.objects.filter(recipient=self.patient_user, title="Factura pendiente", related_object_id=str(invoice.id)).exists())
+        self.assertTrue(Notification.objects.filter(recipient=self.admin, title="Factura pendiente", related_object_id=str(invoice.id)).exists())
+        self.assertTrue(Notification.objects.filter(recipient=self.reception, title="Factura pendiente", related_object_id=str(invoice.id)).exists())
+        self.assertEqual(generate_billing_alerts(), 0)
+
+    def test_open_cash_session_generates_operational_alert(self):
+        session = CashSession.objects.create(
+            clinic=self.clinic,
+            opened_by=self.reception,
+            opening_datetime=timezone.now() - timedelta(hours=13),
+            opening_amount=Decimal("100.00"),
+        )
+        created = generate_cash_alerts()
+        self.assertEqual(created, 3)
+        self.assertTrue(Notification.objects.filter(recipient=self.admin, title="Caja abierta sin cierre", related_object_id=str(session.id)).exists())
+        self.assertTrue(Notification.objects.filter(recipient=self.reception, title="Caja abierta sin cierre", related_object_id=str(session.id)).exists())
+        self.assertEqual(generate_cash_alerts(), 0)
+
+    def test_fiscal_range_alerts_warn_expiring_or_low_stock_cai(self):
+        fiscal_range = FiscalDocumentRange.objects.create(
+            clinic=self.clinic,
+            document_type=FiscalDocumentRange.DocumentType.INVOICE,
+            cai="DEMO-CAI-NO-VALIDO",
+            start_number=1,
+            end_number=100,
+            current_number=95,
+            start_date=timezone.localdate(),
+            expiration_date=timezone.localdate() + timedelta(days=10),
+            is_active=True,
+        )
+        created = generate_fiscal_range_alerts()
+        self.assertEqual(created, 2)
+        notification = Notification.objects.get(recipient=self.admin, related_model="FiscalDocumentRange", related_object_id=str(fiscal_range.id))
+        self.assertEqual(notification.title, "Rango CAI por vencer")
+        self.assertIn("000-001-01-00000001", notification.message)
+        self.assertEqual(generate_fiscal_range_alerts(), 0)
 
     def test_unauthenticated_cannot_access(self):
         self.assertEqual(self.client.get("/api/notifications/").status_code, 401)

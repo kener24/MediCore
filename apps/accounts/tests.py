@@ -78,6 +78,21 @@ class AuthAndUsersTests(APITestCase):
         self.assertEqual(response.data["total_users"], 4)
         self.assertEqual(response.data["total_admins"], 1)
 
+    def test_roles_incluyen_permisos_operativos(self):
+        self.authenticate(self.clinic_admin)
+        response = self.client.get("/api/roles/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        admin = next(item for item in response.data if item["nombre"] == "admin")
+        self.assertIn("Gestionar equipo de clínica", admin["permissions"])
+        self.assertIn("Administración", admin["permission_groups"])
+
+    def test_catalogo_permisos_por_rol(self):
+        self.authenticate(self.clinic_admin)
+        response = self.client.get("/api/roles/permissions/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("recepcionista", response.data)
+        self.assertIn("Caja", response.data["recepcionista"])
+
     def test_admin_no_puede_ver_dashboard_global(self):
         self.authenticate(self.clinic_admin)
         response = self.client.get("/api/admin/dashboard/")

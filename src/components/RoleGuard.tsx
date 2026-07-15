@@ -19,35 +19,33 @@ export function RoleGuard({ children, roles }: RoleGuardProps) {
   }
 
   if (!user || !appRole || !roles.includes(appRole)) {
-    const isPatientPortal = roles.length === 1 && roles[0] === 'paciente';
-    const isDoctorModule = roles.includes('medico') || roles.includes('doctor');
-    const isNurseModule = roles.some((role) => isNurseRole(role));
-    const isReceptionModule = roles.some((role) => isReceptionRole(role));
-    const isCashierModule = roles.some((role) => isCashierRole(role));
-    const isPatientRoleOnly = roles.some((role) => isPatientRole(role));
-    const isSuperAdminModule = roles.includes('superadmin');
-
     return (
       <ErrorState
-        message={
-          isPatientPortal || isPatientRoleOnly
-            ? 'Tu rol no tiene acceso al portal paciente.'
-            : isDoctorModule
-              ? 'No tienes acceso al módulo médico.'
-              : isNurseModule
-                ? 'No tienes acceso al módulo de enfermería.'
-                : isReceptionModule
-                  ? 'No tienes acceso al módulo de recepción.'
-                  : isCashierModule
-                    ? 'No tienes acceso al módulo de caja.'
-                    : isSuperAdminModule
-                      ? 'No tienes acceso al control global del sistema.'
-                      : 'Tu usuario no tiene permisos para abrir esta sección.'
-        }
+        message={resolveDeniedMessage(roles)}
+        status={403}
         title="Acceso no autorizado"
+        tone="permission"
       />
     );
   }
 
   return children;
+}
+
+function resolveDeniedMessage(roles: AppRole[]) {
+  const isPatientPortal = roles.length === 1 && roles[0] === 'paciente';
+  const isDoctorModule = roles.includes('medico') || roles.includes('doctor');
+  const isNurseModule = roles.some((role) => isNurseRole(role));
+  const isReceptionModule = roles.some((role) => isReceptionRole(role));
+  const isCashierModule = roles.some((role) => isCashierRole(role));
+  const isPatientRoleOnly = roles.some((role) => isPatientRole(role));
+  const isSuperAdminModule = roles.includes('superadmin');
+
+  if (isPatientPortal || isPatientRoleOnly) return 'Tu rol no tiene acceso al portal de paciente.';
+  if (isDoctorModule) return 'No tienes acceso al módulo médico.';
+  if (isNurseModule) return 'No tienes acceso al módulo de enfermería.';
+  if (isReceptionModule) return 'No tienes acceso al módulo de recepción.';
+  if (isCashierModule) return 'No tienes acceso al módulo de caja.';
+  if (isSuperAdminModule) return 'No tienes acceso al control global del sistema.';
+  return 'Tu usuario no tiene permisos para abrir esta sección.';
 }

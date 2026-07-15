@@ -88,3 +88,30 @@ class NotificationPreference(TimeStampedModel):
     def __str__(self):
         return f"Preferencias {self.user_id}"
 
+
+class PushDevice(TimeStampedModel):
+    class Platform(models.TextChoices):
+        ANDROID = "android", "Android"
+        IOS = "ios", "iOS"
+        WEB = "web", "Web"
+        UNKNOWN = "unknown", "Desconocido"
+
+    user = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="push_devices")
+    clinic = models.ForeignKey("clinics.Clinic", on_delete=models.SET_NULL, null=True, blank=True, related_name="push_devices")
+    expo_push_token = models.CharField(max_length=255, unique=True)
+    platform = models.CharField(max_length=20, choices=Platform.choices, default=Platform.UNKNOWN)
+    device_name = models.CharField(max_length=180, blank=True)
+    app_version = models.CharField(max_length=40, blank=True)
+    is_active = models.BooleanField(default=True)
+    last_seen_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-last_seen_at", "-creado_en"]
+        indexes = [
+            models.Index(fields=["user", "is_active"]),
+            models.Index(fields=["clinic", "is_active"]),
+            models.Index(fields=["platform"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user_id} - {self.platform}"

@@ -9,8 +9,8 @@ from rest_framework.views import APIView
 
 from apps.accounts.permissions import get_role_name
 from apps.notifications.generators import generate_appointment_reminders, generate_billing_alerts, generate_inventory_alerts
-from apps.notifications.models import Notification, NotificationPreference
-from apps.notifications.serializers import NotificationDetailSerializer, NotificationFilterSerializer, NotificationListSerializer, NotificationPreferenceSerializer, NotificationStatsSerializer
+from apps.notifications.models import Notification, NotificationPreference, PushDevice
+from apps.notifications.serializers import NotificationDetailSerializer, NotificationFilterSerializer, NotificationListSerializer, NotificationPreferenceSerializer, NotificationStatsSerializer, PushDeviceSerializer
 
 
 class NotificationPagination(PageNumberPagination):
@@ -107,6 +107,44 @@ class NotificationPreferenceView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
+
+
+class PushDeviceView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        devices = PushDevice.objects.filter(user=request.user, is_active=True)
+        return Response(PushDeviceSerializer(devices, many=True).data)
+
+    def post(self, request):
+        serializer = PushDeviceSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        token = serializer.validated_data["expo_push_token"]
+        device, _ = PushDevice.objects.update_or_create(
+            expo_push_token=token,
+            defaults={
+                "user": request.user,
+                "clinic": request.user.clinica,
+                "platform": serializer.validated_data.get("platform") or PushDevice.Platform.UNKNOWN,
+                "device_name": serializer.validated_data.get("device_name", ""),
+                "app_version": serializer.validated_data.get("app_version", ""),
+                "is_active": True,
+                "last_seen_at": timezone.now(),
+            },
+        )
+        preferences, _ = NotificationPreference.objects.get_or_create(user=request.user)
+        if not preferences.push_enabled:
+            preferences.push_enabled = True
+            preferences.save(update_fields=["push_enabled", "actualizado_en"])
+        return Response(PushDeviceSerializer(device).data, status=status.HTTP_201_CREATED)
+
+    def delete(self, request):
+        token = str(request.data.get("expo_push_token") or "").strip()
+        queryset = PushDevice.objects.filter(user=request.user, is_active=True)
+        if token:
+            queryset = queryset.filter(expo_push_token=token)
+        updated = queryset.update(is_active=False, actualizado_en=timezone.now())
+        return Response({"disabled": updated})
 
 
 class NotificationStatsView(APIView):

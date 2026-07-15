@@ -10,7 +10,7 @@ from apps.billing.models import CashSession, FiscalDocumentRange, Invoice
 from apps.doctors.models import DoctorProfile, DoctorSchedule, MedicalSpecialty
 from apps.inventory.models import InventoryCategory, InventoryItem
 from apps.notifications.generators import generate_billing_alerts, generate_cash_alerts, generate_fiscal_range_alerts, generate_inventory_alerts
-from apps.notifications.models import Notification, NotificationPreference
+from apps.notifications.models import Notification, NotificationPreference, PushDevice
 from apps.notifications.services import create_notification
 from apps.patients.models import Patient
 from apps.clinics.models import Clinic
@@ -83,6 +83,28 @@ class NotificationTests(APITestCase):
         self.assertEqual(self.client.patch("/api/notifications/preferences/", {"receive_inventory_alerts": False}, format="json").status_code, 200)
         self.auth(self.patient_user)
         response = self.client.patch("/api/notifications/preferences/", {"receive_inventory_alerts": True}, format="json")
+        self.assertEqual(response.status_code, 400)
+
+    def test_register_and_disable_push_device(self):
+        self.auth(self.admin)
+        payload = {
+            "expo_push_token": "ExponentPushToken[demo123]",
+            "platform": "android",
+            "device_name": "Pixel demo",
+            "app_version": "1.0.0",
+        }
+        response = self.client.post("/api/notifications/push-devices/", payload, format="json")
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(PushDevice.objects.filter(user=self.admin, expo_push_token=payload["expo_push_token"], is_active=True).exists())
+        self.assertTrue(NotificationPreference.objects.get(user=self.admin).push_enabled)
+        self.assertEqual(self.client.get("/api/notifications/push-devices/").status_code, 200)
+        response = self.client.delete("/api/notifications/push-devices/", {"expo_push_token": payload["expo_push_token"]}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(PushDevice.objects.get(expo_push_token=payload["expo_push_token"]).is_active)
+
+    def test_reject_invalid_push_token(self):
+        self.auth(self.admin)
+        response = self.client.post("/api/notifications/push-devices/", {"expo_push_token": "bad-token"}, format="json")
         self.assertEqual(response.status_code, 400)
 
     def test_appointment_create_and_cancel_generate_notifications(self):

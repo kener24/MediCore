@@ -1,10 +1,16 @@
 import logging
+import json
 from collections.abc import Mapping
 from datetime import date, datetime
 from decimal import Decimal
+from urllib import request as urlrequest
+from urllib.error import URLError
+
+from django.conf import settings
+from django.utils import timezone
 
 from apps.accounts.models import User
-from apps.notifications.models import Notification, NotificationPreference
+from apps.notifications.models import Notification, NotificationPreference, PushDevice
 
 
 logger = logging.getLogger(__name__)
@@ -19,6 +25,7 @@ MODULE_PREFS = {
     "audit": "receive_audit_alerts",
     "system": "receive_system_notifications",
 }
+EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 
 
 def clean_metadata(value):
@@ -71,7 +78,7 @@ def create_notification(
             return None
         if not preference_allows(recipient, module):
             return None
-        return Notification.objects.create(
+        notification = Notification.objects.create(
             clinic=clinic or getattr(recipient, "clinica", None),
             recipient=recipient,
             title=title,
@@ -85,9 +92,62 @@ def create_notification(
             metadata=clean_metadata(metadata or {}),
             expires_at=expires_at,
         )
+        send_push_for_notification(notification)
+        return notification
     except Exception as exc:
         logger.warning("Notification failed: %s", exc)
         return None
+
+
+def push_enabled():
+    return bool(getattr(settings, "EXPO_PUSH_ENABLED", True))
+
+
+def push_priority(priority):
+    return "high" if priority in [Notification.Priority.HIGH, Notification.Priority.URGENT] else "default"
+
+
+def send_push_for_notification(notification):
+    if not push_enabled():
+        return 0
+    preferences = get_preferences(notification.recipient)
+    if not preferences.push_enabled:
+        return 0
+    devices = PushDevice.objects.filter(user=notification.recipient, is_active=True)
+    sent = 0
+    for device in devices:
+        payload = {
+            "to": device.expo_push_token,
+            "title": notification.title,
+            "body": notification.message,
+            "sound": "default",
+            "priority": push_priority(notification.priority),
+            "data": {
+                "notificationId": notification.id,
+                "module": notification.module,
+                "actionUrl": notification.action_url,
+                "relatedModel": notification.related_model,
+                "relatedObjectId": notification.related_object_id,
+            },
+        }
+        try:
+            request = urlrequest.Request(
+                EXPO_PUSH_URL,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json", "Accept": "application/json"},
+                method="POST",
+            )
+            with urlrequest.urlopen(request, timeout=4) as response:
+                if 200 <= response.status < 300:
+                    sent += 1
+        except URLError as exc:
+            logger.info("Expo push not delivered for device %s: %s", device.id, exc)
+        except Exception as exc:
+            logger.warning("Expo push failed for device %s: %s", device.id, exc)
+    if sent:
+        notification.sent_at = timezone.now()
+        notification.save(update_fields=["sent_at", "actualizado_en"])
+    return sent
 
 
 def create_bulk_notifications(recipients, title, message, **kwargs):

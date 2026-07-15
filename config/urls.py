@@ -43,7 +43,7 @@ from apps.reports.views import (
     SuperAdminDashboardReportView,
 )
 from apps.audit.views import AuditLogViewSet, AuditStatsViewSet
-from apps.notifications.views import GenerateAppointmentRemindersView, GenerateBillingAlertsView, GenerateInventoryAlertsView, NotificationPreferenceView, NotificationStatsView, NotificationViewSet
+from apps.notifications.views import GenerateAppointmentRemindersView, GenerateBillingAlertsView, GenerateInventoryAlertsView, NotificationPreferenceView, NotificationStatsView, NotificationViewSet, PushDeviceView
 from apps.clinic_settings.views import ClinicSettingsByClinicView, ClinicSettingsSummaryView, ClinicWorkflowSettingsByClinicView, MyClinicSettingsView, MyClinicWorkflowSettingsView, PublicClinicSettingsView
 from apps.subscriptions.views import ClinicPlanUsageView, ClinicSubscriptionActionView, ClinicSubscriptionDetailView, ClinicSubscriptionsView, MyPlanUsageView, MySubscriptionView, SubscriptionFeaturesView, SubscriptionPlanViewSet
 from apps.documents.views import (
@@ -268,6 +268,7 @@ urlpatterns = [
     path("api/audit/my-activity/", AuditLogViewSet.as_view({"get": "my_activity"}), name="audit-my-activity"),
     path("api/audit/summary/", AuditStatsViewSet.as_view({"get": "list"}), name="audit-summary"),
     path("api/notifications/preferences/", NotificationPreferenceView.as_view(), name="notification-preferences"),
+    path("api/notifications/push-devices/", PushDeviceView.as_view(), name="notification-push-devices"),
     path("api/notifications/stats/", NotificationStatsView.as_view(), name="notification-stats"),
     path("api/notifications/generate-inventory-alerts/", GenerateInventoryAlertsView.as_view(), name="notification-generate-inventory-alerts"),
     path("api/notifications/generate-appointment-reminders/", GenerateAppointmentRemindersView.as_view(), name="notification-generate-appointment-reminders"),

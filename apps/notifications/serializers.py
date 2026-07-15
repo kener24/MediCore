@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from apps.accounts.permissions import get_role_name
-from apps.notifications.models import Notification, NotificationPreference
+from apps.notifications.models import Notification, NotificationPreference, PushDevice
 
 
 class NotificationListSerializer(serializers.ModelSerializer):
@@ -32,6 +32,21 @@ class NotificationPreferenceSerializer(serializers.ModelSerializer):
         return attrs
 
 
+class PushDeviceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PushDevice
+        fields = ["id", "expo_push_token", "platform", "device_name", "app_version", "is_active", "last_seen_at", "creado_en", "actualizado_en"]
+        read_only_fields = ["id", "is_active", "last_seen_at", "creado_en", "actualizado_en"]
+
+    def validate_expo_push_token(self, value):
+        token = str(value or "").strip()
+        if not token.startswith("ExponentPushToken[") and not token.startswith("ExpoPushToken["):
+            raise serializers.ValidationError("Token push Expo inválido.")
+        if len(token) > 255:
+            raise serializers.ValidationError("Token push demasiado largo.")
+        return token
+
+
 class NotificationStatsSerializer(serializers.Serializer):
     total = serializers.IntegerField()
     unread = serializers.IntegerField()
@@ -50,4 +65,3 @@ class NotificationFilterSerializer(serializers.Serializer):
         if attrs.get("date_from") and attrs.get("date_to") and attrs["date_from"] > attrs["date_to"]:
             raise serializers.ValidationError("date_from no puede ser mayor que date_to.")
         return attrs
-

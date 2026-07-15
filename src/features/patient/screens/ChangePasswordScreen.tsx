@@ -6,11 +6,14 @@ import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { AppInput } from '@/components/AppInput';
 import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen';
+import { validatePasswordPair } from '@/core/utils/formValidation';
+import { useAuth } from '@/features/auth/context/AuthContext';
 import { changePasswordService } from '@/features/auth/services/authService';
 import { PatientHeader } from '@/features/patient/components/PatientHeader';
 
 export function ChangePasswordScreen() {
   const navigation = useNavigation<any>();
+  const { signOut } = useAuth();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -19,18 +22,8 @@ export function ChangePasswordScreen() {
   const [secureConfirm, setSecureConfirm] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  function validate() {
-    if (!currentPassword) return 'La contraseña actual es requerida.';
-    if (!newPassword) return 'La nueva contraseña es requerida.';
-    if (!confirmPassword) return 'Confirma la nueva contraseña.';
-    if (newPassword.length < 8) return 'La contraseña debe tener al menos 8 caracteres.';
-    if (newPassword !== confirmPassword) return 'Las contraseñas no coinciden.';
-    if (newPassword === currentPassword) return 'La nueva contraseña debe ser diferente a la actual.';
-    return '';
-  }
-
   async function save() {
-    const validation = validate();
+    const validation = validatePasswordPair(newPassword, confirmPassword, currentPassword);
     if (validation) {
       Alert.alert('Contraseña', validation);
       return;
@@ -42,8 +35,9 @@ export function ChangePasswordScreen() {
         current_password: currentPassword,
         new_password: newPassword,
       });
-      Alert.alert('Contraseña', 'Contraseña actualizada correctamente.');
-      navigation.goBack();
+      Alert.alert('Contraseña actualizada', 'Contraseña actualizada correctamente. Por seguridad inicia sesión nuevamente.', [
+        { onPress: signOut, text: 'Aceptar' },
+      ]);
     } catch (err) {
       Alert.alert('Contraseña', err instanceof Error ? err.message : 'No se pudo cambiar la contraseña.');
     } finally {

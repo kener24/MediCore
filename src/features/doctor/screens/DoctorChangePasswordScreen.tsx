@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
 import { colors } from '@/core/theme/colors';
+import { validatePasswordPair } from '@/core/utils/formValidation';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import { ChangePasswordForm } from '@/features/doctor/components/DoctorProfileCards';
 import { DoctorHeader } from '@/features/doctor/components/DoctorHeader';
@@ -28,7 +29,7 @@ export function DoctorChangePasswordScreen() {
   }
 
   async function submit() {
-    const validation = validate(values);
+    const validation = validatePasswordPair(values.new_password, values.confirm_password, values.current_password);
     if (validation) return Alert.alert('Cambiar contraseña', validation);
     setSaving(true);
     try {
@@ -55,14 +56,6 @@ export function DoctorChangePasswordScreen() {
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
-}
-
-function validate(values: ChangePasswordPayload) {
-  if (!values.current_password) return 'Escribe tu contraseña actual.';
-  if (!values.new_password || values.new_password.length < 8) return 'La nueva contraseña debe tener al menos 8 caracteres.';
-  if (values.new_password !== values.confirm_password) return 'Las contraseñas no coinciden.';
-  if (values.new_password === values.current_password) return 'La nueva contraseña debe ser diferente a la actual.';
-  return '';
 }
 
 const styles = StyleSheet.create({

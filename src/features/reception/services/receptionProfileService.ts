@@ -1,5 +1,6 @@
 import { endpoints } from '@/core/api/endpoints';
-import { getFirstAvailable, patchFirstAvailable, postFirstAvailable } from '@/features/reception/services/receptionApiHelpers';
+import { changePasswordService } from '@/features/auth/services/authService';
+import { getFirstAvailable, patchFirstAvailable } from '@/features/reception/services/receptionApiHelpers';
 import type {
   ReceptionChangePasswordPayload,
   ReceptionProfile,
@@ -20,7 +21,7 @@ export async function updateReceptionProfile(payload: ReceptionProfileUpdatePayl
 }
 
 export async function changeReceptionPassword(payload: ReceptionChangePasswordPayload) {
-  return postFirstAvailable([endpoints.auth.changePassword, '/users/change-password/', '/auth/password/change/'], payload);
+  return changePasswordService(payload);
 }
 
 function mapReceptionProfile(response: unknown): ReceptionProfile {

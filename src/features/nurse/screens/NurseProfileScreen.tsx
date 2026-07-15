@@ -47,6 +47,7 @@ export function NurseProfileScreen() {
           onPress={() => navigation.navigate('NurseSecurity')}
           title="Seguridad"
         />
+        <AppButton label="Cambiar contraseña" onPress={() => navigation.navigate('NurseChangePassword')} variant="secondary" />
         <AppButton label="Cerrar sesión" onPress={confirmLogout} variant="danger" />
       </ScrollView>
     </SafeAreaView>

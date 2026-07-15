@@ -5,27 +5,27 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
+import { AppHeader } from '@/components/AppHeader';
 import { AppInput } from '@/components/AppInput';
 import { colors } from '@/core/theme/colors';
 import { validatePasswordPair } from '@/core/utils/formValidation';
 import { useAuth } from '@/features/auth/context/AuthContext';
-import { CashierHeader } from '@/features/cashier/components/CashierHeader';
-import { changeCashierPassword } from '@/features/cashier/services/cashierProfileService';
-import type { CashierChangePasswordPayload } from '@/features/cashier/types/cashierProfile.types';
+import { changePasswordService } from '@/features/auth/services/authService';
+import type { ChangePasswordPayload } from '@/features/auth/types/auth.types';
 
-const initialValues: CashierChangePasswordPayload = {
+const initialValues: ChangePasswordPayload = {
   confirm_password: '',
   current_password: '',
   new_password: '',
 };
 
-export function CashierChangePasswordScreen() {
+export function NurseChangePasswordScreen() {
   const navigation = useNavigation<any>();
   const { signOut } = useAuth();
-  const [values, setValues] = useState<CashierChangePasswordPayload>(initialValues);
+  const [values, setValues] = useState<ChangePasswordPayload>(initialValues);
   const [saving, setSaving] = useState(false);
 
-  function update(field: keyof CashierChangePasswordPayload, value: string) {
+  function update(field: keyof ChangePasswordPayload, value: string) {
     setValues((current) => ({ ...current, [field]: value }));
   }
 
@@ -34,7 +34,7 @@ export function CashierChangePasswordScreen() {
     if (validation) return Alert.alert('Cambiar contraseña', validation);
     setSaving(true);
     try {
-      await changeCashierPassword(values);
+      await changePasswordService(values);
       setValues(initialValues);
       Alert.alert('Contraseña actualizada', 'Contraseña actualizada correctamente. Por seguridad inicia sesión nuevamente.', [
         { onPress: signOut, text: 'Aceptar' },
@@ -49,8 +49,8 @@ export function CashierChangePasswordScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboard}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <CashierHeader subtitle="Protege el acceso de caja." title="Cambiar contraseña" />
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <AppHeader icon="key-outline" subtitle="Protege el acceso de enfermería." title="Cambiar contraseña" />
           <AppCard style={styles.card}>
             <AppInput label="Contraseña actual" onChangeText={(value) => update('current_password', value)} secureTextEntry value={values.current_password} />
             <AppInput label="Nueva contraseña" onChangeText={(value) => update('new_password', value)} secureTextEntry value={values.new_password} />

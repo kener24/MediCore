@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RoleGuard } from '@/components/RoleGuard';
 import { NurseCompletedTriagesScreen } from '@/features/nurse/screens/NurseCompletedTriagesScreen';
+import { NurseChangePasswordScreen } from '@/features/nurse/screens/NurseChangePasswordScreen';
 import { NurseDashboardScreen } from '@/features/nurse/screens/NurseDashboardScreen';
 import { NurseBedStatusScreen } from '@/features/nurse/hospitalization/screens/NurseBedStatusScreen';
 import { NurseHospitalizationDashboardScreen } from '@/features/nurse/hospitalization/screens/NurseHospitalizationDashboardScreen';
@@ -127,6 +128,7 @@ function NurseProfileStack() {
       <Stack.Screen component={NurseProfileScreen} name="NurseProfile" />
       <Stack.Screen component={NurseNotificationsScreen} name="NurseNotifications" />
       <Stack.Screen component={NurseSecurityScreen} name="NurseSecurity" />
+      <Stack.Screen component={NurseChangePasswordScreen} name="NurseChangePassword" />
     </Stack.Navigator>
   );
 }

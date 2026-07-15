@@ -8,6 +8,7 @@ import { AppCard } from '@/components/AppCard';
 import { AppHeader } from '@/components/AppHeader';
 import { AppInput } from '@/components/AppInput';
 import { colors } from '@/core/theme/colors';
+import { validatePasswordPair } from '@/core/utils/formValidation';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import { changeReceptionPassword } from '@/features/reception/services/receptionProfileService';
 import type { ReceptionChangePasswordPayload } from '@/features/reception/types/receptionProfile.types';
@@ -29,7 +30,7 @@ export function ReceptionChangePasswordScreen() {
   }
 
   async function submit() {
-    const validation = validate(values);
+    const validation = validatePasswordPair(values.new_password, values.confirm_password, values.current_password);
     if (validation) return Alert.alert('Cambiar contraseña', validation);
     setSaving(true);
     try {
@@ -61,14 +62,6 @@ export function ReceptionChangePasswordScreen() {
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
-}
-
-function validate(values: ReceptionChangePasswordPayload) {
-  if (!values.current_password) return 'Escribe tu contraseña actual.';
-  if (!values.new_password || values.new_password.length < 8) return 'La nueva contraseña debe tener al menos 8 caracteres.';
-  if (values.new_password !== values.confirm_password) return 'Las contraseñas no coinciden.';
-  if (values.new_password === values.current_password) return 'La nueva contraseña debe ser diferente a la actual.';
-  return '';
 }
 
 const styles = StyleSheet.create({

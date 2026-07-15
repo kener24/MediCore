@@ -1,7 +1,7 @@
 import { apiClient } from '@/core/api/apiClient';
 import { endpoints } from '@/core/api/endpoints';
-import { logoutService } from '@/features/auth/services/authService';
-import { getFirstAvailable, patchFirstAvailable, postFirstAvailable } from '@/features/doctor/services/doctorApiHelpers';
+import { changePasswordService, logoutService } from '@/features/auth/services/authService';
+import { getFirstAvailable, patchFirstAvailable } from '@/features/doctor/services/doctorApiHelpers';
 import { normalizeListResponse, type ApiListResponse } from '@/features/doctor/types/commonDoctor.types';
 import type {
   ChangePasswordPayload,
@@ -62,10 +62,7 @@ export async function updateDoctorProfile(payload: DoctorProfileUpdatePayload) {
 }
 
 export async function changePassword(payload: ChangePasswordPayload) {
-  return postFirstAvailable(
-    [endpoints.auth.changePassword, '/users/change-password/'],
-    payload,
-  );
+  return changePasswordService(payload);
 }
 
 export async function getDoctorSchedule() {

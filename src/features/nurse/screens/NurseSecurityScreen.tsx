@@ -1,11 +1,15 @@
+import { useNavigation } from '@react-navigation/native';
 import { ScrollView, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { AppHeader } from '@/components/AppHeader';
 import { colors } from '@/core/theme/colors';
 
 export function NurseSecurityScreen() {
+  const navigation = useNavigation<any>();
+
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -28,6 +32,7 @@ export function NurseSecurityScreen() {
             Cierra sesión al terminar turno, confirma siempre el paciente antes de guardar signos vitales y evita compartir tu usuario con otro miembro del equipo.
           </Text>
         </AppCard>
+        <AppButton label="Cambiar contraseña" onPress={() => navigation.navigate('NurseChangePassword')} />
       </ScrollView>
     </SafeAreaView>
   );

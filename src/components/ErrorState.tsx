@@ -35,12 +35,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 22,
   },
-  title: {
-    color: colors.danger,
-    fontSize: 16,
-    fontWeight: '900',
-    marginTop: 8,
-  },
   message: {
     color: colors.muted,
     fontSize: 13,
@@ -59,5 +53,11 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 14,
     fontWeight: '900',
+  },
+  title: {
+    color: colors.danger,
+    fontSize: 16,
+    fontWeight: '900',
+    marginTop: 8,
   },
 });

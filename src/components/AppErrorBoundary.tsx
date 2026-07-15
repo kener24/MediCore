@@ -35,9 +35,9 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.content}>
           <Text style={styles.kicker}>MediCore</Text>
-          <Text style={styles.title}>Algo no se cargo correctamente</Text>
+          <Text style={styles.title}>Algo no se cargó correctamente</Text>
           <Text style={styles.message}>
-            La app se recupero de un error inesperado. Puedes intentar volver a cargar esta pantalla.
+            La app se recuperó de un error inesperado. Puedes intentar volver a cargar esta pantalla.
           </Text>
           <AppButton label="Reintentar" onPress={this.reset} />
         </View>

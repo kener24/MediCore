@@ -1,10 +1,15 @@
 import axios, { type AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
 
+import { buildApiCacheKey, cacheApiResponse, clearApiCache, getCachedApiResponse } from '@/core/api/apiCache';
 import { endpoints } from '@/core/api/endpoints';
 import { appConfig } from '@/core/config/appConfig';
 import { clearSession, getSession, saveSession } from '@/core/storage/sessionStorage';
 
-type RetriableRequestConfig = InternalAxiosRequestConfig & { _retry?: boolean };
+type RetriableRequestConfig = InternalAxiosRequestConfig & {
+  _cacheKey?: string;
+  _cacheUserKey?: string;
+  _retry?: boolean;
+};
 
 let onSessionExpired: (() => void) | null = null;
 
@@ -13,20 +18,23 @@ export function setSessionExpiredHandler(handler: (() => void) | null) {
 }
 
 export class ApiClientError extends Error {
-  status?: number;
+  code?: string;
   payload?: unknown;
+  status?: number;
 
-  constructor(message: string, status?: number, payload?: unknown) {
+  constructor(message: string, status?: number, payload?: unknown, code?: string) {
     super(message);
     this.name = 'ApiClientError';
     this.status = status;
     this.payload = payload;
+    this.code = code;
   }
 }
 
 function extractErrorMessage(error: AxiosError) {
   if (!error.response) {
-    return 'No se pudo conectar con el servidor. Revisa tu conexion.';
+    if (error.code === 'ECONNABORTED') return 'La conexión tardó demasiado. Revisa internet e intenta nuevamente.';
+    return 'No se pudo conectar con el servidor. Revisa tu conexión.';
   }
 
   const status = error.response.status;
@@ -58,6 +66,10 @@ function extractPayloadMessage(payload: unknown): string {
   return '';
 }
 
+function isReadRequest(config?: RetriableRequestConfig) {
+  return (config?.method ?? 'get').toLowerCase() === 'get';
+}
+
 export function setupAuthInterceptors(apiClient: AxiosInstance) {
   apiClient.interceptors.request.use(async (config) => {
     const { accessToken, sessionKey } = await getSession();
@@ -67,11 +79,29 @@ export function setupAuthInterceptors(apiClient: AxiosInstance) {
     if (sessionKey) {
       config.headers['X-Session-Key'] = sessionKey;
     }
+
+    const cacheableConfig = config as RetriableRequestConfig;
+    cacheableConfig._cacheUserKey = sessionKey || 'anonymous';
+    if (isReadRequest(cacheableConfig)) {
+      cacheableConfig._cacheKey = buildApiCacheKey({
+        baseURL: config.baseURL,
+        method: config.method,
+        params: config.params,
+        url: config.url,
+        userKey: cacheableConfig._cacheUserKey,
+      });
+    }
     return config;
   });
 
   apiClient.interceptors.response.use(
-    (response) => response,
+    (response) => {
+      const config = response.config as RetriableRequestConfig;
+      if (config._cacheKey && isReadRequest(config)) {
+        void cacheApiResponse(config._cacheKey, response.data);
+      }
+      return response;
+    },
     async (error: AxiosError) => {
       const originalRequest = error.config as RetriableRequestConfig | undefined;
 
@@ -98,6 +128,7 @@ export function setupAuthInterceptors(apiClient: AxiosInstance) {
             }
           } catch {
             await clearSession();
+            await clearApiCache();
             onSessionExpired?.();
           }
         }
@@ -105,10 +136,26 @@ export function setupAuthInterceptors(apiClient: AxiosInstance) {
 
       if (error.response?.status === 401) {
         await clearSession();
+        await clearApiCache();
         onSessionExpired?.();
       }
+
+      if (originalRequest?._cacheKey && isReadRequest(originalRequest) && (!error.response || error.response.status >= 500)) {
+        const cached = await getCachedApiResponse(originalRequest._cacheKey);
+        if (cached) {
+          return {
+            config: originalRequest,
+            data: cached.data,
+            headers: {},
+            request: error.request,
+            status: 200,
+            statusText: cached.stale ? 'OK_FROM_STALE_CACHE' : 'OK_FROM_CACHE',
+          };
+        }
+      }
+
       return Promise.reject(
-        new ApiClientError(extractErrorMessage(error), error.response?.status, error.response?.data),
+        new ApiClientError(extractErrorMessage(error), error.response?.status, error.response?.data, error.code),
       );
     },
   );

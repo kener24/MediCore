@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Alert } from 'react-native';
 
+import { clearApiCache } from '@/core/api/apiCache';
 import { setSessionExpiredHandler } from '@/core/api/authInterceptor';
 import {
   clearSession,
@@ -13,12 +14,12 @@ import { getMeService, loginService, logoutService } from '@/features/auth/servi
 import type { AppRole, LoginPayload, RoleName, User } from '@/features/auth/types/auth.types';
 
 interface AuthContextValue {
-  loading: boolean;
-  user: User | null;
-  role: RoleName | null;
   appRole: AppRole | null;
+  loading: boolean;
+  role: RoleName | null;
   signIn: (payload: LoginPayload) => Promise<void>;
   signOut: () => Promise<void>;
+  user: User | null;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -52,13 +53,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (mounted) setUser(currentUser);
       } catch {
         await clearSession();
+        await clearApiCache();
         if (mounted) setUser(null);
       } finally {
         if (mounted) setLoading(false);
       }
     }
 
-    restore();
+    void restore();
 
     return () => {
       mounted = false;
@@ -81,18 +83,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function signOut() {
     await logoutService();
     await clearSession();
+    await clearApiCache();
     setUser(null);
   }
 
   const role = resolveRole(user);
   const value = useMemo(
     () => ({
-      loading,
-      user,
-      role,
       appRole: resolveSupportedAppRole(role, user?.permissions ?? user?.user_permissions),
+      loading,
+      role,
       signIn,
       signOut,
+      user,
     }),
     [loading, role, user],
   );

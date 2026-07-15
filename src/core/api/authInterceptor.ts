@@ -11,10 +11,15 @@ type RetriableRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean;
 };
 
-let onSessionExpired: (() => void) | null = null;
+let onSessionExpired: ((message?: string) => void) | null = null;
+let sessionExpirationNotified = false;
 
-export function setSessionExpiredHandler(handler: (() => void) | null) {
+export function setSessionExpiredHandler(handler: ((message?: string) => void) | null) {
   onSessionExpired = handler;
+}
+
+export function resetSessionExpiredNotification() {
+  sessionExpirationNotified = false;
 }
 
 export class ApiClientError extends Error {
@@ -70,6 +75,14 @@ function isReadRequest(config?: RetriableRequestConfig) {
   return (config?.method ?? 'get').toLowerCase() === 'get';
 }
 
+async function expireSession(message?: string) {
+  await clearSession();
+  await clearApiCache();
+  if (sessionExpirationNotified) return;
+  sessionExpirationNotified = true;
+  onSessionExpired?.(message);
+}
+
 export function setupAuthInterceptors(apiClient: AxiosInstance) {
   apiClient.interceptors.request.use(async (config) => {
     const { accessToken, sessionKey } = await getSession();
@@ -123,21 +136,18 @@ export function setupAuthInterceptors(apiClient: AxiosInstance) {
                 sessionKey: session.sessionKey ?? undefined,
                 user: session.user,
               });
+              resetSessionExpiredNotification();
               originalRequest.headers.Authorization = `Bearer ${data.access}`;
               return apiClient(originalRequest);
             }
           } catch {
-            await clearSession();
-            await clearApiCache();
-            onSessionExpired?.();
+            await expireSession('Tu sesión expiró por seguridad. Inicia sesión nuevamente para continuar.');
           }
         }
       }
 
       if (error.response?.status === 401) {
-        await clearSession();
-        await clearApiCache();
-        onSessionExpired?.();
+        await expireSession(extractErrorMessage(error));
       }
 
       if (originalRequest?._cacheKey && isReadRequest(originalRequest) && (!error.response || error.response.status >= 500)) {

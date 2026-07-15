@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { Alert } from 'react-native';
 
 import { clearApiCache } from '@/core/api/apiCache';
-import { setSessionExpiredHandler } from '@/core/api/authInterceptor';
+import { resetSessionExpiredNotification, setSessionExpiredHandler } from '@/core/api/authInterceptor';
 import { registerDeviceForPushNotifications } from '@/core/notifications/pushNotificationService';
 import {
   clearSession,
@@ -30,9 +30,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    setSessionExpiredHandler(() => {
+    setSessionExpiredHandler((message) => {
       setUser(null);
-      Alert.alert('Sesión expirada', 'Tu sesión expiró por seguridad. Inicia sesión nuevamente para continuar.');
+      Alert.alert('Sesión expirada', message || 'Tu sesión expiró por seguridad. Inicia sesión nuevamente para continuar.');
     });
 
     let mounted = true;
@@ -51,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           sessionKey: session.sessionKey ?? undefined,
           user: currentUser,
         });
+        resetSessionExpiredNotification();
         if (mounted) setUser(currentUser);
       } catch {
         await clearSession();
@@ -78,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sessionKey: response.session_key,
       user: currentUser,
     });
+    resetSessionExpiredNotification();
     setUser(currentUser);
     void registerDeviceForPushNotifications().catch(() => undefined);
   }
@@ -86,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await logoutService();
     await clearSession();
     await clearApiCache();
+    resetSessionExpiredNotification();
     setUser(null);
   }
 

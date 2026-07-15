@@ -40,6 +40,8 @@ export const endpoints = {
   },
   notifications: {
     list: '/notifications/',
+    preferences: '/notifications/preferences/',
+    pushDevices: '/notifications/push-devices/',
     unreadCount: '/notifications/unread-count/',
     markRead: (id: number | string) => `/notifications/${id}/mark-read/`,
   },

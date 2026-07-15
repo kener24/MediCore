@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 
 import { clearApiCache } from '@/core/api/apiCache';
 import { setSessionExpiredHandler } from '@/core/api/authInterceptor';
+import { registerDeviceForPushNotifications } from '@/core/notifications/pushNotificationService';
 import {
   clearSession,
   getSession,
@@ -78,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: currentUser,
     });
     setUser(currentUser);
+    void registerDeviceForPushNotifications().catch(() => undefined);
   }
 
   async function signOut() {

@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
+import { isNonNegativeMoney, isPositiveMoney } from '@/core/utils/formValidation';
 import { CashierHeader } from '@/features/cashier/components/CashierHeader';
 import { closeCashSession, createCashMovement, getCashSessions, getCashSummary, getCurrentCashSession, openCashSession } from '@/features/cashier/services/cashierCashService';
 import type { CashMovementType, CashSession, CashSummary } from '@/features/cashier/types/cashierCash.types';
@@ -62,13 +63,15 @@ export function CashierCashSessionScreen() {
     const value = Number(amount);
     const expected = numericValue(current?.expected_amount_live ?? current?.expected_amount);
     const difference = mode === 'close' ? value - expected : 0;
-    if (!Number.isFinite(value) || value < 0) return Alert.alert('Caja', 'Ingresa un monto válido.');
-    if ((mode === 'ingreso' || mode === 'egreso') && (!current?.id || value <= 0 || !reason.trim())) {
+
+    if (!isNonNegativeMoney(amount)) return Alert.alert('Caja', 'Ingresa un monto válido.');
+    if ((mode === 'ingreso' || mode === 'egreso') && (!current?.id || !isPositiveMoney(amount) || !reason.trim())) {
       return Alert.alert('Caja', 'Para registrar movimientos debes indicar monto mayor a 0 y razón.');
     }
     if (mode === 'close' && difference !== 0 && !notes.trim()) {
       return Alert.alert('Caja', 'Debes agregar una nota cuando el arqueo tenga diferencia.');
     }
+
     setSaving(true);
     try {
       if (mode === 'open') {
@@ -142,7 +145,7 @@ export function CashierCashSessionScreen() {
               {current ? <ModeButton active={mode === 'egreso'} label="Egreso" onPress={() => selectMode('egreso')} /> : null}
             </View>
             {mode === 'close' ? <Text style={[styles.hint, difference !== 0 && styles.warning]}>Monto esperado: {formatCurrency(expected)}. Diferencia actual: {formatCurrency(difference)}{difference !== 0 ? '. Nota obligatoria.' : ''}</Text> : null}
-            <AppInput keyboardType="decimal-pad" label={mode === 'open' ? 'Monto de apertura' : mode === 'close' ? 'Monto contado' : 'Monto'} onChangeText={(value) => setAmount(normalizeMoney(value))} value={amount} />
+            <AppInput keyboardType="decimal-pad" label={mode === 'open' ? 'Monto de apertura' : mode === 'close' ? 'Monto contado' : 'Monto'} onChangeText={setAmount} sanitizer="money" value={amount} />
             {mode === 'ingreso' || mode === 'egreso' ? <AppInput label="Razón" onChangeText={setReason} value={reason} /> : null}
             <AppInput label="Notas" multiline onChangeText={setNotes} scrollEnabled={false} style={styles.textArea} value={notes} />
             <AppButton label={mode === 'open' ? 'Abrir caja' : mode === 'close' ? 'Cerrar caja' : 'Registrar movimiento'} loading={saving} onPress={submit} variant={mode === 'close' ? 'danger' : 'primary'} />
@@ -193,13 +196,6 @@ function ModeButton({ active, label, onPress }: { active: boolean; label: string
       <Text style={[styles.modeText, active && styles.modeTextActive]}>{label}</Text>
     </Pressable>
   );
-}
-
-function normalizeMoney(value: string) {
-  const sanitized = value.replace(/[^0-9.]/g, '');
-  const [whole, ...decimals] = sanitized.split('.');
-  if (!decimals.length) return whole;
-  return `${whole}.${decimals.join('').slice(0, 2)}`;
 }
 
 const styles = StyleSheet.create({

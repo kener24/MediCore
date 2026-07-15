@@ -9,6 +9,7 @@ import { AppDateInput } from '@/components/AppDateInput';
 import { AppHeader } from '@/components/AppHeader';
 import { AppInput } from '@/components/AppInput';
 import { colors } from '@/core/theme/colors';
+import { isValidIdentity, isValidPhone, phoneDigits } from '@/core/utils/formValidation';
 import { patientIdentity, patientName, patientPhone } from '@/features/reception/services/receptionMappers';
 import { createMinimalPatient, searchPatients } from '@/features/reception/services/receptionPatientService';
 import type { MinimalPatientPayload, ReceptionPatient } from '@/features/reception/types/receptionPatient.types';
@@ -27,16 +28,16 @@ export function ReceptionPatientCreateScreen() {
 
   async function submit() {
     const fullName = form.full_name?.trim() ?? '';
-    const identity = form.identity_number?.trim() ?? '';
+    const identity = phoneDigits(form.identity_number);
     const phone = form.phone?.trim() ?? '';
     const birthDate = form.birth_date?.trim() ?? '';
 
     if (fullName.length < 5) return Alert.alert('Paciente', 'Ingresa el nombre completo del paciente.');
-    if (identity && identity.length < 8) return Alert.alert('Paciente', 'La identidad debe tener al menos 8 dígitos.');
-    if (phone && phone.replace(/\D/g, '').length < 8) return Alert.alert('Paciente', 'El teléfono debe tener al menos 8 dígitos.');
+    if (!isValidIdentity(identity)) return Alert.alert('Paciente', 'La identidad debe tener entre 8 y 14 dígitos.');
+    if (!isValidPhone(phone)) return Alert.alert('Paciente', 'El teléfono debe tener entre 8 y 15 dígitos.');
     if (birthDate && !/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) return Alert.alert('Paciente', 'La fecha debe tener formato YYYY-MM-DD.');
 
-    const payload = { ...form, full_name: fullName, identity_number: identity, phone, birth_date: birthDate || undefined };
+    const payload = { ...form, full_name: fullName, identity_number: identity || undefined, phone: phone || undefined, birth_date: birthDate || undefined };
 
     setSaving(true);
     try {
@@ -80,9 +81,9 @@ export function ReceptionPatientCreateScreen() {
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <AppHeader icon="account-plus-outline" subtitle="Registro rápido para recepción." title="Crear paciente" />
           <AppCard style={styles.form}>
-            <AppInput autoCapitalize="words" label="Nombre completo" onChangeText={(value) => setForm({ ...form, full_name: value })} value={form.full_name} />
-            <AppInput keyboardType="number-pad" label="Identidad" maxLength={20} onChangeText={(value) => setForm({ ...form, identity_number: value.replace(/[^0-9]/g, '') })} value={form.identity_number} />
-            <AppInput keyboardType="phone-pad" label="Teléfono" maxLength={20} onChangeText={(value) => setForm({ ...form, phone: value.replace(/[^0-9+()\-\s]/g, '') })} value={form.phone} />
+            <AppInput autoCapitalize="words" label="Nombre completo" onChangeText={(value) => setForm({ ...form, full_name: value })} sanitizer="name" value={form.full_name} />
+            <AppInput keyboardType="number-pad" label="Identidad" maxLength={14} onChangeText={(value) => setForm({ ...form, identity_number: value })} sanitizer="identity" value={form.identity_number} />
+            <AppInput keyboardType="phone-pad" label="Teléfono" maxLength={20} onChangeText={(value) => setForm({ ...form, phone: value })} sanitizer="phone" value={form.phone} />
             <Text style={styles.label}>Sexo</Text>
             <View style={styles.chips}>{genders.map(([value, label]) => <Chip active={form.gender === value} key={value} label={label} onPress={() => setForm({ ...form, gender: value })} />)}</View>
             <AppDateInput label="Fecha de nacimiento" maximumDate={new Date()} onChange={(value) => setForm({ ...form, birth_date: value })} placeholder="Seleccionar fecha" value={form.birth_date ?? ''} />
@@ -99,12 +100,12 @@ function Chip({ active, label, onPress }: { active: boolean; label: string; onPr
 }
 
 async function findPossibleDuplicate(identity: string, phone: string): Promise<ReceptionPatient | null> {
-  const terms = [identity, phone.replace(/\D/g, '')].filter((term) => term.length >= 8);
+  const terms = [identity, phoneDigits(phone)].filter((term) => term.length >= 8);
   for (const term of terms) {
     const matches = await searchPatients(term).catch(() => []);
     const duplicate = matches.find((patient) => {
-      const sameIdentity = identity && patientIdentity(patient).replace(/\D/g, '') === identity.replace(/\D/g, '');
-      const samePhone = phone && patientPhone(patient).replace(/\D/g, '') === phone.replace(/\D/g, '');
+      const sameIdentity = identity && phoneDigits(patientIdentity(patient)) === phoneDigits(identity);
+      const samePhone = phone && phoneDigits(patientPhone(patient)) === phoneDigits(phone);
       return sameIdentity || samePhone;
     });
     if (duplicate) return duplicate;

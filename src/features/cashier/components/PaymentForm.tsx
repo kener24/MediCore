@@ -56,7 +56,7 @@ export function PaymentForm({
         </View>
         {onFillBalance ? <Text onPress={onFillBalance} style={styles.fullBalance}>Pagar saldo</Text> : null}
       </View>
-      <AppInput keyboardType="decimal-pad" label="Monto a registrar" onChangeText={(value) => onChangeAmount(normalizeMoney(value))} value={amount} />
+      <AppInput keyboardType="decimal-pad" label="Monto a registrar" onChangeText={onChangeAmount} sanitizer="money" value={amount} />
       <Text style={styles.label}>Método de pago</Text>
       <View style={styles.methods}>
         {paymentMethods.map((item) => (
@@ -71,13 +71,6 @@ export function PaymentForm({
       <AppButton label="Registrar pago" loading={loading} onPress={onSubmit} />
     </View>
   );
-}
-
-function normalizeMoney(value: string) {
-  const sanitized = value.replace(/[^0-9.]/g, '');
-  const [whole, ...decimals] = sanitized.split('.');
-  if (!decimals.length) return whole;
-  return `${whole}.${decimals.join('').slice(0, 2)}`;
 }
 
 const styles = StyleSheet.create({

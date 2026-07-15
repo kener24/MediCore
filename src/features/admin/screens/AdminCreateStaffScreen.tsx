@@ -10,6 +10,7 @@ import { AppInput } from '@/components/AppInput';
 import { LoadingState } from '@/components/LoadingState';
 import { RoleGuard } from '@/components/RoleGuard';
 import { colors } from '@/core/theme/colors';
+import { isValidEmail, isValidPhone, phoneDigits, validatePasswordPair } from '@/core/utils/formValidation';
 import { createClinicStaff, getAdminSpecialties } from '@/features/admin/services/adminService';
 import type { AdminSpecialty, CreateClinicUserPayload } from '@/features/admin/types/admin.types';
 
@@ -144,9 +145,9 @@ export function AdminCreateStaffScreen() {
               </View>
               <Text style={styles.helper}>{roles.find((role) => role.value === form.role)?.description}</Text>
 
-              <AppInput autoCapitalize="words" label="Nombre completo" onChangeText={(value) => update({ fullName: value })} value={form.fullName} />
-              <AppInput autoCapitalize="none" keyboardType="email-address" label="Correo" onChangeText={(value) => update({ email: value })} value={form.email} />
-              <AppInput keyboardType="phone-pad" label="Teléfono" maxLength={20} onChangeText={(value) => update({ phone: value.replace(/[^0-9+()\-\s]/g, '') })} value={form.phone} />
+              <AppInput autoCapitalize="words" label="Nombre completo" onChangeText={(value) => update({ fullName: value })} sanitizer="name" value={form.fullName} />
+              <AppInput autoCapitalize="none" keyboardType="email-address" label="Correo" onChangeText={(value) => update({ email: value })} sanitizer="email" value={form.email} />
+              <AppInput keyboardType="phone-pad" label="Teléfono" maxLength={20} onChangeText={(value) => update({ phone: value })} sanitizer="phone" value={form.phone} />
               <AppInput label="Contraseña temporal" onChangeText={(value) => update({ password: value })} secureTextEntry value={form.password} />
               <AppInput label="Confirmar contraseña" onChangeText={(value) => update({ confirmPassword: value })} secureTextEntry value={form.confirmPassword} />
 
@@ -165,8 +166,8 @@ export function AdminCreateStaffScreen() {
                     })}
                   </View>
                   <AppInput label="Número de colegiación" onChangeText={(value) => update({ license: value })} value={form.license} />
-                  <AppInput autoCapitalize="words" label="Título profesional" onChangeText={(value) => update({ title: value })} placeholder="Médico general" value={form.title} />
-                  <AppInput keyboardType="number-pad" label="Duración consulta (minutos)" onChangeText={(value) => update({ duration: value.replace(/[^0-9]/g, '') })} value={form.duration} />
+                  <AppInput autoCapitalize="words" label="Título profesional" onChangeText={(value) => update({ title: value })} placeholder="Médico general" sanitizer="name" value={form.title} />
+                  <AppInput keyboardType="number-pad" label="Duración consulta (minutos)" onChangeText={(value) => update({ duration: value })} sanitizer="digits" value={form.duration} />
                   <Text onPress={() => update({ virtualCare: !form.virtualCare })} style={[styles.toggle, form.virtualCare && styles.toggleActive]}>
                     {form.virtualCare ? 'Atiende virtual: Sí' : 'Atiende virtual: No'}
                   </Text>
@@ -183,18 +184,19 @@ export function AdminCreateStaffScreen() {
 }
 
 function validateForm(form: FormState) {
-  const email = form.email.trim();
-  const phoneDigits = form.phone.replace(/\D/g, '');
+  const email = form.email.trim().toLowerCase();
+  const phone = phoneDigits(form.phone);
+  const passwordError = validatePasswordPair(form.password, form.confirmPassword);
+
   if (form.fullName.trim().length < 5) return 'Ingresa el nombre completo.';
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Ingresa un correo válido.';
-  if (phoneDigits && phoneDigits.length < 8) return 'El teléfono debe tener al menos 8 dígitos.';
-  if (form.password.length < 8) return 'La contraseña temporal debe tener al menos 8 caracteres.';
-  if (form.password !== form.confirmPassword) return 'La confirmación de contraseña no coincide.';
+  if (!isValidEmail(email)) return 'Ingresa un correo válido.';
+  if (!isValidPhone(phone)) return 'El teléfono debe tener entre 8 y 15 dígitos.';
+  if (passwordError) return passwordError.replace('La contraseña', 'La contraseña temporal');
   if (form.role === 'medico') {
     if (!form.specialtyId) return 'Selecciona una especialidad para el médico.';
     if (form.license.trim().length < 3) return 'Ingresa el número de colegiación.';
     const duration = Number(form.duration);
-    if (!Number.isFinite(duration) || duration <= 0) return 'La duración de consulta debe ser mayor que 0.';
+    if (!Number.isFinite(duration) || duration <= 0 || duration > 480) return 'La duración de consulta debe estar entre 1 y 480 minutos.';
   }
   return '';
 }
@@ -279,4 +281,3 @@ const styles = StyleSheet.create({
     color: colors.primaryDark,
   },
 });
-

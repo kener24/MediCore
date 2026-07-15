@@ -56,7 +56,16 @@ export function AdminUsersScreen() {
           <AppButton label="Crear enfermero, recepción o doctor" onPress={() => navigation.navigate('AdminCreateStaff')} />
           <AppInput icon="magnify" label="Buscar usuario" onChangeText={setSearch} placeholder="Nombre, correo o rol" value={search} />
           <Text style={styles.counter}>{filtered.length} de {users.length} usuarios</Text>
-          {!error && filtered.length === 0 ? <EmptyState description="No hay usuarios que coincidan con la búsqueda." title="Sin resultados" /> : null}
+          {!error && filtered.length === 0 ? (
+            <EmptyState
+              actionLabel={users.length === 0 ? 'Crear usuario' : undefined}
+              description={users.length === 0 ? 'Crea médicos, enfermería o recepción para empezar a operar la clínica desde MediCore.' : 'No hay usuarios que coincidan con la búsqueda actual.'}
+              icon={users.length === 0 ? 'account-multiple-plus-outline' : 'account-search-outline'}
+              onAction={users.length === 0 ? () => navigation.navigate('AdminCreateStaff') : undefined}
+              title={users.length === 0 ? 'Aún no hay equipo configurado' : 'Sin resultados'}
+              tone={users.length === 0 ? 'info' : 'warning'}
+            />
+          ) : null}
           {filtered.map((user) => (
             <AppCard key={user.id} style={styles.userCard}>
               <View style={styles.userHeader}>

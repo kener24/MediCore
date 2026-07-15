@@ -153,7 +153,12 @@ export function DoctorScheduleScreen() {
             />
           ))
         ) : (
-          <EmptyState description="No tienes citas para este día." title="Agenda vacía" />
+          <EmptyState
+            description={filter === 'all' ? 'No hay citas asignadas para esta fecha. Puedes cambiar de día para revisar agenda histórica o futura.' : 'No hay citas con este estado para la fecha seleccionada.'}
+            icon="calendar-blank-outline"
+            title={filter === 'all' ? 'Agenda vacía' : 'Sin citas para este filtro'}
+            tone={filter === 'all' ? 'success' : 'warning'}
+          />
         )}
       </ScrollView>
     </SafeAreaView>

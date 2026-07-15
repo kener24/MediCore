@@ -87,7 +87,12 @@ export function PatientDocumentsScreen() {
             />
           ))
         ) : (
-          <EmptyState description="No tienes documentos disponibles." title="Sin documentos" />
+          <EmptyState
+            description="Los resultados, constancias o archivos compartidos por la clínica aparecerán aquí cuando estén disponibles."
+            icon="folder-open-outline"
+            title="Sin documentos disponibles"
+            tone="info"
+          />
         )}
       </ScrollView>
     </SafeAreaView>

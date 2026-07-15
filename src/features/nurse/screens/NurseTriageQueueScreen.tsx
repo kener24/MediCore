@@ -75,7 +75,14 @@ export function NurseTriageQueueScreen() {
         <Text style={styles.counter}>{filtered.length} de {patients.length} pacientes</Text>
         <SearchAndFilters filters={filters} onFilterChange={setFilter} onSearchChange={setSearch} search={search} searchLabel="Buscar por paciente, documento, motivo o médico" selectedFilter={filter} />
         {error ? <ErrorState message={error} onRetry={() => void load()} title="Triaje no disponible" /> : null}
-        {!error && filtered.length === 0 ? <EmptyState description="No hay pacientes que coincidan con la búsqueda o filtro." title="Cola vacía" /> : null}
+        {!error && filtered.length === 0 ? (
+          <EmptyState
+            description={search.trim() || filter !== 'all' ? 'Ajusta la búsqueda o cambia el filtro de prioridad para revisar la cola completa.' : 'No hay pacientes pendientes de triaje. Las nuevas admisiones aparecerán aquí automáticamente.'}
+            icon="clipboard-check-outline"
+            title={search.trim() || filter !== 'all' ? 'Sin pacientes para este filtro' : 'Cola de triaje vacía'}
+            tone={search.trim() || filter !== 'all' ? 'warning' : 'success'}
+          />
+        ) : null}
         {filtered.map((patient) => (
           <PatientQueueCard
             key={`${patient.visitId ?? patient.id}`}

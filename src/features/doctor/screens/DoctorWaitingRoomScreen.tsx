@@ -146,7 +146,12 @@ export function DoctorWaitingRoomScreen() {
             );
           })
         ) : (
-          <EmptyState description="Ajusta la búsqueda o revisa pacientes pendientes de triaje." title="No hay pacientes listos para médico." />
+          <EmptyState
+            description={search.trim() || filter !== 'all' ? 'Ajusta la búsqueda o cambia el filtro de prioridad para ver más pacientes.' : 'Cuando enfermería complete el triaje, los pacientes aparecerán aquí ordenados por prioridad clínica.'}
+            icon="account-clock-outline"
+            title={search.trim() || filter !== 'all' ? 'Sin pacientes para este filtro' : 'Sala de espera despejada'}
+            tone={search.trim() || filter !== 'all' ? 'warning' : 'success'}
+          />
         )}
       </ScrollView>
     </SafeAreaView>

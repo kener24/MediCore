@@ -96,8 +96,12 @@ export function PatientAppointmentsScreen() {
           </View>
         ) : (
           <EmptyState
-            description="Cuando tengas citas registradas aparecerán en esta sección."
-            title="No hay citas disponibles"
+            actionLabel="Solicitar cita"
+            description={filter === 'upcoming' ? 'Agenda una nueva cita desde la app y aquí verás fecha, médico y estado de confirmación.' : 'Cambia el filtro o solicita una cita si necesitas atención.'}
+            icon="calendar-plus"
+            onAction={() => navigation.navigate('RequestAppointment' as never)}
+            title={filter === 'upcoming' ? 'No tienes próximas citas' : 'No hay citas para este filtro'}
+            tone="info"
           />
         )}
       </ScrollView>

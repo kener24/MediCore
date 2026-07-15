@@ -90,7 +90,12 @@ export function PatientInvoicesScreen() {
             />
           ))
         ) : (
-          <EmptyState description="No tienes facturas registradas." title="Sin facturas" />
+          <EmptyState
+            description={filter === 'pending' ? 'No tienes saldos pendientes en este momento.' : 'Cuando la clínica emita una factura, podrás consultar el detalle y sus pagos aquí.'}
+            icon={filter === 'pending' ? 'check-circle-outline' : 'file-document-outline'}
+            title={filter === 'pending' ? 'Todo al día' : 'Sin facturas registradas'}
+            tone={filter === 'pending' ? 'success' : 'info'}
+          />
         )}
       </ScrollView>
     </SafeAreaView>

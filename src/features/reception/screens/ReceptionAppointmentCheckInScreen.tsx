@@ -144,7 +144,14 @@ export function ReceptionAppointmentCheckInScreen() {
         <View style={styles.filters}>{filters.map(([value, label]) => <Text key={value} onPress={() => setFilter(value)} style={[styles.filter, filter === value && styles.filterActive]}>{label}</Text>)}</View>
         <AppInput autoCapitalize="none" label="Buscar cita" onChangeText={setSearch} placeholder="Paciente, médico, hora o motivo" value={search} />
         {error ? <ErrorState message={error} onRetry={() => void load()} title="No se pudo cargar" /> : null}
-        {!error && visible.length === 0 ? <EmptyState description="No hay citas para este filtro o búsqueda." title="Sin citas" /> : null}
+        {!error && visible.length === 0 ? (
+          <EmptyState
+            description={search.trim() ? 'No hay citas que coincidan con tu búsqueda. Limpia el filtro o revisa otra fecha.' : 'No hay pacientes pendientes de llegada para este filtro.'}
+            icon="calendar-search"
+            title={search.trim() ? 'Sin coincidencias' : 'Agenda despejada'}
+            tone={search.trim() ? 'warning' : 'success'}
+          />
+        ) : null}
         {visible.map((appointment) => (
           <AppointmentCheckInCard
             appointment={appointment}

@@ -80,7 +80,14 @@ export function CashierPendingInvoicesScreen() {
         <View style={styles.filters}>{filters.map(([value, label]) => <Text key={value} onPress={() => setFilter(value)} style={[styles.filter, filter === value && styles.filterActive]}>{label}</Text>)}</View>
         <AppInput autoCapitalize="none" label="Buscar factura" onChangeText={setSearch} placeholder="Paciente, identidad, teléfono o factura" value={search} />
         {error ? <ErrorState message={error} onRetry={() => void load()} title="No se pudieron cargar" /> : null}
-        {!error && visible.length === 0 ? <EmptyState description="Ajusta la búsqueda o el filtro para ver más facturas." title="Sin facturas" /> : null}
+        {!error && visible.length === 0 ? (
+          <EmptyState
+            description={search.trim() || filter !== 'all' ? 'Ajusta la búsqueda o cambia el filtro para revisar otras facturas.' : 'No hay facturas pendientes de cobro en este momento.'}
+            icon={search.trim() || filter !== 'all' ? 'file-search-outline' : 'cash-check'}
+            title={search.trim() || filter !== 'all' ? 'Sin resultados de facturación' : 'Caja sin pendientes'}
+            tone={search.trim() || filter !== 'all' ? 'warning' : 'success'}
+          />
+        ) : null}
         {visible.map((invoice) => (
           <InvoiceCard
             invoice={invoice}

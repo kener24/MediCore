@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
+import { toPositiveId } from '@/core/utils/idUtils';
 import { ConsultationStatusBadge } from '@/features/doctor/components/ConsultationStatusBadge';
 import { DoctorHeader } from '@/features/doctor/components/DoctorHeader';
 import {
@@ -21,7 +22,7 @@ import { isConsultationFinalized } from '@/features/doctor/types/commonDoctor.ty
 import type { ConsultationFormValues, DoctorConsultation } from '@/features/doctor/types/doctorConsultation.types';
 import { validateConsultationFinish } from '@/features/doctor/utils/clinicalValidation';
 
-type Params = { consultationId?: number; patientId?: number; visitId?: number };
+type Params = { consultationId?: number | string; patientId?: number | string; visitId?: number | string };
 
 export function DoctorConsultationDetailScreen() {
   const navigation = useNavigation<any>();
@@ -37,9 +38,9 @@ export function DoctorConsultationDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [finishing, setFinishing] = useState(false);
 
-  const consultationId = params.consultationId ?? consultation?.id ?? consultation?.consultation_id;
-  const patientId = params.patientId ?? consultation?.patient_id ?? asPatientRecord(consultation?.patient)?.id;
-  const visitId = params.visitId ?? consultation?.visit_id ?? consultation?.patient_visit ?? undefined;
+  const consultationId = toPositiveId(params.consultationId ?? consultation?.id ?? consultation?.consultation_id);
+  const patientId = toPositiveId(params.patientId ?? consultation?.patient_id ?? asPatientRecord(consultation?.patient)?.id);
+  const visitId = toPositiveId(params.visitId ?? consultation?.visit_id ?? consultation?.patient_visit);
   const completed = isConsultationFinalized(consultation?.status);
   const form = toFormValues(consultation);
 
@@ -66,6 +67,7 @@ export function DoctorConsultationDetailScreen() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   function confirmFinish() {
+    if (finishing) return;
     if (completed) return Alert.alert('Consulta médica', 'Esta consulta ya fue finalizada.');
     if (!consultationId || !visitId) return Alert.alert('Consulta médica', 'No se encontró la consulta o visita asociada.');
     const validation = validateConsultationFinish(form, consultation);
@@ -77,7 +79,7 @@ export function DoctorConsultationDetailScreen() {
   }
 
   async function finish() {
-    if (!consultationId || !visitId) return;
+    if (finishing || !consultationId || !visitId) return;
     setFinishing(true);
     try {
       await completeConsultation(visitId, { status: 'completed' }).catch(() => completeConsultationById(consultationId, { status: 'completed' }));
@@ -119,17 +121,17 @@ export function DoctorConsultationDetailScreen() {
         <RelatedSection title="Órdenes médicas" count={related.medical_orders.length} />
         <RelatedSection title="Consumos clínicos" count={related.consumptions.length} />
 
-        <AppButton disabled={completed} label="Continuar edición" onPress={() => navigation.navigate('DoctorConsultation', { consultationId, patientId, visitId })} />
+        <AppButton disabled={completed || finishing} label="Continuar edición" onPress={() => navigation.navigate('DoctorConsultation', { consultationId, patientId, visitId })} />
         <AppButton label="Ver resumen" onPress={() => navigation.navigate('DoctorConsultationSummary', { consultationId, patientId, visitId })} variant="secondary" />
         <AppButton
           label="Historial del paciente"
           onPress={() => patientId ? navigation.navigate('DoctorConsultationHistory', { patientId }) : Alert.alert('Historial', 'No se encontró el paciente.')}
           variant="secondary"
         />
-        <AppButton disabled={completed} label="Agregar receta" onPress={() => navigation.navigate('DoctorPrescription', { consultationId, patientId, visitId })} variant="secondary" />
-        <AppButton disabled={completed} label="Agregar orden médica" onPress={() => navigation.navigate('DoctorMedicalOrder', { consultationId, patientId, visitId })} variant="secondary" />
-        <AppButton disabled={completed} label="Agregar consumo clínico" onPress={() => navigation.navigate('DoctorClinicalConsumption', { consultationId, patientId, visitId })} variant="secondary" />
-        <AppButton disabled={completed} label={completed ? 'Consulta finalizada' : 'Finalizar consulta'} loading={finishing} onPress={confirmFinish} />
+        <AppButton disabled={completed || finishing} label="Agregar receta" onPress={() => navigation.navigate('DoctorPrescription', { consultationId, patientId, visitId })} variant="secondary" />
+        <AppButton disabled={completed || finishing} label="Agregar orden médica" onPress={() => navigation.navigate('DoctorMedicalOrder', { consultationId, patientId, visitId })} variant="secondary" />
+        <AppButton disabled={completed || finishing} label="Agregar consumo clínico" onPress={() => navigation.navigate('DoctorClinicalConsumption', { consultationId, patientId, visitId })} variant="secondary" />
+        <AppButton disabled={completed || finishing} label={completed ? 'Consulta finalizada' : 'Finalizar consulta'} loading={finishing} onPress={confirmFinish} />
         <AppButton label="Volver" onPress={() => navigation.goBack()} variant="secondary" />
       </ScrollView>
     </SafeAreaView>

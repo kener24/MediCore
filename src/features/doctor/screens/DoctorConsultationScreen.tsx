@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
+import { toPositiveId } from '@/core/utils/idUtils';
 import { ClinicalSummaryCard } from '@/features/doctor/components/ClinicalSummaryCard';
 import { ClinicalRiskBanner } from '@/features/doctor/components/ClinicalRiskBanner';
 import { ClinicalTimelineSection } from '@/features/doctor/components/ClinicalTimelineSection';
@@ -71,10 +72,10 @@ const emptyForm: ConsultationFormValues = {
 };
 
 type RouteParams = {
-  consultationId?: number;
+  consultationId?: number | string;
   patient?: DoctorPatientSummary | DoctorPatientBasicInfo | null;
-  patientId?: number;
-  visitId?: number;
+  patientId?: number | string;
+  visitId?: number | string;
 };
 
 export function DoctorConsultationScreen() {
@@ -95,21 +96,22 @@ export function DoctorConsultationScreen() {
   const [saving, setSaving] = useState(false);
   const [finishing, setFinishing] = useState(false);
 
-  const consultationId = consultation?.id ?? consultation?.consultation_id ?? params.consultationId;
-  const visitId = params.visitId ?? consultation?.visit_id ?? consultation?.patient_visit ?? visit?.id ?? visit?.visit_id;
+  const consultationId = toPositiveId(consultation?.id ?? consultation?.consultation_id ?? params.consultationId);
+  const visitId = toPositiveId(params.visitId ?? consultation?.visit_id ?? consultation?.patient_visit ?? visit?.id ?? visit?.visit_id);
   const resolvedPatientId =
-    params.patientId ??
-    patient?.id ??
-    consultation?.patient_id ??
-    (typeof consultation?.patient === 'number' ? consultation.patient : undefined) ??
-    visit?.patient_id ??
-    visit?.paciente_id;
+    toPositiveId(params.patientId) ??
+    toPositiveId(patient?.id) ??
+    toPositiveId(consultation?.patient_id) ??
+    toPositiveId(typeof consultation?.patient === 'number' ? consultation.patient : undefined) ??
+    toPositiveId(visit?.patient_id ?? visit?.paciente_id);
   const completed = isConsultationFinalized(consultation?.status);
   const busy = saving || savingDraft || finishing;
   const localDraftKey = visitId ?? consultationId;
 
   const load = useCallback(async () => {
-    if (!params.visitId && !params.consultationId) {
+    const routeVisitId = toPositiveId(params.visitId);
+    const routeConsultationId = toPositiveId(params.consultationId);
+    if (!routeVisitId && !routeConsultationId) {
       setLoading(false);
       setError('No se encontró la consulta médica.');
       return;
@@ -119,11 +121,11 @@ export function DoctorConsultationScreen() {
     setError('');
     try {
       let consultationData: DoctorConsultation | null = null;
-      if (params.consultationId) {
-        consultationData = await getConsultationDetail(params.consultationId).catch(() => null);
+      if (routeConsultationId) {
+        consultationData = await getConsultationDetail(routeConsultationId).catch(() => null);
       }
 
-      const initialVisitId = params.visitId ?? consultationData?.visit_id ?? consultationData?.patient_visit ?? undefined;
+      const initialVisitId = toPositiveId(routeVisitId ?? consultationData?.visit_id ?? consultationData?.patient_visit);
       const [visitData, vitalsData, triageData] = await Promise.all([
         initialVisitId ? getVisitDetail(initialVisitId).catch(() => null) : Promise.resolve(null),
         initialVisitId ? getVisitVitalSigns(initialVisitId).catch(() => null) : Promise.resolve(null),
@@ -154,12 +156,11 @@ export function DoctorConsultationScreen() {
       }
 
       const nextPatientId =
-        params.patientId ??
-        visitData?.patient_id ??
-        visitData?.paciente_id ??
-        (typeof visitData?.patient === 'object' ? visitData.patient?.id : undefined) ??
-        consultationData?.patient_id ??
-        (typeof consultationData?.patient === 'number' ? consultationData.patient : undefined);
+        toPositiveId(params.patientId) ??
+        toPositiveId(visitData?.patient_id ?? visitData?.paciente_id) ??
+        toPositiveId(typeof visitData?.patient === 'object' ? visitData.patient?.id : undefined) ??
+        toPositiveId(consultationData?.patient_id) ??
+        toPositiveId(typeof consultationData?.patient === 'number' ? consultationData.patient : undefined);
 
       const [patientData, medicalData] = await Promise.all([
         nextPatientId ? getPatientSummary(nextPatientId).catch(() => null) : Promise.resolve(null),
@@ -201,18 +202,21 @@ export function DoctorConsultationScreen() {
   }
 
   async function handleSaveDraft() {
+    if (busy) return;
     const validation = validateConsultationDraft(form);
     if (validation) return Alert.alert('Consulta médica', validation);
     await persist('draft');
   }
 
   async function handleSave() {
+    if (busy) return;
     const validation = validateConsultationSave(form);
     if (validation) return Alert.alert('Consulta médica', validation);
     await persist('in_progress');
   }
 
   async function persist(status: 'draft' | 'in_progress') {
+    if (busy) return;
     if (completed) return Alert.alert('Consulta médica', 'Esta consulta ya fue finalizada.');
     if (!visitId && !consultationId) return Alert.alert('Consulta médica', 'No se encontró la visita o consulta.');
 
@@ -245,6 +249,7 @@ export function DoctorConsultationScreen() {
   }
 
   function confirmFinish() {
+    if (busy) return;
     if (completed) return Alert.alert('Finalizar consulta', 'Esta consulta ya fue finalizada.');
     const validation = validateConsultationFinish(form, consultation);
     if (validation) return Alert.alert('Finalizar consulta', validation);
@@ -256,7 +261,7 @@ export function DoctorConsultationScreen() {
   }
 
   async function finishConsultation() {
-    if (!visitId) return;
+    if (busy || !visitId) return;
     setFinishing(true);
     try {
       const payload = buildPayload(form, 'in_progress', visitId, resolvedPatientId);

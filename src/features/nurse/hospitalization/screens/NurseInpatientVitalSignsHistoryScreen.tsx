@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
+import { toPositiveId } from '@/core/utils/idUtils';
 import { InpatientVitalSignsCard } from '@/features/nurse/hospitalization/components/HospitalizationCards';
 import { getInpatientVitalSigns } from '@/features/nurse/hospitalization/services/nurseHospitalizationService';
 import type { InpatientVitalSigns, VitalSignsFilter } from '@/features/nurse/hospitalization/types/nurseHospitalization.types';
@@ -20,7 +21,7 @@ const filters: { label: string; value: VitalSignsFilter }[] = [
 
 export function NurseInpatientVitalSignsHistoryScreen() {
   const route = useRoute<any>();
-  const hospitalizationId = Number(route.params?.hospitalizationId);
+  const hospitalizationId = toPositiveId(route.params?.hospitalizationId);
   const [items, setItems] = useState<InpatientVitalSigns[]>([]);
   const [filter, setFilter] = useState<VitalSignsFilter>('today');
   const [loading, setLoading] = useState(true);
@@ -28,6 +29,12 @@ export function NurseInpatientVitalSignsHistoryScreen() {
   const [error, setError] = useState('');
 
   const load = useCallback(async (refresh = false) => {
+    if (!hospitalizationId) {
+      setError('No se encontró el internamiento.');
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
     if (refresh) setRefreshing(true);
     else setLoading(true);
     setError('');

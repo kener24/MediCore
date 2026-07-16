@@ -11,6 +11,7 @@ import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
 import { formatDateTime } from '@/core/utils/dateUtils';
+import { toPositiveId } from '@/core/utils/idUtils';
 import {
   CurrentBedCard,
   HospitalizationEventCard,
@@ -26,13 +27,19 @@ import type { NurseHospitalizationDetail } from '@/features/nurse/hospitalizatio
 export function NurseHospitalizationDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const hospitalizationId = Number(route.params?.hospitalizationId);
+  const hospitalizationId = toPositiveId(route.params?.hospitalizationId);
   const [detail, setDetail] = useState<NurseHospitalizationDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
   const load = useCallback(async (refresh = false) => {
+    if (!hospitalizationId) {
+      setError('No se encontró el internamiento.');
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
     if (refresh) setRefreshing(true);
     else setLoading(true);
     setError('');

@@ -13,6 +13,7 @@ import { LoadingState } from '@/components/LoadingState';
 import { StatusBadge } from '@/components/StatusBadge';
 import { colors } from '@/core/theme/colors';
 import { formatDateTime } from '@/core/utils/dateUtils';
+import { toPositiveId } from '@/core/utils/idUtils';
 import { administerMedication, delayMedication, getMedicationAdministrations, omitMedication } from '@/features/nurse/hospitalization/services/nurseHospitalizationService';
 import type { MedicationAdministration } from '@/features/nurse/hospitalization/types/nurseHospitalization.types';
 
@@ -21,7 +22,7 @@ type MedicationAction = 'omit' | 'delay';
 export function NurseMedicationAdministrationsScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const hospitalizationId = Number(route.params?.hospitalizationId);
+  const hospitalizationId = toPositiveId(route.params?.hospitalizationId);
   const [items, setItems] = useState<MedicationAdministration[]>([]);
   const [selected, setSelected] = useState<MedicationAdministration | null>(null);
   const [action, setAction] = useState<MedicationAction | null>(null);

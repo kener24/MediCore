@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
+import { toPositiveId } from '@/core/utils/idUtils';
 import { NursingNoteCard } from '@/features/nurse/hospitalization/components/HospitalizationCards';
 import { getNursingNotes } from '@/features/nurse/hospitalization/services/nurseHospitalizationService';
 import type { NursingNote, NursingNotesFilter } from '@/features/nurse/hospitalization/types/nurseHospitalization.types';
@@ -21,7 +22,7 @@ const filters: { label: string; value: NursingNotesFilter }[] = [
 
 export function NurseNursingNotesListScreen() {
   const route = useRoute<any>();
-  const hospitalizationId = Number(route.params?.hospitalizationId);
+  const hospitalizationId = toPositiveId(route.params?.hospitalizationId);
   const [items, setItems] = useState<NursingNote[]>([]);
   const [filter, setFilter] = useState<NursingNotesFilter>('all');
   const [loading, setLoading] = useState(true);
@@ -29,6 +30,12 @@ export function NurseNursingNotesListScreen() {
   const [error, setError] = useState('');
 
   const load = useCallback(async (refresh = false) => {
+    if (!hospitalizationId) {
+      setError('No se encontró el internamiento.');
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
     if (refresh) setRefreshing(true);
     else setLoading(true);
     setError('');

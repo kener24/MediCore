@@ -11,6 +11,7 @@ import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
 import { formatDateTime } from '@/core/utils/dateUtils';
+import { toPositiveId } from '@/core/utils/idUtils';
 import { getNursingRounds } from '@/features/nurse/hospitalization/services/nurseHospitalizationService';
 import type { NursingRound } from '@/features/nurse/hospitalization/types/nurseHospitalization.types';
 
@@ -19,13 +20,19 @@ const roundLabels: Record<string, string> = { follow_up: 'Seguimiento', medicati
 export function NurseNursingRoundsScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const hospitalizationId = Number(route.params?.hospitalizationId);
+  const hospitalizationId = toPositiveId(route.params?.hospitalizationId);
   const [items, setItems] = useState<NursingRound[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
   const load = useCallback(async (refresh = false) => {
+    if (!hospitalizationId) {
+      setError('No se encontró el internamiento.');
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
     if (refresh) setRefreshing(true);
     else setLoading(true);
     setError('');

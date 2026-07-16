@@ -10,6 +10,7 @@ import { LoadingState } from '@/components/LoadingState';
 import { StatusBadge } from '@/components/StatusBadge';
 import { colors } from '@/core/theme/colors';
 import { formatDateTime } from '@/core/utils/dateUtils';
+import { toPositiveId } from '@/core/utils/idUtils';
 import { getPatientMedicalOrder } from '@/features/patient/services/patientMedicalOrdersService';
 import type { PatientMedicalOrder } from '@/features/patient/types/patientMedicalOrders.types';
 
@@ -17,8 +18,7 @@ export function PatientMedicalOrderDetailScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const routeParams = (route.params ?? {}) as { id?: number | string };
-  const id = Number(routeParams.id);
-  const hasValidId = Number.isFinite(id) && id > 0;
+  const id = toPositiveId(routeParams.id);
   const [order, setOrder] = useState<PatientMedicalOrder | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -26,7 +26,7 @@ export function PatientMedicalOrderDetailScreen() {
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
-    if (!hasValidId) {
+    if (!id) {
       setError('No se encontró la orden solicitada.');
       setLoading(false);
       return;
@@ -38,7 +38,7 @@ export function PatientMedicalOrderDetailScreen() {
     } finally {
       setLoading(false);
     }
-  }, [hasValidId, id]);
+  }, [id]);
 
   useEffect(() => { load(); }, [load]);
 

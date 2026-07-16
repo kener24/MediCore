@@ -10,6 +10,7 @@ import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
 import { formatDate } from '@/core/utils/dateUtils';
 import { isImageFile } from '@/core/utils/fileUtils';
+import { toPositiveId } from '@/core/utils/idUtils';
 import { getPatientDocument, openPatientDocumentUrl } from '@/features/patient/services/patientDocumentsService';
 import type { PatientDocument } from '@/features/patient/types/patientDocuments.types';
 
@@ -17,8 +18,7 @@ export function PatientDocumentDetailScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const routeParams = (route.params ?? {}) as { id?: number | string };
-  const id = Number(routeParams.id);
-  const hasValidId = Number.isFinite(id) && id > 0;
+  const id = toPositiveId(routeParams.id);
   const [document, setDocument] = useState<PatientDocument | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -26,7 +26,7 @@ export function PatientDocumentDetailScreen() {
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
-    if (!hasValidId) {
+    if (!id) {
       setError('No se encontró el documento solicitado.');
       setLoading(false);
       return;
@@ -38,7 +38,7 @@ export function PatientDocumentDetailScreen() {
     } finally {
       setLoading(false);
     }
-  }, [hasValidId, id]);
+  }, [id]);
 
   useEffect(() => { load(); }, [load]);
 

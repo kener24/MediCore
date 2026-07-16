@@ -11,6 +11,7 @@ import { LoadingState } from '@/components/LoadingState';
 import { StatusBadge } from '@/components/StatusBadge';
 import { colors } from '@/core/theme/colors';
 import { formatDate } from '@/core/utils/dateUtils';
+import { toPositiveId } from '@/core/utils/idUtils';
 import { getPatientPrescription } from '@/features/patient/services/patientPrescriptionsService';
 import type { PatientPrescription, PatientPrescriptionItem } from '@/features/patient/types/patientPrescriptions.types';
 
@@ -18,8 +19,7 @@ export function PatientPrescriptionDetailScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const routeParams = (route.params ?? {}) as { id?: number | string };
-  const id = Number(routeParams.id);
-  const hasValidId = Number.isFinite(id) && id > 0;
+  const id = toPositiveId(routeParams.id);
   const [prescription, setPrescription] = useState<PatientPrescription | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -27,7 +27,7 @@ export function PatientPrescriptionDetailScreen() {
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
-    if (!hasValidId) {
+    if (!id) {
       setError('No se encontró la receta solicitada.');
       setLoading(false);
       return;
@@ -39,7 +39,7 @@ export function PatientPrescriptionDetailScreen() {
     } finally {
       setLoading(false);
     }
-  }, [hasValidId, id]);
+  }, [id]);
 
   useEffect(() => { load(); }, [load]);
 

@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
+import { toPositiveId } from '@/core/utils/idUtils';
 import { CashierHeader } from '@/features/cashier/components/CashierHeader';
 import { canPayInvoice, InvoiceStatusBadge } from '@/features/cashier/components/InvoiceStatusBadge';
 import { InvoiceTotalsCard } from '@/features/cashier/components/InvoiceTotalsCard';
@@ -22,13 +23,14 @@ export function CashierInvoiceDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute();
   const params = useMemo(() => (route.params ?? {}) as { invoiceId?: number }, [route.params]);
+  const invoiceId = toPositiveId(params.invoiceId);
   const [invoice, setInvoice] = useState<CashierInvoiceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
   const load = useCallback(async (refresh = false) => {
-    if (!params.invoiceId) {
+    if (!invoiceId) {
       setError('No se encontró la factura.');
       setLoading(false);
       return;
@@ -37,14 +39,14 @@ export function CashierInvoiceDetailScreen() {
     else setLoading(true);
     setError('');
     try {
-      setInvoice(await getInvoiceDetail(params.invoiceId));
+      setInvoice(await getInvoiceDetail(invoiceId));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar la factura.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [params.invoiceId]);
+  }, [invoiceId]);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 

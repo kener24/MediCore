@@ -68,7 +68,7 @@ function mapCheckInResponse(response: unknown): AppointmentCheckInResult {
   if (appointment || looksLikeAppointment(root)) {
     return {
       appointmentOnly: true,
-      message: 'Check-in realizado. El servidor no devolvio la visita creada.',
+      message: 'Check-in realizado. El servidor no devolvió la visita creada.',
       raw: response,
     };
   }

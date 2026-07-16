@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
+import { toPositiveId } from '@/core/utils/idUtils';
 import { VisitStatusBadge } from '@/features/reception/components/VisitStatusBadge';
 import { cancelAdmission, generateInvoiceFromReceptionVisit, getVisitDetail, sendToDoctor, sendToTriage, updateReceptionVisitNote } from '@/features/reception/services/receptionAdmissionService';
 import { visitDoctorName, visitPatientName } from '@/features/reception/services/receptionMappers';
@@ -18,7 +19,7 @@ import type { ReceptionVisit } from '@/features/reception/types/receptionAdmissi
 export function ReceptionVisitDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const visitId = Number(route.params?.visitId);
+  const visitId = toPositiveId(route.params?.visitId);
   const [visit, setVisit] = useState<ReceptionVisit | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);

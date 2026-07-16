@@ -8,6 +8,7 @@ import { AppCard } from '@/components/AppCard';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
+import { toPositiveId } from '@/core/utils/idUtils';
 import { CashierHeader } from '@/features/cashier/components/CashierHeader';
 import { PaymentMethodBadge } from '@/features/cashier/components/PaymentMethodBadge';
 import { PaymentStatusBadge } from '@/features/cashier/components/PaymentStatusBadge';
@@ -19,12 +20,14 @@ export function CashierPaymentDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute();
   const params = useMemo(() => (route.params ?? {}) as { invoiceId?: number; paymentId?: number }, [route.params]);
+  const invoiceId = toPositiveId(params.invoiceId);
+  const paymentId = toPositiveId(params.paymentId);
   const [payment, setPayment] = useState<CashierPayment | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
-    if (!params.paymentId) {
+    if (!paymentId) {
       setError('No se encontró el pago.');
       setLoading(false);
       return;
@@ -32,13 +35,13 @@ export function CashierPaymentDetailScreen() {
     setLoading(true);
     setError('');
     try {
-      setPayment(await getPaymentDetail(params.paymentId));
+      setPayment(await getPaymentDetail(paymentId));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar el pago.');
     } finally {
       setLoading(false);
     }
-  }, [params.paymentId]);
+  }, [paymentId]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -60,7 +63,7 @@ export function CashierPaymentDetailScreen() {
           <Text style={styles.meta}>Recibido por: {payment.received_by_name ?? 'No indicado'}</Text>
           <Text style={styles.meta}>Notas: {payment.notes ?? 'Sin notas'}</Text>
         </AppCard>
-        {params.invoiceId ? <AppButton label="Volver a factura" onPress={() => navigation.navigate('CashierInvoiceDetail', { invoiceId: params.invoiceId })} /> : null}
+        {invoiceId ? <AppButton label="Volver a factura" onPress={() => navigation.navigate('CashierInvoiceDetail', { invoiceId })} /> : null}
         <AppButton label="Volver" onPress={() => navigation.goBack()} variant="secondary" />
       </ScrollView>
     </SafeAreaView>

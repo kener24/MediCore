@@ -10,6 +10,7 @@ import { AppHeader } from '@/components/AppHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
+import { toPositiveId } from '@/core/utils/idUtils';
 import { InvoiceCard } from '@/features/cashier/components/InvoiceCard';
 import { getPendingInvoices } from '@/features/cashier/services/cashierInvoiceService';
 import type { CashierInvoice } from '@/features/cashier/types/cashierInvoice.types';
@@ -24,7 +25,7 @@ import type { ReceptionPatient } from '@/features/reception/types/receptionPatie
 export function ReceptionPatientDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const patientId = Number(route.params?.patientId);
+  const patientId = toPositiveId(route.params?.patientId);
   const [patient, setPatient] = useState<ReceptionPatient | null>(null);
   const [pendingInvoices, setPendingInvoices] = useState<CashierInvoice[]>([]);
   const [todayVisits, setTodayVisits] = useState<ReceptionVisit[]>([]);
@@ -48,7 +49,7 @@ export function ReceptionPatientDetailScreen() {
       ]);
       setPatient(patientData);
       setPendingInvoices(invoices);
-      setTodayVisits(visits.filter((visit) => Number(visit.patient_id ?? visit.patient) === patientId || !visit.patient_id));
+      setTodayVisits(visits.filter((visit) => toPositiveId(visit.patient_id ?? visit.patient) === patientId || !visit.patient_id));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar el paciente.');
     } finally {

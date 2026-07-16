@@ -61,7 +61,7 @@ export function DoctorScheduleScreen() {
     }
   }, [date]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   function viewAppointment(item: DoctorAppointment) {
     const visitId = item.visit_id ?? item.visita_id;
@@ -90,7 +90,7 @@ export function DoctorScheduleScreen() {
     }
     Alert.alert('Iniciar consulta', '¿Deseas iniciar la consulta de este paciente?', [
       { style: 'cancel', text: 'Cancelar' },
-      { onPress: () => handleAttend(item, visitId), text: 'Iniciar' },
+      { onPress: () => void handleAttend(item, visitId), text: 'Iniciar' },
     ]);
   }
 
@@ -120,15 +120,15 @@ export function DoctorScheduleScreen() {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl onRefresh={() => load(true)} refreshing={refreshing} />}
+        refreshControl={<RefreshControl onRefresh={() => void load(true)} refreshing={refreshing} />}
         showsVerticalScrollIndicator={false}>
         <DoctorHeader title="Agenda médica" />
         <View style={styles.controls}>
           <AppDateInput label="Fecha seleccionada" onChange={setDate} value={date} />
           <View style={styles.dateButtons}>
-            <AppButton label="Dia anterior" onPress={() => setDate(shiftDate(date, -1))} style={styles.dateButton} variant="secondary" />
+            <AppButton label="Día anterior" onPress={() => setDate(shiftDate(date, -1))} style={styles.dateButton} variant="secondary" />
             <AppButton label="Hoy" onPress={() => setDate(toISODate(new Date()))} style={styles.dateButton} variant="secondary" />
-            <AppButton label="Dia siguiente" onPress={() => setDate(shiftDate(date, 1))} style={styles.dateButton} variant="secondary" />
+            <AppButton label="Día siguiente" onPress={() => setDate(shiftDate(date, 1))} style={styles.dateButton} variant="secondary" />
           </View>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -141,15 +141,15 @@ export function DoctorScheduleScreen() {
           </View>
         </ScrollView>
         {error ? (
-          <ErrorState message={error} onRetry={() => load()} title="No se pudo cargar la agenda" />
+          <ErrorState message={error} onRetry={() => void load()} title="No se pudo cargar la agenda" />
         ) : visibleAppointments.length ? (
           visibleAppointments.map((item) => (
             <DoctorAppointmentCard
               appointment={item}
+              attendLoading={startingVisitId === (item.visit_id ?? item.visita_id)}
               key={item.id}
               onAttend={() => attendAppointment(item)}
               onPress={() => viewAppointment(item)}
-              attendLoading={startingVisitId === (item.visit_id ?? item.visita_id)}
             />
           ))
         ) : (

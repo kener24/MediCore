@@ -39,7 +39,7 @@ export function DoctorDashboardScreen() {
     }
   }, []);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   function go(target: string) {
     if (target === 'schedule') navigation.getParent()?.navigate('DoctorScheduleTab');
@@ -57,7 +57,7 @@ export function DoctorDashboardScreen() {
     }
     Alert.alert('Iniciar consulta', '¿Deseas iniciar la consulta de este paciente?', [
       { style: 'cancel', text: 'Cancelar' },
-      { onPress: () => handleStart(item, visitId), text: 'Iniciar' },
+      { onPress: () => void handleStart(item, visitId), text: 'Iniciar' },
     ]);
   }
 
@@ -86,10 +86,10 @@ export function DoctorDashboardScreen() {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl onRefresh={() => load(true)} refreshing={refreshing} />}
+        refreshControl={<RefreshControl onRefresh={() => void load(true)} refreshing={refreshing} />}
         showsVerticalScrollIndicator={false}>
         {error ? (
-          <ErrorState message={error} onRetry={() => load()} title="No se pudo cargar el panel médico" />
+          <ErrorState message={error} onRetry={() => void load()} title="No se pudo cargar el panel médico" />
         ) : dashboard ? (
           <>
             <DoctorHeader
@@ -97,8 +97,8 @@ export function DoctorDashboardScreen() {
               doctorName={dashboard.doctorName}
               onNotificationsPress={() => navigation.navigate('DoctorNotifications')}
               specialty={dashboard.specialty}
-              unreadCount={dashboard.stats.unreadNotifications}
               title="Bienvenido"
+              unreadCount={dashboard.stats.unreadNotifications}
             />
             <DoctorStatsGrid stats={dashboard.stats} />
             <DoctorQuickActions onNavigate={go} />

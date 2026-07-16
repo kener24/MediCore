@@ -70,7 +70,7 @@ export function DoctorConsultationsScreen() {
     }
   }, [params]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   function openDetail(item: DoctorConsultation) {
     navigation.navigate('DoctorConsultationDetail', {
@@ -102,7 +102,7 @@ export function DoctorConsultationsScreen() {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl onRefresh={() => load(true)} refreshing={refreshing} />}
+        refreshControl={<RefreshControl onRefresh={() => void load(true)} refreshing={refreshing} />}
         showsVerticalScrollIndicator={false}>
         <DoctorHeader title="Consultas médicas" />
         <AppCard style={styles.summaryCard}>
@@ -118,7 +118,7 @@ export function DoctorConsultationsScreen() {
           search={search}
         />
         {error ? (
-          <ErrorState message={error} onRetry={() => load()} title="No se pudo cargar el módulo" />
+          <ErrorState message={error} onRetry={() => void load()} title="No se pudo cargar el módulo" />
         ) : filteredItems.length ? (
           filteredItems.map((item, index) => (
             <ConsultationCard

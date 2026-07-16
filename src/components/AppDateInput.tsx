@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors } from '@/core/theme/colors';
-import { toISODate } from '@/core/utils/dateUtils';
+import { formatDate, toISODate } from '@/core/utils/dateUtils';
 
 type AppDateInputProps = {
   label: string;
@@ -18,6 +18,7 @@ type AppDateInputProps = {
 export function AppDateInput({ label, maximumDate, minimumDate, onChange, placeholder = 'Seleccionar fecha', value }: AppDateInputProps) {
   const [open, setOpen] = useState(false);
   const dateValue = useMemo(() => parseISODate(value) ?? minimumDate ?? new Date(), [minimumDate, value]);
+  const displayValue = value ? formatDate(value) : placeholder;
 
   function handleChange(event: DateTimePickerEvent, selectedDate?: Date) {
     if (Platform.OS !== 'ios') setOpen(false);
@@ -30,7 +31,7 @@ export function AppDateInput({ label, maximumDate, minimumDate, onChange, placeh
       <Text style={styles.label}>{label}</Text>
       <Pressable onPress={() => setOpen(true)} style={styles.shell}>
         <MaterialCommunityIcons color={colors.muted} name="calendar" size={20} />
-        <Text style={[styles.value, !value && styles.placeholder]}>{value || placeholder}</Text>
+        <Text style={[styles.value, !value && styles.placeholder]}>{displayValue}</Text>
         <MaterialCommunityIcons color={colors.muted} name="chevron-down" size={22} />
       </Pressable>
       {open ? (

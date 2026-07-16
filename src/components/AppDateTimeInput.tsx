@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors } from '@/core/theme/colors';
-import { toISODate } from '@/core/utils/dateUtils';
+import { formatDate, toISODate } from '@/core/utils/dateUtils';
 
 type PickerMode = 'date' | 'time';
 
@@ -18,7 +18,7 @@ type AppDateTimeInputProps = {
 export function AppDateTimeInput({ label, minimumDate, onChange, value }: AppDateTimeInputProps) {
   const [openMode, setOpenMode] = useState<PickerMode | null>(null);
   const dateValue = useMemo(() => parseDateTime(value) ?? minimumDate ?? new Date(), [minimumDate, value]);
-  const displayDate = value ? value.slice(0, 10) : 'Seleccionar fecha';
+  const displayDate = value ? formatDate(value.slice(0, 10)) : 'Seleccionar fecha';
   const displayTime = value && value.includes('T') ? value.slice(11, 16) : 'Seleccionar hora';
 
   function handleChange(event: DateTimePickerEvent, selectedDate?: Date) {

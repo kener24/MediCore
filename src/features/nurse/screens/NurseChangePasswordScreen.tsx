@@ -30,6 +30,7 @@ export function NurseChangePasswordScreen() {
   }
 
   async function submit() {
+    if (saving) return;
     const validation = validatePasswordPair(values.new_password, values.confirm_password, values.current_password);
     if (validation) return Alert.alert('Cambiar contraseña', validation);
     setSaving(true);
@@ -55,7 +56,7 @@ export function NurseChangePasswordScreen() {
             <AppInput label="Contraseña actual" onChangeText={(value) => update('current_password', value)} secureTextEntry value={values.current_password} />
             <AppInput label="Nueva contraseña" onChangeText={(value) => update('new_password', value)} secureTextEntry value={values.new_password} />
             <AppInput label="Confirmar contraseña" onChangeText={(value) => update('confirm_password', value)} secureTextEntry value={values.confirm_password} />
-            <AppButton label="Actualizar contraseña" loading={saving} onPress={submit} />
+            <AppButton disabled={saving} label="Actualizar contraseña" loading={saving} onPress={submit} />
             <AppButton label="Volver" onPress={() => navigation.goBack()} variant="secondary" />
           </AppCard>
         </ScrollView>

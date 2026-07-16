@@ -29,6 +29,7 @@ export function DoctorChangePasswordScreen() {
   }
 
   async function submit() {
+    if (saving) return;
     const validation = validatePasswordPair(values.new_password, values.confirm_password, values.current_password);
     if (validation) return Alert.alert('Cambiar contraseña', validation);
     setSaving(true);

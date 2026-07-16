@@ -34,6 +34,7 @@ export function NursingNoteForm({
   const [error, setError] = useState('');
 
   function submit() {
+    if (loading) return;
     const trimmed = content.trim();
     if (!noteType) {
       setError('Selecciona el tipo de nota.');
@@ -52,25 +53,25 @@ export function NursingNoteForm({
       <Text style={styles.label}>Tipo de nota</Text>
       <View style={styles.chips}>
         {noteTypes.map((item) => (
-          <Chip active={noteType === item.value} key={item.value} label={item.label} onPress={() => setNoteType(item.value)} />
+          <Chip active={noteType === item.value} disabled={loading} key={item.value} label={item.label} onPress={() => setNoteType(item.value)} />
         ))}
       </View>
       <Text style={styles.label}>Prioridad</Text>
       <View style={styles.chips}>
         {priorities.map((item) => (
-          <Chip active={priority === item.value} key={item.value} label={item.label} onPress={() => setPriority(item.value)} />
+          <Chip active={priority === item.value} disabled={loading} key={item.value} label={item.label} onPress={() => setPriority(item.value)} />
         ))}
       </View>
       <AppInput icon="note-text-outline" label="Contenido" multiline onChangeText={setContent} style={styles.noteInput} value={content} />
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      <AppButton label="Guardar nota de enfermería" loading={loading} onPress={submit} />
+      <AppButton disabled={loading} label="Guardar nota de enfermería" loading={loading} onPress={submit} />
     </View>
   );
 }
 
-function Chip({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
+function Chip({ active, disabled, label, onPress }: { active: boolean; disabled?: boolean; label: string; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} style={[styles.chip, active && styles.chipActive]}>
+    <Pressable disabled={disabled} onPress={onPress} style={[styles.chip, active && styles.chipActive, disabled && styles.disabled]}>
       <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
     </Pressable>
   );
@@ -96,6 +97,9 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: colors.white,
+  },
+  disabled: {
+    opacity: 0.55,
   },
   chips: {
     flexDirection: 'row',

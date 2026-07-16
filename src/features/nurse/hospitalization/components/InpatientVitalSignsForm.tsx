@@ -83,6 +83,7 @@ export function InpatientVitalSignsForm({
   }
 
   function submit() {
+    if (loading) return;
     const validation = validate(state);
     setErrors(validation);
     if (validation.length) return;
@@ -129,7 +130,7 @@ export function InpatientVitalSignsForm({
       {errors.map((error) => (
         <Text key={error} style={styles.error}>{error}</Text>
       ))}
-      <AppButton label="Guardar signos hospitalarios" loading={loading} onPress={submit} />
+      <AppButton disabled={loading} label="Guardar signos hospitalarios" loading={loading} onPress={submit} />
     </View>
   );
 }

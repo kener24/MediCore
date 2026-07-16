@@ -9,6 +9,7 @@ import { AppDateTimeInput } from '@/components/AppDateTimeInput';
 import { AppHeader } from '@/components/AppHeader';
 import { AppInput } from '@/components/AppInput';
 import { colors } from '@/core/theme/colors';
+import { toPositiveId } from '@/core/utils/idUtils';
 import { createMedicationAdministration } from '@/features/nurse/hospitalization/services/nurseHospitalizationService';
 import type { MedicationAdministrationPayload } from '@/features/nurse/hospitalization/types/nurseHospitalization.types';
 
@@ -17,11 +18,13 @@ const routes = [['oral', 'Oral'], ['iv', 'IV'], ['im', 'IM'], ['sc', 'SC'], ['to
 export function NurseMedicationAdministrationFormScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const hospitalizationId = Number(route.params?.hospitalizationId);
+  const hospitalizationId = toPositiveId(route.params?.hospitalizationId);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<MedicationAdministrationPayload>({ medication_name: '', dosage: '', route: 'oral', scheduled_time: '', notes: '' });
 
   async function submit() {
+    if (saving) return;
+    if (!hospitalizationId) return Alert.alert('Medicamento', 'No se encontró el internamiento.');
     if (!form.medication_name.trim() || !form.dosage.trim()) {
       Alert.alert('Medicamento', 'Medicamento y dosis son obligatorios.');
       return;
@@ -55,7 +58,7 @@ export function NurseMedicationAdministrationFormScreen() {
             <View style={styles.chips}>{routes.map(([value, label]) => <Chip active={form.route === value} key={value} label={label} onPress={() => setForm({ ...form, route: value })} />)}</View>
             <AppDateTimeInput label="Fecha y hora programada" minimumDate={new Date()} onChange={(value) => setForm({ ...form, scheduled_time: value })} value={form.scheduled_time ?? ''} />
             <AppInput label="Observaciones" onChangeText={(value) => setForm({ ...form, notes: value })} value={form.notes} />
-            <AppButton label="Guardar medicamento" loading={saving} onPress={submit} />
+            <AppButton disabled={saving || !hospitalizationId} label="Guardar medicamento" loading={saving} onPress={submit} />
           </AppCard>
         </ScrollView>
       </KeyboardAvoidingView>

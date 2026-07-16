@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppCard } from '@/components/AppCard';
 import { AppHeader } from '@/components/AppHeader';
 import { colors } from '@/core/theme/colors';
+import { toPositiveId } from '@/core/utils/idUtils';
 import { InpatientVitalSignsForm } from '@/features/nurse/hospitalization/components/InpatientVitalSignsForm';
 import { createInpatientVitalSigns } from '@/features/nurse/hospitalization/services/nurseHospitalizationService';
 import type { InpatientVitalSignsPayload } from '@/features/nurse/hospitalization/types/nurseHospitalization.types';
@@ -13,10 +14,12 @@ import type { InpatientVitalSignsPayload } from '@/features/nurse/hospitalizatio
 export function NurseInpatientVitalSignsFormScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const hospitalizationId = Number(route.params?.hospitalizationId);
+  const hospitalizationId = toPositiveId(route.params?.hospitalizationId);
   const [saving, setSaving] = useState(false);
 
   async function submit(payload: InpatientVitalSignsPayload) {
+    if (saving) return;
+    if (!hospitalizationId) return Alert.alert('Signos hospitalarios', 'No se encontró el internamiento.');
     setSaving(true);
     try {
       await createInpatientVitalSigns(hospitalizationId, payload);

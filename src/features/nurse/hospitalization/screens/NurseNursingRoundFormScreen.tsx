@@ -8,6 +8,7 @@ import { AppCard } from '@/components/AppCard';
 import { AppHeader } from '@/components/AppHeader';
 import { AppInput } from '@/components/AppInput';
 import { colors } from '@/core/theme/colors';
+import { toPositiveId } from '@/core/utils/idUtils';
 import { createNursingRound } from '@/features/nurse/hospitalization/services/nurseHospitalizationService';
 import type { NursingRoundPayload } from '@/features/nurse/hospitalization/types/nurseHospitalization.types';
 
@@ -22,11 +23,13 @@ const types = [
 export function NurseNursingRoundFormScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const hospitalizationId = Number(route.params?.hospitalizationId);
+  const hospitalizationId = toPositiveId(route.params?.hospitalizationId);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<NursingRoundPayload>({ round_type: 'routine', general_condition: '', pain_level: '', consciousness_status: '', mobility_status: '', feeding_status: '', elimination_status: '', notes: '' });
 
   async function submit() {
+    if (saving) return;
+    if (!hospitalizationId) return Alert.alert('Ronda de enfermería', 'No se encontró el internamiento.');
     const pain = form.pain_level === '' || form.pain_level === undefined ? undefined : Number(form.pain_level);
     if (pain !== undefined && (Number.isNaN(pain) || pain < 0 || pain > 10)) {
       Alert.alert('Ronda de enfermería', 'El nivel de dolor debe estar entre 0 y 10.');
@@ -67,7 +70,7 @@ export function NurseNursingRoundFormScreen() {
             <AppInput label="Alimentación" onChangeText={(value) => setForm({ ...form, feeding_status: value })} value={String(form.feeding_status ?? '')} />
             <AppInput label="Eliminación" onChangeText={(value) => setForm({ ...form, elimination_status: value })} value={String(form.elimination_status ?? '')} />
             <AppInput label="Notas" multiline onChangeText={(value) => setForm({ ...form, notes: value })} style={styles.notes} value={String(form.notes ?? '')} />
-            <AppButton label="Guardar ronda" loading={saving} onPress={submit} />
+            <AppButton disabled={saving || !hospitalizationId} label="Guardar ronda" loading={saving} onPress={submit} />
           </AppCard>
         </ScrollView>
       </KeyboardAvoidingView>

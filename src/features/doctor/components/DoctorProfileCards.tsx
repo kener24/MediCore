@@ -172,7 +172,7 @@ export function ChangePasswordForm({
       <AppInput label="Contraseña actual" onChangeText={(value) => onChange('current_password', value)} secureTextEntry value={values.current_password} />
       <AppInput label="Nueva contraseña" onChangeText={(value) => onChange('new_password', value)} secureTextEntry value={values.new_password} />
       <AppInput label="Confirmar nueva contraseña" onChangeText={(value) => onChange('confirm_password', value)} secureTextEntry value={values.confirm_password} />
-      <AppButton label="Actualizar contraseña" loading={loading} onPress={onSubmit} />
+      <AppButton disabled={loading} label="Actualizar contraseña" loading={loading} onPress={onSubmit} />
     </AppCard>
   );
 }

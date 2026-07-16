@@ -23,6 +23,7 @@ export function ChangePasswordScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   async function save() {
+    if (submitting) return;
     const validation = validatePasswordPair(newPassword, confirmPassword, currentPassword);
     if (validation) {
       Alert.alert('Contraseña', validation);
@@ -76,7 +77,7 @@ export function ChangePasswordScreen() {
           secureTextEntry={secureConfirm}
           value={confirmPassword}
         />
-        <AppButton label="Guardar cambios" loading={submitting} onPress={save} />
+        <AppButton disabled={submitting} label="Guardar cambios" loading={submitting} onPress={save} />
         <AppButton label="Cancelar" onPress={() => navigation.goBack()} variant="secondary" />
       </AppCard>
     </KeyboardAwareScreen>

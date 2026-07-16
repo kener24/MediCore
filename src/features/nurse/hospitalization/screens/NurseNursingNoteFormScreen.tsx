@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppCard } from '@/components/AppCard';
 import { AppHeader } from '@/components/AppHeader';
 import { colors } from '@/core/theme/colors';
+import { toPositiveId } from '@/core/utils/idUtils';
 import { NursingNoteForm } from '@/features/nurse/hospitalization/components/NursingNoteForm';
 import { createNursingNote } from '@/features/nurse/hospitalization/services/nurseHospitalizationService';
 import type { NursingNotePayload } from '@/features/nurse/hospitalization/types/nurseHospitalization.types';
@@ -13,10 +14,12 @@ import type { NursingNotePayload } from '@/features/nurse/hospitalization/types/
 export function NurseNursingNoteFormScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const hospitalizationId = Number(route.params?.hospitalizationId);
+  const hospitalizationId = toPositiveId(route.params?.hospitalizationId);
   const [saving, setSaving] = useState(false);
 
   async function submit(payload: NursingNotePayload) {
+    if (saving) return;
+    if (!hospitalizationId) return Alert.alert('Nota de enfermería', 'No se encontró el internamiento.');
     setSaving(true);
     try {
       await createNursingNote(hospitalizationId, payload);

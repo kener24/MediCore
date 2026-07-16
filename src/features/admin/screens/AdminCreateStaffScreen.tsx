@@ -80,6 +80,7 @@ export function AdminCreateStaffScreen() {
   const update = (patch: Partial<FormState>) => setForm((current) => ({ ...current, ...patch }));
 
   async function submit() {
+    if (saving) return;
     const validation = validateForm(form);
     if (validation) {
       Alert.alert('Equipo', validation);
@@ -174,7 +175,7 @@ export function AdminCreateStaffScreen() {
                 </>
               ) : null}
 
-              <AppButton label="Crear usuario" loading={saving} onPress={submit} />
+              <AppButton disabled={saving} label="Crear usuario" loading={saving} onPress={submit} />
             </AppCard>
           </ScrollView>
         </KeyboardAvoidingView>

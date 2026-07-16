@@ -45,6 +45,7 @@ export function ReceptionCreateAdmissionScreen() {
   }, []));
 
   async function submit() {
+    if (saving) return;
     if (!form.patient_id) return Alert.alert('Admisión', 'Selecciona un paciente.');
     if (Number(form.patient_id) <= 0) return Alert.alert('Admisión', 'El paciente seleccionado no es válido.');
     if (form.reason.trim().length < 4) return Alert.alert('Admisión', 'El motivo de visita es obligatorio.');
@@ -127,7 +128,7 @@ export function ReceptionCreateAdmissionScreen() {
                 />
               ))}
             </View>
-            <AppButton disabled={!form.patient_id} label="Registrar admisión" loading={saving} onPress={submit} />
+            <AppButton disabled={!form.patient_id || saving} label="Registrar admisión" loading={saving} onPress={submit} />
           </AppCard>
         </ScrollView>
       </KeyboardAvoidingView>

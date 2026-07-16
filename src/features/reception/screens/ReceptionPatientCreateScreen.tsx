@@ -27,6 +27,7 @@ export function ReceptionPatientCreateScreen() {
   const [form, setForm] = useState<MinimalPatientPayload>({ full_name: '', identity_number: '', phone: '', gender: 'no_especificado', birth_date: '' });
 
   async function submit() {
+    if (saving) return;
     const fullName = form.full_name?.trim() ?? '';
     const identity = phoneDigits(form.identity_number);
     const phone = form.phone?.trim() ?? '';
@@ -64,6 +65,7 @@ export function ReceptionPatientCreateScreen() {
   }
 
   async function persistPatient(payload: MinimalPatientPayload) {
+    if (saving) return;
     setSaving(true);
     try {
       const patient = await createMinimalPatient(payload);
@@ -87,7 +89,7 @@ export function ReceptionPatientCreateScreen() {
             <Text style={styles.label}>Sexo</Text>
             <View style={styles.chips}>{genders.map(([value, label]) => <Chip active={form.gender === value} key={value} label={label} onPress={() => setForm({ ...form, gender: value })} />)}</View>
             <AppDateInput label="Fecha de nacimiento" maximumDate={new Date()} onChange={(value) => setForm({ ...form, birth_date: value })} placeholder="Seleccionar fecha" value={form.birth_date ?? ''} />
-            <AppButton label="Guardar paciente" loading={saving} onPress={submit} />
+            <AppButton disabled={saving} label="Guardar paciente" loading={saving} onPress={submit} />
           </AppCard>
         </ScrollView>
       </KeyboardAvoidingView>

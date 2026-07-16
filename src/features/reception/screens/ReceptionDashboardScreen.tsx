@@ -110,7 +110,7 @@ export function ReceptionDashboardScreen() {
           <QuickActionCard description="Recibe pacientes con cita y crea la visita operativa." icon="calendar-check-outline" onPress={() => navigation.navigate('ReceptionAppointmentCheckIn')} title="Check-in de cita" />
         </View>
 
-        <SectionHeader action="Ver agenda" onPress={() => navigation.navigate('ReceptionAppointmentCheckIn')} title="Proximas citas" />
+        <SectionHeader action="Ver agenda" onPress={() => navigation.navigate('ReceptionAppointmentCheckIn')} title="Próximas citas" />
         {nextAppointments.length ? nextAppointments.map((appointment) => (
           <AppointmentCheckInCard
             appointment={appointment}

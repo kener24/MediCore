@@ -55,7 +55,7 @@ export function PatientPaymentDetailScreen() {
           <Text style={styles.title}>{payment.payment_number || `Pago #${payment.id}`}</Text>
           <Text style={styles.amount}>{formatCurrency(payment.amount)}</Text>
           <Detail label="Fecha" value={formatDateTime(payment.payment_date || payment.creado_en)} />
-          <Detail label="Metodo" value={payment.method} />
+          <Detail label="Método" value={payment.method} />
           <Detail label="Referencia" value={payment.reference} />
           <Detail label="Factura" value={payment.invoice_number || payment.invoice} />
           <Detail label="Recibido por" value={payment.received_by_nombre} />

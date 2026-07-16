@@ -56,7 +56,7 @@ export function PatientPaymentsScreen() {
                 <StatusBadge status={payment.status} />
                 <Text style={styles.title}>{payment.payment_number || `Pago #${payment.id}`}</Text>
                 <Text style={styles.amount}>{formatCurrency(payment.amount)}</Text>
-                <Text style={styles.meta}>{formatDate(payment.payment_date || payment.creado_en)} · {payment.method || 'Metodo no indicado'}</Text>
+                <Text style={styles.meta}>{formatDate(payment.payment_date || payment.creado_en)} · {payment.method || 'Método no indicado'}</Text>
                 <Text style={styles.meta}>{payment.invoice_number ? `Factura ${payment.invoice_number}` : 'Factura no indicada'}</Text>
               </AppCard>
             </Pressable>

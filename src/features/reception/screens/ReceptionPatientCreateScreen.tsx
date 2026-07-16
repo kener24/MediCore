@@ -35,7 +35,7 @@ export function ReceptionPatientCreateScreen() {
     if (fullName.length < 5) return Alert.alert('Paciente', 'Ingresa el nombre completo del paciente.');
     if (!isValidIdentity(identity)) return Alert.alert('Paciente', 'La identidad debe tener entre 8 y 14 dígitos.');
     if (!isValidPhone(phone)) return Alert.alert('Paciente', 'El teléfono debe tener entre 8 y 15 dígitos.');
-    if (birthDate && !/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) return Alert.alert('Paciente', 'La fecha debe tener formato YYYY-MM-DD.');
+    if (birthDate && !/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) return Alert.alert('Paciente', 'Selecciona una fecha de nacimiento válida.');
 
     const payload = { ...form, full_name: fullName, identity_number: identity || undefined, phone: phone || undefined, birth_date: birthDate || undefined };
 

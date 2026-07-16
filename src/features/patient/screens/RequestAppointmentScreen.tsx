@@ -239,7 +239,7 @@ export function RequestAppointmentScreen() {
           label="Fecha"
           minimumDate={new Date()}
           onChange={updateDate}
-          placeholder="YYYY-MM-DD"
+          placeholder="Seleccionar fecha"
           value={date}
         />
         <View style={styles.dateActions}>
@@ -319,9 +319,9 @@ async function findNextAvailability(doctorId: number, fromDate: string, modality
 function validateDate(value: string) {
   const trimmed = value.trim();
   if (!trimmed) return 'Selecciona una fecha.';
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return 'Ingresa una fecha válida en formato YYYY-MM-DD.';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return 'Selecciona una fecha válida.';
   const parsed = new Date(`${trimmed}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) return 'Ingresa una fecha válida.';
+  if (Number.isNaN(parsed.getTime())) return 'Selecciona una fecha válida.';
   if (isPastISODate(trimmed)) return 'La fecha no puede ser pasada.';
   return '';
 }

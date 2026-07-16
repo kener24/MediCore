@@ -54,7 +54,7 @@ export function ConsultationFilters({
       <AppDateInput
         label="Fecha"
         onChange={onChangeDate}
-        placeholder="YYYY-MM-DD"
+        placeholder="Seleccionar fecha"
         value={date}
       />
     </View>

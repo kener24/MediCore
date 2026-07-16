@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
+import { AppDateTimeInput } from '@/components/AppDateTimeInput';
 import { AppHeader } from '@/components/AppHeader';
 import { AppInput } from '@/components/AppInput';
 import { colors } from '@/core/theme/colors';
@@ -52,7 +53,7 @@ export function NurseMedicationAdministrationFormScreen() {
             <AppInput label="Dosis" onChangeText={(value) => setForm({ ...form, dosage: value })} value={form.dosage} />
             <Text style={styles.label}>Vía</Text>
             <View style={styles.chips}>{routes.map(([value, label]) => <Chip active={form.route === value} key={value} label={label} onPress={() => setForm({ ...form, route: value })} />)}</View>
-            <AppInput label="Hora programada" placeholder="2026-06-19T08:00" onChangeText={(value) => setForm({ ...form, scheduled_time: value })} value={form.scheduled_time} />
+            <AppDateTimeInput label="Fecha y hora programada" minimumDate={new Date()} onChange={(value) => setForm({ ...form, scheduled_time: value })} value={form.scheduled_time ?? ''} />
             <AppInput label="Observaciones" onChangeText={(value) => setForm({ ...form, notes: value })} value={form.notes} />
             <AppButton label="Guardar medicamento" loading={saving} onPress={submit} />
           </AppCard>

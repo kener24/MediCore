@@ -1,29 +1,34 @@
+import { toPositiveId } from '@/core/utils/idUtils';
 import { getConsultationByVisit, getConsultationDetail } from '@/features/doctor/services/doctorConsultationService';
 
 export type DoctorConsultationRouteParams = {
-  consultationId?: number;
-  patientId?: number;
-  visitId?: number;
+  consultationId?: number | string;
+  patientId?: number | string;
+  visitId?: number | string;
 };
 
 export async function resolveRequiredConsultation(params: DoctorConsultationRouteParams) {
-  if (params.consultationId) {
-    const consultation = await getConsultationDetail(params.consultationId);
+  const consultationParamId = toPositiveId(params.consultationId);
+  const patientParamId = toPositiveId(params.patientId);
+  const visitParamId = toPositiveId(params.visitId);
+
+  if (consultationParamId) {
+    const consultation = await getConsultationDetail(consultationParamId);
     return {
       consultation,
-      consultationId: consultation.id ?? consultation.consultation_id ?? params.consultationId,
-      patientId: params.patientId ?? consultation.patient_id ?? (typeof consultation.patient === 'number' ? consultation.patient : undefined),
-      visitId: params.visitId ?? consultation.visit_id ?? consultation.patient_visit ?? undefined,
+      consultationId: toPositiveId(consultation.id ?? consultation.consultation_id) ?? consultationParamId,
+      patientId: patientParamId ?? toPositiveId(consultation.patient_id ?? (typeof consultation.patient === 'number' ? consultation.patient : undefined)),
+      visitId: visitParamId ?? toPositiveId(consultation.visit_id ?? consultation.patient_visit),
     };
   }
-  if (params.visitId) {
-    const consultation = await getConsultationByVisit(params.visitId);
+  if (visitParamId) {
+    const consultation = await getConsultationByVisit(visitParamId);
     if (consultation) {
       return {
         consultation,
-        consultationId: consultation.id ?? consultation.consultation_id,
-        patientId: params.patientId ?? consultation.patient_id ?? (typeof consultation.patient === 'number' ? consultation.patient : undefined),
-        visitId: params.visitId,
+        consultationId: toPositiveId(consultation.id ?? consultation.consultation_id),
+        patientId: patientParamId ?? toPositiveId(consultation.patient_id ?? (typeof consultation.patient === 'number' ? consultation.patient : undefined)),
+        visitId: visitParamId,
       };
     }
   }

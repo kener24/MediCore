@@ -67,6 +67,7 @@ export function DoctorClinicalConsumptionScreen() {
   }
 
   async function submit(payload: ClinicalConsumptionPayload) {
+    if (submitting) return;
     if (readOnly) return Alert.alert('Consumo clínico', 'Esta consulta ya fue finalizada.');
     if (!consultationId) return Alert.alert('Consumo clínico', 'Primero debes iniciar o guardar la consulta médica.');
     setSubmitting(true);

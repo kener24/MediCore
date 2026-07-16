@@ -54,6 +54,7 @@ export function DoctorPrescriptionScreen() {
   }, [load]);
 
   async function submit(payload: CreatePrescriptionPayload) {
+    if (submitting) return;
     if (readOnly) return Alert.alert('Receta médica', 'Esta consulta ya fue finalizada.');
     if (!consultationId) return Alert.alert('Receta médica', 'Primero debes iniciar o guardar la consulta médica.');
     setSubmitting(true);

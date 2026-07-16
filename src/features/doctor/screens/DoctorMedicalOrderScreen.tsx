@@ -54,6 +54,7 @@ export function DoctorMedicalOrderScreen() {
   }, [load]);
 
   async function submit(payload: CreateMedicalOrderPayload) {
+    if (submitting) return;
     if (readOnly) return Alert.alert('Orden médica', 'Esta consulta ya fue finalizada.');
     if (!consultationId) return Alert.alert('Orden médica', 'Primero debes iniciar o guardar la consulta médica.');
     setSubmitting(true);

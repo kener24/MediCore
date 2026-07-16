@@ -5,12 +5,14 @@ import { colors } from '@/core/theme/colors';
 import type { InventoryItem } from '@/features/doctor/types/doctorClinicalConsumption.types';
 
 export function InventoryItemSelector({
+  disabled,
   items,
   onChangeSearch,
   onSelect,
   search,
   selected,
 }: {
+  disabled?: boolean;
   items: InventoryItem[];
   onChangeSearch: (value: string) => void;
   onSelect: (item: InventoryItem) => void;
@@ -19,11 +21,11 @@ export function InventoryItemSelector({
 }) {
   return (
     <View style={styles.group}>
-      <AppInput label="Buscar insumo" onChangeText={onChangeSearch} placeholder="Nombre o SKU" value={search} />
+      <AppInput editable={!disabled} label="Buscar insumo" onChangeText={onChangeSearch} placeholder="Nombre o SKU" value={search} />
       {items.slice(0, 5).map((item) => {
         const active = selected?.id === item.id;
         return (
-          <Pressable key={item.id} onPress={() => onSelect(item)} style={[styles.item, active && styles.itemActive]}>
+          <Pressable disabled={disabled} key={item.id} onPress={() => onSelect(item)} style={[styles.item, active && styles.itemActive, disabled && styles.disabled]}>
             <Text style={[styles.name, active && styles.nameActive]}>{item.name ?? item.nombre ?? `Insumo ${item.id}`}</Text>
             <Text style={styles.meta}>Stock: {item.stock ?? 'N/D'} {item.unit ?? item.unidad ?? ''}</Text>
           </Pressable>
@@ -35,6 +37,7 @@ export function InventoryItemSelector({
 
 const styles = StyleSheet.create({
   group: { gap: 8 },
+  disabled: { opacity: 0.55 },
   item: { backgroundColor: colors.surfaceMuted, borderColor: colors.border, borderRadius: 12, borderWidth: 1, gap: 3, padding: 10 },
   itemActive: { backgroundColor: colors.palePrimary, borderColor: colors.primary },
   meta: { color: colors.muted, fontSize: 12 },

@@ -23,6 +23,7 @@ export function ClinicalConsumptionForm({
   search?: string;
   submitting?: boolean;
 }) {
+  const locked = Boolean(disabled || submitting);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [itemName, setItemName] = useState('');
   const [quantity, setQuantity] = useState('1');
@@ -30,7 +31,7 @@ export function ClinicalConsumptionForm({
   const [billable, setBillable] = useState(true);
 
   async function submit() {
-    if (disabled) return;
+    if (locked) return;
     const numericQuantity = Number(quantity);
     const stock = selectedItem?.stock === undefined ? undefined : Number(selectedItem.stock);
     if (!selectedItem && !itemName.trim()) return Alert.alert('Consumo clínico', 'Selecciona un insumo.');
@@ -48,18 +49,18 @@ export function ClinicalConsumptionForm({
   return (
     <AppCard style={styles.form}>
       {onChangeSearch ? (
-        <InventoryItemSelector items={inventoryItems} onChangeSearch={onChangeSearch} onSelect={setSelectedItem} search={search} selected={selectedItem} />
+        <InventoryItemSelector disabled={locked} items={inventoryItems} onChangeSearch={onChangeSearch} onSelect={setSelectedItem} search={search} selected={selectedItem} />
       ) : null}
-      {!selectedItem ? <AppInput editable={!disabled} label="Insumo o producto" onChangeText={setItemName} value={itemName} /> : null}
-      <AppInput editable={!disabled} keyboardType="numeric" label="Cantidad" onChangeText={(value) => setQuantity(value.replace(/[^0-9.]/g, ''))} value={quantity} />
-      <AppInput editable={!disabled} label="Notas" multiline onChangeText={setNotes} value={notes} />
+      {!selectedItem ? <AppInput editable={!locked} label="Insumo o producto" onChangeText={setItemName} value={itemName} /> : null}
+      <AppInput editable={!locked} keyboardType="numeric" label="Cantidad" onChangeText={(value) => setQuantity(value.replace(/[^0-9.]/g, ''))} value={quantity} />
+      <AppInput editable={!locked} label="Notas" multiline onChangeText={setNotes} value={notes} />
       <View style={styles.row}>
         <Text style={styles.label}>Facturable</Text>
-        <Pressable disabled={disabled} onPress={() => setBillable((value) => !value)} style={[styles.toggle, billable && styles.toggleActive, disabled && styles.disabled]}>
+        <Pressable disabled={locked} onPress={() => setBillable((value) => !value)} style={[styles.toggle, billable && styles.toggleActive, locked && styles.disabled]}>
           <Text style={[styles.toggleText, billable && styles.toggleTextActive]}>{billable ? 'Sí' : 'No'}</Text>
         </Pressable>
       </View>
-      <AppButton disabled={disabled} label="Registrar consumo clínico" loading={submitting} onPress={submit} />
+      <AppButton disabled={locked} label="Registrar consumo clínico" loading={submitting} onPress={submit} />
     </AppCard>
   );
 }

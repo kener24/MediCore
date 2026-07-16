@@ -35,6 +35,7 @@ export function PrescriptionForm({
   onSubmit: (payload: CreatePrescriptionPayload) => Promise<void>;
   submitting?: boolean;
 }) {
+  const locked = Boolean(disabled || submitting);
   const [generalInstructions, setGeneralInstructions] = useState('');
   const [notes, setNotes] = useState('');
   const [medications, setMedications] = useState<PrescriptionMedicationPayload[]>([{ ...emptyMedication }]);
@@ -54,7 +55,7 @@ export function PrescriptionForm({
   }
 
   async function submit() {
-    if (disabled) return;
+    if (locked) return;
     if (!medications.length) return Alert.alert('Receta médica', 'Agrega al menos un medicamento.');
     for (const item of medications) {
       if (item.medication_name.trim().length < 3) return Alert.alert('Receta médica', 'Escribe el nombre del medicamento.');
@@ -81,7 +82,7 @@ export function PrescriptionForm({
     <AppCard style={styles.form}>
       {medications.map((item, index) => (
         <MedicationFormItem
-          disabled={disabled}
+          disabled={locked}
           catalogItems={medicationCatalog}
           favoriteItems={favoriteMedications}
           index={index}
@@ -95,10 +96,10 @@ export function PrescriptionForm({
           removable={medications.length > 1}
         />
       ))}
-      <AppButton disabled={disabled} label="Agregar medicamento" onPress={() => setMedications((current) => [...current, { ...emptyMedication }])} variant="secondary" />
-      <AppInput editable={!disabled} label="Instrucciones generales" multiline onChangeText={setGeneralInstructions} value={generalInstructions} />
-      <AppInput editable={!disabled} label="Notas" multiline onChangeText={setNotes} value={notes} />
-      <AppButton disabled={disabled} label="Guardar receta" loading={submitting} onPress={submit} />
+      <AppButton disabled={locked} label="Agregar medicamento" onPress={() => setMedications((current) => [...current, { ...emptyMedication }])} variant="secondary" />
+      <AppInput editable={!locked} label="Instrucciones generales" multiline onChangeText={setGeneralInstructions} value={generalInstructions} />
+      <AppInput editable={!locked} label="Notas" multiline onChangeText={setNotes} value={notes} />
+      <AppButton disabled={locked} label="Guardar receta" loading={submitting} onPress={submit} />
     </AppCard>
   );
 }

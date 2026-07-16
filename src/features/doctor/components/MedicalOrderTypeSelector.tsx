@@ -3,11 +3,13 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '@/core/theme/colors';
 
 export function MedicalOrderTypeSelector<T extends string>({
+  disabled,
   label,
   onChange,
   options,
   value,
 }: {
+  disabled?: boolean;
   label: string;
   onChange: (value: T) => void;
   options: { label: string; value: T }[];
@@ -20,7 +22,7 @@ export function MedicalOrderTypeSelector<T extends string>({
         {options.map((item) => {
           const active = item.value === value;
           return (
-            <Pressable key={item.value} onPress={() => onChange(item.value)} style={[styles.chip, active && styles.chipActive]}>
+            <Pressable disabled={disabled} key={item.value} onPress={() => onChange(item.value)} style={[styles.chip, active && styles.chipActive, disabled && styles.disabled]}>
               <Text style={[styles.chipText, active && styles.chipTextActive]}>{item.label}</Text>
             </Pressable>
           );
@@ -43,6 +45,7 @@ const styles = StyleSheet.create({
   chipText: { color: colors.muted, fontSize: 12, fontWeight: '900' },
   chipTextActive: { color: colors.white },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  disabled: { opacity: 0.55 },
   group: { gap: 8 },
   label: { color: colors.ink, fontSize: 14, fontWeight: '900' },
 });

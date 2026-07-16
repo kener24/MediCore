@@ -38,6 +38,7 @@ export function MedicalOrderForm({
   onSubmit: (payload: CreateMedicalOrderPayload) => Promise<void>;
   submitting?: boolean;
 }) {
+  const locked = Boolean(disabled || submitting);
   const [orderType, setOrderType] = useState<MedicalOrderType>('laboratorio');
   const [priority, setPriority] = useState<MedicalOrderPriority>('normal');
   const [description, setDescription] = useState('');
@@ -53,7 +54,7 @@ export function MedicalOrderForm({
   }
 
   async function submit() {
-    if (disabled) return;
+    if (locked) return;
     if (!orderType) return Alert.alert('Orden médica', 'Selecciona el tipo de orden.');
     if (description.trim().length < 5) return Alert.alert('Orden médica', 'Escribe la descripción de la orden.');
     if (priority === 'urgente' && instructions.trim().length < 5) {
@@ -70,19 +71,19 @@ export function MedicalOrderForm({
 
   return (
     <AppCard style={styles.form}>
-      <MedicalOrderTypeSelector label="Tipo de orden" onChange={setOrderType} options={orderTypes} value={orderType} />
-      <MedicalOrderTypeSelector label="Prioridad" onChange={setPriority} options={priorities} value={priority} />
+      <MedicalOrderTypeSelector disabled={locked} label="Tipo de orden" onChange={setOrderType} options={orderTypes} value={orderType} />
+      <MedicalOrderTypeSelector disabled={locked} label="Prioridad" onChange={setPriority} options={priorities} value={priority} />
       {favoriteOrders?.length ? (
         <View style={styles.favoriteWrap}>
           {favoriteOrders.slice(0, 4).map((favorite, index) => (
-            <Pressable disabled={disabled} key={`${favorite.order_type}-${favorite.description}-${index}`} onPress={() => applyOrder(favorite)} style={styles.favorite}>
+            <Pressable disabled={locked} key={`${favorite.order_type}-${favorite.description}-${index}`} onPress={() => applyOrder(favorite)} style={[styles.favorite, locked && styles.disabled]}>
               <Text numberOfLines={1} style={styles.favoriteText}>{favorite.description}</Text>
             </Pressable>
           ))}
         </View>
       ) : null}
       <AppInput
-        editable={!disabled}
+        editable={!locked}
         label="Descripción"
         multiline
         onChangeText={(value) => {
@@ -94,16 +95,16 @@ export function MedicalOrderForm({
       {orderCatalog?.length ? (
         <View style={styles.suggestions}>
           {orderCatalog.slice(0, 4).map((item) => (
-            <Pressable disabled={disabled} key={item.id} onPress={() => setDescription(item.name ?? item.nombre ?? '')} style={styles.suggestion}>
+            <Pressable disabled={locked} key={item.id} onPress={() => setDescription(item.name ?? item.nombre ?? '')} style={[styles.suggestion, locked && styles.disabled]}>
               <Text style={styles.suggestionTitle}>{item.name ?? item.nombre ?? `Item ${item.id}`}</Text>
               <Text style={styles.suggestionMeta}>{item.sku ? `${item.sku} - ` : ''}{item.category_name ?? item.item_type ?? 'Catálogo'}</Text>
             </Pressable>
           ))}
         </View>
       ) : null}
-      <AppInput editable={!disabled} label="Instrucciones" multiline onChangeText={setInstructions} value={instructions} />
-      <AppInput editable={!disabled} label="Notas" multiline onChangeText={setNotes} value={notes} />
-      <AppButton disabled={disabled} label="Guardar orden médica" loading={submitting} onPress={submit} />
+      <AppInput editable={!locked} label="Instrucciones" multiline onChangeText={setInstructions} value={instructions} />
+      <AppInput editable={!locked} label="Notas" multiline onChangeText={setNotes} value={notes} />
+      <AppButton disabled={locked} label="Guardar orden médica" loading={submitting} onPress={submit} />
     </AppCard>
   );
 }
@@ -113,6 +114,7 @@ const styles = StyleSheet.create({
   favoriteText: { color: colors.primaryDark, fontSize: 12, fontWeight: '900', maxWidth: 190 },
   favoriteWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   form: { gap: 14 },
+  disabled: { opacity: 0.55 },
   suggestion: { backgroundColor: colors.surfaceMuted, borderColor: colors.border, borderRadius: 12, borderWidth: 1, gap: 2, padding: 9 },
   suggestionMeta: { color: colors.muted, fontSize: 11 },
   suggestionTitle: { color: colors.ink, fontSize: 13, fontWeight: '900' },

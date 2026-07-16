@@ -21,6 +21,7 @@ export function SuperAdminCreateClinicScreen() {
   const update = (patch: Partial<CreateClinicPayload>) => setForm((current) => ({ ...current, ...patch }));
 
   async function submit() {
+    if (saving) return;
     const name = form.nombre.trim();
     const email = form.correo?.trim().toLowerCase() || '';
     const phone = phoneDigits(form.telefono);
@@ -54,7 +55,7 @@ export function SuperAdminCreateClinicScreen() {
               <AppInput keyboardType="phone-pad" label="Teléfono" onChangeText={(value) => update({ telefono: value })} sanitizer="phone" value={form.telefono} />
               <AppInput autoCapitalize="none" keyboardType="email-address" label="Correo" onChangeText={(value) => update({ correo: value })} sanitizer="email" value={form.correo} />
               <AppInput autoCapitalize="sentences" label="Dirección" onChangeText={(value) => update({ direccion: value })} value={form.direccion} />
-              <AppButton label="Crear clínica" loading={saving} onPress={submit} />
+              <AppButton disabled={saving} label="Crear clínica" loading={saving} onPress={submit} />
             </AppCard>
           </ScrollView>
         </KeyboardAvoidingView>

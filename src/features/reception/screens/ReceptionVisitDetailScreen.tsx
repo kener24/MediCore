@@ -91,6 +91,7 @@ export function ReceptionVisitDetailScreen() {
   }
 
   async function confirmCancel() {
+    if (busy) return;
     const reason = cancelReason.trim();
     if (reason.length < 5) return Alert.alert('Cancelar admisión', 'Indica un motivo claro de cancelación.');
     if (!visit?.id) return;
@@ -108,6 +109,7 @@ export function ReceptionVisitDetailScreen() {
   }
 
   async function saveNote() {
+    if (busy) return;
     if (!visit?.id) return;
     if (note.trim().length < 3) return Alert.alert('Nota administrativa', 'Escribe una nota más clara.');
     try {

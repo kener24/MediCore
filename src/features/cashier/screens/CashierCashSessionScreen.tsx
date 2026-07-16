@@ -148,7 +148,7 @@ export function CashierCashSessionScreen() {
             <AppInput keyboardType="decimal-pad" label={mode === 'open' ? 'Monto de apertura' : mode === 'close' ? 'Monto contado' : 'Monto'} onChangeText={setAmount} sanitizer="money" value={amount} />
             {mode === 'ingreso' || mode === 'egreso' ? <AppInput label="Razón" onChangeText={setReason} value={reason} /> : null}
             <AppInput label="Notas" multiline onChangeText={setNotes} scrollEnabled={false} style={styles.textArea} value={notes} />
-            <AppButton label={mode === 'open' ? 'Abrir caja' : mode === 'close' ? 'Cerrar caja' : 'Registrar movimiento'} loading={saving} onPress={submit} variant={mode === 'close' ? 'danger' : 'primary'} />
+            <AppButton disabled={saving} label={mode === 'open' ? 'Abrir caja' : mode === 'close' ? 'Cerrar caja' : 'Registrar movimiento'} loading={saving} onPress={submit} variant={mode === 'close' ? 'danger' : 'primary'} />
           </AppCard>
           <AppCard style={styles.form}>
             <Text style={styles.sectionTitle}>Movimientos recientes</Text>

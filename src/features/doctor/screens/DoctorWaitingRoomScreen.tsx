@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
+import { toPositiveId } from '@/core/utils/idUtils';
 import { DoctorHeader } from '@/features/doctor/components/DoctorHeader';
 import { WaitingRoomPatientCard } from '@/features/doctor/components/WaitingRoomPatientCard';
 import { getDoctorWaitingRoom, startConsultation } from '@/features/doctor/services/doctorWaitingRoomService';
@@ -69,7 +70,7 @@ export function DoctorWaitingRoomScreen() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   function confirmStart(item: WaitingRoomPatient) {
-    const visitId = item.visit_id ?? item.visita_id ?? item.id;
+    const visitId = toPositiveId(item.visit_id ?? item.visita_id ?? item.id);
     if (!visitId) {
       Alert.alert('Consulta', 'No se puede iniciar consulta sin visita asociada.');
       return;
@@ -86,7 +87,7 @@ export function DoctorWaitingRoomScreen() {
     try {
       const response = await startConsultation(visitId);
       const consultationId = response.consultation_id ?? response.id;
-      navigation.navigate('DoctorConsultation', { consultationId, patient: item.patient, patientId: item.patient_id ?? item.paciente_id, visitId });
+      navigation.navigate('DoctorConsultation', { consultationId, patient: item.patient, patientId: toPositiveId(item.patient_id ?? item.paciente_id), visitId });
     } catch (err) {
       Alert.alert('Consulta', err instanceof Error ? err.message : 'No se pudo iniciar la consulta.');
     } finally {
@@ -134,14 +135,14 @@ export function DoctorWaitingRoomScreen() {
           <ErrorState message={error} onRetry={() => load()} title="No se pudo cargar la sala" />
         ) : filteredPatients.length ? (
           filteredPatients.map((item) => {
-            const visitId = item.visit_id ?? item.visita_id ?? item.id;
+            const visitId = toPositiveId(item.visit_id ?? item.visita_id ?? item.id);
             return (
               <WaitingRoomPatientCard
                 item={item}
                 key={item.id}
                 loading={startingVisitId === visitId}
                 onStartConsultation={() => confirmStart(item)}
-                onView={() => navigation.navigate('DoctorPatientDetail', { item, patientId: item.patient_id ?? item.paciente_id, visitId })}
+                onView={() => navigation.navigate('DoctorPatientDetail', { item, patientId: toPositiveId(item.patient_id ?? item.paciente_id), visitId })}
               />
             );
           })

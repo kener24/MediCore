@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
+import { toPositiveId } from '@/core/utils/idUtils';
 import { DoctorAppointmentCard } from '@/features/doctor/components/DoctorAppointmentCard';
 import { DoctorHeader } from '@/features/doctor/components/DoctorHeader';
 import { DoctorQuickActions } from '@/features/doctor/components/DoctorQuickActions';
@@ -50,7 +51,7 @@ export function DoctorDashboardScreen() {
   }
 
   function confirmStart(item: WaitingRoomPatient) {
-    const visitId = item.visit_id ?? item.visita_id ?? item.id;
+    const visitId = toPositiveId(item.visit_id ?? item.visita_id ?? item.id);
     if (!visitId) {
       Alert.alert('Consulta', 'No se puede iniciar consulta sin visita asociada.');
       return;
@@ -70,7 +71,7 @@ export function DoctorDashboardScreen() {
       navigation.navigate('DoctorConsultation', {
         consultationId,
         patient: item.patient,
-        patientId: item.patient_id ?? item.paciente_id,
+        patientId: toPositiveId(item.patient_id ?? item.paciente_id),
         visitId,
       });
     } catch (err) {
@@ -104,14 +105,14 @@ export function DoctorDashboardScreen() {
             <DoctorQuickActions onNavigate={go} />
             <View style={styles.section}>
               {dashboard.waitingRoom.slice(0, 2).map((item) => {
-                const visitId = item.visit_id ?? item.visita_id ?? item.id;
+                const visitId = toPositiveId(item.visit_id ?? item.visita_id ?? item.id);
                 return (
                   <WaitingRoomPatientCard
                     item={item}
                     key={item.id}
                     loading={startingVisitId === visitId}
                     onStartConsultation={() => confirmStart(item)}
-                    onView={() => navigation.navigate('DoctorPatientDetail', { item, visitId })}
+                    onView={() => navigation.navigate('DoctorPatientDetail', { item, patientId: toPositiveId(item.patient_id ?? item.paciente_id), visitId })}
                   />
                 );
               })}
@@ -125,7 +126,7 @@ export function DoctorDashboardScreen() {
                   onPress={() =>
                     navigation.navigate('DoctorPatientDetail', {
                       appointment: item,
-                      visitId: item.visit_id ?? item.visita_id,
+                      visitId: toPositiveId(item.visit_id ?? item.visita_id),
                     })
                   }
                 />

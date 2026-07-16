@@ -10,6 +10,7 @@ import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
 import { toISODate } from '@/core/utils/dateUtils';
+import { toPositiveId } from '@/core/utils/idUtils';
 import { DoctorAppointmentCard } from '@/features/doctor/components/DoctorAppointmentCard';
 import { DoctorHeader } from '@/features/doctor/components/DoctorHeader';
 import { startConsultation } from '@/features/doctor/services/doctorConsultationService';
@@ -64,14 +65,15 @@ export function DoctorScheduleScreen() {
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   function viewAppointment(item: DoctorAppointment) {
-    const visitId = item.visit_id ?? item.visita_id;
-    const patientId = item.patient_id ?? item.patient;
+    const visitId = toPositiveId(item.visit_id ?? item.visita_id);
+    const patientId = toPositiveId(item.patient_id ?? item.patient);
     if (!visitId) {
       Alert.alert('Agenda médica', 'Esta cita aún no tiene admisión registrada. Primero debe pasar por recepción.');
+      return;
     }
     navigation.navigate('DoctorPatientDetail', {
       appointment: item,
-      appointmentId: item.appointment_id ?? item.id,
+      appointmentId: toPositiveId(item.appointment_id ?? item.id),
       patient: {
         full_name: item.patient_name ?? item.patient_nombre ?? item.paciente_nombre,
         id: patientId,
@@ -83,7 +85,7 @@ export function DoctorScheduleScreen() {
   }
 
   function attendAppointment(item: DoctorAppointment) {
-    const visitId = item.visit_id ?? item.visita_id;
+    const visitId = toPositiveId(item.visit_id ?? item.visita_id);
     if (!visitId) {
       Alert.alert('Agenda médica', 'Esta cita aún no tiene admisión registrada. Primero debe pasar por recepción.');
       return;
@@ -98,11 +100,11 @@ export function DoctorScheduleScreen() {
     if (startingVisitId) return;
     setStartingVisitId(visitId);
     try {
-      const patientId = item.patient_id ?? item.patient;
+      const patientId = toPositiveId(item.patient_id ?? item.patient);
       const response = await startConsultation(visitId);
       const consultationId = response.consultation_id ?? response.id;
       navigation.navigate('DoctorConsultation', {
-        appointmentId: item.appointment_id ?? item.id,
+        appointmentId: toPositiveId(item.appointment_id ?? item.id),
         consultationId,
         patientId,
         visitId,
@@ -146,7 +148,7 @@ export function DoctorScheduleScreen() {
           visibleAppointments.map((item) => (
             <DoctorAppointmentCard
               appointment={item}
-              attendLoading={startingVisitId === (item.visit_id ?? item.visita_id)}
+              attendLoading={startingVisitId === toPositiveId(item.visit_id ?? item.visita_id)}
               key={item.id}
               onAttend={() => attendAppointment(item)}
               onPress={() => viewAppointment(item)}

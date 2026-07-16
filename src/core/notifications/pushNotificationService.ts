@@ -1,20 +1,12 @@
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import { apiClient } from '@/core/api/apiClient';
 import { endpoints } from '@/core/api/endpoints';
 import { appConfig } from '@/core/config/appConfig';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+type NotificationsModule = typeof import('expo-notifications');
 
 export type NotificationPreferences = {
   push_enabled?: boolean;
@@ -25,6 +17,25 @@ export type NotificationPreferences = {
 
 function projectId() {
   return Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+}
+
+function isExpoGo() {
+  return Constants.appOwnership === 'expo';
+}
+
+async function loadNotificationsModule(): Promise<NotificationsModule | null> {
+  if (isExpoGo()) return null;
+
+  const notifications = await import('expo-notifications');
+  notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+  return notifications;
 }
 
 export async function getNotificationPreferences() {
@@ -42,6 +53,14 @@ export async function disablePushDevice(expoPushToken?: string) {
 }
 
 export async function registerDeviceForPushNotifications() {
+  const Notifications = await loadNotificationsModule();
+  if (!Notifications) {
+    return {
+      registered: false,
+      reason: 'Expo Go no soporta push notifications en Android desde SDK 53. Usa un development build o APK para probarlas.',
+    };
+  }
+
   if (!Device.isDevice) {
     return { registered: false, reason: 'Las notificaciones push requieren un dispositivo físico.' };
   }

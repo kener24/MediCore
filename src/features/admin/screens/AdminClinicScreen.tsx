@@ -1,15 +1,18 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Modal, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { AppHeader } from '@/components/AppHeader';
+import { AppInput } from '@/components/AppInput';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { RoleGuard } from '@/components/RoleGuard';
 import { colors } from '@/core/theme/colors';
+import { isValidEmail, isValidPhone, phoneDigits } from '@/core/utils/formValidation';
 import { AdminInfoRow, AdminStatusCard } from '@/features/admin/components/AdminCards';
 import {
   clinicEmail,
@@ -18,11 +21,13 @@ import {
   getAdminClinic,
   getAdminFiscalRanges,
   getAdminFiscalReadiness,
+  updateAdminClinic,
 } from '@/features/admin/services/adminService';
 import type { AdminClinic, AdminFiscalRange, AdminFiscalReadiness } from '@/features/admin/types/admin.types';
 import { formatDate } from '@/features/patient/utils/formatters';
 
 type RangeHealth = 'ok' | 'warning' | 'danger' | 'inactive';
+type ClinicForm = { correo: string; direccion: string; nombre: string; rtn: string; telefono: string };
 
 export function AdminClinicScreen() {
   const [clinic, setClinic] = useState<AdminClinic | null>(null);
@@ -31,6 +36,9 @@ export function AdminClinicScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [editOpen, setEditOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState<ClinicForm>({ correo: '', direccion: '', nombre: '', rtn: '', telefono: '' });
 
   const load = useCallback(async (refresh = false) => {
     if (refresh) setRefreshing(true);
@@ -65,6 +73,41 @@ export function AdminClinicScreen() {
   const expiringRanges = ranges.filter((range) => isExpiringSoon(range.expiration_date)).length;
   const missingFields = getMissingClinicFields(clinic);
   const checklist = buildClinicChecklist({ activeRanges, fiscalReady, missingFields, readiness, ranges });
+
+  const openEdit = () => {
+    setForm({
+      correo: clinic?.correo ?? clinic?.email ?? '',
+      direccion: clinic?.direccion ?? clinic?.address ?? '',
+      nombre: clinicName(clinic) === 'Clínica' ? '' : clinicName(clinic),
+      rtn: clinic?.rtn ?? '',
+      telefono: clinic?.telefono ?? clinic?.phone ?? '',
+    });
+    setEditOpen(true);
+  };
+
+  const saveClinic = async () => {
+    const validation = validateClinicForm(form);
+    if (validation) {
+      Alert.alert('Clínica', validation);
+      return;
+    }
+    setSaving(true);
+    try {
+      await updateAdminClinic({
+        correo: form.correo.trim().toLowerCase(),
+        direccion: form.direccion.trim(),
+        nombre: form.nombre.trim(),
+        rtn: form.rtn.replace(/\D/g, ''),
+        telefono: phoneDigits(form.telefono),
+      });
+      setEditOpen(false);
+      await load(true);
+    } catch (err) {
+      Alert.alert('No se pudo guardar', err instanceof Error ? err.message : 'Revisa los datos de la clínica.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (loading) return <LoadingState label="Cargando clínica..." />;
 
@@ -107,6 +150,7 @@ export function AdminClinicScreen() {
             <AdminInfoRow label="Dirección" value={clinic?.direccion ?? clinic?.address} />
             <AdminInfoRow label="RTN" value={clinic?.rtn} />
             {missingFields.length ? <Text style={styles.helper}>Pendiente: {missingFields.join(', ')}.</Text> : null}
+            <AppButton label="Editar datos de clínica" onPress={openEdit} variant="secondary" />
           </AppCard>
 
           <AdminStatusCard
@@ -166,9 +210,37 @@ export function AdminClinicScreen() {
             })}
           </View>
         </ScrollView>
+
+        <Modal animationType="fade" transparent visible={editOpen}>
+          <View style={styles.modalBackdrop}>
+            <AppCard style={styles.modalCard}>
+              <Text style={styles.title}>Editar clínica</Text>
+              <Text style={styles.meta}>Actualiza solo datos administrativos básicos. Los datos fiscales sensibles deben validarse antes de emitir.</Text>
+              <AppInput autoCapitalize="words" label="Nombre" onChangeText={(value) => setForm((current) => ({ ...current, nombre: value }))} sanitizer="name" value={form.nombre} />
+              <AppInput autoCapitalize="none" keyboardType="email-address" label="Correo" onChangeText={(value) => setForm((current) => ({ ...current, correo: value }))} sanitizer="email" value={form.correo} />
+              <AppInput keyboardType="phone-pad" label="Teléfono" onChangeText={(value) => setForm((current) => ({ ...current, telefono: value }))} sanitizer="phone" value={form.telefono} />
+              <AppInput label="Dirección" multiline onChangeText={(value) => setForm((current) => ({ ...current, direccion: value }))} value={form.direccion} />
+              <AppInput keyboardType="number-pad" label="RTN" maxLength={20} onChangeText={(value) => setForm((current) => ({ ...current, rtn: value }))} sanitizer="digits" value={form.rtn} />
+              <View style={styles.modalActions}>
+                <AppButton disabled={saving} label="Cancelar" onPress={() => setEditOpen(false)} variant="secondary" />
+                <AppButton loading={saving} label="Guardar" onPress={saveClinic} />
+              </View>
+            </AppCard>
+          </View>
+        </Modal>
       </SafeAreaView>
     </RoleGuard>
   );
+}
+
+function validateClinicForm(form: ClinicForm) {
+  if (form.nombre.trim().length < 3) return 'Ingresa el nombre de la clínica.';
+  if (!isValidEmail(form.correo.trim().toLowerCase())) return 'Ingresa un correo válido.';
+  if (!isValidPhone(phoneDigits(form.telefono))) return 'El teléfono debe tener entre 8 y 15 dígitos.';
+  if (form.direccion.trim().length < 5) return 'Ingresa una dirección válida.';
+  const rtn = form.rtn.replace(/\D/g, '');
+  if (rtn.length < 8 || rtn.length > 20) return 'El RTN debe tener entre 8 y 20 dígitos.';
+  return '';
 }
 
 function buildClinicChecklist({
@@ -381,6 +453,19 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 13,
     fontWeight: '700',
+  },
+  modalActions: {
+    gap: 10,
+  },
+  modalBackdrop: {
+    backgroundColor: 'rgba(15, 23, 42, 0.35)',
+    flex: 1,
+    justifyContent: 'flex-end',
+    padding: 18,
+  },
+  modalCard: {
+    gap: 12,
+    maxHeight: '92%',
   },
   okFill: {
     backgroundColor: colors.success,

@@ -2,8 +2,10 @@ import { endpoints } from '@/core/api/endpoints';
 import { getFirstAvailable, normalizeAdminList, patchFirstAvailable, postFirstAvailable, type AdminQueryParams } from '@/features/admin/services/adminApiHelpers';
 import type {
   AdminAuditLog,
+  AdminAccountLock,
   AdminClinic,
   AdminDashboard,
+  AdminDoctorProfile,
   AdminFiscalRange,
   AdminFiscalReadiness,
   AdminReportSummary,
@@ -14,6 +16,9 @@ import type {
   AdminUser,
   CreateClinicUserPayload,
   CreateDoctorProfilePayload,
+  UpdateAdminClinicPayload,
+  UpdateAdminDoctorProfilePayload,
+  UpdateAdminUserPayload,
 } from '@/features/admin/types/admin.types';
 
 export async function getAdminDashboard(): Promise<AdminDashboard> {
@@ -24,9 +29,21 @@ export async function getAdminClinic(): Promise<AdminClinic> {
   return getFirstAvailable<AdminClinic>([endpoints.clinicAdmin.myClinic]);
 }
 
+export async function updateAdminClinic(payload: UpdateAdminClinicPayload): Promise<AdminClinic> {
+  return patchFirstAvailable<AdminClinic>([endpoints.clinicAdmin.myClinic], payload);
+}
+
 export async function getAdminUsers(params?: AdminQueryParams): Promise<AdminUser[]> {
   const data = await getFirstAvailable<unknown>([endpoints.clinicAdmin.users, '/users/'], params);
   return normalizeAdminList<AdminUser>(data);
+}
+
+export async function getAdminUser(id: number | string): Promise<AdminUser> {
+  return getFirstAvailable<AdminUser>([endpoints.clinicAdmin.user(id)]);
+}
+
+export async function updateAdminUser(id: number | string, payload: UpdateAdminUserPayload): Promise<AdminUser> {
+  return patchFirstAvailable<AdminUser>([endpoints.clinicAdmin.user(id)], payload);
 }
 
 export async function getAdminRolePermissions(): Promise<AdminRolePermissions> {
@@ -46,6 +63,23 @@ export async function createDoctorProfile(payload: CreateDoctorProfilePayload) {
   return postFirstAvailable([endpoints.clinicAdmin.doctors], payload);
 }
 
+export async function getAdminDoctorProfiles(params?: AdminQueryParams): Promise<AdminDoctorProfile[]> {
+  const data = await getFirstAvailable<unknown>([endpoints.clinicAdmin.doctors], params);
+  return normalizeAdminList<AdminDoctorProfile>(data);
+}
+
+export async function findAdminDoctorProfileForUser(user: AdminUser): Promise<AdminDoctorProfile | null> {
+  const profiles = await getAdminDoctorProfiles({ search: user.email });
+  return profiles.find((profile) => {
+    if (typeof profile.user === 'number') return profile.user === user.id;
+    return profile.user?.id === user.id || profile.user_email === user.email;
+  }) ?? null;
+}
+
+export async function updateAdminDoctorProfile(id: number | string, payload: UpdateAdminDoctorProfilePayload): Promise<AdminDoctorProfile> {
+  return patchFirstAvailable<AdminDoctorProfile>([`${endpoints.clinicAdmin.doctors}${id}/`], payload);
+}
+
 export async function createClinicStaff(payload: CreateClinicUserPayload, doctorProfile?: Omit<CreateDoctorProfilePayload, 'user'>): Promise<AdminUser> {
   return postFirstAvailable<AdminUser>([endpoints.clinicAdmin.createStaff], {
     ...payload,
@@ -53,8 +87,8 @@ export async function createClinicStaff(payload: CreateClinicUserPayload, doctor
   });
 }
 
-export async function setAdminUserActive(id: number | string, active: boolean): Promise<AdminUser> {
-  return patchFirstAvailable<AdminUser>([active ? endpoints.clinicAdmin.activateUser(id) : endpoints.clinicAdmin.deactivateUser(id)]);
+export async function setAdminUserActive(id: number | string, active: boolean, reason?: string): Promise<AdminUser> {
+  return patchFirstAvailable<AdminUser>([active ? endpoints.clinicAdmin.activateUser(id) : endpoints.clinicAdmin.deactivateUser(id)], reason ? { reason } : undefined);
 }
 
 export async function getAdminClinicReport(params?: AdminQueryParams): Promise<AdminReportSummary> {
@@ -63,6 +97,10 @@ export async function getAdminClinicReport(params?: AdminQueryParams): Promise<A
 
 export async function getAdminFinancialReport(params?: AdminQueryParams): Promise<AdminReportSummary> {
   return getFirstAvailable<AdminReportSummary>([endpoints.clinicAdmin.financialReport], params);
+}
+
+export async function getAdminAppointmentsReport(params?: AdminQueryParams): Promise<AdminReportSummary> {
+  return getFirstAvailable<AdminReportSummary>([endpoints.clinicAdmin.appointmentsReport], params);
 }
 
 export async function getAdminFiscalReadiness(): Promise<AdminFiscalReadiness> {
@@ -77,6 +115,24 @@ export async function getAdminFiscalRanges(): Promise<AdminFiscalRange[]> {
 export async function getAdminAuditLogs(): Promise<AdminAuditLog[]> {
   const data = await getFirstAvailable<unknown>([endpoints.clinicAdmin.auditLogs], { page_size: 8 });
   return normalizeAdminList<AdminAuditLog>(data);
+}
+
+export async function getAdminAuditLogsFiltered(params?: AdminQueryParams): Promise<AdminAuditLog[]> {
+  const data = await getFirstAvailable<unknown>([endpoints.clinicAdmin.auditLogs], { page_size: 30, ...params });
+  return normalizeAdminList<AdminAuditLog>(data);
+}
+
+export async function getAdminAccountLocks(params?: AdminQueryParams): Promise<AdminAccountLock[]> {
+  const data = await getFirstAvailable<unknown>(['/security/account-locks/'], params);
+  return normalizeAdminList<AdminAccountLock>(data);
+}
+
+export async function unlockAdminAccountLock(id: number | string): Promise<AdminAccountLock> {
+  return patchFirstAvailable<AdminAccountLock>([`/security/account-locks/${id}/unlock/`]);
+}
+
+export async function requestAdminPasswordReset(email: string): Promise<void> {
+  await postFirstAvailable(['/security/password-reset/request/'], { email });
 }
 
 export async function getAdminSubscription(): Promise<AdminSubscription | null> {

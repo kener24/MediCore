@@ -15,6 +15,14 @@ export type AdminClinic = {
   active?: boolean;
 };
 
+export type UpdateAdminClinicPayload = {
+  correo?: string;
+  direccion?: string;
+  nombre?: string;
+  rtn?: string;
+  telefono?: string;
+};
+
 export type AdminDashboard = {
   clinic?: AdminClinic;
   total_users?: number;
@@ -37,6 +45,48 @@ export type AdminUser = {
   role?: { id?: number; nombre?: RoleName; name?: RoleName } | number | string;
   is_active?: boolean;
   last_login?: string | null;
+  ultimo_acceso?: string | null;
+  email_verified?: boolean;
+  last_login_ip?: string | null;
+  password_changed_at?: string | null;
+  date_joined?: string | null;
+  creado_en?: string | null;
+  actualizado_en?: string | null;
+};
+
+export type UpdateAdminUserPayload = {
+  email?: string;
+  is_active?: boolean;
+  nombre_completo?: string;
+  role?: 'admin' | 'medico' | 'enfermera' | 'recepcionista' | 'paciente';
+  telefono?: string;
+};
+
+export type AdminDoctorProfile = {
+  id: number;
+  user?: number | { id?: number; email?: string; nombre_completo?: string };
+  user_nombre?: string;
+  user_email?: string;
+  specialty?: number;
+  specialty_nombre?: string;
+  numero_colegiacion?: string;
+  titulo_profesional?: string;
+  biografia?: string;
+  tarifa_consulta?: string | number;
+  duracion_consulta_minutos?: number;
+  atiende_virtual?: boolean;
+  atiende_presencial?: boolean;
+  activo?: boolean;
+};
+
+export type UpdateAdminDoctorProfilePayload = {
+  atiende_presencial?: boolean;
+  atiende_virtual?: boolean;
+  duracion_consulta_minutos?: number;
+  numero_colegiacion?: string;
+  specialty?: number;
+  tarifa_consulta?: string;
+  titulo_profesional?: string;
 };
 
 export type AdminReportSummary = {
@@ -84,6 +134,19 @@ export type AdminAuditLog = {
   created_at?: string;
   severity?: string;
   status?: string;
+};
+
+export type AdminAccountLock = {
+  id: number;
+  user?: number;
+  user_email?: string;
+  user_nombre?: string;
+  locked_until?: string | null;
+  reason?: string;
+  failed_attempts?: number;
+  active?: boolean;
+  created_at?: string;
+  unlocked_at?: string | null;
 };
 
 export type AdminSubscription = {

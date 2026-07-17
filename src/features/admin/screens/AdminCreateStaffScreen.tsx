@@ -11,8 +11,8 @@ import { LoadingState } from '@/components/LoadingState';
 import { RoleGuard } from '@/components/RoleGuard';
 import { colors } from '@/core/theme/colors';
 import { isValidEmail, isValidPhone, phoneDigits, validatePasswordPair } from '@/core/utils/formValidation';
-import { createClinicStaff, getAdminSpecialties } from '@/features/admin/services/adminService';
-import type { AdminSpecialty, CreateClinicUserPayload } from '@/features/admin/types/admin.types';
+import { createClinicStaff, getAdminSpecialties, getAdminUsage } from '@/features/admin/services/adminService';
+import type { AdminSpecialty, AdminUsage, CreateClinicUserPayload } from '@/features/admin/types/admin.types';
 
 const roles = [
   { description: 'Acceso a triaje, signos vitales y hospitalización.', label: 'Enfermería', value: 'enfermera' },
@@ -54,6 +54,7 @@ export function AdminCreateStaffScreen() {
   const navigation = useNavigation<any>();
   const [form, setForm] = useState<FormState>(initialForm);
   const [specialties, setSpecialties] = useState<AdminSpecialty[]>([]);
+  const [usage, setUsage] = useState<AdminUsage | null>(null);
   const [loadingCatalogs, setLoadingCatalogs] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -61,10 +62,11 @@ export function AdminCreateStaffScreen() {
     useCallback(() => {
       let mounted = true;
       setLoadingCatalogs(true);
-      getAdminSpecialties()
-        .then((items) => {
+      Promise.all([getAdminSpecialties(), getAdminUsage().catch(() => null)])
+        .then(([items, nextUsage]) => {
           if (!mounted) return;
           setSpecialties(items);
+          setUsage(nextUsage);
           if (!form.specialtyId && items[0]?.id) setForm((current) => ({ ...current, specialtyId: items[0].id }));
         })
         .catch(() => setSpecialties([]))
@@ -133,6 +135,11 @@ export function AdminCreateStaffScreen() {
             <AppHeader icon="account-plus-outline" subtitle="Alta controlada de personal de clínica." title="Crear usuario" />
 
             <AppCard style={styles.form}>
+              {isPlanAtLimit(usage) ? (
+                <Text style={styles.warning}>El plan alcanzó el límite de usuarios. Libera usuarios inactivos o actualiza la suscripción antes de crear más personal.</Text>
+              ) : usage ? (
+                <Text style={styles.helper}>Uso del plan: {String(usage.users ?? 0)} usuario(s){planLimit(usage) ? ` de ${planLimit(usage)}` : ''}.</Text>
+              ) : null}
               <Text style={styles.label}>Rol</Text>
               <View style={styles.roleGrid}>
                 {roles.map((role) => (
@@ -175,7 +182,7 @@ export function AdminCreateStaffScreen() {
                 </>
               ) : null}
 
-              <AppButton disabled={saving} label="Crear usuario" loading={saving} onPress={submit} />
+              <AppButton disabled={saving || isPlanAtLimit(usage)} label="Crear usuario" loading={saving} onPress={submit} />
             </AppCard>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -200,6 +207,19 @@ function validateForm(form: FormState) {
     if (!Number.isFinite(duration) || duration <= 0 || duration > 480) return 'La duración de consulta debe estar entre 1 y 480 minutos.';
   }
   return '';
+}
+
+function planLimit(usage: AdminUsage | null) {
+  if (!usage) return 0;
+  const limit = Number(usage.max_users ?? usage.users_limit ?? usage.limit_users ?? 0);
+  return Number.isFinite(limit) ? limit : 0;
+}
+
+function isPlanAtLimit(usage: AdminUsage | null) {
+  const limit = planLimit(usage);
+  if (!limit) return false;
+  const used = Number(usage?.users ?? 0);
+  return Number.isFinite(used) && used >= limit;
 }
 
 const styles = StyleSheet.create({
@@ -280,5 +300,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.palePrimary,
     borderColor: colors.primary,
     color: colors.primaryDark,
+  },
+  warning: {
+    color: colors.warning,
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 18,
   },
 });

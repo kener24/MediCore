@@ -25,8 +25,8 @@ function normalizeList<T>(response: ListResponse<T>): T[] {
   return [];
 }
 
-export async function getManagedSessions() {
-  const { data } = await apiClient.get<ListResponse<ManagedSession>>('/security/admin/sessions/', { params: { active: true } });
+export async function getManagedSessions(params?: { active?: boolean; user?: number | string }) {
+  const { data } = await apiClient.get<ListResponse<ManagedSession>>('/security/admin/sessions/', { params: { active: true, ...params } });
   return normalizeList(data);
 }
 

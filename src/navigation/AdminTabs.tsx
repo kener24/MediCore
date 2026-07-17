@@ -5,9 +5,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AdminClinicScreen } from '@/features/admin/screens/AdminClinicScreen';
 import { AdminCreateStaffScreen } from '@/features/admin/screens/AdminCreateStaffScreen';
 import { AdminDashboardScreen } from '@/features/admin/screens/AdminDashboardScreen';
+import { AdminEditUserScreen } from '@/features/admin/screens/AdminEditUserScreen';
 import { AdminHomeScreen } from '@/features/admin/screens/AdminHomeScreen';
 import { AdminProfileScreen } from '@/features/admin/screens/AdminProfileScreen';
 import { AdminReportsScreen } from '@/features/admin/screens/AdminReportsScreen';
+import { AdminUserDetailScreen } from '@/features/admin/screens/AdminUserDetailScreen';
 import { AdminUsersScreen } from '@/features/admin/screens/AdminUsersScreen';
 import { createTabOptions, tabIcon } from '@/navigation/tabOptions';
 
@@ -29,6 +31,8 @@ function AdminUsersStack() {
     <Stack.Navigator screenOptions={stackOptions}>
       <Stack.Screen component={AdminUsersScreen} name="AdminUsersList" />
       <Stack.Screen component={AdminCreateStaffScreen} name="AdminCreateStaff" />
+      <Stack.Screen component={AdminUserDetailScreen} name="AdminUserDetail" />
+      <Stack.Screen component={AdminEditUserScreen} name="AdminEditUser" />
     </Stack.Navigator>
   );
 }

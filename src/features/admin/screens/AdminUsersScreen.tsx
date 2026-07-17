@@ -1,6 +1,6 @@
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
@@ -12,7 +12,7 @@ import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { RoleGuard } from '@/components/RoleGuard';
 import { colors } from '@/core/theme/colors';
-import { adminUserName, adminUserRole, getAdminUsers, setAdminUserActive } from '@/features/admin/services/adminService';
+import { adminUserName, adminUserRole, getAdminUsers } from '@/features/admin/services/adminService';
 import type { AdminUser } from '@/features/admin/types/admin.types';
 
 const roleFilters = [
@@ -40,7 +40,6 @@ export function AdminUsersScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const [changingId, setChangingId] = useState<number | null>(null);
 
   const load = useCallback(async (refresh = false) => {
     if (refresh) setRefreshing(true);
@@ -79,26 +78,6 @@ export function AdminUsersScreen() {
       })
       .sort((a, b) => Number(b.is_active !== false) - Number(a.is_active !== false) || adminUserName(a).localeCompare(adminUserName(b)));
   }, [roleFilter, search, statusFilter, users]);
-
-  const confirmStatus = (user: AdminUser, active: boolean) => {
-    Alert.alert(active ? 'Activar usuario' : 'Desactivar usuario', `${adminUserName(user)} cambiará de estado. ¿Deseas continuar?`, [
-      { style: 'cancel', text: 'Cancelar' },
-      { onPress: () => void changeStatus(user, active), style: active ? 'default' : 'destructive', text: 'Confirmar' },
-    ]);
-  };
-
-  async function changeStatus(user: AdminUser, active: boolean) {
-    if (changingId) return;
-    setChangingId(user.id);
-    try {
-      await setAdminUserActive(user.id, active);
-      await load(true);
-    } catch (err) {
-      Alert.alert('Equipo', err instanceof Error ? err.message : 'No se pudo cambiar el estado del usuario.');
-    } finally {
-      setChangingId(null);
-    }
-  }
 
   if (loading) return <LoadingState label="Cargando usuarios..." />;
 
@@ -169,13 +148,7 @@ export function AdminUsersScreen() {
               </View>
               <Text style={styles.meta}>Rol: {adminUserRole(user)}</Text>
               <Text style={styles.meta}>Teléfono: {user.telefono ?? user.phone ?? 'Sin teléfono'}</Text>
-              <AppButton
-                disabled={changingId === user.id}
-                label={user.is_active === false ? 'Activar usuario' : 'Desactivar usuario'}
-                loading={changingId === user.id}
-                onPress={() => confirmStatus(user, user.is_active === false)}
-                variant={user.is_active === false ? 'secondary' : 'danger'}
-              />
+              <AppButton label="Ver detalle y seguridad" onPress={() => navigation.navigate('AdminUserDetail', { userId: user.id })} variant="secondary" />
             </AppCard>
           ))}
         </ScrollView>

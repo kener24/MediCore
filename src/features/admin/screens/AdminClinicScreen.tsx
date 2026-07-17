@@ -1,5 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -21,6 +21,8 @@ import {
 } from '@/features/admin/services/adminService';
 import type { AdminClinic, AdminFiscalRange, AdminFiscalReadiness } from '@/features/admin/types/admin.types';
 import { formatDate } from '@/features/patient/utils/formatters';
+
+type RangeHealth = 'ok' | 'warning' | 'danger' | 'inactive';
 
 export function AdminClinicScreen() {
   const [clinic, setClinic] = useState<AdminClinic | null>(null);
@@ -53,24 +55,58 @@ export function AdminClinicScreen() {
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
-  if (loading) return <LoadingState label="Cargando clínica..." />;
-
   const fiscalReady = Boolean(readiness?.ready ?? readiness?.is_ready ?? (readiness?.profile_complete && readiness?.has_active_range));
-  const sortedRanges = [...ranges].sort((a, b) => Number(b.is_active) - Number(a.is_active) || String(a.expiration_date ?? '').localeCompare(String(b.expiration_date ?? '')));
+  const sortedRanges = useMemo(
+    () => [...ranges].sort((a, b) => Number(b.is_active) - Number(a.is_active) || String(a.expiration_date ?? '').localeCompare(String(b.expiration_date ?? ''))),
+    [ranges],
+  );
+  const activeRanges = ranges.filter((range) => range.is_active && !range.is_exhausted).length;
+  const exhaustedRanges = ranges.filter((range) => range.is_exhausted).length;
+  const expiringRanges = ranges.filter((range) => isExpiringSoon(range.expiration_date)).length;
+  const missingFields = getMissingClinicFields(clinic);
+  const checklist = buildClinicChecklist({ activeRanges, fiscalReady, missingFields, readiness, ranges });
+
+  if (loading) return <LoadingState label="Cargando clínica..." />;
 
   return (
     <RoleGuard roles={['admin']}>
       <SafeAreaView edges={['top']} style={styles.safe}>
         <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl onRefresh={() => void load(true)} refreshing={refreshing} />}>
-          <AppHeader icon="domain" subtitle="Datos generales y control fiscal básico." title="Clínica y fiscal" />
+          <AppHeader icon="domain" subtitle="Datos generales, operación fiscal y riesgos de emisión." title="Clínica y fiscal" />
           {error ? <ErrorState message={error} onRetry={() => void load()} title="Clínica no disponible" /> : null}
 
-          <AppCard>
+          <View style={styles.summaryGrid}>
+            <AppCard style={styles.summaryCard}>
+              <Text style={styles.summaryValue}>{clinic?.activo === false || clinic?.active === false ? 'Inactiva' : 'Activa'}</Text>
+              <Text style={styles.summaryLabel}>Estado de clínica</Text>
+            </AppCard>
+            <AppCard style={styles.summaryCard}>
+              <Text style={styles.summaryValue}>{activeRanges}</Text>
+              <Text style={styles.summaryLabel}>Rangos activos</Text>
+            </AppCard>
+            <AppCard style={styles.summaryCard}>
+              <Text style={styles.summaryValue}>{expiringRanges}</Text>
+              <Text style={styles.summaryLabel}>Por vencer</Text>
+            </AppCard>
+            <AppCard style={styles.summaryCard}>
+              <Text style={styles.summaryValue}>{exhaustedRanges}</Text>
+              <Text style={styles.summaryLabel}>Agotados</Text>
+            </AppCard>
+          </View>
+
+          <AppCard style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.title}>Datos generales</Text>
+              <Text style={[styles.badge, missingFields.length ? styles.badgeWarning : styles.badgeOk]}>
+                {missingFields.length ? `${missingFields.length} pendientes` : 'Completo'}
+              </Text>
+            </View>
             <AdminInfoRow label="Nombre" value={clinicName(clinic)} />
             <AdminInfoRow label="Correo" value={clinicEmail(clinic)} />
             <AdminInfoRow label="Teléfono" value={clinicPhone(clinic)} />
             <AdminInfoRow label="Dirección" value={clinic?.direccion ?? clinic?.address} />
             <AdminInfoRow label="RTN" value={clinic?.rtn} />
+            {missingFields.length ? <Text style={styles.helper}>Pendiente: {missingFields.join(', ')}.</Text> : null}
           </AppCard>
 
           <AdminStatusCard
@@ -80,26 +116,52 @@ export function AdminClinicScreen() {
             tone={fiscalReady ? 'primary' : 'warning'}
           />
 
+          <AppCard style={styles.card}>
+            <Text style={styles.title}>Checklist administrativo</Text>
+            {checklist.map((item) => (
+              <View key={item.label} style={styles.checkRow}>
+                <Text style={[styles.checkDot, item.ok ? styles.checkOk : styles.checkWarning]}>{item.ok ? '✓' : '!'}</Text>
+                <View style={styles.checkText}>
+                  <Text style={styles.checkLabel}>{item.label}</Text>
+                  <Text style={styles.checkDescription}>{item.description}</Text>
+                </View>
+              </View>
+            ))}
+          </AppCard>
+
+          {(readiness?.errors?.length || readiness?.warnings?.length) ? (
+            <AppCard style={styles.card}>
+              <Text style={styles.title}>Alertas fiscales</Text>
+              {readiness.errors?.map((item) => <Text key={`error-${item}`} style={styles.alertDanger}>• {item}</Text>)}
+              {readiness.warnings?.map((item) => <Text key={`warning-${item}`} style={styles.alertWarning}>• {item}</Text>)}
+            </AppCard>
+          ) : null}
+
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Rangos CAI</Text>
             {ranges.length === 0 ? <EmptyState description="No se encontraron rangos fiscales configurados." title="Sin rangos" /> : null}
             {sortedRanges.map((range) => {
-              const remaining = range.end_number && range.current_number ? Math.max(range.end_number - range.current_number + 1, 0) : null;
-              const expiresSoon = isExpiringSoon(range.expiration_date);
+              const remaining = getRemaining(range);
+              const usedPercent = getUsedPercent(range);
+              const health = getRangeHealth(range);
               return (
-              <AppCard key={range.id} style={styles.rangeCard}>
-                <View style={styles.rangeHeader}>
-                  <Text style={styles.rangeTitle}>{range.document_type ?? 'Factura'}</Text>
-                  <Text style={[styles.rangeBadge, range.is_active && !expiresSoon ? styles.active : styles.inactive]}>
-                    {range.is_exhausted ? 'Agotado' : expiresSoon ? 'Por vencer' : range.is_active ? 'Activo' : 'Inactivo'}
-                  </Text>
-                </View>
-                <Text style={styles.meta}>CAI: {range.cai ?? 'Sin CAI'}</Text>
-                <Text style={styles.meta}>Desde: {range.full_start_number ?? range.start_number ?? 'N/D'}</Text>
-                <Text style={styles.meta}>Hasta: {range.full_end_number ?? range.end_number ?? 'N/D'}</Text>
-                <Text style={styles.meta}>Actual: {range.current_number ?? 'N/D'} {remaining !== null ? `· Disponibles: ${remaining}` : ''}</Text>
-                <Text style={styles.meta}>Vence: {formatDate(range.expiration_date)}</Text>
-              </AppCard>
+                <AppCard key={range.id} style={styles.rangeCard}>
+                  <View style={styles.rangeHeader}>
+                    <Text style={styles.rangeTitle}>{documentTypeLabel(range.document_type)}</Text>
+                    <Text style={[styles.rangeBadge, styles[`${health}Text`]]}>{rangeHealthLabel(range)}</Text>
+                  </View>
+                  <Text style={styles.meta}>CAI: {range.cai ?? 'Sin CAI'}</Text>
+                  <Text style={styles.meta}>Desde: {range.full_start_number ?? range.start_number ?? 'N/D'}</Text>
+                  <Text style={styles.meta}>Hasta: {range.full_end_number ?? range.end_number ?? 'N/D'}</Text>
+                  <Text style={styles.meta}>Actual: {range.current_number ?? 'N/D'} {remaining !== null ? `· Disponibles: ${remaining}` : ''}</Text>
+                  <Text style={styles.meta}>Vence: {formatDate(range.expiration_date)} {daysUntil(range.expiration_date) !== null ? `· ${daysUntil(range.expiration_date)} días` : ''}</Text>
+                  {usedPercent !== null ? (
+                    <View style={styles.progressTrack}>
+                      <View style={[styles.progressFill, styles[`${health}Fill`], { width: `${usedPercent}%` }]} />
+                    </View>
+                  ) : null}
+                  {usedPercent !== null ? <Text style={styles.progressText}>Uso del rango: {usedPercent}%</Text> : null}
+                </AppCard>
               );
             })}
           </View>
@@ -109,37 +171,244 @@ export function AdminClinicScreen() {
   );
 }
 
+function buildClinicChecklist({
+  activeRanges,
+  fiscalReady,
+  missingFields,
+  readiness,
+  ranges,
+}: {
+  activeRanges: number;
+  fiscalReady: boolean;
+  missingFields: string[];
+  readiness: AdminFiscalReadiness | null;
+  ranges: AdminFiscalRange[];
+}) {
+  return [
+    {
+      description: missingFields.length ? `Completa: ${missingFields.join(', ')}.` : 'Los datos principales están disponibles.',
+      label: 'Datos de clínica',
+      ok: missingFields.length === 0,
+    },
+    {
+      description: fiscalReady ? 'La clínica puede emitir documentos fiscales.' : readiness?.message ?? 'Falta validar perfil fiscal y CAI.',
+      label: 'Perfil fiscal',
+      ok: fiscalReady,
+    },
+    {
+      description: activeRanges ? `${activeRanges} rango(s) disponible(s).` : 'No hay rangos activos para emitir.',
+      label: 'Rango CAI activo',
+      ok: activeRanges > 0,
+    },
+    {
+      description: ranges.some((range) => isExpiringSoon(range.expiration_date)) ? 'Hay rangos que vencen en 15 días o menos.' : 'No hay vencimientos críticos detectados.',
+      label: 'Vencimientos',
+      ok: !ranges.some((range) => isExpiringSoon(range.expiration_date)),
+    },
+  ];
+}
+
+function getMissingClinicFields(clinic: AdminClinic | null) {
+  const missing: string[] = [];
+  if (!clinicName(clinic) || clinicName(clinic) === 'Clínica') missing.push('nombre');
+  if (!clinicEmail(clinic) || clinicEmail(clinic).startsWith('Sin')) missing.push('correo');
+  if (!clinicPhone(clinic) || clinicPhone(clinic).startsWith('Sin')) missing.push('teléfono');
+  if (!(clinic?.direccion ?? clinic?.address)) missing.push('dirección');
+  if (!clinic?.rtn) missing.push('RTN');
+  return missing;
+}
+
+function getRemaining(range: AdminFiscalRange) {
+  if (range.end_number === undefined || range.current_number === undefined) return null;
+  return Math.max(range.end_number - range.current_number + 1, 0);
+}
+
+function getUsedPercent(range: AdminFiscalRange) {
+  if (range.start_number === undefined || range.end_number === undefined || range.current_number === undefined) return null;
+  const total = range.end_number - range.start_number + 1;
+  if (total <= 0) return null;
+  const used = Math.max(range.current_number - range.start_number, 0);
+  return Math.min(Math.round((used / total) * 100), 100);
+}
+
+function getRangeHealth(range: AdminFiscalRange): RangeHealth {
+  if (!range.is_active) return 'inactive';
+  if (range.is_exhausted) return 'danger';
+  if (isExpired(range.expiration_date)) return 'danger';
+  if (isExpiringSoon(range.expiration_date)) return 'warning';
+  const remaining = getRemaining(range);
+  if (remaining !== null && remaining <= 10) return 'warning';
+  return 'ok';
+}
+
+function rangeHealthLabel(range: AdminFiscalRange) {
+  const health = getRangeHealth(range);
+  if (range.is_exhausted) return 'Agotado';
+  if (health === 'danger') return 'Vencido';
+  if (health === 'warning') return 'Revisar';
+  if (health === 'inactive') return 'Inactivo';
+  return 'Activo';
+}
+
+function documentTypeLabel(type?: string) {
+  if (type === 'invoice') return 'Factura';
+  if (type === 'credit_note') return 'Nota de crédito';
+  if (type === 'debit_note') return 'Nota de débito';
+  if (type === 'receipt') return 'Recibo';
+  return type ?? 'Documento fiscal';
+}
+
+function isExpired(date?: string) {
+  const days = daysUntil(date);
+  return days !== null && days < 0;
+}
+
 function isExpiringSoon(date?: string) {
-  if (!date) return false;
+  const days = daysUntil(date);
+  return days !== null && days >= 0 && days <= 15;
+}
+
+function daysUntil(date?: string) {
+  if (!date) return null;
   const expiration = new Date(`${date}T23:59:59`);
-  if (Number.isNaN(expiration.getTime())) return false;
-  const days = Math.ceil((expiration.getTime() - Date.now()) / 86_400_000);
-  return days >= 0 && days <= 15;
+  if (Number.isNaN(expiration.getTime())) return null;
+  return Math.ceil((expiration.getTime() - Date.now()) / 86_400_000);
 }
 
 const styles = StyleSheet.create({
-  active: {
-    color: colors.primaryDark,
+  alertDanger: {
+    color: colors.danger,
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 19,
+  },
+  alertWarning: {
+    color: colors.warning,
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 19,
+  },
+  badge: {
+    borderRadius: 999,
+    fontSize: 11,
+    fontWeight: '900',
+    overflow: 'hidden',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  badgeOk: {
+    backgroundColor: '#dcfce7',
+    color: colors.success,
+  },
+  badgeWarning: {
+    backgroundColor: '#fef3c7',
+    color: colors.warning,
+  },
+  card: {
+    gap: 10,
+  },
+  cardHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'space-between',
+  },
+  checkDescription: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
+  },
+  checkDot: {
+    borderRadius: 999,
+    fontSize: 13,
+    fontWeight: '900',
+    height: 24,
+    overflow: 'hidden',
+    paddingTop: 3,
+    textAlign: 'center',
+    width: 24,
+  },
+  checkLabel: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  checkOk: {
+    backgroundColor: '#dcfce7',
+    color: colors.success,
+  },
+  checkRow: {
+    alignItems: 'flex-start',
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    paddingTop: 10,
+  },
+  checkText: {
+    flex: 1,
+    gap: 2,
+  },
+  checkWarning: {
+    backgroundColor: '#fef3c7',
+    color: colors.warning,
   },
   content: {
     gap: 16,
     padding: 18,
     paddingBottom: 120,
   },
-  inactive: {
+  dangerFill: {
+    backgroundColor: colors.danger,
+  },
+  dangerText: {
     color: colors.danger,
+  },
+  helper: {
+    color: colors.warning,
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 18,
+  },
+  inactiveFill: {
+    backgroundColor: colors.muted,
+  },
+  inactiveText: {
+    color: colors.muted,
   },
   meta: {
     color: colors.muted,
     fontSize: 13,
     fontWeight: '700',
   },
+  okFill: {
+    backgroundColor: colors.success,
+  },
+  okText: {
+    color: colors.success,
+  },
+  progressFill: {
+    borderRadius: 999,
+    height: 8,
+  },
+  progressText: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  progressTrack: {
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 999,
+    height: 8,
+    overflow: 'hidden',
+  },
   rangeBadge: {
     fontSize: 12,
     fontWeight: '900',
   },
   rangeCard: {
-    gap: 7,
+    gap: 8,
   },
   rangeHeader: {
     alignItems: 'center',
@@ -150,7 +419,6 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: 15,
     fontWeight: '900',
-    textTransform: 'capitalize',
   },
   safe: {
     backgroundColor: colors.background,
@@ -163,5 +431,37 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: 16,
     fontWeight: '900',
+  },
+  summaryCard: {
+    flexBasis: '47%',
+    flexGrow: 1,
+    gap: 3,
+    minHeight: 76,
+  },
+  summaryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  summaryLabel: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  summaryValue: {
+    color: colors.ink,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  title: {
+    color: colors.ink,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  warningFill: {
+    backgroundColor: colors.warning,
+  },
+  warningText: {
+    color: colors.warning,
   },
 });

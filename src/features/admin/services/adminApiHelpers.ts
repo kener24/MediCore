@@ -42,3 +42,17 @@ export async function postFirstAvailable<T>(urls: string[], payload?: unknown): 
   }
   throw lastError instanceof Error ? lastError : new Error(unavailableAdminAction);
 }
+
+export async function patchFirstAvailable<T>(urls: string[], payload?: unknown): Promise<T> {
+  let lastError: unknown;
+  for (const url of urls) {
+    try {
+      const { data } = await apiClient.patch<T>(url, payload ?? {});
+      return data;
+    } catch (error) {
+      lastError = error;
+      if (error instanceof ApiClientError && error.status && ![404, 405].includes(error.status)) throw error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(unavailableAdminAction);
+}

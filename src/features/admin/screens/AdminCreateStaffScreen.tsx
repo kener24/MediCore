@@ -95,7 +95,7 @@ export function AdminCreateStaffScreen() {
         nombre_completo: form.fullName.trim(),
         password: form.password,
         role: form.role,
-        telefono: form.phone.trim() || undefined,
+        telefono: phoneDigits(form.phone) || undefined,
       };
       await createClinicStaff(
         payload,

@@ -1,5 +1,5 @@
 import { endpoints } from '@/core/api/endpoints';
-import { getFirstAvailable, normalizeAdminList, postFirstAvailable, type AdminQueryParams } from '@/features/admin/services/adminApiHelpers';
+import { getFirstAvailable, normalizeAdminList, patchFirstAvailable, postFirstAvailable, type AdminQueryParams } from '@/features/admin/services/adminApiHelpers';
 import type {
   AdminAuditLog,
   AdminClinic,
@@ -51,6 +51,10 @@ export async function createClinicStaff(payload: CreateClinicUserPayload, doctor
     ...payload,
     doctor_profile: doctorProfile,
   });
+}
+
+export async function setAdminUserActive(id: number | string, active: boolean): Promise<AdminUser> {
+  return patchFirstAvailable<AdminUser>([active ? endpoints.clinicAdmin.activateUser(id) : endpoints.clinicAdmin.deactivateUser(id)]);
 }
 
 export async function getAdminClinicReport(params?: AdminQueryParams): Promise<AdminReportSummary> {

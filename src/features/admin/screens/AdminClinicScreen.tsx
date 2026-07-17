@@ -56,6 +56,7 @@ export function AdminClinicScreen() {
   if (loading) return <LoadingState label="Cargando clínica..." />;
 
   const fiscalReady = Boolean(readiness?.ready ?? readiness?.is_ready ?? (readiness?.profile_complete && readiness?.has_active_range));
+  const sortedRanges = [...ranges].sort((a, b) => Number(b.is_active) - Number(a.is_active) || String(a.expiration_date ?? '').localeCompare(String(b.expiration_date ?? '')));
 
   return (
     <RoleGuard roles={['admin']}>
@@ -82,25 +83,38 @@ export function AdminClinicScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Rangos CAI</Text>
             {ranges.length === 0 ? <EmptyState description="No se encontraron rangos fiscales configurados." title="Sin rangos" /> : null}
-            {ranges.map((range) => (
+            {sortedRanges.map((range) => {
+              const remaining = range.end_number && range.current_number ? Math.max(range.end_number - range.current_number + 1, 0) : null;
+              const expiresSoon = isExpiringSoon(range.expiration_date);
+              return (
               <AppCard key={range.id} style={styles.rangeCard}>
                 <View style={styles.rangeHeader}>
                   <Text style={styles.rangeTitle}>{range.document_type ?? 'Factura'}</Text>
-                  <Text style={[styles.rangeBadge, range.is_active ? styles.active : styles.inactive]}>
-                    {range.is_exhausted ? 'Agotado' : range.is_active ? 'Activo' : 'Inactivo'}
+                  <Text style={[styles.rangeBadge, range.is_active && !expiresSoon ? styles.active : styles.inactive]}>
+                    {range.is_exhausted ? 'Agotado' : expiresSoon ? 'Por vencer' : range.is_active ? 'Activo' : 'Inactivo'}
                   </Text>
                 </View>
                 <Text style={styles.meta}>CAI: {range.cai ?? 'Sin CAI'}</Text>
                 <Text style={styles.meta}>Desde: {range.full_start_number ?? range.start_number ?? 'N/D'}</Text>
                 <Text style={styles.meta}>Hasta: {range.full_end_number ?? range.end_number ?? 'N/D'}</Text>
+                <Text style={styles.meta}>Actual: {range.current_number ?? 'N/D'} {remaining !== null ? `· Disponibles: ${remaining}` : ''}</Text>
                 <Text style={styles.meta}>Vence: {formatDate(range.expiration_date)}</Text>
               </AppCard>
-            ))}
+              );
+            })}
           </View>
         </ScrollView>
       </SafeAreaView>
     </RoleGuard>
   );
+}
+
+function isExpiringSoon(date?: string) {
+  if (!date) return false;
+  const expiration = new Date(`${date}T23:59:59`);
+  if (Number.isNaN(expiration.getTime())) return false;
+  const days = Math.ceil((expiration.getTime() - Date.now()) / 86_400_000);
+  return days >= 0 && days <= 15;
 }
 
 const styles = StyleSheet.create({
@@ -151,4 +165,3 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
 });
-

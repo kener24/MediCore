@@ -98,7 +98,7 @@ export function DoctorConsultationSummaryScreen() {
       Alert.alert('Consulta finalizada', 'Consulta finalizada correctamente.');
       navigation.getParent()?.navigate('DoctorWaitingRoomTab');
     } catch (err) {
-      Alert.alert('Finalizar consulta', err instanceof Error ? err.message : 'Ocurrió un error en el servidor.');
+      Alert.alert('Finalizar consulta', err instanceof Error ? err.message : 'No se pudo finalizar la consulta. Revisa la conexión e intenta nuevamente.');
     } finally {
       setFinishing(false);
     }

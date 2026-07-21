@@ -248,7 +248,7 @@ function normalizeConsultationError(err: unknown) {
   if (err instanceof ApiClientError) {
     if (err.status === 403) return new Error('No tienes permiso para ver esta consulta.');
     if (err.status === 404) return new Error(unavailableMessage);
-    if (err.status && err.status >= 500) return new Error('Ocurrió un error en el servidor.');
+    if (err.status && err.status >= 500) return new Error('No se pudo procesar la consulta en el servidor. Intenta nuevamente antes de salir de la pantalla.');
     return err;
   }
   return err instanceof Error ? err : new Error(unavailableMessage);

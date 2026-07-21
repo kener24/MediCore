@@ -183,7 +183,7 @@ export function DoctorConsultationScreen() {
       const localDraft = initialVisitId ? await getDoctorConsultationDraft(initialVisitId).catch(() => null) : null;
       setForm(hasFormContent(serverForm) ? serverForm : localDraft?.values ?? serverForm);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Ocurrió un error en el servidor.');
+      setError(err instanceof Error ? err.message : 'No se pudo cargar la consulta. Actualiza e intenta nuevamente.');
     } finally {
       setLoading(false);
     }

@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.0",
-    "axios": "^1.7.9",
+    "axios": "^1.18.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",

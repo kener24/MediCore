@@ -42,6 +42,11 @@ api.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
+    if (error.response?.status === 403) {
+      toast.error("No tienes permiso para realizar esta acción.");
+      return Promise.reject(error);
+    }
+
     if (error.response?.status !== 401 || originalRequest?._retry) {
       return Promise.reject(error);
     }
@@ -69,9 +74,11 @@ api.interceptors.response.use(
     isRefreshing = true;
 
     try {
+      const sessionKey = localStorage.getItem(SESSION_KEY);
       const response = await axios.post<{ access: string }>(
         `${api.defaults.baseURL}/auth/refresh/`,
-        { refresh }
+        { refresh },
+        { headers: sessionKey ? { "X-Session-Key": sessionKey } : undefined }
       );
       localStorage.setItem(ACCESS_TOKEN_KEY, response.data.access);
       resolveQueue(response.data.access);
@@ -80,7 +87,7 @@ api.interceptors.response.use(
     } catch (refreshError) {
       resolveQueue(null);
       clearSession();
-      toast.error("La sesión expiró. Inicia sesión nuevamente.");
+      toast.error("Tu sesión expiró. Inicia sesión nuevamente.");
       return Promise.reject(refreshError);
     } finally {
       isRefreshing = false;
@@ -101,7 +108,7 @@ export function getErrorMessage(error: unknown) {
       if (typeof firstValue === "string") return firstValue;
       if ("detail" in data) return String(data.detail);
     }
-    if (error.response?.status === 403) return "No tienes permisos para esta acción.";
+    if (error.response?.status === 403) return "No tienes permiso para realizar esta acción.";
   }
   return "Ocurrió un error inesperado.";
 }

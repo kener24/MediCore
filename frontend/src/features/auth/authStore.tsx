@@ -1,6 +1,6 @@
 import { createContext, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { getMe, login as loginRequest } from "../../api/authApi";
+import { getMe, login as loginRequest, logout as logoutRequest } from "../../api/authApi";
 import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, SESSION_KEY } from "../../utils/constants";
 import type { LoginPayload } from "../../types/auth";
 import type { User } from "../../types/user";
@@ -10,7 +10,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   isBootstrapping: boolean;
   login: (payload: LoginPayload) => Promise<User>;
-  logout: () => void;
+  logout: () => Promise<void>;
   refreshMe: () => Promise<void>;
 }
 
@@ -20,12 +20,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
 
-  const logout = useCallback(() => {
+  const clearLocalSession = useCallback(() => {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(SESSION_KEY);
     setUser(null);
   }, []);
+
+  const logout = useCallback(async () => {
+    try {
+      await logoutRequest();
+    } catch {
+      // Local cleanup must always succeed, even without network access.
+    } finally {
+      clearLocalSession();
+    }
+  }, [clearLocalSession]);
 
   const refreshMe = useCallback(async () => {
     const me = await getMe();
@@ -55,16 +65,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         await refreshMe();
       } catch {
-        logout();
+        clearLocalSession();
       } finally {
         setIsBootstrapping(false);
       }
     }
 
     bootstrap();
-    window.addEventListener("medicore:logout", logout);
-    return () => window.removeEventListener("medicore:logout", logout);
-  }, [logout, refreshMe]);
+    const handleForcedLogout = () => clearLocalSession();
+    window.addEventListener("medicore:logout", handleForcedLogout);
+    return () => window.removeEventListener("medicore:logout", handleForcedLogout);
+  }, [clearLocalSession, refreshMe]);
 
   const value = useMemo(
     () => ({

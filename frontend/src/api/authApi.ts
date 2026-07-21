@@ -21,3 +21,7 @@ export async function changePassword(payload: { old_password: string; new_passwo
   const { data } = await api.post<{ detail: string }>("/auth/change-password/", payload);
   return data;
 }
+
+export async function logout() {
+  await api.post("/auth/logout/");
+}

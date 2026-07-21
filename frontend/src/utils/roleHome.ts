@@ -2,6 +2,9 @@ export function homePathForRole(roleName?: string) {
   if (roleName === "superadmin") return "/superadmin/dashboard";
   if (roleName === "admin") return "/clinic/dashboard";
   if (roleName === "medico") return "/doctor/dashboard";
+  if (roleName === "enfermera") return "/clinic/triage";
+  if (roleName === "recepcionista" || roleName === "recepcionista_caja") return "/clinic/reception-dashboard";
+  if (roleName === "cajero") return "/clinic/billing";
   if (roleName === "paciente") return "/patient/dashboard";
   return "/dashboard";
 }

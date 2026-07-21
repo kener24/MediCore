@@ -237,22 +237,9 @@ const receptionistGroups: NavGroup[] = [
       { label: "Pacientes", path: "/clinic/patients" },
       { label: "Admisiones", path: "/clinic/admissions" },
       { label: "Nueva atencion", path: "/clinic/admissions/new" },
-      { label: "Hospitalizacion", path: "/clinic/hospitalization" },
       { label: "Citas", path: "/clinic/appointments" },
       { label: "Calendario", path: "/clinic/calendar" },
       { label: "Documentos", path: "/clinic/documents" },
-    ],
-  },
-  {
-    label: "Facturacion",
-    icon: Wallet,
-    items: [
-      { label: "Resumen", path: "/clinic/billing" },
-      { label: "Pendientes de cobro", path: "/clinic/billing/pending" },
-      { label: "Facturas", path: "/clinic/billing/invoices" },
-      { label: "Pagos", path: "/clinic/billing/payments" },
-      { label: "Caja", path: "/clinic/billing/cash" },
-      { label: "Fiscal / CAI", path: "/clinic/settings/fiscal" },
     ],
   },
   {
@@ -261,10 +248,38 @@ const receptionistGroups: NavGroup[] = [
     items: [
       { label: "Dashboard Recepcion", path: "/clinic/reception-dashboard" },
       { label: "Citas", path: "/clinic/reports/appointments" },
+    ],
+  },
+  accountGroup,
+];
+
+const cashierGroups: NavGroup[] = [
+  { label: "Dashboard", path: "/dashboard", icon: Gauge },
+  {
+    label: "Caja y facturacion",
+    icon: Wallet,
+    items: [
+      { label: "Resumen", path: "/clinic/billing" },
+      { label: "Pendientes de cobro", path: "/clinic/billing/pending" },
+      { label: "Facturas", path: "/clinic/billing/invoices" },
+      { label: "Pagos", path: "/clinic/billing/payments" },
+      { label: "Caja", path: "/clinic/billing/cash" },
+    ],
+  },
+  {
+    label: "Reportes",
+    icon: BarChart3,
+    items: [
+      { label: "Financiero", path: "/clinic/reports/financial" },
       { label: "Caja", path: "/clinic/reports/cash" },
     ],
   },
   accountGroup,
+];
+
+const receptionCashierGroups: NavGroup[] = [
+  ...receptionistGroups.slice(0, -1),
+  ...cashierGroups.slice(1),
 ];
 
 const patientGroups: NavGroup[] = [
@@ -328,6 +343,8 @@ function navGroupsForRole(roleName: string) {
   if (roleName === "medico") return doctorGroups;
   if (roleName === "enfermera") return nurseGroups;
   if (roleName === "recepcionista") return receptionistGroups;
+  if (roleName === "cajero") return cashierGroups;
+  if (roleName === "recepcionista_caja") return receptionCashierGroups;
   if (canManageCatalogs(roleName)) return adminGroups;
   return baseGroups;
 }

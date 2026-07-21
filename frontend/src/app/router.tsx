@@ -86,11 +86,6 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <Navigate to="/dashboard" replace /> },
           { path: "/dashboard", element: <RoleDashboardRedirect /> },
-          { path: "/users", element: <UsersPage /> },
-          { path: "/users/new", element: <UserCreatePage /> },
-          { path: "/users/:id", element: <UserDetailsPage /> },
-          { path: "/roles", element: <RolesPage /> },
-          { path: "/clinics", element: <ClinicsPage /> },
           { path: "/profile", element: <ProfilePage /> },
           { path: "/change-password", element: <ChangePasswordPage /> },
           { path: "/security", element: <SecurityCenterPage /> },
@@ -105,6 +100,11 @@ export const router = createBrowserRouter([
           {
             element: <RoleProtectedRoute allowedRoles={["superadmin"]} />,
             children: [
+              { path: "/users", element: <UsersPage /> },
+              { path: "/users/new", element: <UserCreatePage /> },
+              { path: "/users/:id", element: <UserDetailsPage /> },
+              { path: "/roles", element: <RolesPage /> },
+              { path: "/clinics", element: <ClinicsPage /> },
               { path: "/superadmin/dashboard", element: <SuperAdminDashboardPage /> },
               { path: "/superadmin/clinics", element: <SuperAdminClinicsPage /> },
               { path: "/superadmin/clinics/new", element: <SuperAdminClinicFormPage /> },

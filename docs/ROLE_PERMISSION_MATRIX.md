@@ -1,54 +1,44 @@
 # Matriz de roles y permisos
 
-## Superadmin SaaS
+Fecha de revisión: 2026-07-21
 
-Puede administrar plataforma, clínicas, planes, suscripciones, métricas agregadas y auditoría técnica.
+Esta matriz describe el acceso esperado y certificado en el Sprint 1.0. Ocultar una opción en la interfaz no reemplaza el control del backend.
 
-No puede ver datos clínicos internos: pacientes, citas clínicas detalladas, expedientes, consultas, diagnósticos, recetas, órdenes, documentos clínicos, facturas detalladas ni pagos individuales.
+| Módulo o acción | Superadmin | Admin clínica | Recepción | Caja | Enfermería | Médico | Paciente |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Estado general del SaaS | Agregado | No | No | No | No | No | No |
+| Clínicas, planes y suscripciones | Gestiona | Solo su suscripción | No | No | No | No | No |
+| Administradores de clínica | Gestiona | No | No | No | No | No | No |
+| Personal de clínica | No | Solo su clínica | No | No | No | No | No |
+| Configuración fiscal | No emite por clínica | Solo su clínica | No | No | No | No | No |
+| Pacientes | Sin detalle clínico | Su clínica | Datos administrativos | No | Datos necesarios | Asignados/permitidos | Solo propio |
+| Citas | Sin detalle clínico | Su clínica | Gestiona | No | Consulta operativa | Agenda propia | Solo propias |
+| Check-in y admisiones | No | Su clínica | Gestiona | No | Flujo permitido | Sala de espera | No |
+| Triaje y signos vitales | No | Consulta operativa | No clínico | No | Gestiona | Consulta | No |
+| Expediente completo | Bloqueado | Su clínica | Bloqueado | Bloqueado | Permitido | Permitido | Resumen propio |
+| Consultas clínicas | Bloqueado | Lectura operativa | Bloqueado | Bloqueado | Lectura permitida | Crea y edita propias | Finalizadas propias |
+| Diagnósticos | Bloqueado | Lectura de su clínica | Bloqueado | Bloqueado | Lectura permitida | Gestiona propios | Lectura propia permitida |
+| Recetas y órdenes | Bloqueado | Lectura de su clínica | Bloqueado | Bloqueado | Lectura permitida | Gestiona propias | Lectura propia emitida |
+| Hospitalización | Bloqueado | Su clínica | Flujo administrativo | No | Seguimiento permitido | Seguimiento permitido | No |
+| Documentos clínicos | Bloqueado | Su clínica | Solo administrativos no sensibles | No | Permitidos | Permitidos | Propios visibles |
+| Facturas, pagos y caja | Sin detalle individual | Su clínica | Según rol combinado | Gestiona | No | No | Solo propios |
+| Auditoría | Global permitida | Solo su clínica | No | No | No | No | No |
+| Sesiones activas | Global administrable | Su clínica | Solo propia | Solo propia | Solo propia | Solo propia | Solo propia |
 
-## Admin clínica
+## Reglas de aislamiento
 
-Puede administrar su clínica, usuarios, flujo clínico, pacientes, citas, admisiones, facturación, caja, inventario, reportes y auditoría de su clínica.
+- Los usuarios de clínica operan únicamente con `request.user.clinica`.
+- Los serializers rechazan relaciones con pacientes, citas, visitas, facturas, documentos o usuarios de otra clínica.
+- El acceso cruzado por ID responde 403 o 404 y nunca devuelve el objeto.
+- El superadmin administra la plataforma, pero los querysets clínicos identificables quedan vacíos o bloqueados.
+- El paciente solo consulta recursos vinculados a su propia cuenta.
+- Las mutaciones de consultas, diagnósticos, recetas y órdenes quedan limitadas al médico propietario cuando corresponden a criterio clínico.
 
-La visibilidad clínica sensible puede refinarse luego con permisos granulares por clínica.
+## Rutas web sensibles
 
-## Recepción
-
-Puede buscar/crear paciente básico, crear visitas, hacer check-in, agendar citas y ver sala administrativa.
-
-No puede ver notas médicas completas, diagnósticos detallados, editar consultas, crear recetas ni órdenes médicas.
-
-## Caja
-
-Puede ver facturas, pagos, caja, recibos y cierres.
-
-No puede editar consultas ni ver notas clínicas completas.
-
-## Enfermería
-
-Puede ver cola de triaje, datos básicos del paciente, registrar signos vitales, evaluación inicial y prioridad.
-
-No puede ver caja completa, crear facturas, modificar diagnósticos médicos ni editar consultas.
-
-## Médico
-
-Puede ver sus citas, pacientes asignados, triaje, signos vitales, consultas, diagnósticos, recetas, órdenes y consumos de sus atenciones.
-
-No puede ver caja completa, administrar usuarios ni ver pacientes de otros médicos salvo configuración futura.
-
-## Paciente
-
-Puede ver sus citas, recetas, facturas, perfil e historial permitido.
-
-No puede ver información de otros pacientes ni datos internos.
-
-## Bloqueos backend aplicados
-
-| Recurso | Superadmin | Recepción | Enfermería | Médico | Paciente |
-| --- | --- | --- | --- | --- | --- |
-| Pacientes | Bloqueado | Básico | Básico | Asignados/permitidos | Propio |
-| Expediente completo | Bloqueado | Bloqueado | Permitido | Permitido | Resumen permitido |
-| Consultas | Bloqueado | Bloqueado | Clínica | Propias | Finalizadas propias |
-| Recetas/diagnósticos | Bloqueado | Bloqueado | Clínica | Propias | Propias emitidas |
-| Facturas detalladas | Bloqueado | Permitido si caja/recepción | Bloqueado | Bloqueado | Propias |
-| Documentos clínicos | Bloqueado | Solo no sensibles admin | Permitido | Permitido | Propios visibles |
+- `/users`, `/users/new`, `/users/:id`, `/roles` y `/clinics`: solo superadmin.
+- `/superadmin/*`: solo superadmin.
+- `/clinic/*`: admin o rol clínico expresamente permitido por la matriz central de rutas.
+- `/doctor/*`: solo médico.
+- `/patient/*`: solo paciente.
+- Las rutas de perfil, seguridad y notificaciones propias requieren sesión, pero están disponibles para los roles autenticados.

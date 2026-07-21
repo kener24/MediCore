@@ -88,6 +88,8 @@ class DiagnosisViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         diagnosis = self.get_object()
+        if get_role_name(request.user) != "medico" or diagnosis.doctor.user_id != request.user.id:
+            return Response({"detail": "No tienes permiso para eliminar este diagnóstico."}, status=status.HTTP_403_FORBIDDEN)
         diagnosis.activo = False
         diagnosis.save(update_fields=["activo"])
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -145,6 +147,8 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         prescription = self.get_object()
+        if get_role_name(request.user) != "medico" or prescription.doctor.user_id != request.user.id:
+            return Response({"detail": "No tienes permiso para anular esta receta."}, status=status.HTTP_403_FORBIDDEN)
         prescription.status = Prescription.Status.ANULADA
         prescription.activo = False
         prescription.void_reason = "Anulada desde DELETE."
@@ -169,6 +173,8 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["patch"])
     def void(self, request, pk=None):
         prescription = self.get_object()
+        if get_role_name(request.user) != "medico" or prescription.doctor.user_id != request.user.id:
+            return Response({"detail": "No tienes permiso para anular esta receta."}, status=status.HTTP_403_FORBIDDEN)
         prescription.status = Prescription.Status.ANULADA
         prescription.activo = False
         prescription.void_reason = request.data.get("reason", "")
@@ -271,6 +277,8 @@ class MedicalOrderViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         order = self.get_object()
+        if get_role_name(request.user) != "medico" or order.doctor.user_id != request.user.id:
+            return Response({"detail": "No tienes permiso para cancelar esta orden médica."}, status=status.HTTP_403_FORBIDDEN)
         order.status = MedicalOrder.Status.CANCELADA
         order.activo = False
         order.save(update_fields=["status", "activo"])
@@ -280,6 +288,8 @@ class MedicalOrderViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["patch"])
     def complete(self, request, pk=None):
         order = self.get_object()
+        if get_role_name(request.user) != "medico" or order.doctor.user_id != request.user.id:
+            return Response({"detail": "No tienes permiso para completar esta orden médica."}, status=status.HTTP_403_FORBIDDEN)
         if order.status == MedicalOrder.Status.CANCELADA:
             return Response({"detail": "No puedes completar una orden cancelada."}, status=status.HTTP_400_BAD_REQUEST)
         order.status = MedicalOrder.Status.COMPLETADA
@@ -292,6 +302,8 @@ class MedicalOrderViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["patch"])
     def cancel(self, request, pk=None):
         order = self.get_object()
+        if get_role_name(request.user) != "medico" or order.doctor.user_id != request.user.id:
+            return Response({"detail": "No tienes permiso para cancelar esta orden médica."}, status=status.HTTP_403_FORBIDDEN)
         if order.status == MedicalOrder.Status.COMPLETADA:
             return Response({"detail": "No puedes cancelar una orden completada."}, status=status.HTTP_400_BAD_REQUEST)
         order.status = MedicalOrder.Status.CANCELADA

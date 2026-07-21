@@ -18,6 +18,7 @@ class MedicalRecordsModuleTests(APITestCase):
         self.other_clinic = Clinic.objects.create(nombre="Clinica Norte")
         self.specialty = MedicalSpecialty.objects.create(nombre="Medicina General")
         self.admin = User.objects.create_user(email="admin@x.com", password="x", nombre_completo="Admin", role=self.roles["admin"], clinica=self.clinic)
+        self.superadmin = User.objects.create_user(email="super@x.com", password="x", nombre_completo="Super", role=self.roles["superadmin"], is_superuser=True, is_staff=True)
         self.doctor_user = User.objects.create_user(email="doc@x.com", password="x", nombre_completo="Doc", role=self.roles["medico"], clinica=self.clinic)
         self.nurse = User.objects.create_user(email="nurse@x.com", password="x", nombre_completo="Nurse", role=self.roles["enfermera"], clinica=self.clinic)
         self.reception = User.objects.create_user(email="rec@x.com", password="x", nombre_completo="Rec", role=self.roles["recepcionista"], clinica=self.clinic)
@@ -107,6 +108,42 @@ class MedicalRecordsModuleTests(APITestCase):
         consultation = ClinicalConsultation.objects.create(clinic=self.clinic, medical_record=record, patient=self.patient, doctor=self.doctor, created_by=self.doctor_user)
         self.auth(self.reception)
         response = self.client.post(f"/api/consultations/{consultation.id}/vital-signs/", {"weight": "70.00"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_superadmin_no_accede_a_expedientes_ni_consultas(self):
+        record = MedicalRecord.objects.create(patient=self.patient)
+        consultation = ClinicalConsultation.objects.create(
+            clinic=self.clinic,
+            medical_record=record,
+            patient=self.patient,
+            doctor=self.doctor,
+            created_by=self.doctor_user,
+        )
+        self.auth(self.superadmin)
+        self.assertEqual(self.client.get("/api/medical-records/").status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self.client.get(f"/api/medical-records/{record.id}/").status_code, status.HTTP_404_NOT_FOUND)
+        consultations = self.client.get("/api/consultations/")
+        self.assertEqual(consultations.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(consultations.data), 0)
+        self.assertEqual(self.client.get(f"/api/consultations/{consultation.id}/").status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_paciente_y_enfermera_no_modifican_consulta_medica(self):
+        record = MedicalRecord.objects.create(patient=self.patient)
+        consultation = ClinicalConsultation.objects.create(
+            clinic=self.clinic,
+            medical_record=record,
+            patient=self.patient,
+            doctor=self.doctor,
+            status=ClinicalConsultation.Status.FINALIZADA,
+            chief_complaint="Control clínico",
+            clinical_assessment="Paciente estable",
+            created_by=self.doctor_user,
+        )
+        self.auth(self.patient_user)
+        response = self.client.delete(f"/api/consultations/{consultation.id}/")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.auth(self.nurse)
+        response = self.client.patch(f"/api/consultations/{consultation.id}/", {"chief_complaint": "Cambio"}, format="json")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_sin_auth_no_accede(self):

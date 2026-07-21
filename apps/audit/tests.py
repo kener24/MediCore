@@ -9,7 +9,7 @@ from apps.accounts.models import Role, User
 from apps.appointments.models import Appointment
 from apps.audit.models import AuditLog
 from apps.audit.services import log_audit_event, mask_sensitive
-from apps.billing.models import Invoice, InvoiceItem
+from apps.billing.models import CashSession, Invoice, InvoiceItem
 from apps.clinics.models import Clinic
 from apps.doctors.models import DoctorProfile, DoctorSchedule, MedicalSpecialty
 from apps.inventory.models import InventoryCategory, InventoryItem
@@ -72,6 +72,7 @@ class AuditTests(APITestCase):
     def test_register_payment_generates_log(self):
         invoice = Invoice.objects.create(clinic=self.clinic, patient=self.patient, created_by=self.admin)
         InvoiceItem.objects.create(invoice=invoice, description="Consulta", quantity=1, unit_price=Decimal("300"))
+        CashSession.objects.create(clinic=self.clinic, opened_by=self.admin, opening_amount=Decimal("0.00"))
         self.auth(self.admin)
         response = self.client.post("/api/billing/payments/", {"invoice": invoice.id, "amount": "100", "method": "efectivo"}, format="json")
         self.assertEqual(response.status_code, 201)

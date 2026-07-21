@@ -187,3 +187,27 @@ class DoctorsModuleTests(APITestCase):
         response = self.client.post("/api/doctors/", self.payload(), format="json")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_superadmin_no_lista_ni_crea_perfiles_medicos(self):
+        DoctorProfile.objects.create(
+            clinic=self.clinic,
+            user=self.doctor_user,
+            specialty=self.specialty,
+            numero_colegiacion="CMH-12345",
+        )
+        self.auth(self.superadmin)
+        response = self.client.get("/api/doctors/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 0)
+        response = self.client.post("/api/doctors/", self.payload(self.other_doctor_user), format="json")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_medico_no_puede_desactivar_su_perfil(self):
+        doctor = DoctorProfile.objects.create(
+            clinic=self.clinic,
+            user=self.doctor_user,
+            specialty=self.specialty,
+            numero_colegiacion="CMH-12345",
+        )
+        self.auth(self.doctor_user)
+        response = self.client.delete(f"/api/doctors/{doctor.id}/")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

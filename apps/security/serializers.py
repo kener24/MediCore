@@ -49,7 +49,7 @@ class UserSessionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserSession
-        fields = ["id", "user", "user_email", "user_nombre", "session_key", "ip_address", "user_agent", "device_name", "last_activity_at", "expires_at", "revoked_at", "active", "created_at", "current"]
+        fields = ["id", "user", "user_email", "user_nombre", "ip_address", "user_agent", "device_name", "last_activity_at", "expires_at", "revoked_at", "active", "created_at", "current"]
         read_only_fields = fields
 
     def get_current(self, obj) -> bool:

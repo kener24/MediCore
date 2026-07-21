@@ -281,7 +281,9 @@ class ClinicalConsultationUpdateSerializer(serializers.ModelSerializer):
         request = self.context["request"]
         if self.instance.status == ClinicalConsultation.Status.FINALIZADA:
             raise serializers.ValidationError("No se puede editar una consulta finalizada.")
-        if get_role_name(request.user) == "medico" and self.instance.doctor.user_id != request.user.id:
+        if get_role_name(request.user) != "medico":
+            raise serializers.ValidationError("Solo médicos pueden editar consultas clínicas.")
+        if self.instance.doctor.user_id != request.user.id:
             raise serializers.ValidationError("No puedes editar consultas de otro medico.")
         return attrs
 

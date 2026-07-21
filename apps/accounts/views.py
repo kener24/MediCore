@@ -1,12 +1,13 @@
 from django.db import transaction
 from django.db.models import Count, Q
+from django.utils import timezone
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from apps.accounts.models import Role, User
 from apps.accounts.permissions import CanManageClinicUsers, IsClinicAdmin, IsOwnerOrAdmin, IsSuperAdmin, get_role_name
@@ -28,7 +29,8 @@ from apps.clinics.models import Clinic
 from apps.audit.models import AuditLog
 from apps.doctors.serializers import DoctorProfileCreateSerializer, DoctorProfileDetailSerializer
 from apps.audit.services import get_object_audit_data, log_audit_event
-from apps.security.services import active_lock, create_user_session, record_login_attempt, register_failed_login, revoke_all_user_sessions
+from apps.security.models import UserSession
+from apps.security.services import active_lock, create_user_session, hash_token, record_login_attempt, register_failed_login, revoke_all_user_sessions, revoke_user_session
 
 
 class LoginSerializer(TokenObtainPairSerializer):
@@ -70,6 +72,59 @@ class LoginView(TokenObtainPairView):
         register_failed_login(user, request)
         log_audit_event(request=request, user=user, clinic=getattr(user, "clinica", None), action=AuditLog.Action.LOGIN_FAILED, module=AuditLog.Module.AUTH, object_repr=email, description="Intento fallido de login.", status=AuditLog.Status.FAILED, severity=AuditLog.Severity.WARNING, metadata={"email": email})
         return super().handle_exception(exc)
+
+
+class SessionTokenRefreshView(TokenRefreshView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        refresh_token = str(request.data.get("refresh") or "")
+        session_key = request.headers.get("X-Session-Key", "").strip()
+        if not refresh_token or not session_key:
+            return Response({"detail": "La sesión no es válida. Inicia sesión nuevamente."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        session = UserSession.objects.select_related("user", "user__clinica").filter(
+            session_key=session_key,
+            refresh_token_hash=hash_token(refresh_token),
+            active=True,
+            expires_at__gt=timezone.now(),
+        ).first()
+        if not session:
+            return Response({"detail": "Tu sesión expiró o fue revocada. Inicia sesión nuevamente."}, status=status.HTTP_401_UNAUTHORIZED)
+        if not session.user.is_active:
+            revoke_user_session(session)
+            return Response({"detail": "Tu usuario se encuentra inactivo."}, status=status.HTTP_401_UNAUTHORIZED)
+        if session.user.clinica_id and not session.user.clinica.activo:
+            revoke_user_session(session)
+            return Response({"detail": "Tu clínica se encuentra inactiva."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        response = super().post(request, *args, **kwargs)
+        if response.status_code == status.HTTP_200_OK:
+            session.last_activity_at = timezone.now()
+            session.save(update_fields=["last_activity_at"])
+        return response
+
+
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        session = getattr(request, "medicore_session", None)
+        if session is None:
+            session_key = request.headers.get("X-Session-Key", "").strip()
+            session = UserSession.objects.filter(user=request.user, session_key=session_key, active=True).first()
+        if session:
+            revoke_user_session(session, revoked_by=request.user)
+        log_audit_event(
+            request=request,
+            action=AuditLog.Action.LOGOUT,
+            module=AuditLog.Module.AUTH,
+            model_name="User",
+            object_id=request.user.id,
+            object_repr=request.user.email,
+            description="Cierre de sesión.",
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class MeView(APIView):
@@ -164,7 +219,7 @@ class UserViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
 
         if user.is_superuser or get_role_name(user) == "superadmin":
-            pass
+            queryset = queryset.filter(role__nombre__in=["superadmin", "admin"])
         elif get_role_name(user) == "admin" and user.clinica_id:
             queryset = queryset.filter(clinica_id=user.clinica_id)
         else:

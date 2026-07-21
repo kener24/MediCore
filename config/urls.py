@@ -2,16 +2,17 @@ from django.contrib import admin
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework.routers import DefaultRouter
-from rest_framework_simplejwt.views import TokenRefreshView
 
 from apps.accounts.views import (
     ChangePasswordView,
     ClinicAdminDashboardView,
     ClinicAdminUserViewSet,
     LoginView,
+    LogoutView,
     MeView,
     MyClinicView,
     RoleViewSet,
+    SessionTokenRefreshView,
     SuperAdminDashboardView,
     UserViewSet,
 )
@@ -146,7 +147,8 @@ router.register("documents", ClinicalDocumentViewSet, basename="documents")
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/auth/login/", LoginView.as_view(), name="token_obtain_pair"),
-    path("api/auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("api/auth/refresh/", SessionTokenRefreshView.as_view(), name="token_refresh"),
+    path("api/auth/logout/", LogoutView.as_view(), name="auth_logout"),
     path("api/auth/me/", MeView.as_view(), name="auth_me"),
     path("api/auth/change-password/", ChangePasswordView.as_view(), name="change_password"),
     path("api/security/password-reset/request/", PasswordResetRequestView.as_view(), name="security-password-reset-request"),

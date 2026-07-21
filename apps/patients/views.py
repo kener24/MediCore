@@ -20,7 +20,7 @@ from apps.audit.models import AuditLog
 from apps.audit.services import log_audit_event
 
 
-CLINIC_VIEW_ROLES = ["superadmin", "admin", "medico", "enfermera", "recepcionista"]
+CLINIC_VIEW_ROLES = ["admin", "medico", "enfermera", "recepcionista"]
 PATIENT_WRITE_ROLES = ["admin", "enfermera", "recepcionista"]
 PATIENT_DEACTIVATE_ROLES = ["admin"]
 
@@ -47,7 +47,7 @@ class PatientViewSet(viewsets.ModelViewSet):
         role = normalized_role(user)
         queryset = super().get_queryset()
         if role == "superadmin" or user.is_superuser:
-            pass
+            queryset = queryset.none()
         elif role in ["admin", "medico", "enfermera", "recepcionista"] and user.clinica_id:
             queryset = queryset.filter(clinic_id=user.clinica_id)
         elif role in ["paciente", "patient"]:
@@ -90,7 +90,7 @@ class PatientViewSet(viewsets.ModelViewSet):
         role = normalized_role(request.user)
         if role in ["paciente", "patient"]:
             return Response({"detail": "No tienes permiso para listar pacientes."}, status=status.HTTP_403_FORBIDDEN)
-        if role not in CLINIC_VIEW_ROLES and not request.user.is_superuser:
+        if role not in CLINIC_VIEW_ROLES:
             return Response({"detail": "No tienes permiso para ver pacientes."}, status=status.HTTP_403_FORBIDDEN)
         return super().list(request, *args, **kwargs)
 

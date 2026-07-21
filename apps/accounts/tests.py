@@ -15,6 +15,7 @@ class AuthAndUsersTests(APITestCase):
         self.medico_role = Role.objects.create(nombre="medico")
         self.enfermera_role = Role.objects.create(nombre="enfermera")
         self.recepcionista_role = Role.objects.create(nombre="recepcionista")
+        self.cajero_role = Role.objects.create(nombre="cajero")
         self.paciente_role = Role.objects.create(nombre="paciente")
         self.specialty = MedicalSpecialty.objects.create(nombre="Medicina General")
         self.clinic = Clinic.objects.create(nombre="Clinica Demo", correo="demo@medicore.com")
@@ -66,6 +67,47 @@ class AuthAndUsersTests(APITestCase):
         response = self.client.post(
             "/api/auth/login/",
             {"email": "admin@medicore.com", "password": "wrong"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_login_correcto_para_todos_los_roles_principales(self):
+        users = [self.superadmin, self.clinic_admin, self.normal_user]
+        for index, role in enumerate(
+            [self.enfermera_role, self.recepcionista_role, self.cajero_role, self.paciente_role],
+            start=1,
+        ):
+            users.append(
+                User.objects.create_user(
+                    email=f"rol-{index}@medicore.test",
+                    password="PruebaSegura123*",
+                    nombre_completo=f"Usuario Rol {index}",
+                    role=role,
+                    clinica=self.clinic,
+                )
+            )
+
+        passwords = {
+            self.superadmin.id: "Admin12345*",
+            self.clinic_admin.id: "Admin12345*",
+            self.normal_user.id: "Medico12345*",
+        }
+        for user in users:
+            response = self.client.post(
+                "/api/auth/login/",
+                {"email": user.email, "password": passwords.get(user.id, "PruebaSegura123*")},
+                format="json",
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK, user.role.nombre)
+            self.assertEqual(response.data["user"]["role_nombre"], user.role.nombre)
+            self.assertIn("session_key", response.data)
+
+    def test_usuario_inactivo_no_puede_iniciar_sesion(self):
+        self.normal_user.is_active = False
+        self.normal_user.save(update_fields=["is_active"])
+        response = self.client.post(
+            "/api/auth/login/",
+            {"email": self.normal_user.email, "password": "Medico12345*"},
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
@@ -190,6 +232,35 @@ class AuthAndUsersTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         clinic_ids = {item["clinica"] for item in response.data}
         self.assertEqual(clinic_ids, {self.clinic.id})
+
+    def test_superadmin_solo_lista_administradores(self):
+        self.authenticate(self.superadmin)
+        response = self.client.get("/api/users/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual({item["role_nombre"] for item in response.data}, {"superadmin", "admin"})
+        self.assertNotIn(self.normal_user.email, {item["email"] for item in response.data})
+
+    def test_superadmin_no_crea_personal_clinico(self):
+        self.authenticate(self.superadmin)
+        response = self.client.post(
+            "/api/users/",
+            {
+                "email": "medico-global@medicore.test",
+                "password": "MedicoSeguro123*",
+                "nombre_completo": "Medico Global",
+                "role": self.medico_role.id,
+                "clinica": self.clinic.id,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_admin_no_consulta_ni_edita_usuario_de_otra_clinica(self):
+        external = User.objects.get(email="externo@medicore.com")
+        self.authenticate(self.clinic_admin)
+        self.assertEqual(self.client.get(f"/api/users/{external.id}/").status_code, status.HTTP_404_NOT_FOUND)
+        response = self.client.patch(f"/api/users/{external.id}/", {"telefono": "9999-9999"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_no_se_puede_desactivar_ultimo_superadmin_activo(self):
         self.authenticate(self.superadmin)

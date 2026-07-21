@@ -75,6 +75,8 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
         if patient.clinic_id != doctor.clinic_id:
             raise serializers.ValidationError("Paciente y medico deben pertenecer a la misma clinica.")
         role = get_role_name(request.user)
+        if role not in ["admin", "enfermera", "recepcionista", "medico", "paciente"]:
+            raise serializers.ValidationError("No tienes permiso para crear citas.")
         if role in ["admin", "enfermera", "recepcionista"] and request.user.clinica_id != doctor.clinic_id:
             raise serializers.ValidationError("No puedes crear citas fuera de tu clinica.")
         if role == "medico" and doctor.user_id != request.user.id:
@@ -106,10 +108,16 @@ class AppointmentUpdateSerializer(serializers.ModelSerializer):
         extra_kwargs = {"end_time": {"required": False}}
 
     def validate(self, attrs):
+        request = self.context["request"]
+        role = get_role_name(request.user)
+        if role not in ["admin", "recepcionista"]:
+            raise serializers.ValidationError("No tienes permiso para editar citas.")
         if self.instance.status == Appointment.Status.ATENDIDA:
             raise serializers.ValidationError("No se puede modificar una cita atendida.")
         patient = attrs.get("patient", self.instance.patient)
         doctor = attrs.get("doctor", self.instance.doctor)
+        if request.user.clinica_id != patient.clinic_id or request.user.clinica_id != doctor.clinic_id:
+            raise serializers.ValidationError("No puedes editar una cita con recursos de otra clinica.")
         scheduled_date = attrs.get("scheduled_date", self.instance.scheduled_date)
         start_time = attrs.get("start_time", self.instance.start_time)
         end_time = attrs.get("end_time", self.instance.end_time)

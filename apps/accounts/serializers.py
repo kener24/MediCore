@@ -101,6 +101,8 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
         if request and request.user.is_authenticated:
             requester_role = getattr(request.user.role, "nombre", None)
+            if requester_role == "superadmin" and role.nombre not in ["superadmin", "admin"]:
+                raise serializers.ValidationError({"role": "El superadmin solo puede crear administradores de clínica."})
             if role.nombre == "superadmin" and not (request.user.is_superuser or requester_role == "superadmin"):
                 raise serializers.ValidationError({"role": "No tienes permiso para asignar el rol superadmin."})
             if requester_role == "admin":
@@ -160,6 +162,8 @@ class UserUpdateSerializer(serializers.ModelSerializer):
 
         if request and request.user.is_authenticated:
             requester_role = getattr(request.user.role, "nombre", None)
+            if requester_role == "superadmin" and role and role.nombre not in ["superadmin", "admin"]:
+                raise serializers.ValidationError({"role": "El superadmin solo puede gestionar administradores de clínica."})
             if role and role.nombre == "superadmin" and not (request.user.is_superuser or requester_role == "superadmin"):
                 raise serializers.ValidationError({"role": "No tienes permiso para asignar el rol superadmin."})
             if requester_role == "admin":

@@ -133,7 +133,8 @@ class AdmissionsFlowTests(APITestCase):
         self.assertEqual(duplicate.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_usuario_no_ve_visitas_de_otra_clinica(self):
-        PatientVisit.objects.create(clinic=self.other_clinic, patient=self.other_patient, medical_record=MedicalRecord.objects.create(patient=self.other_patient), reason="X")
+        visit = PatientVisit.objects.create(clinic=self.other_clinic, patient=self.other_patient, medical_record=MedicalRecord.objects.create(patient=self.other_patient), reason="X")
         self.auth(self.rec)
         res = self.client.get("/api/admissions/visits/")
         self.assertEqual(len(res.data), 0)
+        self.assertEqual(self.client.get(f"/api/admissions/visits/{visit.id}/").status_code, status.HTTP_404_NOT_FOUND)

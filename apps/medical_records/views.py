@@ -205,8 +205,16 @@ class ClinicalConsultationViewSet(viewsets.ModelViewSet):
             return Response({"detail": "No tienes permiso para listar consultas clinicas."}, status=status.HTTP_403_FORBIDDEN)
         return super().list(request, *args, **kwargs)
 
+    def update(self, request, *args, **kwargs):
+        consultation = self.get_object()
+        if get_role_name(request.user) != "medico" or consultation.doctor.user_id != request.user.id:
+            return Response({"detail": "No tienes permiso para editar esta consulta."}, status=status.HTTP_403_FORBIDDEN)
+        return super().update(request, *args, **kwargs)
+
     def destroy(self, request, *args, **kwargs):
         consultation = self.get_object()
+        if get_role_name(request.user) != "medico" or consultation.doctor.user_id != request.user.id:
+            return Response({"detail": "No tienes permiso para anular esta consulta."}, status=status.HTTP_403_FORBIDDEN)
         consultation.status = ClinicalConsultation.Status.ANULADA
         consultation.activo = False
         consultation.void_reason = "Anulada desde DELETE."

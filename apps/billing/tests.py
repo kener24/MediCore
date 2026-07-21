@@ -80,6 +80,12 @@ class BillingModuleTests(APITestCase):
         res = self.client.post("/api/billing/invoices/", {"patient": self.other_patient.id}, format="json")
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_admin_no_consulta_factura_de_otra_clinica(self):
+        invoice = Invoice.objects.create(clinic=self.other_clinic, patient=self.other_patient)
+        self.auth(self.admin)
+        response = self.client.get(f"/api/billing/invoices/{invoice.id}/")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
     def test_factura_calcula_total(self):
         inv = self.invoice()
         self.assertEqual(inv.total_amount, Decimal("500.00"))

@@ -25,7 +25,13 @@ from apps.notifications.models import Notification
 from apps.notifications.services import create_notification, notify_role_users
 
 
-CLINIC_ROLES = ["superadmin", "admin", "enfermera", "recepcionista"]
+CLINIC_ROLES = ["admin", "enfermera", "recepcionista"]
+
+
+def deny_unless_role(request, allowed_roles):
+    if get_role_name(request.user) not in allowed_roles:
+        return Response({"detail": "No tienes permiso para realizar esta accion."}, status=status.HTTP_403_FORBIDDEN)
+    return None
 
 
 class AppointmentViewSet(viewsets.ModelViewSet):
@@ -46,9 +52,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         role = get_role_name(user)
         queryset = super().get_queryset()
         if role == "superadmin" or user.is_superuser:
-            clinic = self.request.query_params.get("clinic")
-            if clinic:
-                queryset = queryset.filter(clinic_id=clinic)
+            queryset = queryset.none()
         elif role in ["admin", "enfermera", "recepcionista"] and user.clinica_id:
             queryset = queryset.filter(clinic_id=user.clinica_id)
         elif role == "medico":
@@ -93,7 +97,22 @@ class AppointmentViewSet(viewsets.ModelViewSet):
                         create_notification(user, "Nueva cita", message, clinic=appointment.clinic, notification_type=Notification.Type.REMINDER, module=Notification.Module.APPOINTMENTS, priority=Notification.Priority.NORMAL, related_model="Appointment", related_object_id=appointment.id, action_url=f"/clinic/appointments/{appointment.id}")
         return response
 
+    def update(self, request, *args, **kwargs):
+        denied = deny_unless_role(request, ["admin", "recepcionista"])
+        if denied:
+            return denied
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        denied = deny_unless_role(request, ["admin", "recepcionista"])
+        if denied:
+            return denied
+        return super().partial_update(request, *args, **kwargs)
+
     def destroy(self, request, *args, **kwargs):
+        denied = deny_unless_role(request, ["admin", "recepcionista"])
+        if denied:
+            return denied
         appointment = self.get_object()
         response = self._cancel(request, appointment, "Cancelada desde DELETE.")
         return Response(status=status.HTTP_204_NO_CONTENT) if response.status_code == status.HTTP_200_OK else response
@@ -117,6 +136,9 @@ class AppointmentViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["patch"])
     def confirm(self, request, pk=None):
+        denied = deny_unless_role(request, ["admin", "recepcionista"])
+        if denied:
+            return denied
         appointment = self.get_object()
         if appointment.status == Appointment.Status.CANCELADA:
             return Response({"detail": "No puedes confirmar una cita cancelada."}, status=status.HTTP_400_BAD_REQUEST)
@@ -132,6 +154,9 @@ class AppointmentViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["patch"])
     def cancel(self, request, pk=None):
+        denied = deny_unless_role(request, ["admin", "recepcionista"])
+        if denied:
+            return denied
         appointment = self.get_object()
         serializer = AppointmentCancelSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -139,6 +164,9 @@ class AppointmentViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["patch"], url_path="mark-attended")
     def mark_attended(self, request, pk=None):
+        denied = deny_unless_role(request, ["admin", "recepcionista", "medico"])
+        if denied:
+            return denied
         appointment = self.get_object()
         if appointment.status == Appointment.Status.CANCELADA:
             return Response({"detail": "No puedes atender una cita cancelada."}, status=status.HTTP_400_BAD_REQUEST)
@@ -150,6 +178,9 @@ class AppointmentViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["patch"], url_path="mark-no-show")
     def mark_no_show(self, request, pk=None):
+        denied = deny_unless_role(request, ["admin", "recepcionista"])
+        if denied:
+            return denied
         appointment = self.get_object()
         if appointment.status == Appointment.Status.CANCELADA:
             return Response({"detail": "No puedes marcar no asistio una cita cancelada."}, status=status.HTTP_400_BAD_REQUEST)
@@ -165,12 +196,18 @@ class AppointmentViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="start-consultation")
     def start_consultation(self, request, pk=None):
+        denied = deny_unless_role(request, ["medico"])
+        if denied:
+            return denied
         from apps.medical_records.views import start_consultation_from_appointment
 
         return start_consultation_from_appointment(request, self.get_object())
 
     @action(detail=True, methods=["patch", "post"], url_path="check-in")
     def check_in(self, request, pk=None):
+        denied = deny_unless_role(request, ["admin", "recepcionista"])
+        if denied:
+            return denied
         from apps.admissions.models import PatientVisit
         from apps.admissions.serializers import AppointmentCheckInSerializer, PatientVisitSerializer
         from apps.medical_records.models import MedicalRecord
@@ -201,6 +238,9 @@ class AppointmentViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["patch"])
     def reschedule(self, request, pk=None):
+        denied = deny_unless_role(request, ["admin", "recepcionista"])
+        if denied:
+            return denied
         appointment = self.get_object()
         old_values = {"scheduled_date": appointment.scheduled_date, "start_time": appointment.start_time, "end_time": appointment.end_time, "doctor": appointment.doctor_id, "status": appointment.status}
         if appointment.status == Appointment.Status.ATENDIDA:
@@ -220,6 +260,9 @@ class AppointmentViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def availability(self, request):
+        denied = deny_unless_role(request, ["admin", "enfermera", "recepcionista", "medico", "paciente"])
+        if denied:
+            return denied
         doctor_id = request.query_params.get("doctor")
         date_value = request.query_params.get("date")
         if not doctor_id or not date_value:
@@ -228,7 +271,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         if not doctor:
             return Response({"detail": "Medico no encontrado."}, status=status.HTTP_404_NOT_FOUND)
         target_date = timezone.datetime.fromisoformat(date_value).date()
-        if get_role_name(request.user) in ["admin", "enfermera", "recepcionista"] and doctor.clinic_id != request.user.clinica_id:
+        if doctor.clinic_id != request.user.clinica_id:
             return Response({"detail": "No tienes permiso para consultar esta disponibilidad."}, status=status.HTTP_403_FORBIDDEN)
         return Response(build_availability(doctor, target_date))
 

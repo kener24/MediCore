@@ -8,16 +8,17 @@ from apps.clinics.models import Clinic
 from apps.doctors.models import DoctorProfile, MedicalSpecialty
 from apps.medical_records.models import ClinicalConsultation, MedicalRecord
 from apps.patients.models import Patient
-from apps.prescriptions.models import Diagnosis, Prescription
+from apps.prescriptions.models import Diagnosis, MedicalOrder, Prescription
 
 
 class PrescriptionsModuleTests(APITestCase):
     def setUp(self):
-        self.roles = {name: Role.objects.create(nombre=name) for name in ["admin", "medico", "enfermera", "recepcionista", "paciente"]}
+        self.roles = {name: Role.objects.create(nombre=name) for name in ["superadmin", "admin", "medico", "enfermera", "recepcionista", "paciente"]}
         self.clinic = Clinic.objects.create(nombre="Clinica Demo")
         self.other_clinic = Clinic.objects.create(nombre="Clinica Norte")
         self.specialty = MedicalSpecialty.objects.create(nombre="Medicina General")
         self.doctor_user = User.objects.create_user(email="doc@x.com", password="x", nombre_completo="Doc", role=self.roles["medico"], clinica=self.clinic)
+        self.superadmin = User.objects.create_user(email="super@x.com", password="x", nombre_completo="Super", role=self.roles["superadmin"], is_superuser=True, is_staff=True)
         self.other_doctor_user = User.objects.create_user(email="doc2@x.com", password="x", nombre_completo="Doc2", role=self.roles["medico"], clinica=self.other_clinic)
         self.nurse = User.objects.create_user(email="nurse@x.com", password="x", nombre_completo="Nurse", role=self.roles["enfermera"], clinica=self.clinic)
         self.reception = User.objects.create_user(email="rec@x.com", password="x", nombre_completo="Rec", role=self.roles["recepcionista"], clinica=self.clinic)
@@ -134,6 +135,36 @@ class PrescriptionsModuleTests(APITestCase):
         self.auth(self.nurse)
         response = self.client.patch(f"/api/prescriptions/{prescription.id}/issue/")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_superadmin_no_accede_a_recetas_diagnosticos_ni_ordenes(self):
+        diagnosis = Diagnosis.objects.create(consultation=self.consultation, name="Diagnostico privado")
+        prescription = Prescription.objects.create(consultation=self.consultation)
+        order = MedicalOrder.objects.create(consultation=self.consultation, title="Orden privada")
+        self.auth(self.superadmin)
+        for url in ["/api/diagnoses/", "/api/prescriptions/", "/api/medical-orders/"]:
+            response = self.client.get(url)
+            self.assertIn(response.status_code, [status.HTTP_200_OK, status.HTTP_403_FORBIDDEN])
+            if response.status_code == status.HTTP_200_OK:
+                self.assertEqual(len(response.data), 0)
+        for url in [
+            f"/api/diagnoses/{diagnosis.id}/",
+            f"/api/prescriptions/{prescription.id}/",
+            f"/api/medical-orders/{order.id}/",
+        ]:
+            self.assertEqual(self.client.get(url).status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_paciente_no_puede_anular_datos_clinicos(self):
+        self.consultation.status = ClinicalConsultation.Status.FINALIZADA
+        self.consultation.save(update_fields=["status"])
+        diagnosis = Diagnosis.objects.create(consultation=self.consultation, name="Gripe")
+        prescription = Prescription.objects.create(consultation=self.consultation)
+        prescription.items.create(medication_name="Acetaminofen", dosage="500mg", frequency="cada 8 horas")
+        prescription.issue()
+        order = MedicalOrder.objects.create(consultation=self.consultation, title="Hemograma")
+        self.auth(self.patient_user)
+        self.assertEqual(self.client.delete(f"/api/diagnoses/{diagnosis.id}/").status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self.client.patch(f"/api/prescriptions/{prescription.id}/void/").status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self.client.patch(f"/api/medical-orders/{order.id}/cancel/").status_code, status.HTTP_403_FORBIDDEN)
 
     def test_sin_auth_no_accede(self):
         response = self.client.get("/api/prescriptions/")

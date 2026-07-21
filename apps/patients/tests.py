@@ -21,7 +21,7 @@ class PatientsModuleTests(APITestCase):
         self.recepcion = User.objects.create_user(email="recepcion@x.com", password="x", nombre_completo="Recepcion", role=self.recepcion_role, clinica=self.clinic)
         self.patient_user = User.objects.create_user(email="paciente@x.com", password="x", nombre_completo="Paciente", role=self.paciente_role, clinica=self.clinic)
         self.patient = Patient.objects.create(clinic=self.clinic, user=self.patient_user, nombres="Juan", apellidos="Perez", identidad="080119900001")
-        Patient.objects.create(clinic=self.other_clinic, nombres="Maria", apellidos="Lopez", identidad="080219900002")
+        self.other_patient = Patient.objects.create(clinic=self.other_clinic, nombres="Maria", apellidos="Lopez", identidad="080219900002")
 
     def auth(self, user):
         self.client.force_authenticate(user=user)
@@ -29,11 +29,10 @@ class PatientsModuleTests(APITestCase):
     def payload(self):
         return {"nombres": "Ana", "apellidos": "Soto", "identidad": "080319900003", "genero": "femenino", "tipo_sangre": "A+", "telefono": "9999-9999"}
 
-    def test_superadmin_puede_listar_todas_las_clinicas(self):
+    def test_superadmin_no_puede_listar_pacientes(self):
         self.auth(self.superadmin)
         response = self.client.get("/api/patients/")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 2)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_admin_solo_lista_su_clinica(self):
         self.auth(self.admin)
@@ -46,6 +45,12 @@ class PatientsModuleTests(APITestCase):
         response = self.client.post("/api/patients/", {**self.payload(), "clinic": self.other_clinic.id}, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Patient.objects.get(identidad="080319900003").clinic_id, self.clinic.id)
+
+    def test_admin_no_consulta_ni_edita_paciente_de_otra_clinica(self):
+        self.auth(self.admin)
+        self.assertEqual(self.client.get(f"/api/patients/{self.other_patient.id}/").status_code, status.HTTP_404_NOT_FOUND)
+        response = self.client.patch(f"/api/patients/{self.other_patient.id}/", {"telefono": "9999-0000"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_recepcionista_puede_crear_paciente(self):
         self.auth(self.recepcion)

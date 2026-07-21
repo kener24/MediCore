@@ -67,6 +67,20 @@ class ClinicalDocumentApiTests(APITestCase):
         response = self.client.get(f"/api/documents/{doc.id}/download/")
         self.assertEqual(response.status_code, 404)
 
+    def test_admin_cannot_download_document_from_other_clinic(self):
+        document = ClinicalDocument.objects.create(
+            clinic=self.other_clinic,
+            patient=self.other_patient,
+            title="Documento ajeno",
+            file=self.file("foreign.pdf"),
+            original_filename="foreign.pdf",
+            file_size=7,
+            file_extension="pdf",
+        )
+        self.auth(self.admin)
+        response = self.client.get(f"/api/documents/{document.id}/download/")
+        self.assertEqual(response.status_code, 404)
+
     def test_archive_restore_and_stats(self):
         doc = ClinicalDocument.objects.create(clinic=self.clinic, patient=self.patient, title="Doc", file=self.file(), original_filename="doc.pdf", file_size=7, file_extension="pdf")
         self.auth(self.admin)

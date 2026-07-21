@@ -21,6 +21,7 @@ class AppointmentsModuleTests(APITestCase):
         self.other_clinic = Clinic.objects.create(nombre="Clinica Norte")
         self.specialty = MedicalSpecialty.objects.create(nombre="Medicina General")
         self.admin = User.objects.create_user(email="admin@x.com", password="x", nombre_completo="Admin", role=self.admin_role, clinica=self.clinic)
+        self.superadmin = User.objects.create_user(email="super@x.com", password="x", nombre_completo="Super", role=self.super_role, is_superuser=True)
         self.recepcion = User.objects.create_user(email="rec@x.com", password="x", nombre_completo="Rec", role=self.recepcion_role, clinica=self.clinic)
         self.doctor_user = User.objects.create_user(email="doc@x.com", password="x", nombre_completo="Doc", role=self.medico_role, clinica=self.clinic)
         self.second_doctor_user = User.objects.create_user(email="doc3@x.com", password="x", nombre_completo="Doc3", role=self.medico_role, clinica=self.clinic)
@@ -71,6 +72,13 @@ class AppointmentsModuleTests(APITestCase):
         response = self.client.post("/api/appointments/", self.payload(), format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
+    def test_superadmin_no_puede_listar_citas_clinicas(self):
+        self.create_appointment()
+        self.auth(self.superadmin)
+        response = self.client.get("/api/appointments/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
+
     def test_admin_no_puede_crear_cita_con_paciente_de_otra_clinica(self):
         self.auth(self.admin)
         response = self.client.post("/api/appointments/", self.payload(patient=self.other_patient.id), format="json")
@@ -80,6 +88,36 @@ class AppointmentsModuleTests(APITestCase):
         self.auth(self.admin)
         response = self.client.post("/api/appointments/", self.payload(doctor=self.other_doctor.id), format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_admin_no_puede_mover_cita_a_otra_clinica(self):
+        appointment = self.create_appointment()
+        self.auth(self.admin)
+        response = self.client.patch(
+            f"/api/appointments/{appointment.id}/",
+            {"patient": self.other_patient.id, "doctor": self.other_doctor.id},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.clinic_id, self.clinic.id)
+
+    def test_paciente_no_puede_marcar_su_cita_como_atendida(self):
+        appointment = self.create_appointment()
+        self.auth(self.patient_user)
+        response = self.client.patch(f"/api/appointments/{appointment.id}/mark-attended/")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_superadmin_no_puede_listar_citas_clinicas(self):
+        self.create_appointment()
+        self.auth(self.superadmin)
+        response = self.client.get("/api/appointments/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
+
+    def test_superadmin_no_puede_consultar_disponibilidad_clinica(self):
+        self.auth(self.superadmin)
+        response = self.client.get(f"/api/appointments/availability/?doctor={self.doctor.id}&date={self.next_monday.isoformat()}")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_recepcionista_puede_crear_cita(self):
         self.auth(self.recepcion)
@@ -99,6 +137,12 @@ class AppointmentsModuleTests(APITestCase):
         response = self.client.get("/api/appointments/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 0)
+
+    def test_admin_no_consulta_cita_de_otra_clinica(self):
+        appointment = self.create_appointment(doctor=self.other_doctor, patient=self.other_patient)
+        self.auth(self.admin)
+        response = self.client.get(f"/api/appointments/{appointment.id}/")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_paciente_puede_ver_sus_citas(self):
         self.create_appointment()

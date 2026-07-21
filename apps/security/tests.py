@@ -134,6 +134,49 @@ class SecurityApiTests(APITestCase):
         self.assertEqual(sessions.status_code, status.HTTP_200_OK)
         self.assertEqual(len(sessions.data), 1)
         self.assertTrue(sessions.data[0]["current"])
+        self.assertNotIn("session_key", sessions.data[0])
+
+    def test_refresh_y_logout_exigen_sesion_activa(self):
+        login = self.client.post(
+            "/api/auth/login/",
+            {"email": self.user.email, "password": "Medico12345*"},
+            format="json",
+        )
+        self.assertEqual(login.status_code, status.HTTP_200_OK)
+        access = login.data["access"]
+        refresh = login.data["refresh"]
+        session_key = login.data["session_key"]
+
+        without_session = self.client.post("/api/auth/refresh/", {"refresh": refresh}, format="json")
+        self.assertEqual(without_session.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        refreshed = self.client.post(
+            "/api/auth/refresh/",
+            {"refresh": refresh},
+            format="json",
+            HTTP_X_SESSION_KEY=session_key,
+        )
+        self.assertEqual(refreshed.status_code, status.HTTP_200_OK)
+        self.assertIn("access", refreshed.data)
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {access}", HTTP_X_SESSION_KEY=session_key)
+        self.assertEqual(self.client.get("/api/auth/me/").status_code, status.HTTP_200_OK)
+        self.assertEqual(self.client.post("/api/auth/logout/").status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(self.client.get("/api/auth/me/").status_code, status.HTTP_401_UNAUTHORIZED)
+
+        self.client.credentials(HTTP_X_SESSION_KEY=session_key)
+        reused_refresh = self.client.post("/api/auth/refresh/", {"refresh": refresh}, format="json")
+        self.assertEqual(reused_refresh.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_jwt_sin_session_key_no_autentica(self):
+        login = self.client.post(
+            "/api/auth/login/",
+            {"email": self.user.email, "password": "Medico12345*"},
+            format="json",
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {login.data['access']}")
+        response = self.client.get("/api/auth/me/")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_usuario_revoca_sesion_propia_y_revoke_all_respeta_actual(self):
         current = UserSession.objects.create(

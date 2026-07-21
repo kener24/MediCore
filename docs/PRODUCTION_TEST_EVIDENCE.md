@@ -26,12 +26,14 @@ Resultados ejecutados contra `https://kp-software.tech`. Este documento no conti
 | PROD-18 | Navegador móvil 390 x 844 | Aprobado | Login completo y sin desbordamiento horizontal |
 | PROD-19 | Inicio de Expo contra API HTTPS | Aprobado | Metro activo en puerto 8081; API predeterminada `https://kp-software.tech/api/` |
 | PROD-20 | Flujo en Android físico | Pendiente de prueba física | Requiere abrir `exp://192.168.101.27:8081` con Expo Go en la misma red |
+| PROD-21 | Login por rol en dos clínicas | Aprobado | Admin, recepción/caja, enfermería, médico y paciente validaron login, `/auth/me/` y logout en A y B |
 
 ## Observaciones de despliegue
 
 - MySQL advirtió que no aplica siete restricciones únicas condicionales de Django. No bloqueó el despliegue, pero deben mantenerse cubiertas por validación transaccional y pruebas.
 - El build web conserva una advertencia de tamaño de chunk; no afecta la ejecución.
 - Android físico no se marca como aprobado por inferencia.
+- Caja comparte actualmente el rol de recepción; no existe un usuario de caja separado por decisión funcional del proyecto.
 
 ## Política de evidencia
 

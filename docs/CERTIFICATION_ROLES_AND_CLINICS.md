@@ -22,6 +22,7 @@ Clínicas automatizadas: Clínica A y Clínica B, creadas dentro de bases tempor
 | API-14 | Backend/API | Superadmin | Global | Expedientes/consultas | No obtener contenido clínico | 403/404/vacío | Validado | Aprobado | Suite medical_records |
 | API-15 | Backend/API | Superadmin | Global | Recetas/órdenes/hospitalización/documentos | Bloquear contenido clínico | 403/404/vacío | Validado | Aprobado | Suites clínicas |
 | API-16 | Backend/API | Superadmin | Global | Usuarios/perfiles médicos | Ver solo administradores | Personal clínico excluido | Validado | Aprobado | Suite accounts/doctors |
+| API-17 | Producción/API | Roles clínicos | A/B | Login, `/auth/me/`, logout | Sesión válida y aislada | Cinco roles por clínica validados | Aprobado | `PRODUCTION_TEST_EVIDENCE.md` |
 | WEB-01 | Web | Todos | A/B | Build producción | Compilar sin errores | Build completado | Aprobado | Vite: 1848 módulos |
 | WEB-02 | Web | Admin clínica | A | Dashboard | Login, datos y recarga protegida | Carga correcta | Aprobado | Navegador en producción |
 | WEB-03 | Web | Rol clínico | A | `/users` manual | Redirigir a forbidden | `/forbidden` | Aprobado | Navegador en producción |
@@ -42,4 +43,5 @@ Clínicas automatizadas: Clínica A y Clínica B, creadas dentro de bases tempor
 - Móvil: TypeScript, lint y Expo Doctor 18/18 aprobados.
 - Móvil `npm audit`: 15 avisos moderados transitivos de Expo SDK 54; corregirlos exige actualizar a SDK 57 y queda fuera de este sprint.
 - Producción: servicios activos, HTTPS operativo, aislamiento entre dos clínicas, sesión y permisos comprobados.
+- Caja se certifica mediante el rol de recepción/caja existente; no se creó un rol duplicado.
 - Único control abierto: recorrido físico en Android mediante Expo Go.

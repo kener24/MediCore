@@ -13,6 +13,7 @@ type RetriableRequestConfig = InternalAxiosRequestConfig & {
 
 let onSessionExpired: ((message?: string) => void) | null = null;
 let sessionExpirationNotified = false;
+let refreshPromise: Promise<string | null> | null = null;
 
 export function setSessionExpiredHandler(handler: ((message?: string) => void) | null) {
   onSessionExpired = handler;
@@ -83,6 +84,30 @@ async function expireSession(message?: string) {
   onSessionExpired?.(message);
 }
 
+async function refreshAccessToken() {
+  const session = await getSession();
+  if (!session.refreshToken || !session.sessionKey) return null;
+  const { data } = await axios.post<{ access?: string; refresh?: string }>(
+    `${appConfig.API_BASE_URL}${endpoints.auth.refresh}`,
+    { refresh: session.refreshToken },
+    {
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'X-Session-Key': session.sessionKey,
+      },
+    },
+  );
+  if (!data.access) return null;
+  await saveSession({
+    accessToken: data.access,
+    refreshToken: data.refresh ?? session.refreshToken,
+    sessionKey: session.sessionKey,
+    user: session.user,
+  });
+  return data.access;
+}
+
 export function setupAuthInterceptors(apiClient: AxiosInstance) {
   apiClient.interceptors.request.use(async (config) => {
     const { accessToken, sessionKey } = await getSession();
@@ -123,21 +148,15 @@ export function setupAuthInterceptors(apiClient: AxiosInstance) {
         if (session.refreshToken) {
           originalRequest._retry = true;
           try {
-            const { data } = await axios.post<{ access?: string; refresh?: string }>(
-              `${appConfig.API_BASE_URL}${endpoints.auth.refresh}`,
-              { refresh: session.refreshToken },
-              { headers: { Accept: 'application/json', 'Content-Type': 'application/json' } },
-            );
-
-            if (data.access) {
-              await saveSession({
-                accessToken: data.access,
-                refreshToken: data.refresh ?? session.refreshToken,
-                sessionKey: session.sessionKey ?? undefined,
-                user: session.user,
+            if (!refreshPromise) {
+              refreshPromise = refreshAccessToken().finally(() => {
+                refreshPromise = null;
               });
+            }
+            const accessToken = await refreshPromise;
+            if (accessToken) {
               resetSessionExpiredNotification();
-              originalRequest.headers.Authorization = `Bearer ${data.access}`;
+              originalRequest.headers.Authorization = `Bearer ${accessToken}`;
               return apiClient(originalRequest);
             }
           } catch {

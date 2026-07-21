@@ -85,11 +85,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut() {
-    await logoutService();
-    await clearSession();
-    await clearApiCache();
-    resetSessionExpiredNotification();
-    setUser(null);
+    try {
+      await logoutService();
+    } catch {
+      // Local logout must still complete when the device has no connection.
+    } finally {
+      await clearSession();
+      await clearApiCache();
+      resetSessionExpiredNotification();
+      setUser(null);
+    }
   }
 
   const role = resolveRole(user);

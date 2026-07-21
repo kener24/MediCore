@@ -2,6 +2,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { RoleGuard } from '@/components/RoleGuard';
 import { SuperAdminClinicDetailScreen } from '@/features/superadmin/screens/SuperAdminClinicDetailScreen';
 import { SuperAdminClinicsScreen } from '@/features/superadmin/screens/SuperAdminClinicsScreen';
 import { SuperAdminCreateAdminScreen } from '@/features/superadmin/screens/SuperAdminCreateAdminScreen';
@@ -43,11 +44,13 @@ function SuperAdminAdminsStack() {
 export function SuperAdminTabs() {
   const insets = useSafeAreaInsets();
   return (
-    <Tab.Navigator screenOptions={createTabOptions(insets)}>
-      <Tab.Screen component={SuperAdminHomeScreen} name="SuperAdminHomeTab" options={{ tabBarIcon: tabIcon('shield-crown-outline'), title: 'Inicio' }} />
-      <Tab.Screen component={SuperAdminClinicsStack} name="SuperAdminClinicsTab" options={{ tabBarIcon: tabIcon('hospital-building'), title: 'Clínicas' }} />
-      <Tab.Screen component={SuperAdminAdminsStack} name="SuperAdminUsersTab" options={{ tabBarIcon: tabIcon('account-supervisor-outline'), title: 'Admins' }} />
-      <Tab.Screen component={SuperAdminProfileScreen} name="SuperAdminProfileTab" options={{ tabBarIcon: tabIcon('shield-key-outline'), title: 'Perfil' }} />
-    </Tab.Navigator>
+    <RoleGuard roles={['superadmin']}>
+      <Tab.Navigator screenOptions={createTabOptions(insets)}>
+        <Tab.Screen component={SuperAdminHomeScreen} name="SuperAdminHomeTab" options={{ tabBarIcon: tabIcon('shield-crown-outline'), title: 'Inicio' }} />
+        <Tab.Screen component={SuperAdminClinicsStack} name="SuperAdminClinicsTab" options={{ tabBarIcon: tabIcon('hospital-building'), title: 'Clínicas' }} />
+        <Tab.Screen component={SuperAdminAdminsStack} name="SuperAdminUsersTab" options={{ tabBarIcon: tabIcon('account-supervisor-outline'), title: 'Admins' }} />
+        <Tab.Screen component={SuperAdminProfileScreen} name="SuperAdminProfileTab" options={{ tabBarIcon: tabIcon('shield-key-outline'), title: 'Perfil' }} />
+      </Tab.Navigator>
+    </RoleGuard>
   );
 }

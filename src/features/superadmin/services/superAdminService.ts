@@ -2,6 +2,7 @@ import { apiClient } from '@/core/api/apiClient';
 import { endpoints } from '@/core/api/endpoints';
 import { ApiClientError } from '@/core/api/authInterceptor';
 import type {
+  CreateClinicAdminPayload,
   CreateClinicPayload,
   ListResponse,
   SuperAdminAuditLog,
@@ -9,6 +10,8 @@ import type {
   SuperAdminDashboard,
   SuperAdminRole,
   SuperAdminUser,
+  UpdateClinicAdminPayload,
+  UpdateClinicPayload,
 } from '@/features/superadmin/types/superAdmin.types';
 
 type QueryParams = Record<string, string | number | boolean | undefined | null>;
@@ -40,9 +43,17 @@ export async function getSuperAdminClinics(params?: QueryParams) {
   return normalizeList<SuperAdminClinic>(await get<unknown>(endpoints.superAdmin.clinics, params));
 }
 
+export async function getSuperAdminClinic(id: number | string) {
+  return get<SuperAdminClinic>(endpoints.superAdmin.clinic(id));
+}
+
 export async function createSuperAdminClinic(payload: CreateClinicPayload) {
   const { data } = await apiClient.post<SuperAdminClinic>(endpoints.superAdmin.clinics, payload);
   return data;
+}
+
+export async function updateSuperAdminClinic(id: number | string, payload: UpdateClinicPayload) {
+  return patch<SuperAdminClinic>(endpoints.superAdmin.clinic(id), payload);
 }
 
 export async function setClinicActive(id: number | string, active: boolean, reason: string) {
@@ -53,12 +64,36 @@ export async function getSuperAdminUsers(params?: QueryParams) {
   return normalizeList<SuperAdminUser>(await get<unknown>(endpoints.superAdmin.users, params));
 }
 
-export async function setUserActive(id: number | string, active: boolean) {
-  return patch<SuperAdminUser>(active ? endpoints.superAdmin.activateUser(id) : endpoints.superAdmin.deactivateUser(id));
+export async function getSuperAdminClinicAdmins(params?: QueryParams) {
+  return normalizeList<SuperAdminUser>(await get<unknown>(endpoints.superAdmin.users, { role: 'admin', ...params }));
+}
+
+export async function getSuperAdminUser(id: number | string) {
+  return get<SuperAdminUser>(endpoints.superAdmin.user(id));
+}
+
+export async function createSuperAdminClinicAdmin(payload: CreateClinicAdminPayload) {
+  const { data } = await apiClient.post<SuperAdminUser>(endpoints.superAdmin.users, payload);
+  return data;
+}
+
+export async function updateSuperAdminClinicAdmin(id: number | string, payload: UpdateClinicAdminPayload) {
+  return patch<SuperAdminUser>(endpoints.superAdmin.user(id), payload);
+}
+
+export async function setUserActive(id: number | string, active: boolean, reason?: string) {
+  return patch<SuperAdminUser>(active ? endpoints.superAdmin.activateUser(id) : endpoints.superAdmin.deactivateUser(id), reason ? { reason } : undefined);
 }
 
 export async function getSuperAdminRoles() {
   return normalizeList<SuperAdminRole>(await get<unknown>(endpoints.superAdmin.roles));
+}
+
+export async function getClinicAdminRoleId() {
+  const roles = await getSuperAdminRoles();
+  const adminRole = roles.find((role) => role.nombre === 'admin');
+  if (!adminRole) throw new Error('No se encontró el rol admin de clínica.');
+  return adminRole.id;
 }
 
 export async function getSuperAdminAuditLogs() {

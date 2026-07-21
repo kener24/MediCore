@@ -17,11 +17,14 @@ import { clinicName, getSuperAdminClinics, setClinicActive } from '@/features/su
 import type { SuperAdminClinic } from '@/features/superadmin/types/superAdmin.types';
 
 type StatusModal = { active: boolean; clinic: SuperAdminClinic } | null;
+const statusFilters = ['Todas', 'Activas', 'Inactivas'] as const;
+type StatusFilter = (typeof statusFilters)[number];
 
 export function SuperAdminClinicsScreen() {
   const navigation = useNavigation<any>();
   const [clinics, setClinics] = useState<SuperAdminClinic[]>([]);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('Todas');
   const [statusModal, setStatusModal] = useState<StatusModal>(null);
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(true);
@@ -47,9 +50,16 @@ export function SuperAdminClinicsScreen() {
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return clinics;
-    return clinics.filter((clinic) => [clinic.nombre, clinic.correo, clinic.rtn].join(' ').toLowerCase().includes(term));
-  }, [clinics, search]);
+    return clinics.filter((clinic) => {
+      const active = clinic.activo !== false;
+      const matchesStatus = statusFilter === 'Todas' || (statusFilter === 'Activas' ? active : !active);
+      const matchesTerm = !term || [clinic.nombre, clinic.correo, clinic.rtn, clinic.telefono].join(' ').toLowerCase().includes(term);
+      return matchesStatus && matchesTerm;
+    });
+  }, [clinics, search, statusFilter]);
+
+  const activeCount = clinics.filter((clinic) => clinic.activo !== false).length;
+  const inactiveCount = clinics.length - activeCount;
 
   const openStatusModal = (clinic: SuperAdminClinic, active: boolean) => {
     setReason('');
@@ -59,8 +69,8 @@ export function SuperAdminClinicsScreen() {
   async function submitStatusChange() {
     if (!statusModal) return;
     const cleanReason = reason.trim();
-    if (cleanReason.length < 5) {
-      Alert.alert('Motivo requerido', 'Escribe un motivo claro para auditoría.');
+    if (cleanReason.length < 8) {
+      Alert.alert('Motivo requerido', 'Escribe un motivo claro de al menos 8 caracteres.');
       return;
     }
     setSaving(true);
@@ -84,7 +94,22 @@ export function SuperAdminClinicsScreen() {
           <AppHeader icon="hospital-building" subtitle="Gestión global de clínicas del SaaS." title="Clínicas" />
           {error ? <ErrorState message={error} onRetry={() => void load()} title="Clínicas no disponibles" /> : null}
           <AppButton label="Crear clínica" onPress={() => navigation.navigate('SuperAdminCreateClinic')} />
-          <AppInput icon="magnify" label="Buscar clínica" onChangeText={setSearch} placeholder="Nombre, correo o RTN" value={search} />
+          <AppInput icon="magnify" label="Buscar clínica" onChangeText={setSearch} placeholder="Nombre, correo, teléfono o RTN" value={search} />
+
+          <View style={styles.summary}>
+            <Text style={styles.summaryText}>Total: {clinics.length}</Text>
+            <Text style={styles.summaryText}>Activas: {activeCount}</Text>
+            <Text style={styles.summaryText}>Inactivas: {inactiveCount}</Text>
+          </View>
+
+          <View style={styles.filters}>
+            {statusFilters.map((item) => (
+              <Text key={item} onPress={() => setStatusFilter(item)} style={[styles.filter, statusFilter === item && styles.filterActive, statusFilter === item && styles.filterTextActive]}>
+                {item}
+              </Text>
+            ))}
+          </View>
+
           <Text style={styles.counter}>{filtered.length} de {clinics.length} clínicas</Text>
           {!error && filtered.length === 0 ? <EmptyState description="No hay clínicas con esos criterios." title="Sin resultados" /> : null}
           {filtered.map((clinic) => (
@@ -97,6 +122,7 @@ export function SuperAdminClinicsScreen() {
                 </View>
                 <StatusPill active={clinic.activo !== false} />
               </View>
+              <AppButton label="Ver y gestionar" onPress={() => navigation.navigate('SuperAdminClinicDetail', { clinicId: clinic.id })} />
               <AppButton
                 label={clinic.activo === false ? 'Activar' : 'Desactivar'}
                 onPress={() => openStatusModal(clinic, clinic.activo === false)}
@@ -130,6 +156,21 @@ const styles = StyleSheet.create({
   card: { gap: 12 },
   content: { gap: 14, padding: 18, paddingBottom: 120 },
   counter: { color: colors.muted, fontSize: 13, fontWeight: '800' },
+  filter: {
+    backgroundColor: colors.white,
+    borderColor: colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '900',
+    overflow: 'hidden',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  filterActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  filterTextActive: { color: colors.white },
+  filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   main: { flex: 1, gap: 3 },
   meta: { color: colors.muted, fontSize: 13, fontWeight: '700' },
   modalActions: { gap: 10 },
@@ -139,5 +180,16 @@ const styles = StyleSheet.create({
   modalTitle: { color: colors.ink, fontSize: 18, fontWeight: '900' },
   row: { alignItems: 'center', flexDirection: 'row', gap: 10 },
   safe: { backgroundColor: colors.background, flex: 1 },
+  summary: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  summaryText: {
+    backgroundColor: colors.palePrimary,
+    borderRadius: 999,
+    color: colors.primaryDark,
+    fontSize: 12,
+    fontWeight: '900',
+    overflow: 'hidden',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
   title: { color: colors.ink, fontSize: 16, fontWeight: '900' },
 });

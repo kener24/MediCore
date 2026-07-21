@@ -19,6 +19,7 @@ export type SuperAdminClinic = {
   direccion?: string;
   activo?: boolean;
   creado_en?: string;
+  actualizado_en?: string;
 };
 
 export type SuperAdminUser = {
@@ -63,5 +64,25 @@ export type CreateClinicPayload = {
   telefono?: string;
 };
 
-export type ListResponse<T> = T[] | { results?: T[]; data?: T[]; items?: T[]; count?: number };
+export type UpdateClinicPayload = Partial<CreateClinicPayload>;
 
+export type CreateClinicAdminPayload = {
+  clinica: number;
+  email: string;
+  is_active?: boolean;
+  nombre_completo: string;
+  password: string;
+  role: number;
+  telefono?: string;
+};
+
+export type UpdateClinicAdminPayload = {
+  clinica?: number;
+  email?: string;
+  is_active?: boolean;
+  nombre_completo?: string;
+  role?: number;
+  telefono?: string;
+};
+
+export type ListResponse<T> = T[] | { results?: T[]; data?: T[]; items?: T[]; count?: number };

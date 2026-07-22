@@ -54,8 +54,9 @@ def next_entry_status(clinic, visit_type):
 
 
 @transaction.atomic
-def create_walk_in_visit(*, patient, reason, user, request=None, **extra):
-    _assert_role(user, RECEPTION_ROLES | {"enfermera"}, "No tienes permiso para registrar pacientes sin cita.")
+def create_walk_in_visit(*, patient, reason, user, request=None, visit_type=PatientVisit.VisitType.WALK_IN, **extra):
+    _assert_role(user, RECEPTION_ROLES, "No tienes permiso para registrar pacientes sin cita.")
+    patient = type(patient).objects.select_for_update().select_related("clinic").get(pk=patient.pk)
     _assert_clinic(user, patient.clinic)
     workflow = get_or_create_workflow_settings(patient.clinic)
     if not workflow.allow_walk_in_patients:
@@ -63,14 +64,17 @@ def create_walk_in_visit(*, patient, reason, user, request=None, **extra):
     if PatientVisit.objects.filter(patient=patient, visit_date=timezone.localdate(), status__in=PatientVisit.ACTIVE_STATUSES).exists():
         raise ValidationError("Este paciente ya tiene una visita activa hoy.")
     record, _ = MedicalRecord.objects.get_or_create(patient=patient, defaults={"clinic": patient.clinic})
+    initial_status = next_entry_status(patient.clinic, visit_type)
+    if initial_status == PatientVisit.Status.WAITING_DOCTOR and not extra.get("assigned_doctor"):
+        raise ValidationError("Asigna un médico porque esta clínica envía la admisión directamente a consulta.")
     visit = PatientVisit.objects.create(
         clinic=patient.clinic,
         patient=patient,
         medical_record=record,
-        visit_type=PatientVisit.VisitType.WALK_IN,
+        visit_type=visit_type,
         origin=PatientVisit.Origin.RECEPTION,
         reason=reason,
-        status=next_entry_status(patient.clinic, PatientVisit.VisitType.WALK_IN),
+        status=initial_status,
         created_by=user,
         checked_in_by=user,
         **extra,
@@ -82,14 +86,21 @@ def create_walk_in_visit(*, patient, reason, user, request=None, **extra):
 @transaction.atomic
 def check_in_appointment(*, appointment, user, request=None, priority=PatientVisit.Priority.NORMAL, symptoms="", assigned_nurse=None):
     _assert_role(user, RECEPTION_ROLES, "No tienes permiso para hacer check-in.")
+    appointment = type(appointment).objects.select_for_update().select_related("clinic", "patient", "doctor").get(pk=appointment.pk)
     _assert_clinic(user, appointment.clinic)
     workflow = get_or_create_workflow_settings(appointment.clinic)
     if not workflow.allow_appointments:
         raise ValidationError("La clinica no permite citas.")
-    if appointment.status == appointment.Status.CANCELADA:
-        raise ValidationError("No puedes hacer check-in de una cita cancelada.")
-    if PatientVisit.objects.filter(appointment=appointment, status__in=PatientVisit.ACTIVE_STATUSES).exists():
-        raise ValidationError("Esta cita ya tiene una visita activa.")
+    existing = PatientVisit.objects.select_for_update().filter(appointment=appointment).order_by("id").first()
+    if existing:
+        if existing.status in PatientVisit.ACTIVE_STATUSES:
+            return existing, False
+        raise ValidationError("La cita ya tiene una visita registrada y no puede generar otra.")
+    allowed_statuses = [appointment.Status.PENDIENTE, appointment.Status.CONFIRMADA, appointment.Status.REPROGRAMADA]
+    if appointment.status not in allowed_statuses:
+        raise ValidationError("La cita no se encuentra en un estado válido para check-in.")
+    if assigned_nurse and assigned_nurse.clinica_id != appointment.clinic_id:
+        raise ValidationError("La enfermera asignada debe pertenecer a la misma clínica.")
     record, _ = MedicalRecord.objects.get_or_create(patient=appointment.patient, defaults={"clinic": appointment.clinic})
     visit = PatientVisit.objects.create(
         clinic=appointment.clinic,
@@ -111,11 +122,16 @@ def check_in_appointment(*, appointment, user, request=None, priority=PatientVis
     appointment.confirmed_at = appointment.confirmed_at or timezone.now()
     appointment.save(update_fields=["status", "confirmed_at"])
     _audit(request, visit, AuditLog.Action.CREATE, "Check-in de cita registrado.")
-    return visit
+    return visit, True
 
 
+@transaction.atomic
 def send_to_triage(visit, *, user, request=None):
     _assert_role(user, RECEPTION_ROLES | TRIAGE_ROLES, "No tienes permiso para enviar a triaje.")
+    visit = PatientVisit.objects.select_for_update().select_related("clinic").get(pk=visit.pk)
+    _assert_clinic(user, visit.clinic)
+    if visit.status == PatientVisit.Status.WAITING_TRIAGE:
+        return visit
     if visit.status not in [PatientVisit.Status.REGISTERED, PatientVisit.Status.WAITING_DOCTOR]:
         raise ValidationError("La visita no puede enviarse a triaje desde su estado actual.")
     old = visit.status
@@ -146,9 +162,20 @@ def complete_triage(visit, *, user, request=None):
     return visit
 
 
+@transaction.atomic
 def send_to_doctor(visit, *, user, request=None):
     _assert_role(user, RECEPTION_ROLES | TRIAGE_ROLES, "No tienes permiso para enviar al medico.")
-    if visit.status not in [PatientVisit.Status.REGISTERED, PatientVisit.Status.WAITING_TRIAGE, PatientVisit.Status.IN_TRIAGE]:
+    visit = PatientVisit.objects.select_for_update().select_related("clinic", "assigned_doctor").get(pk=visit.pk)
+    _assert_clinic(user, visit.clinic)
+    if visit.status == PatientVisit.Status.WAITING_DOCTOR:
+        return visit
+    workflow = get_or_create_workflow_settings(visit.clinic)
+    requires_triage = workflow.appointment_requires_triage if visit.visit_type == PatientVisit.VisitType.APPOINTMENT else workflow.walk_in_requires_triage
+    if requires_triage:
+        raise ValidationError("La configuración de la clínica exige completar triaje antes de enviar al médico.")
+    if not visit.assigned_doctor_id:
+        raise ValidationError("Asigna un médico antes de enviar la visita a la sala de espera.")
+    if visit.status not in [PatientVisit.Status.REGISTERED, PatientVisit.Status.WAITING_TRIAGE]:
         raise ValidationError("La visita no puede enviarse al medico desde su estado actual.")
     old = visit.status
     visit.touch_status(PatientVisit.Status.WAITING_DOCTOR, user=user)
@@ -236,10 +263,14 @@ def complete_visit(visit, *, user, request=None):
     return visit
 
 
+@transaction.atomic
 def cancel_visit(visit, *, user, reason, request=None):
     _assert_role(user, RECEPTION_ROLES, "No tienes permiso para cancelar visita.")
-    if visit.status in [PatientVisit.Status.COMPLETED, PatientVisit.Status.CANCELLED]:
-        raise ValidationError("La visita ya esta cerrada.")
+    visit = PatientVisit.objects.select_for_update().select_related("clinic").get(pk=visit.pk)
+    _assert_clinic(user, visit.clinic)
+    cancellable = [PatientVisit.Status.REGISTERED, PatientVisit.Status.WAITING_TRIAGE, PatientVisit.Status.WAITING_DOCTOR]
+    if visit.status not in cancellable:
+        raise ValidationError("La visita ya no puede cancelarse desde recepción en su estado actual.")
     old = visit.status
     visit.cancellation_reason = reason
     visit.touch_status(PatientVisit.Status.CANCELLED, user=user)

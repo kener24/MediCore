@@ -20,7 +20,7 @@ def is_admin(user):
 
 
 def can_view_workflow(user):
-    return is_superadmin(user) or is_admin(user)
+    return is_superadmin(user) or get_role_name(user) in ["admin", "recepcionista"]
 
 
 def can_edit_workflow(user):

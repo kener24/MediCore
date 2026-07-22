@@ -111,6 +111,8 @@ class ClinicWorkflowSettings(TimeStampedModel):
             raise ValidationError({"allow_consultation_without_payment": "No se puede requerir pago previo y permitir consulta sin pago."})
         if self.appointment_requires_triage and self.appointment_direct_to_doctor:
             raise ValidationError({"appointment_direct_to_doctor": "Una cita no puede requerir triaje y pasar directo al medico a la vez."})
+        if self.allow_appointments and not self.appointment_requires_triage and not self.appointment_direct_to_doctor:
+            raise ValidationError({"appointment_direct_to_doctor": "Define si las citas pasan por triaje o directamente al medico."})
 
     def save(self, *args, **kwargs):
         self.full_clean()

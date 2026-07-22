@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework import serializers
 
 from apps.accounts.permissions import get_role_name
@@ -5,6 +6,7 @@ from apps.clinics.models import Clinic
 from apps.core.validators import validate_digits_identifier, validate_phone
 from apps.patients.models import Patient
 from apps.subscriptions.services import ensure_can_create_patient
+from apps.clinic_settings.models import get_or_create_workflow_settings
 
 
 class PatientListSerializer(serializers.ModelSerializer):
@@ -93,6 +95,11 @@ class PatientCreateSerializer(serializers.ModelSerializer):
     def validate_contacto_emergencia_telefono(self, value):
         return validate_phone(value)
 
+    def validate_fecha_nacimiento(self, value):
+        if value and value > timezone.localdate():
+            raise serializers.ValidationError("La fecha de nacimiento no puede estar en el futuro.")
+        return value
+
     def _resolve_clinic(self, attrs):
         request = self.context["request"]
         role = get_role_name(request.user)
@@ -105,6 +112,14 @@ class PatientCreateSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         clinic = self._resolve_clinic(attrs)
         attrs["clinic"] = clinic
+        role = get_role_name(self.context["request"].user)
+        workflow = get_or_create_workflow_settings(clinic)
+        if role == "recepcionista" and not workflow.reception_can_create_minimal_patient:
+            raise serializers.ValidationError("Recepción no puede crear pacientes básicos en esta clínica.")
+        if workflow.require_identity_for_patient and not attrs.get("identidad"):
+            raise serializers.ValidationError({"identidad": "La identidad es obligatoria para esta clínica."})
+        if workflow.require_phone_for_patient and not attrs.get("telefono"):
+            raise serializers.ValidationError({"telefono": "El teléfono es obligatorio para esta clínica."})
         identidad = attrs.get("identidad")
         codigo = attrs.get("codigo_paciente")
         if identidad and Patient.objects.filter(clinic=clinic, identidad=identidad).exists():
@@ -161,4 +176,3 @@ class PatientStatsSerializer(serializers.Serializer):
     male_patients = serializers.IntegerField()
     female_patients = serializers.IntegerField()
     other_patients = serializers.IntegerField()
-

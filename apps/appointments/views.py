@@ -35,7 +35,7 @@ def deny_unless_role(request, allowed_roles):
 
 
 class AppointmentViewSet(viewsets.ModelViewSet):
-    queryset = Appointment.objects.select_related("clinic", "patient", "doctor__user", "doctor__specialty", "created_by", "cancelled_by")
+    queryset = Appointment.objects.select_related("clinic", "patient", "doctor__user", "doctor__specialty", "created_by", "cancelled_by").prefetch_related("visits")
     permission_classes = [IsAuthenticated]
 
     def get_serializer_class(self):
@@ -208,33 +208,36 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         denied = deny_unless_role(request, ["admin", "recepcionista"])
         if denied:
             return denied
-        from apps.admissions.models import PatientVisit
+        from django.core.exceptions import ValidationError as DjangoValidationError
         from apps.admissions.serializers import AppointmentCheckInSerializer, PatientVisitSerializer
-        from apps.medical_records.models import MedicalRecord
+        from apps.clinic_flow import services as flow
 
         data = {**request.data, "appointment": self.get_object().id}
         serializer = AppointmentCheckInSerializer(data=data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         appointment = serializer.validated_data["appointment"]
-        visit = PatientVisit.objects.create(
-            clinic=appointment.clinic,
-            patient=appointment.patient,
-            appointment=appointment,
-            medical_record=MedicalRecord.objects.get_or_create(patient=appointment.patient, defaults={"clinic": appointment.clinic})[0],
-            visit_type=PatientVisit.VisitType.APPOINTMENT,
-            priority=serializer.validated_data["priority"],
-            reason=appointment.reason,
-            symptoms=serializer.validated_data.get("symptoms", ""),
-            assigned_doctor=appointment.doctor,
-            created_by=request.user,
-            checked_in_by=request.user,
-            status=PatientVisit.Status.WAITING_TRIAGE,
+        try:
+            visit, created = flow.check_in_appointment(
+                appointment=appointment,
+                user=request.user,
+                request=request,
+                priority=serializer.validated_data["priority"],
+                symptoms=serializer.validated_data.get("symptoms", ""),
+                assigned_nurse=serializer.validated_data.get("assigned_nurse"),
+            )
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {
+                "success": True,
+                "appointment_id": appointment.id,
+                "visit_id": visit.id,
+                "visit": PatientVisitSerializer(visit).data,
+                "created": created,
+                "message": "Check-in realizado correctamente." if created else "La cita ya tenía una visita registrada.",
+            },
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
-        appointment.status = Appointment.Status.CONFIRMADA
-        appointment.confirmed_at = appointment.confirmed_at or timezone.now()
-        appointment.save(update_fields=["status", "confirmed_at"])
-        log_audit_event(request=request, clinic=visit.clinic, action=AuditLog.Action.CREATE, module=AuditLog.Module.APPOINTMENTS, model_name="PatientVisit", object_id=visit.id, object_repr=visit.visit_number, description="Check-in de cita registrado.", new_values={"appointment": appointment.id})
-        return Response(PatientVisitSerializer(visit).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["patch"])
     def reschedule(self, request, pk=None):

@@ -80,7 +80,8 @@ class AdmissionsFlowTests(APITestCase):
         self.auth(self.rec)
         res = self.client.patch(f"/api/appointments/{appt.id}/check-in/", {"symptoms": "Nausea"}, format="json")
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(res.data["appointment"], appt.id)
+        self.assertEqual(res.data["appointment_id"], appt.id)
+        self.assertEqual(res.data["visit"]["appointment"], appt.id)
 
     def test_enfermera_triaje_signos_e_imc_y_oxigeno_invalido(self):
         visit = self.register_visit()

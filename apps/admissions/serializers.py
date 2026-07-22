@@ -1,8 +1,9 @@
 from django.db import transaction
-from django.utils import timezone
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from apps.accounts.permissions import get_role_name
+from apps.accounts.models import User
 from apps.clinic_settings.models import get_or_create_workflow_settings
 from apps.admissions.models import PatientVisit
 from apps.appointments.models import Appointment
@@ -73,7 +74,20 @@ class PatientVisitSerializer(serializers.ModelSerializer):
             "creado_en",
             "actualizado_en",
         ]
-        read_only_fields = ["id", "clinic", "medical_record", "consultation", "invoice", "visit_number", "created_by", "checked_in_by", "active"]
+        read_only_fields = [
+            "id", "clinic", "patient", "appointment", "medical_record", "consultation", "invoice", "visit_number",
+            "visit_date", "arrival_time", "triage_started_at", "triage_completed_at", "consultation_started_at",
+            "consultation_completed_at", "billing_started_at", "completed_at", "cancelled_at", "checkout_at",
+            "visit_type", "origin", "priority", "status", "reason", "symptoms", "cancellation_reason",
+            "assigned_doctor", "assigned_nurse", "created_by", "checked_in_by", "active",
+        ]
+
+    def validate(self, attrs):
+        if self.instance:
+            attempted = set(self.initial_data) - {"notes"}
+            if attempted:
+                raise serializers.ValidationError({"detail": "Los estados y datos clínicos de la visita solo cambian mediante sus acciones autorizadas."})
+        return attrs
 
     def get_vital_signs(self, obj):
         signs = VitalSigns.objects.filter(patient_visit=obj).order_by("-creado_en").first() if hasattr(VitalSigns, "patient_visit") else None
@@ -83,43 +97,37 @@ class PatientVisitSerializer(serializers.ModelSerializer):
 class PatientVisitCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = PatientVisit
-        fields = ["id", "patient", "appointment", "visit_type", "priority", "reason", "symptoms", "notes", "assigned_doctor", "assigned_nurse", "status"]
+        fields = ["id", "patient", "visit_type", "priority", "reason", "symptoms", "notes", "assigned_doctor", "assigned_nurse"]
         read_only_fields = ["id"]
 
     def validate(self, attrs):
         request = self.context["request"]
         role = get_role_name(request.user)
-        if role not in ["admin", "recepcionista", "enfermera"]:
+        if role not in ["admin", "recepcionista"]:
             raise serializers.ValidationError("No tienes permiso para registrar admisiones.")
         patient = attrs["patient"]
         if not can_access_clinic(request.user, patient.clinic_id):
             raise serializers.ValidationError("No tienes permiso sobre este paciente.")
-        active_exists = PatientVisit.objects.filter(patient=patient, visit_date=timezone.localdate(), status__in=PatientVisit.ACTIVE_STATUSES).exists()
-        if active_exists:
-            raise serializers.ValidationError({"patient": "Este paciente ya tiene una atencion activa hoy."})
-        appointment = attrs.get("appointment")
-        if appointment:
-            if appointment.patient_id != patient.id or appointment.clinic_id != patient.clinic_id:
-                raise serializers.ValidationError({"appointment": "La cita debe pertenecer al paciente."})
-            if appointment.status == Appointment.Status.CANCELADA:
-                raise serializers.ValidationError({"appointment": "No puedes registrar llegada de una cita cancelada."})
-            attrs["visit_type"] = PatientVisit.VisitType.APPOINTMENT
-            attrs["assigned_doctor"] = attrs.get("assigned_doctor") or appointment.doctor
+        workflow = get_or_create_workflow_settings(patient.clinic)
+        if not workflow.allow_walk_in_patients:
+            raise serializers.ValidationError("La clínica no permite admisiones sin cita.")
+        if attrs.get("visit_type") == PatientVisit.VisitType.APPOINTMENT:
+            raise serializers.ValidationError({"visit_type": "Usa la acción de check-in para registrar una visita con cita."})
         doctor = attrs.get("assigned_doctor")
         if doctor and doctor.clinic_id != patient.clinic_id:
             raise serializers.ValidationError({"assigned_doctor": "El medico debe pertenecer a la misma clinica."})
-        attrs["clinic"] = patient.clinic
-        attrs["created_by"] = request.user
-        attrs["checked_in_by"] = request.user
-        attrs["medical_record"] = MedicalRecord.objects.get_or_create(patient=patient, defaults={"clinic": patient.clinic})[0]
-        workflow = get_or_create_workflow_settings(patient.clinic)
-        if attrs.get("status"):
-            attrs["status"] = attrs["status"]
-        elif attrs.get("visit_type") == PatientVisit.VisitType.APPOINTMENT:
-            attrs["status"] = PatientVisit.Status.WAITING_TRIAGE if workflow.appointment_requires_triage else PatientVisit.Status.WAITING_DOCTOR
-        else:
-            attrs["status"] = PatientVisit.Status.WAITING_TRIAGE if workflow.walk_in_requires_triage else PatientVisit.Status.WAITING_DOCTOR
         return attrs
+
+    def create(self, validated_data):
+        from apps.clinic_flow import services as flow
+
+        request = self.context["request"]
+        patient = validated_data.pop("patient")
+        reason = validated_data.pop("reason")
+        try:
+            return flow.create_walk_in_visit(patient=patient, reason=reason, user=request.user, request=request, **validated_data)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"detail": exc.messages[0]}) from exc
 
 
 class WalkInRegistrationSerializer(serializers.Serializer):
@@ -130,7 +138,7 @@ class WalkInRegistrationSerializer(serializers.Serializer):
     def validate(self, attrs):
         request = self.context["request"]
         role = get_role_name(request.user)
-        if role not in ["admin", "recepcionista", "enfermera"]:
+        if role not in ["admin", "recepcionista"]:
             raise serializers.ValidationError("No tienes permiso para registrar atenciones.")
         patient = attrs.get("patient")
         patient_data = attrs.get("patient_data") or {}
@@ -138,6 +146,9 @@ class WalkInRegistrationSerializer(serializers.Serializer):
             raise serializers.ValidationError({"patient_data": "Datos del paciente requeridos."})
         if patient and not can_access_clinic(request.user, patient.clinic_id):
             raise serializers.ValidationError("No tienes permiso sobre este paciente.")
+        workflow = get_or_create_workflow_settings(request.user.clinica)
+        if not workflow.allow_walk_in_patients:
+            raise serializers.ValidationError("La clínica no permite admisiones sin cita.")
         return attrs
 
     @transaction.atomic
@@ -173,20 +184,25 @@ class AppointmentCheckInSerializer(serializers.Serializer):
     appointment = serializers.PrimaryKeyRelatedField(queryset=Appointment.objects.select_related("clinic", "patient", "doctor"))
     priority = serializers.ChoiceField(choices=PatientVisit.Priority.choices, required=False, default=PatientVisit.Priority.NORMAL)
     symptoms = serializers.CharField(required=False, allow_blank=True)
-    assigned_nurse = serializers.IntegerField(required=False, allow_null=True)
+    assigned_nurse = serializers.PrimaryKeyRelatedField(queryset=User.objects.select_related("role", "clinica"), required=False, allow_null=True)
 
     def validate(self, attrs):
         appointment = attrs["appointment"]
         request = self.context["request"]
+        if get_role_name(request.user) not in ["admin", "recepcionista"]:
+            raise serializers.ValidationError("No tienes permiso para hacer check-in.")
         if not can_access_clinic(request.user, appointment.clinic_id):
             raise serializers.ValidationError("No tienes permiso sobre esta cita.")
         workflow = get_or_create_workflow_settings(appointment.clinic)
         if not workflow.allow_appointments:
             raise serializers.ValidationError("La clinica no permite check-in de citas.")
-        if appointment.status == Appointment.Status.CANCELADA:
-            raise serializers.ValidationError({"appointment": "No puedes hacer check-in de una cita cancelada."})
-        if PatientVisit.objects.filter(appointment=appointment, status__in=PatientVisit.ACTIVE_STATUSES).exists():
-            raise serializers.ValidationError({"appointment": "Esta cita ya tiene una atencion activa."})
+        allowed_statuses = [Appointment.Status.PENDIENTE, Appointment.Status.CONFIRMADA, Appointment.Status.REPROGRAMADA]
+        existing = PatientVisit.objects.filter(appointment=appointment).first()
+        if appointment.status not in allowed_statuses and not (existing and existing.status in PatientVisit.ACTIVE_STATUSES):
+            raise serializers.ValidationError({"appointment": "La cita no se encuentra en un estado válido para check-in."})
+        nurse = attrs.get("assigned_nurse")
+        if nurse and (get_role_name(nurse) != "enfermera" or nurse.clinica_id != appointment.clinic_id):
+            raise serializers.ValidationError({"assigned_nurse": "Selecciona una enfermera de la misma clínica."})
         return attrs
 
 

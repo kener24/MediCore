@@ -91,7 +91,6 @@ class PatientVisitViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         visit = serializer.save()
-        log_audit_event(request=request, clinic=visit.clinic, action=AuditLog.Action.CREATE, module=AuditLog.Module.APPOINTMENTS, model_name="PatientVisit", object_id=visit.id, object_repr=visit.visit_number, description="Atencion registrada.", new_values={"patient": visit.patient_id, "status": visit.status})
         notify_role_users(visit.clinic, ["enfermera"], "Paciente esperando triaje", f"{visit.patient.nombre_completo} espera evaluacion inicial.", module=Notification.Module.APPOINTMENTS, priority=Notification.Priority.NORMAL, notification_type=Notification.Type.INFO, related_model="PatientVisit", related_object_id=visit.id, action_url="/clinic/triage")
         return Response(PatientVisitSerializer(visit).data, status=status.HTTP_201_CREATED)
 
@@ -100,7 +99,8 @@ class PatientVisitViewSet(viewsets.ModelViewSet):
         serializer = WalkInRegistrationSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         visit = serializer.save()
-        log_audit_event(request=request, clinic=visit.clinic, action=AuditLog.Action.CREATE, module=AuditLog.Module.APPOINTMENTS, model_name="PatientVisit", object_id=visit.id, object_repr=visit.visit_number, description="Atencion sin cita registrada.", new_values={"patient": visit.patient_id})
+        if visit.status == PatientVisit.Status.WAITING_TRIAGE:
+            notify_role_users(visit.clinic, ["enfermera"], "Paciente esperando triaje", f"{visit.patient.nombre_completo} espera evaluacion inicial.", module=Notification.Module.APPOINTMENTS, priority=Notification.Priority.NORMAL, notification_type=Notification.Type.INFO, related_model="PatientVisit", related_object_id=visit.id, action_url="/clinic/triage")
         return Response(PatientVisitSerializer(visit).data, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=["post"], url_path="check-in-appointment")
@@ -112,16 +112,28 @@ class PatientVisitViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         appointment = serializer.validated_data["appointment"]
         try:
-            visit = flow.check_in_appointment(
+            visit, created = flow.check_in_appointment(
                 appointment=appointment,
                 user=request.user,
                 request=request,
                 priority=serializer.validated_data["priority"],
                 symptoms=serializer.validated_data.get("symptoms", ""),
+                assigned_nurse=serializer.validated_data.get("assigned_nurse"),
             )
         except DjangoValidationError as exc:
             return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(PatientVisitSerializer(visit).data, status=status.HTTP_201_CREATED)
+        visit_data = PatientVisitSerializer(visit).data
+        return Response(
+            {
+                "success": True,
+                "appointment_id": appointment.id,
+                "visit_id": visit.id,
+                "visit": visit_data,
+                "created": created,
+                "message": "Check-in realizado correctamente." if created else "La cita ya tenía una visita registrada.",
+            },
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
 
     @action(detail=False, methods=["get"], url_path="triage-queue")
     def triage_queue(self, request):
@@ -225,14 +237,13 @@ class PatientVisitViewSet(viewsets.ModelViewSet):
         if get_role_name(request.user) not in RECEPTION_ROLES + ["enfermera"]:
             return Response({"detail": "No tienes permiso para enviar pacientes a triaje."}, status=status.HTTP_403_FORBIDDEN)
         visit = self.get_object()
-        if visit.status in [PatientVisit.Status.CANCELLED, PatientVisit.Status.COMPLETED, PatientVisit.Status.PAID]:
-            return Response({"detail": "Esta atencion ya esta cerrada."}, status=status.HTTP_400_BAD_REQUEST)
-        if visit.status == PatientVisit.Status.WAITING_TRIAGE:
-            return Response(PatientVisitSerializer(visit).data)
-        old_status = visit.status
-        visit.touch_status(PatientVisit.Status.WAITING_TRIAGE, user=request.user)
-        log_audit_event(request=request, clinic=visit.clinic, action=AuditLog.Action.UPDATE, module=AuditLog.Module.APPOINTMENTS, model_name="PatientVisit", object_id=visit.id, object_repr=visit.visit_number, description="Paciente enviado a triaje.", old_values={"status": old_status}, new_values={"status": visit.status})
-        notify_role_users(visit.clinic, ["enfermera"], "Paciente esperando triaje", f"{visit.patient.nombre_completo} espera evaluacion inicial.", module=Notification.Module.APPOINTMENTS, priority=Notification.Priority.NORMAL, notification_type=Notification.Type.INFO, related_model="PatientVisit", related_object_id=visit.id, action_url="/clinic/triage")
+        was_waiting = visit.status == PatientVisit.Status.WAITING_TRIAGE
+        try:
+            visit = flow.send_to_triage(visit, user=request.user, request=request)
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+        if not was_waiting:
+            notify_role_users(visit.clinic, ["enfermera"], "Paciente esperando triaje", f"{visit.patient.nombre_completo} espera evaluacion inicial.", module=Notification.Module.APPOINTMENTS, priority=Notification.Priority.NORMAL, notification_type=Notification.Type.INFO, related_model="PatientVisit", related_object_id=visit.id, action_url="/clinic/triage")
         return Response(PatientVisitSerializer(visit).data)
 
     @action(detail=True, methods=["patch", "post"], url_path="send-to-doctor")
@@ -240,14 +251,13 @@ class PatientVisitViewSet(viewsets.ModelViewSet):
         if get_role_name(request.user) not in RECEPTION_ROLES + TRIAGE_ROLES:
             return Response({"detail": "No tienes permiso para enviar pacientes al medico."}, status=status.HTTP_403_FORBIDDEN)
         visit = self.get_object()
-        if visit.status in [PatientVisit.Status.CANCELLED, PatientVisit.Status.COMPLETED, PatientVisit.Status.PAID]:
-            return Response({"detail": "Esta atencion ya esta cerrada."}, status=status.HTTP_400_BAD_REQUEST)
-        if visit.status == PatientVisit.Status.WAITING_DOCTOR:
-            return Response(PatientVisitSerializer(visit).data)
-        old_status = visit.status
-        visit.touch_status(PatientVisit.Status.WAITING_DOCTOR, user=request.user)
-        log_audit_event(request=request, clinic=visit.clinic, action=AuditLog.Action.UPDATE, module=AuditLog.Module.APPOINTMENTS, model_name="PatientVisit", object_id=visit.id, object_repr=visit.visit_number, description="Paciente enviado al medico.", old_values={"status": old_status}, new_values={"status": visit.status})
-        notify_role_users(visit.clinic, ["medico"], "Paciente esperando consulta", f"{visit.patient.nombre_completo} esta listo para consulta.", module=Notification.Module.APPOINTMENTS, priority=Notification.Priority.NORMAL, notification_type=Notification.Type.INFO, related_model="PatientVisit", related_object_id=visit.id, action_url="/doctor/waiting-room")
+        was_waiting = visit.status == PatientVisit.Status.WAITING_DOCTOR
+        try:
+            visit = flow.send_to_doctor(visit, user=request.user, request=request)
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+        if not was_waiting:
+            notify_role_users(visit.clinic, ["medico"], "Paciente esperando consulta", f"{visit.patient.nombre_completo} esta listo para consulta.", module=Notification.Module.APPOINTMENTS, priority=Notification.Priority.NORMAL, notification_type=Notification.Type.INFO, related_model="PatientVisit", related_object_id=visit.id, action_url="/doctor/waiting-room")
         return Response(PatientVisitSerializer(visit).data)
 
     @action(detail=True, methods=["patch", "post"], url_path="cancel")
@@ -258,14 +268,10 @@ class PatientVisitViewSet(viewsets.ModelViewSet):
         reason = str(request.data.get("reason") or request.data.get("cancellation_reason") or "").strip()
         if len(reason) < 5:
             return Response({"reason": "Indica un motivo claro de cancelacion."}, status=status.HTTP_400_BAD_REQUEST)
-        if visit.status in [PatientVisit.Status.COMPLETED, PatientVisit.Status.PAID]:
-            return Response({"detail": "No puedes cancelar una atencion ya cerrada o pagada."}, status=status.HTTP_400_BAD_REQUEST)
-        if visit.status == PatientVisit.Status.CANCELLED:
-            return Response({"detail": "Esta admision ya fue cancelada."}, status=status.HTTP_400_BAD_REQUEST)
-        old_status = visit.status
-        visit.cancellation_reason = reason
-        visit.touch_status(PatientVisit.Status.CANCELLED, user=request.user)
-        log_audit_event(request=request, clinic=visit.clinic, action=AuditLog.Action.CANCEL, module=AuditLog.Module.APPOINTMENTS, model_name="PatientVisit", object_id=visit.id, object_repr=visit.visit_number, description="Admision cancelada desde recepcion.", old_values={"status": old_status}, new_values={"status": visit.status, "reason": reason})
+        try:
+            visit = flow.cancel_visit(visit, user=request.user, reason=reason, request=request)
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
         return Response(PatientVisitSerializer(visit).data)
 
     @action(detail=True, methods=["post"], url_path="generate-invoice")

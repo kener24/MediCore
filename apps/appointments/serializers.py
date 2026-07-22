@@ -5,6 +5,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from apps.accounts.permissions import get_role_name
+from apps.clinic_settings.models import get_or_create_workflow_settings
 from apps.appointments.models import Appointment
 from apps.clinic_settings.utils import clinic_setting
 from apps.doctors.models import DoctorProfile, DoctorSchedule
@@ -19,6 +20,13 @@ class AppointmentListSerializer(serializers.ModelSerializer):
     doctor_nombre = serializers.CharField(source="doctor.user.nombre_completo", read_only=True)
     specialty_nombre = serializers.CharField(source="doctor.specialty.nombre", read_only=True)
     created_by_nombre = serializers.CharField(source="created_by.nombre_completo", read_only=True)
+    visit_id = serializers.SerializerMethodField()
+
+    def get_visit_id(self, obj):
+        visits = list(obj.visits.all())
+        active = next((visit for visit in visits if visit.status in visit.ACTIVE_STATUSES), None)
+        selected = active or (visits[0] if visits else None)
+        return selected.id if selected else None
 
     class Meta:
         model = Appointment
@@ -43,6 +51,7 @@ class AppointmentListSerializer(serializers.ModelSerializer):
             "activo",
             "creado_en",
             "actualizado_en",
+            "visit_id",
         ]
 
 
@@ -83,6 +92,14 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("No puedes crear citas para otro medico.")
         if role == "paciente" and getattr(patient, "user_id", None) != request.user.id:
             raise serializers.ValidationError("No puedes crear citas para otro paciente.")
+        workflow = get_or_create_workflow_settings(doctor.clinic)
+        if not workflow.allow_appointments:
+            raise serializers.ValidationError("La clínica no permite crear citas.")
+        modality = attrs.get("modality", Appointment.Modality.PRESENCIAL)
+        if modality == Appointment.Modality.ONLINE and not workflow.allow_online_appointments:
+            raise serializers.ValidationError({"modality": "La clínica no tiene habilitadas las citas en línea."})
+        if modality == Appointment.Modality.PRESENCIAL and not workflow.allow_in_person_appointments:
+            raise serializers.ValidationError({"modality": "La clínica no tiene habilitadas las citas presenciales."})
         if role != "superadmin" and attrs["scheduled_date"] < timezone.localdate():
             raise serializers.ValidationError({"scheduled_date": "No puedes crear citas en fechas pasadas."})
         try:
@@ -118,6 +135,14 @@ class AppointmentUpdateSerializer(serializers.ModelSerializer):
         doctor = attrs.get("doctor", self.instance.doctor)
         if request.user.clinica_id != patient.clinic_id or request.user.clinica_id != doctor.clinic_id:
             raise serializers.ValidationError("No puedes editar una cita con recursos de otra clinica.")
+        workflow = get_or_create_workflow_settings(doctor.clinic)
+        if not workflow.allow_appointments:
+            raise serializers.ValidationError("La clínica no permite modificar citas.")
+        modality = attrs.get("modality", self.instance.modality)
+        if modality == Appointment.Modality.ONLINE and not workflow.allow_online_appointments:
+            raise serializers.ValidationError({"modality": "La clínica no tiene habilitadas las citas en línea."})
+        if modality == Appointment.Modality.PRESENCIAL and not workflow.allow_in_person_appointments:
+            raise serializers.ValidationError({"modality": "La clínica no tiene habilitadas las citas presenciales."})
         scheduled_date = attrs.get("scheduled_date", self.instance.scheduled_date)
         start_time = attrs.get("start_time", self.instance.start_time)
         end_time = attrs.get("end_time", self.instance.end_time)

@@ -94,7 +94,10 @@ class PatientVisit(TimeStampedModel):
             models.Index(fields=["priority"]),
             models.Index(fields=["assigned_doctor", "status"]),
         ]
-        constraints = [models.UniqueConstraint(fields=["clinic", "visit_number"], name="unique_visit_number_per_clinic")]
+        constraints = [
+            models.UniqueConstraint(fields=["clinic", "visit_number"], name="unique_visit_number_per_clinic"),
+            models.UniqueConstraint(fields=["appointment"], name="unique_visit_per_appointment"),
+        ]
 
     @classmethod
     def next_visit_number(cls, clinic):

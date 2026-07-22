@@ -31,22 +31,22 @@ export async function getVisitDetail(visitId: number | string): Promise<Receptio
 }
 
 export async function sendToTriage(visitId: number | string): Promise<ReceptionVisit> {
-  return patchFirstAvailable<ReceptionVisit>([`/reception/visits/${visitId}/send-to-triage/`, `/admissions/visits/${visitId}/send-to-triage/`, `/admissions/visits/${visitId}/`], { status: 'waiting_triage' });
+  return patchFirstAvailable<ReceptionVisit>([`/reception/visits/${visitId}/send-to-triage/`, `/admissions/visits/${visitId}/send-to-triage/`]);
 }
 
 export async function sendToDoctor(visitId: number | string): Promise<ReceptionVisit> {
-  return patchFirstAvailable<ReceptionVisit>([`/reception/visits/${visitId}/send-to-doctor/`, `/admissions/visits/${visitId}/send-to-doctor/`, `/admissions/visits/${visitId}/`], { status: 'waiting_doctor' });
+  return patchFirstAvailable<ReceptionVisit>([`/reception/visits/${visitId}/send-to-doctor/`, `/admissions/visits/${visitId}/send-to-doctor/`]);
 }
 
 export async function cancelAdmission(visitId: number | string, reason: string): Promise<ReceptionVisit> {
-  return patchFirstAvailable<ReceptionVisit>([`/reception/visits/${visitId}/cancel/`, `/admissions/visits/${visitId}/cancel/`, `/admissions/visits/${visitId}/`], { status: 'cancelled', reason: reason.trim(), cancellation_reason: reason.trim() });
+  return patchFirstAvailable<ReceptionVisit>([`/reception/visits/${visitId}/cancel/`, `/admissions/visits/${visitId}/cancel/`], { reason: reason.trim(), cancellation_reason: reason.trim() });
 }
 
 export async function updateReceptionVisitNote(visitId: number | string, note: string): Promise<ReceptionVisit> {
   const cleanNote = note.trim();
   return patchFirstAvailable<ReceptionVisit>(
     [`/reception/visits/${visitId}/notes/`, `/admissions/visits/${visitId}/notes/`, `/admissions/visits/${visitId}/`],
-    { notes: cleanNote, reception_notes: cleanNote },
+    { notes: cleanNote },
   );
 }
 
@@ -66,4 +66,21 @@ export type ReceptionDoctorOption = {
 export async function getReceptionDoctors(): Promise<ReceptionDoctorOption[]> {
   const data = await getFirstAvailable<ApiListResponse<ReceptionDoctorOption>>(['/doctors/', '/clinic/doctors/'], { is_active: true });
   return normalizeListResponse<ReceptionDoctorOption>(data).filter((doctor) => Number.isFinite(Number(doctor.id)));
+}
+
+export type ReceptionWorkflowSettings = {
+  allow_walk_in_patients: boolean;
+  allow_appointments: boolean;
+  allow_in_person_appointments: boolean;
+  allow_online_appointments: boolean;
+  reception_can_create_minimal_patient: boolean;
+  walk_in_requires_triage: boolean;
+  appointment_requires_triage: boolean;
+  appointment_direct_to_doctor: boolean;
+  require_identity_for_patient: boolean;
+  require_phone_for_patient: boolean;
+};
+
+export async function getReceptionWorkflowSettings(): Promise<ReceptionWorkflowSettings> {
+  return getFirstAvailable<ReceptionWorkflowSettings>(['/clinic/workflow-settings/']);
 }

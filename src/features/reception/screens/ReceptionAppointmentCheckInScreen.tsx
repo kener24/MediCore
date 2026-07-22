@@ -1,6 +1,6 @@
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Modal, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppCard } from '@/components/AppCard';
@@ -127,7 +127,8 @@ export function ReceptionAppointmentCheckInScreen() {
   if (loading) return <LoadingState label="Cargando citas..." />;
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl onRefresh={() => void load(true)} refreshing={refreshing} />}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboard}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl onRefresh={() => void load(true)} refreshing={refreshing} />}>
         <AppHeader icon="calendar-check-outline" subtitle="Citas del día listas para registrar llegada." title="Check-in de cita" />
         <AppCard style={styles.summary}>
           <Info value={String(summary.total)} label="Citas" />
@@ -201,6 +202,7 @@ export function ReceptionAppointmentCheckInScreen() {
           </View>
         </View>
       </Modal>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -241,6 +243,7 @@ const styles = StyleSheet.create({
   info: { flex: 1, minWidth: 70 },
   infoLabel: { color: colors.muted, fontSize: 11, fontWeight: '800', marginTop: 3 },
   infoValue: { color: colors.ink, fontSize: 20, fontWeight: '900' },
+  keyboard: { flex: 1 },
   modalActions: { gap: 10 },
   modalBackdrop: { alignItems: 'center', backgroundColor: 'rgba(15, 23, 42, 0.45)', flex: 1, justifyContent: 'center', padding: 18 },
   modalCard: { backgroundColor: colors.white, borderRadius: 20, gap: 12, padding: 18, width: '100%' },

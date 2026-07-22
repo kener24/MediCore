@@ -1,6 +1,6 @@
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
-import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
@@ -12,7 +12,7 @@ import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
 import { toPositiveId } from '@/core/utils/idUtils';
 import { VisitStatusBadge } from '@/features/reception/components/VisitStatusBadge';
-import { cancelAdmission, generateInvoiceFromReceptionVisit, getVisitDetail, sendToDoctor, sendToTriage, updateReceptionVisitNote } from '@/features/reception/services/receptionAdmissionService';
+import { cancelAdmission, generateInvoiceFromReceptionVisit, getReceptionWorkflowSettings, getVisitDetail, sendToDoctor, sendToTriage, updateReceptionVisitNote, type ReceptionWorkflowSettings } from '@/features/reception/services/receptionAdmissionService';
 import { visitDoctorName, visitPatientName } from '@/features/reception/services/receptionMappers';
 import type { ReceptionVisit } from '@/features/reception/types/receptionAdmission.types';
 
@@ -27,6 +27,7 @@ export function ReceptionVisitDetailScreen() {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [note, setNote] = useState('');
+  const [workflow, setWorkflow] = useState<ReceptionWorkflowSettings | null>(null);
 
   const load = useCallback(async () => {
     if (!visitId) {
@@ -38,8 +39,9 @@ export function ReceptionVisitDetailScreen() {
     setLoading(true);
     setError('');
     try {
-      const data = await getVisitDetail(visitId);
+      const [data, settings] = await Promise.all([getVisitDetail(visitId), getReceptionWorkflowSettings()]);
       setVisit(data);
+      setWorkflow(settings);
       setNote(data.reception_notes ?? data.notes ?? '');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar la visita.');
@@ -127,13 +129,16 @@ export function ReceptionVisitDetailScreen() {
   if (loading) return <LoadingState label="Cargando visita..." />;
   const status = String(visit?.status ?? '');
   const closed = ['cancelled', 'completed', 'paid'].includes(status);
-  const canSendTriage = !closed && !['waiting_triage', 'in_triage', 'waiting_billing', 'waiting_payment'].includes(status);
-  const canSendDoctor = !closed && !['waiting_doctor', 'in_consultation', 'waiting_billing', 'waiting_payment'].includes(status);
+  const requiresTriage = visit?.visit_type === 'appointment' ? workflow?.appointment_requires_triage : workflow?.walk_in_requires_triage;
+  const canSendTriage = ['registered', 'waiting_doctor'].includes(status);
+  const canSendDoctor = requiresTriage === false && Boolean(visit?.assigned_doctor ?? visit?.doctor_id) && ['registered', 'waiting_triage'].includes(status);
+  const canCancel = ['registered', 'waiting_triage', 'waiting_doctor'].includes(status);
   const canInvoice = status === 'waiting_billing' && !visit?.invoice;
 
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboard}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <AppHeader icon="clipboard-text-outline" subtitle="Información operativa de recepción." title="Detalle de visita" />
         {error ? <ErrorState message={error} onRetry={() => void load()} title="No se pudo cargar" /> : null}
         {!error && !visit ? <EmptyState title="Visita no disponible" /> : null}
@@ -165,12 +170,12 @@ export function ReceptionVisitDetailScreen() {
               />
               <AppButton disabled={busy || note.trim().length < 3} label="Guardar nota" loading={busy} onPress={saveNote} variant="secondary" />
             </AppCard>
-            {!closed ? (
+            {!closed && (canSendTriage || canSendDoctor || canInvoice || canCancel) ? (
               <View style={styles.actions}>
                 {canSendTriage ? <AppButton disabled={busy} label="Enviar a triaje" onPress={() => confirmAction('triage')} /> : null}
                 {canSendDoctor ? <AppButton disabled={busy} label="Enviar a médico" onPress={() => confirmAction('doctor')} variant="secondary" /> : null}
                 {canInvoice ? <AppButton disabled={busy} label="Generar factura" onPress={() => confirmAction('invoice')} /> : null}
-                <AppButton disabled={busy} label="Cancelar admisión" onPress={() => setCancelOpen(true)} variant="danger" />
+                {canCancel ? <AppButton disabled={busy} label="Cancelar admisión" onPress={() => setCancelOpen(true)} variant="danger" /> : null}
               </View>
             ) : null}
             <AppButton label="Volver" onPress={() => navigation.goBack()} variant="secondary" />
@@ -197,6 +202,7 @@ export function ReceptionVisitDetailScreen() {
           </View>
         </View>
       </Modal>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -209,6 +215,7 @@ const styles = StyleSheet.create({
   actions: { gap: 10 },
   card: { gap: 7 },
   content: { gap: 14, padding: 18, paddingBottom: 120 },
+  keyboard: { flex: 1 },
   meta: { color: colors.muted, fontSize: 14, lineHeight: 20 },
   modalActions: { gap: 10 },
   modalBackdrop: { alignItems: 'center', backgroundColor: 'rgba(15, 23, 42, 0.45)', flex: 1, justifyContent: 'center', padding: 18 },

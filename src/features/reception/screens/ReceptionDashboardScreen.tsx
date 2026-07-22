@@ -17,7 +17,7 @@ import { useAuth } from '@/features/auth/context/AuthContext';
 import { AppointmentCheckInCard } from '@/features/reception/components/AppointmentCheckInCard';
 import { ReceptionStatsGrid } from '@/features/reception/components/ReceptionStatsGrid';
 import { TodayAdmissionCard } from '@/features/reception/components/TodayAdmissionCard';
-import { getTodayAdmissions } from '@/features/reception/services/receptionAdmissionService';
+import { getReceptionWorkflowSettings, getTodayAdmissions, type ReceptionWorkflowSettings } from '@/features/reception/services/receptionAdmissionService';
 import { getTodayAppointments } from '@/features/reception/services/receptionAppointmentService';
 import { getReceptionDashboard } from '@/features/reception/services/receptionDashboardService';
 import type { ReceptionStats, ReceptionVisit } from '@/features/reception/types/receptionAdmission.types';
@@ -29,6 +29,7 @@ export function ReceptionDashboardScreen() {
   const [stats, setStats] = useState<ReceptionStats | null>(null);
   const [admissions, setAdmissions] = useState<ReceptionVisit[]>([]);
   const [appointments, setAppointments] = useState<ReceptionAppointment[]>([]);
+  const [workflow, setWorkflow] = useState<ReceptionWorkflowSettings | null>(null);
   const [quickSearch, setQuickSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -39,14 +40,16 @@ export function ReceptionDashboardScreen() {
     else setLoading(true);
     setError('');
     try {
-      const [dashboardStats, todayAdmissions, todayAppointments] = await Promise.all([
+      const [dashboardStats, todayAdmissions, todayAppointments, workflowSettings] = await Promise.all([
         getReceptionDashboard().catch(() => null),
         getTodayAdmissions().catch(() => []),
         getTodayAppointments().catch(() => []),
+        getReceptionWorkflowSettings().catch(() => null),
       ]);
       setStats(dashboardStats);
       setAdmissions(todayAdmissions);
       setAppointments(todayAppointments);
+      setWorkflow(workflowSettings);
       if (!dashboardStats && todayAdmissions.length === 0 && todayAppointments.length === 0) {
         setError('No se pudo cargar la información operativa de recepción.');
       }
@@ -88,7 +91,7 @@ export function ReceptionDashboardScreen() {
           <AppInput autoCapitalize="words" label="Paciente" onChangeText={setQuickSearch} onSubmitEditing={runQuickSearch} placeholder="Buscar paciente" value={quickSearch} />
           <View style={styles.rowButtons}>
             <AppButton label="Buscar" onPress={runQuickSearch} />
-            <AppButton label="Nuevo" onPress={() => navigation.navigate('ReceptionPatientCreate')} variant="secondary" />
+            {workflow?.reception_can_create_minimal_patient !== false ? <AppButton label="Nuevo" onPress={() => navigation.navigate('ReceptionPatientCreate')} variant="secondary" /> : null}
           </View>
         </AppCard>
 
@@ -96,7 +99,7 @@ export function ReceptionDashboardScreen() {
 
         <Text style={styles.sectionTitle}>Bandeja operativa</Text>
         <View style={styles.workflowGrid}>
-          <WorkflowCard count={work.pendingCheckIn} icon="calendar-clock" label="Citas por recibir" onPress={() => navigation.navigate('ReceptionAppointmentCheckIn', { initialFilter: 'scheduled' })} tone="blue" />
+          {workflow?.allow_appointments !== false ? <WorkflowCard count={work.pendingCheckIn} icon="calendar-clock" label="Citas por recibir" onPress={() => navigation.navigate('ReceptionAppointmentCheckIn', { initialFilter: 'scheduled' })} tone="blue" /> : null}
           <WorkflowCard count={work.waitingTriage} icon="clipboard-pulse-outline" label="Esperando triaje" onPress={() => navigation.navigate('ReceptionTodayAdmissions', { initialFilter: 'waiting_triage' })} tone="warning" />
           <WorkflowCard count={work.waitingDoctor} icon="doctor" label="Listos para médico" onPress={() => navigation.navigate('ReceptionTodayAdmissions', { initialFilter: 'waiting_doctor' })} tone="primary" />
           <WorkflowCard count={work.waitingBilling} icon="cash-register" label="Pendiente caja" onPress={() => navigation.navigate('ReceptionTodayAdmissions', { initialFilter: 'waiting_billing' })} tone="danger" />
@@ -105,20 +108,20 @@ export function ReceptionDashboardScreen() {
         <Text style={styles.sectionTitle}>Acciones frecuentes</Text>
         <View style={styles.actions}>
           <QuickActionCard description="Busca, valida identidad y abre expediente operativo." icon="account-search-outline" onPress={() => navigation.navigate('ReceptionPatientSearch')} title="Buscar paciente" />
-          <QuickActionCard description="Registra un paciente mínimo para atención inmediata." icon="account-plus-outline" onPress={() => navigation.navigate('ReceptionPatientCreate')} title="Crear paciente" />
-          <QuickActionCard description="Crea una visita sin cita y asigna prioridad/médico." icon="clipboard-plus-outline" onPress={() => navigation.navigate('ReceptionCreateAdmission')} title="Nueva admisión" />
-          <QuickActionCard description="Recibe pacientes con cita y crea la visita operativa." icon="calendar-check-outline" onPress={() => navigation.navigate('ReceptionAppointmentCheckIn')} title="Check-in de cita" />
+          {workflow?.reception_can_create_minimal_patient !== false ? <QuickActionCard description="Registra un paciente mínimo para atención inmediata." icon="account-plus-outline" onPress={() => navigation.navigate('ReceptionPatientCreate')} title="Crear paciente" /> : null}
+          {workflow?.allow_walk_in_patients !== false ? <QuickActionCard description="Crea una visita sin cita y asigna prioridad/médico." icon="clipboard-plus-outline" onPress={() => navigation.navigate('ReceptionCreateAdmission')} title="Nueva admisión" /> : null}
+          {workflow?.allow_appointments !== false ? <QuickActionCard description="Recibe pacientes con cita y crea la visita operativa." icon="calendar-check-outline" onPress={() => navigation.navigate('ReceptionAppointmentCheckIn')} title="Check-in de cita" /> : null}
         </View>
 
-        <SectionHeader action="Ver agenda" onPress={() => navigation.navigate('ReceptionAppointmentCheckIn')} title="Próximas citas" />
-        {nextAppointments.length ? nextAppointments.map((appointment) => (
+        {workflow?.allow_appointments !== false ? <SectionHeader action="Ver agenda" onPress={() => navigation.navigate('ReceptionAppointmentCheckIn')} title="Próximas citas" /> : null}
+        {workflow?.allow_appointments !== false && (nextAppointments.length ? nextAppointments.map((appointment) => (
           <AppointmentCheckInCard
             appointment={appointment}
             key={appointment.id ?? `${appointment.patient_name}-${appointment.time}`}
             onCheckIn={() => navigation.navigate('ReceptionAppointmentCheckIn', { focusAppointmentId: appointment.id })}
             onViewVisit={() => navigation.navigate('ReceptionAppointmentCheckIn')}
           />
-        )) : <EmptyState description="No hay citas pendientes por recibir." title="Agenda al día" />}
+        )) : <EmptyState description="No hay citas pendientes por recibir." title="Agenda al día" />)}
 
         <SectionHeader action="Ver flujo" onPress={() => navigation.navigate('ReceptionTodayAdmissions')} title="Prioridades de atención" />
         {priorityAdmissions.length ? priorityAdmissions.map((visit) => (

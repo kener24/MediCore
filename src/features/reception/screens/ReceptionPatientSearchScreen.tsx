@@ -12,6 +12,7 @@ import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
 import { ReceptionPatientCard } from '@/features/reception/components/ReceptionPatientCard';
 import { searchPatients } from '@/features/reception/services/receptionPatientService';
+import { getReceptionWorkflowSettings } from '@/features/reception/services/receptionAdmissionService';
 import type { ReceptionPatient } from '@/features/reception/types/receptionPatient.types';
 
 export function ReceptionPatientSearchScreen() {
@@ -23,6 +24,7 @@ export function ReceptionPatientSearchScreen() {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState('');
+  const [canCreatePatient, setCanCreatePatient] = useState(false);
 
   const runSearch = useCallback(async (nextQuery = query) => {
     const cleanQuery = nextQuery.trim();
@@ -51,21 +53,27 @@ export function ReceptionPatientSearchScreen() {
     }
   }, [initialQuery, runSearch]);
 
+  useEffect(() => {
+    getReceptionWorkflowSettings()
+      .then((settings) => setCanCreatePatient(settings.reception_can_create_minimal_patient))
+      .catch(() => setCanCreatePatient(false));
+  }, []);
+
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <AppHeader icon="account-search-outline" subtitle="Busca por nombre, identidad, teléfono o código." title="Buscar paciente" />
         <AppInput autoCapitalize="words" label="Paciente" onChangeText={setQuery} onSubmitEditing={() => void runSearch()} placeholder="Ej. Juan Perez" value={query} />
         <AppButton disabled={query.trim().length < 2} label="Buscar" loading={loading} onPress={() => void runSearch()} />
-        <AppButton label="Crear paciente nuevo" onPress={() => navigation.navigate('ReceptionPatientCreate')} variant="secondary" />
+        {canCreatePatient ? <AppButton label="Crear paciente nuevo" onPress={() => navigation.navigate('ReceptionPatientCreate')} variant="secondary" /> : null}
         {loading ? <LoadingState label="Buscando pacientes..." /> : null}
         {error ? <ErrorState message={error} onRetry={query.trim().length >= 2 ? () => void runSearch() : undefined} title={query.trim().length < 2 ? 'Búsqueda incompleta' : 'No se pudo buscar'} /> : null}
         {!loading && searched && !error && patients.length === 0 ? (
           <EmptyState
-            actionLabel="Crear paciente"
+            actionLabel={canCreatePatient ? 'Crear paciente' : undefined}
             description="Revisa si escribiste correctamente la identidad o teléfono. Si es un paciente nuevo, puedes registrarlo ahora."
             icon="account-plus-outline"
-            onAction={() => navigation.navigate('ReceptionPatientCreate')}
+            onAction={canCreatePatient ? () => navigation.navigate('ReceptionPatientCreate') : undefined}
             title="No encontramos coincidencias"
             tone="warning"
           />

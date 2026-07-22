@@ -7,15 +7,15 @@ import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { AppHeader } from '@/components/AppHeader';
 import { AppInput } from '@/components/AppInput';
+import { ErrorState } from '@/components/ErrorState';
 import { colors } from '@/core/theme/colors';
-import { createAdmission, getReceptionDoctors, type ReceptionDoctorOption } from '@/features/reception/services/receptionAdmissionService';
+import { createAdmission, getReceptionDoctors, getReceptionWorkflowSettings, type ReceptionDoctorOption, type ReceptionWorkflowSettings } from '@/features/reception/services/receptionAdmissionService';
 import { patientIdentity, patientName, patientPhone } from '@/features/reception/services/receptionMappers';
 import type { CreateAdmissionPayload } from '@/features/reception/types/receptionAdmission.types';
 import type { ReceptionPatient } from '@/features/reception/types/receptionPatient.types';
 
 const visitTypes = [
   ['walk_in', 'Sin cita'],
-  ['appointment', 'Cita programada'],
   ['emergency', 'Emergencia'],
   ['follow_up', 'Seguimiento'],
   ['control', 'Control'],
@@ -38,18 +38,31 @@ export function ReceptionCreateAdmissionScreen() {
   const phone = selectedPatient ? patientPhone(selectedPatient) : '';
   const [saving, setSaving] = useState(false);
   const [doctors, setDoctors] = useState<ReceptionDoctorOption[]>([]);
+  const [workflow, setWorkflow] = useState<ReceptionWorkflowSettings | null>(null);
+  const [workflowError, setWorkflowError] = useState('');
   const [form, setForm] = useState({ patient_id: initialPatientId, visit_type: 'walk_in', reason: '', priority: 'normal', doctor_id: '' });
 
   useFocusEffect(useCallback(() => {
-    getReceptionDoctors().then(setDoctors).catch(() => setDoctors([]));
+    Promise.all([getReceptionDoctors(), getReceptionWorkflowSettings()])
+      .then(([doctorList, settings]) => {
+        setDoctors(doctorList);
+        setWorkflow(settings);
+        setWorkflowError('');
+      })
+      .catch((error) => {
+        setDoctors([]);
+        setWorkflowError(error instanceof Error ? error.message : 'No se pudo cargar la configuración de recepción.');
+      });
   }, []));
 
   async function submit() {
     if (saving) return;
+    if (workflowError) return Alert.alert('Admisión', workflowError);
+    if (workflow && !workflow.allow_walk_in_patients) return Alert.alert('Admisión', 'La clínica no permite admisiones sin cita.');
     if (!form.patient_id) return Alert.alert('Admisión', 'Selecciona un paciente.');
     if (Number(form.patient_id) <= 0) return Alert.alert('Admisión', 'El paciente seleccionado no es válido.');
     if (form.reason.trim().length < 4) return Alert.alert('Admisión', 'El motivo de visita es obligatorio.');
-    if (form.priority === 'emergency' && !form.doctor_id) {
+    if ((form.priority === 'emergency' || workflow?.walk_in_requires_triage === false) && !form.doctor_id) {
       return Alert.alert('Admisión urgente', 'Para una emergencia selecciona médico destino o cambia la prioridad.');
     }
     setSaving(true);
@@ -78,6 +91,9 @@ export function ReceptionCreateAdmissionScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboard}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <AppHeader icon="clipboard-plus-outline" subtitle="Registra la llegada del paciente a la clínica." title="Nueva admisión" />
+          {workflowError ? <ErrorState message={workflowError} title="No se pudo cargar la configuración" /> : null}
+          {workflow && !workflow.allow_walk_in_patients ? <ErrorState message="La configuración de esta clínica no permite registrar pacientes sin cita." title="Admisiones sin cita deshabilitadas" /> : null}
+          {workflow?.allow_walk_in_patients !== false ? (
           <AppCard style={styles.form}>
             {form.patient_id ? (
               <View style={styles.patientBox}>
@@ -130,6 +146,7 @@ export function ReceptionCreateAdmissionScreen() {
             </View>
             <AppButton disabled={!form.patient_id || saving} label="Registrar admisión" loading={saving} onPress={submit} />
           </AppCard>
+          ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

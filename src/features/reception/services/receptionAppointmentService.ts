@@ -14,12 +14,12 @@ export type AppointmentCheckInResult = {
 export async function getTodayAppointments(params?: QueryParams): Promise<ReceptionAppointment[]> {
   const today = new Date().toISOString().slice(0, 10);
   const urls = ['/appointments/', '/appointments/today/', '/reception/appointments/today/'];
-  let data: ApiListResponse<ReceptionAppointment>;
-  try {
-    data = await getFirstAvailable<ApiListResponse<ReceptionAppointment>>(urls, { today: true, ...(params ?? {}) });
-  } catch {
-    data = await getFirstAvailable<ApiListResponse<ReceptionAppointment>>(urls, { date: today, scheduled_date: today, ...(params ?? {}) });
-  }
+  const requestedDate = String(params?.date ?? params?.scheduled_date ?? today);
+  const data = await getFirstAvailable<ApiListResponse<ReceptionAppointment>>(urls, {
+    ...(params ?? {}),
+    date: requestedDate,
+    scheduled_date: requestedDate,
+  });
   return normalizeListResponse<ReceptionAppointment>(data);
 }
 

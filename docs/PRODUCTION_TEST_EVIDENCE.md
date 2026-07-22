@@ -30,7 +30,7 @@ Resultados ejecutados contra `https://kp-software.tech`. Este documento no conti
 
 ## Sprint 1.1: recepción, citas y admisiones
 
-Estado previo al despliegue: validación local aprobada; evidencia de servidor pendiente de agregar después del despliegue.
+Despliegue y pruebas ejecutados el 2026-07-22 contra `https://kp-software.tech` con datos sintéticos no sensibles.
 
 | ID | Prueba | Resultado | Evidencia segura |
 | --- | --- | --- | --- |
@@ -45,8 +45,17 @@ Estado previo al despliegue: validación local aprobada; evidencia de servidor p
 | REC-LOCAL-09 | Expo Doctor | Aprobado | 18/18 verificaciones |
 | REC-LOCAL-10 | Auditoría npm web | Aprobado | 0 vulnerabilidades de producción |
 | REC-LOCAL-11 | Auditoría npm móvil | Riesgo aceptado temporalmente | 15 moderadas transitivas; la corrección automática fuerza Expo 57 y requiere un sprint de actualización del SDK |
-| REC-PROD-01 | Despliegue Sprint 1.1 | Pendiente | Se completará después de respaldo, migración y reinicio |
-| REC-PROD-02 | Flujos Clínica A y B | Pendiente | Se ejecutará con datos sintéticos no sensibles |
+| REC-PROD-01 | Respaldo previo | Aprobado | Dump MySQL completo verificado en `backups/sprint11-20260722-054438/database-no-tablespaces.sql` |
+| REC-PROD-02 | Despliegue Sprint 1.1 | Aprobado | Commit `9ddba07`; migración `admissions.0003` aplicada; MediCore y Nginx activos |
+| REC-PROD-03 | Build web y HTTPS | Aprobado | Vite compiló en servidor; `nginx -t` válido y recarga correcta |
+| REC-PROD-04 | Búsqueda y agenda Clínica A | Aprobado | Recursos propios 200 y paciente sintético encontrado únicamente en su clínica |
+| REC-PROD-05 | Check-in Clínica A | Aprobado | Primera llamada 201, reintento por endpoint alterno 200, misma visita y cola `waiting_triage` |
+| REC-PROD-06 | Búsqueda y agenda Clínica B | Aprobado | Recursos propios 200 y paciente sintético encontrado únicamente en su clínica |
+| REC-PROD-07 | Check-in Clínica B | Aprobado | Primera llamada 201, reintento por endpoint alterno 200, misma visita y cola `waiting_triage` |
+| REC-PROD-08 | Triaje obligatorio | Aprobado | Envío directo a médico respondió 400 en ambas clínicas configuradas con triaje obligatorio |
+| REC-PROD-09 | Cita, visita y check-in cruzados | Aprobado | Recepción A recibió 404 al usar IDs de Clínica B |
+| REC-PROD-10 | Búsqueda cruzada | Aprobado | Búsqueda exacta del paciente B desde Clínica A respondió lista vacía |
+| REC-PROD-11 | Paciente y médico cruzados | Aprobado | Creación de admisión respondió 400 sin crear registros |
 | REC-PHYSICAL-01 | Android físico | Pendiente | No se marca aprobado por inferencia; requiere prueba manual con Expo Go |
 
 ## Observaciones de despliegue

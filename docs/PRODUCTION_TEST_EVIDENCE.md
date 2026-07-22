@@ -28,6 +28,27 @@ Resultados ejecutados contra `https://kp-software.tech`. Este documento no conti
 | PROD-20 | Flujo en Android físico | Pendiente de prueba física | Requiere abrir `exp://192.168.101.27:8081` con Expo Go en la misma red |
 | PROD-21 | Login por rol en dos clínicas | Aprobado | Admin, recepción/caja, enfermería, médico y paciente validaron login, `/auth/me/` y logout en A y B |
 
+## Sprint 1.1: recepción, citas y admisiones
+
+Estado previo al despliegue: validación local aprobada; evidencia de servidor pendiente de agregar después del despliegue.
+
+| ID | Prueba | Resultado | Evidencia segura |
+| --- | --- | --- | --- |
+| REC-LOCAL-01 | Suite dirigida de recepción | Aprobado | 55/55 pruebas |
+| REC-LOCAL-02 | Suite completa Django | Aprobado | 263/263 pruebas en 411.710 s |
+| REC-LOCAL-03 | Django system check | Aprobado | Sin errores ni advertencias silenciadas |
+| REC-LOCAL-04 | Coherencia de migraciones | Aprobado | `makemigrations --check --dry-run`: sin cambios pendientes |
+| REC-LOCAL-05 | Build web | Aprobado | Vite produjo assets de producción |
+| REC-LOCAL-06 | Lint web | Aprobado con observaciones | 0 errores; 62 advertencias heredadas después de retirar la advertencia nueva |
+| REC-LOCAL-07 | TypeScript móvil | Aprobado | `npx tsc --noEmit` sin errores |
+| REC-LOCAL-08 | Lint móvil | Aprobado | `expo lint` sin errores |
+| REC-LOCAL-09 | Expo Doctor | Aprobado | 18/18 verificaciones |
+| REC-LOCAL-10 | Auditoría npm web | Aprobado | 0 vulnerabilidades de producción |
+| REC-LOCAL-11 | Auditoría npm móvil | Riesgo aceptado temporalmente | 15 moderadas transitivas; la corrección automática fuerza Expo 57 y requiere un sprint de actualización del SDK |
+| REC-PROD-01 | Despliegue Sprint 1.1 | Pendiente | Se completará después de respaldo, migración y reinicio |
+| REC-PROD-02 | Flujos Clínica A y B | Pendiente | Se ejecutará con datos sintéticos no sensibles |
+| REC-PHYSICAL-01 | Android físico | Pendiente | No se marca aprobado por inferencia; requiere prueba manual con Expo Go |
+
 ## Observaciones de despliegue
 
 - MySQL advirtió que no aplica siete restricciones únicas condicionales de Django. No bloqueó el despliegue, pero deben mantenerse cubiertas por validación transaccional y pruebas.

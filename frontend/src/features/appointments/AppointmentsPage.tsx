@@ -41,7 +41,7 @@ export function AppointmentsPage({ mode = "clinic" }: { mode?: Mode }) {
   const [cancellingId, setCancellingId] = useState<number | null>(null);
   const [cancelReason, setCancelReason] = useState("");
 
-  const canManage = ["admin", "superadmin", "recepcionista", "enfermera"].includes(roleName);
+  const canManage = ["admin", "recepcionista"].includes(roleName);
   const canCreate = canManage || roleName === "medico" || roleName === "paciente";
 
   async function load() {

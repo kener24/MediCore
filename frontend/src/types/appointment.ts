@@ -27,6 +27,7 @@ export interface Appointment {
   cancelled_at?: string | null;
   confirmed_at?: string | null;
   attended_at?: string | null;
+  visit_id?: number | null;
   activo: boolean;
   creado_en?: string;
   actualizado_en?: string;

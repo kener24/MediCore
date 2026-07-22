@@ -6,6 +6,7 @@ import { getErrorMessage } from "../../api/axios";
 import { cancelReceptionVisit, completeTriage, createVisitVitalSigns, generateInvoiceFromVisit, getAdmissionStatsToday, getDoctorWaitingRoom, getPendingBillingVisits, getTriageQueue, getVisit, getVisitVitalSigns, getVisits, registerWalkIn, sendVisitToDoctor, sendVisitToTriage, startTriage, startVisitConsultation } from "../../api/admissionsApi";
 import { getDoctors } from "../../api/doctorsApi";
 import { getPatients } from "../../api/patientsApi";
+import { getClinicWorkflowSettings } from "../../api/clinicSettingsApi";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { EmptyState } from "../../components/ui/EmptyState";
@@ -18,8 +19,11 @@ import type { AdmissionStats, PatientVisit } from "../../types/admission";
 import type { DoctorProfile } from "../../types/doctor";
 import type { VitalSigns, VitalSignsPayload } from "../../types/medicalRecord";
 import type { Patient } from "../../types/patient";
+import type { ClinicWorkflowSettings } from "../../types/clinicSettings";
 import { cleanDecimal, digitInputProps, onlyDigits, onlyPhoneChars, phoneInputProps } from "../../utils/inputSanitizers";
 import { DollarSign } from "lucide-react";
+import { useAuth } from "../../hooks/useAuth";
+import { roleNameFromUser } from "../../utils/roleHome";
 
 const statusLabel: Record<string, string> = {
   registered: "Registrado",
@@ -63,17 +67,37 @@ export function NewWalkInVisitPage() {
   const [patient, setPatient] = useState("");
   const [patientData, setPatientData] = useState({ nombres: "", apellidos: "", identidad: "", fecha_nacimiento: "", genero: "no_especificado", telefono: "", direccion: "" });
   const [visit, setVisit] = useState({ reason: "", symptoms: "", visit_type: "walk_in", priority: "normal", assigned_doctor: "", notes: "" });
+  const [workflow, setWorkflow] = useState<ClinicWorkflowSettings | null>(null);
+  const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
-  useEffect(() => { Promise.all([getPatients({ is_active: "true" }), getDoctors({ is_active: "true" })]).then(([p, d]) => { setPatients(p); setDoctors(d); }).catch((e) => toast.error(getErrorMessage(e))); }, []);
+  useEffect(() => { Promise.all([getPatients({ is_active: "true" }), getDoctors({ is_active: "true" }), getClinicWorkflowSettings()]).then(([p, d, w]) => { setPatients(p); setDoctors(d); setWorkflow(w); }).catch((e) => toast.error(getErrorMessage(e))); }, []);
   async function submit(e: FormEvent) {
     e.preventDefault();
+    if (saving) return;
+    if (workflow && !workflow.allow_walk_in_patients) {
+      toast.error("La clínica no permite admisiones sin cita.");
+      return;
+    }
+    if (mode === "new") {
+      const identity = onlyDigits(patientData.identidad);
+      const phone = onlyDigits(patientData.telefono);
+      const duplicate = patients.find((item) => (identity && onlyDigits(item.identidad || "") === identity) || (phone && onlyDigits(item.telefono || "") === phone));
+      if (duplicate) {
+        setMode("existing");
+        setPatient(String(duplicate.id));
+        toast.warning("Encontramos un paciente con información similar. Revisa el registro antes de crear uno nuevo.");
+        return;
+      }
+    }
+    setSaving(true);
     try {
       const created = await registerWalkIn({ patient: mode === "existing" ? Number(patient) : null, patient_data: mode === "new" ? patientData : undefined, visit: { ...visit, assigned_doctor: visit.assigned_doctor ? Number(visit.assigned_doctor) : null } });
       toast.success("Atencion registrada correctamente.");
       navigate(`/clinic/admissions/visits/${created.id}`);
-    } catch (err) { toast.error(getErrorMessage(err)); }
+    } catch (err) { toast.error(getErrorMessage(err)); } finally { setSaving(false); }
   }
-  return <div className="space-y-6"><PageHeader title="Nueva atencion" description="Registro rapido para pacientes con o sin cita." /><Card><form className="grid gap-4" onSubmit={submit}><div className="flex gap-2"><Button type="button" variant={mode === "existing" ? "primary" : "outline"} onClick={() => setMode("existing")}>Paciente existente</Button><Button type="button" variant={mode === "new" ? "primary" : "outline"} onClick={() => setMode("new")}>Paciente nuevo</Button></div>{mode === "existing" ? <select className="h-11 rounded-md border px-3 text-sm" required value={patient} onChange={(e) => setPatient(e.target.value)}><option value="">Selecciona paciente</option>{patients.map((p) => <option key={p.id} value={p.id}>{p.nombre_completo} | {p.identidad || p.telefono}</option>)}</select> : <div className="grid gap-3 md:grid-cols-3"><input className="h-11 rounded-md border px-3 text-sm" placeholder="Nombres" required value={patientData.nombres} onChange={(e) => setPatientData({ ...patientData, nombres: e.target.value })} /><input className="h-11 rounded-md border px-3 text-sm" placeholder="Apellidos" required value={patientData.apellidos} onChange={(e) => setPatientData({ ...patientData, apellidos: e.target.value })} /><input className="h-11 rounded-md border px-3 text-sm" maxLength={20} placeholder="Identidad" value={patientData.identidad} {...digitInputProps} onChange={(e) => setPatientData({ ...patientData, identidad: onlyDigits(e.target.value) })} /><input className="h-11 rounded-md border px-3 text-sm" type="date" value={patientData.fecha_nacimiento} onChange={(e) => setPatientData({ ...patientData, fecha_nacimiento: e.target.value })} /><select className="h-11 rounded-md border px-3 text-sm" value={patientData.genero} onChange={(e) => setPatientData({ ...patientData, genero: e.target.value })}><option value="no_especificado">No especificado</option><option value="masculino">Masculino</option><option value="femenino">Femenino</option><option value="otro">Otro</option></select><input className="h-11 rounded-md border px-3 text-sm" maxLength={30} placeholder="Telefono" value={patientData.telefono} {...phoneInputProps} onChange={(e) => setPatientData({ ...patientData, telefono: onlyPhoneChars(e.target.value) })} /></div>}<div className="grid gap-3 md:grid-cols-2"><input className="h-11 rounded-md border px-3 text-sm" placeholder="Motivo de visita" required value={visit.reason} onChange={(e) => setVisit({ ...visit, reason: e.target.value })} /><select className="h-11 rounded-md border px-3 text-sm" value={visit.priority} onChange={(e) => setVisit({ ...visit, priority: e.target.value })}><option value="normal">Normal</option><option value="priority">Prioritario</option><option value="urgent">Urgente</option><option value="emergency">Emergencia</option></select><select className="h-11 rounded-md border px-3 text-sm" value={visit.assigned_doctor} onChange={(e) => setVisit({ ...visit, assigned_doctor: e.target.value })}><option value="">Medico sin asignar</option>{doctors.map((d) => <option key={d.id} value={d.id}>{d.user_nombre}</option>)}</select><input className="h-11 rounded-md border px-3 text-sm" placeholder="Sintomas iniciales" value={visit.symptoms} onChange={(e) => setVisit({ ...visit, symptoms: e.target.value })} /></div><Button type="submit">Registrar atencion</Button></form></Card></div>;
+  if (workflow && !workflow.allow_walk_in_patients) return <div className="space-y-6"><PageHeader title="Nueva atención" description="Registro de pacientes sin cita." /><EmptyState title="Admisiones sin cita deshabilitadas" description="La configuración de esta clínica no permite registrar pacientes sin cita." /></div>;
+  return <div className="space-y-6"><PageHeader title="Nueva atencion" description="Registro rapido para pacientes con o sin cita." /><Card><form className="grid gap-4" onSubmit={submit}><div className="flex gap-2"><Button type="button" variant={mode === "existing" ? "primary" : "outline"} onClick={() => setMode("existing")}>Paciente existente</Button>{workflow?.reception_can_create_minimal_patient !== false ? <Button type="button" variant={mode === "new" ? "primary" : "outline"} onClick={() => setMode("new")}>Paciente nuevo</Button> : null}</div>{mode === "existing" ? <select className="h-11 rounded-md border px-3 text-sm" required value={patient} onChange={(e) => setPatient(e.target.value)}><option value="">Selecciona paciente</option>{patients.map((p) => <option key={p.id} value={p.id}>{p.nombre_completo} | {p.identidad || p.telefono}</option>)}</select> : <div className="grid gap-3 md:grid-cols-3"><input className="h-11 rounded-md border px-3 text-sm" placeholder="Nombres" required value={patientData.nombres} onChange={(e) => setPatientData({ ...patientData, nombres: e.target.value })} /><input className="h-11 rounded-md border px-3 text-sm" placeholder="Apellidos" required value={patientData.apellidos} onChange={(e) => setPatientData({ ...patientData, apellidos: e.target.value })} /><input className="h-11 rounded-md border px-3 text-sm" maxLength={20} placeholder="Identidad" required={workflow?.require_identity_for_patient} value={patientData.identidad} {...digitInputProps} onChange={(e) => setPatientData({ ...patientData, identidad: onlyDigits(e.target.value) })} /><input className="h-11 rounded-md border px-3 text-sm" type="date" max={new Date().toISOString().slice(0, 10)} value={patientData.fecha_nacimiento} onChange={(e) => setPatientData({ ...patientData, fecha_nacimiento: e.target.value })} /><select className="h-11 rounded-md border px-3 text-sm" value={patientData.genero} onChange={(e) => setPatientData({ ...patientData, genero: e.target.value })}><option value="no_especificado">No especificado</option><option value="masculino">Masculino</option><option value="femenino">Femenino</option><option value="otro">Otro</option></select><input className="h-11 rounded-md border px-3 text-sm" maxLength={30} placeholder="Telefono" required={workflow?.require_phone_for_patient} value={patientData.telefono} {...phoneInputProps} onChange={(e) => setPatientData({ ...patientData, telefono: onlyPhoneChars(e.target.value) })} /></div>}<div className="grid gap-3 md:grid-cols-2"><input className="h-11 rounded-md border px-3 text-sm" placeholder="Motivo de visita" required value={visit.reason} onChange={(e) => setVisit({ ...visit, reason: e.target.value })} /><select className="h-11 rounded-md border px-3 text-sm" value={visit.priority} onChange={(e) => setVisit({ ...visit, priority: e.target.value })}><option value="normal">Normal</option><option value="priority">Prioritario</option><option value="urgent">Urgente</option><option value="emergency">Emergencia</option></select><select className="h-11 rounded-md border px-3 text-sm" required={workflow?.walk_in_requires_triage === false} value={visit.assigned_doctor} onChange={(e) => setVisit({ ...visit, assigned_doctor: e.target.value })}><option value="">Medico sin asignar</option>{doctors.map((d) => <option key={d.id} value={d.id}>{d.user_nombre}</option>)}</select><input className="h-11 rounded-md border px-3 text-sm" placeholder="Sintomas iniciales" value={visit.symptoms} onChange={(e) => setVisit({ ...visit, symptoms: e.target.value })} /></div><Button type="submit" isLoading={saving}>Registrar atencion</Button></form></Card></div>;
 }
 
 export function AdmissionVisitDetailsPage() {
@@ -82,16 +106,22 @@ export function AdmissionVisitDetailsPage() {
   const [signs, setSigns] = useState<VitalSigns[]>([]);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [workflow, setWorkflow] = useState<ClinicWorkflowSettings | null>(null);
+  const [busy, setBusy] = useState(false);
+  const { user } = useAuth();
+  const role = roleNameFromUser(user);
   const navigate = useNavigate();
   async function load() {
     if (!id) return;
-    const [v, s] = await Promise.all([getVisit(id), getVisitVitalSigns(id)]);
+    const [v, s, w] = await Promise.all([getVisit(id), getVisitVitalSigns(id), getClinicWorkflowSettings()]);
     setVisit(v);
     setSigns(s);
+    setWorkflow(w);
   }
   useEffect(() => { load().catch((e) => toast.error(getErrorMessage(e))); }, [id]);
   async function run(action: "triage" | "doctor" | "invoice" | "cancel") {
-    if (!visit) return;
+    if (!visit || busy) return;
+    setBusy(true);
     try {
       if (action === "triage") {
         setVisit(await sendVisitToTriage(visit.id));
@@ -118,14 +148,16 @@ export function AdmissionVisitDetailsPage() {
       }
     } catch (err) {
       toast.error(getErrorMessage(err));
-    }
+    } finally { setBusy(false); }
   }
   if (!visit) return <Loader />;
-  const closed = ["cancelled", "completed", "paid"].includes(visit.status);
-  const canSendTriage = !closed && !["waiting_triage", "in_triage", "waiting_billing"].includes(visit.status);
-  const canSendDoctor = !closed && !["waiting_doctor", "in_consultation", "waiting_billing"].includes(visit.status);
+  const receptionRole = ["admin", "recepcionista"].includes(role);
+  const requiresTriage = visit.visit_type === "appointment" ? workflow?.appointment_requires_triage : workflow?.walk_in_requires_triage;
+  const canSendTriage = receptionRole && ["registered", "waiting_doctor"].includes(visit.status);
+  const canSendDoctor = receptionRole && requiresTriage === false && Boolean(visit.assigned_doctor) && ["registered", "waiting_triage"].includes(visit.status);
+  const canCancel = receptionRole && ["registered", "waiting_triage", "waiting_doctor"].includes(visit.status);
   const canInvoice = visit.status === "waiting_billing" && !visit.invoice;
-  return <div className="space-y-6"><PageHeader title={`Atencion ${visit.visit_number}`} description={visit.patient_nombre || ""} actions={<div className="flex flex-wrap gap-2"><Link className="inline-flex h-10 items-center rounded-md border px-4 text-sm font-semibold" to="/clinic/admissions">Volver</Link>{canSendTriage ? <Button variant="outline" onClick={() => run("triage")}>Enviar a triaje</Button> : null}{canSendDoctor ? <Button variant="outline" onClick={() => run("doctor")}>Enviar a medico</Button> : null}{canInvoice ? <Button onClick={() => run("invoice")}>Generar factura</Button> : null}{!closed ? <Button variant="danger" onClick={() => setCancelOpen(true)}>Cancelar admision</Button> : null}</div>} /><Card><div className="grid gap-3 text-sm md:grid-cols-3"><p><b>Estado:</b> {statusLabel[visit.status]}</p><p><b>Prioridad:</b> {visit.priority}</p><p><b>Motivo:</b> {visit.reason}</p><p><b>Sintomas:</b> {visit.symptoms || "-"}</p><p><b>Medico:</b> {visit.assigned_doctor_nombre || "-"}</p><p><b>Enfermera:</b> {visit.assigned_nurse_nombre || "-"}</p><p><b>Factura:</b> {visit.invoice ? `#${visit.invoice}` : "Sin factura"}</p></div></Card><Card title="Signos vitales">{signs.length ? <Table data={signs} columns={[{ key: "date", header: "Fecha", render: (s) => s.recorded_at?.slice(0, 16).replace("T", " ") }, { key: "bp", header: "Presion", render: (s) => `${s.blood_pressure_systolic || "-"} / ${s.blood_pressure_diastolic || "-"}` }, { key: "temp", header: "Temp.", render: (s) => s.temperature || "-" }, { key: "ox", header: "Oxigeno", render: (s) => s.oxygen_saturation || "-" }, { key: "bmi", header: "IMC", render: (s) => s.bmi || "-" }]} /> : <EmptyState title="Sin signos vitales." description="La evaluacion de enfermeria aparecera aqui." />}</Card><Modal open={cancelOpen} title="Cancelar admision" onClose={() => setCancelOpen(false)} actions={<><ModalCloseButton onClick={() => setCancelOpen(false)} /><Button variant="danger" onClick={() => run("cancel")}>Confirmar cancelacion</Button></>}><div className="space-y-3"><p className="text-sm text-slate-600">Escribe el motivo. La cancelacion quedara registrada en auditoria.</p><textarea className="min-h-28 w-full rounded-md border px-3 py-2 text-sm" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="Ej. Paciente decide retirarse antes de ser atendido" /></div></Modal></div>;
+  return <div className="space-y-6"><PageHeader title={`Atencion ${visit.visit_number}`} description={visit.patient_nombre || ""} actions={<div className="flex flex-wrap gap-2"><Link className="inline-flex h-10 items-center rounded-md border px-4 text-sm font-semibold" to="/clinic/admissions">Volver</Link>{canSendTriage ? <Button disabled={busy} variant="outline" onClick={() => run("triage")}>Enviar a triaje</Button> : null}{canSendDoctor ? <Button disabled={busy} variant="outline" onClick={() => run("doctor")}>Enviar a medico</Button> : null}{canInvoice ? <Button disabled={busy} onClick={() => run("invoice")}>Generar factura</Button> : null}{canCancel ? <Button disabled={busy} variant="danger" onClick={() => setCancelOpen(true)}>Cancelar admision</Button> : null}</div>} /><Card><div className="grid gap-3 text-sm md:grid-cols-3"><p><b>Estado:</b> {statusLabel[visit.status]}</p><p><b>Prioridad:</b> {visit.priority}</p><p><b>Motivo:</b> {visit.reason}</p><p><b>Sintomas:</b> {visit.symptoms || "-"}</p><p><b>Medico:</b> {visit.assigned_doctor_nombre || "-"}</p><p><b>Enfermera:</b> {visit.assigned_nurse_nombre || "-"}</p><p><b>Factura:</b> {visit.invoice ? `#${visit.invoice}` : "Sin factura"}</p></div></Card><Card title="Signos vitales">{signs.length ? <Table data={signs} columns={[{ key: "date", header: "Fecha", render: (s) => s.recorded_at?.slice(0, 16).replace("T", " ") }, { key: "bp", header: "Presion", render: (s) => `${s.blood_pressure_systolic || "-"} / ${s.blood_pressure_diastolic || "-"}` }, { key: "temp", header: "Temp.", render: (s) => s.temperature || "-" }, { key: "ox", header: "Oxigeno", render: (s) => s.oxygen_saturation || "-" }, { key: "bmi", header: "IMC", render: (s) => s.bmi || "-" }]} /> : <EmptyState title="Sin signos vitales." description="La evaluacion de enfermeria aparecera aqui." />}</Card><Modal open={cancelOpen} title="Cancelar admision" onClose={() => setCancelOpen(false)} actions={<><ModalCloseButton onClick={() => setCancelOpen(false)} /><Button disabled={busy} variant="danger" onClick={() => run("cancel")}>Confirmar cancelacion</Button></>}><div className="space-y-3"><p className="text-sm text-slate-600">Escribe el motivo. La cancelacion quedara registrada en auditoria.</p><textarea className="min-h-28 w-full rounded-md border px-3 py-2 text-sm" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="Ej. Paciente decide retirarse antes de ser atendido" /></div></Modal></div>;
 }
 
 function VitalSignsMiniForm({ visit, onSaved }: { visit: PatientVisit; onSaved: () => void }) {

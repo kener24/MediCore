@@ -1,11 +1,12 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { ArrowLeft, CheckCircle2, Pencil, UserCheck, UserX, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ClipboardCheck, Pencil, UserCheck, UserX, XCircle } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { cancelAppointment, confirmAppointment, getAppointment, markAppointmentAttended, markAppointmentNoShow } from "../../api/appointmentsApi";
 import { getErrorMessage } from "../../api/axios";
 import { startConsultationFromAppointment } from "../../api/medicalRecordsApi";
+import { checkInAppointment } from "../../api/admissionsApi";
 import { AppointmentStatusBadge } from "../../components/ui/AppointmentStatusBadge";
 import { Card } from "../../components/ui/Card";
 import { Loader } from "../../components/ui/Loader";
@@ -25,7 +26,7 @@ export function AppointmentDetailsPage() {
   const [saving, setSaving] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
-  const canManage = ["admin", "superadmin", "recepcionista", "enfermera"].includes(roleName);
+  const canManage = ["admin", "recepcionista"].includes(roleName);
 
   async function load() {
     if (!id) return;
@@ -77,6 +78,20 @@ export function AppointmentDetailsPage() {
     }
   }
 
+  async function checkIn() {
+    if (!id || saving) return;
+    setSaving(true);
+    try {
+      const result = await checkInAppointment({ appointment: Number(id) });
+      toast.success(result.message || "Check-in realizado correctamente.");
+      navigate(`/clinic/admissions/visits/${result.visit_id}`);
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading) return <Loader />;
   if (!appointment) return null;
   const mutable = appointment.status !== "atendida" && appointment.status !== "cancelada";
@@ -109,6 +124,10 @@ export function AppointmentDetailsPage() {
             <p className="text-xs font-semibold uppercase text-slate-500">Fecha y hora</p>
             <p className="mt-1 text-slate-900">{formatDateOnly(appointment.scheduled_date)} | {formatTime(appointment.start_time)} - {formatTime(appointment.end_time)}</p>
           </div>
+          <div>
+            <p className="text-xs font-semibold uppercase text-slate-500">Modalidad</p>
+            <p className="mt-1 text-slate-900">{appointment.modality === "online" ? "En línea" : "Presencial"}</p>
+          </div>
           <div className="lg:col-span-2">
             <p className="text-xs font-semibold uppercase text-slate-500">Motivo</p>
             <p className="mt-1 text-slate-900">{appointment.reason}</p>
@@ -124,6 +143,8 @@ export function AppointmentDetailsPage() {
         <div className="flex flex-wrap justify-end gap-2">
           {canManage && mutable ? <Link className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-200 px-4 text-sm font-semibold text-slate-700" to={`/clinic/appointments/${appointment.id}/edit`}><Pencil className="h-4 w-4" />Editar</Link> : null}
           {canManage && appointment.status === "pendiente" ? <button className="inline-flex h-10 items-center gap-2 rounded-md bg-emerald-600 px-4 text-sm font-semibold text-white" disabled={saving} onClick={() => run(() => confirmAppointment(appointment.id), "Cita confirmada.")}><CheckCircle2 className="h-4 w-4" />Confirmar</button> : null}
+          {canManage && activeFlow && !appointment.visit_id ? <button className="inline-flex h-10 items-center gap-2 rounded-md bg-brand-600 px-4 text-sm font-semibold text-white" disabled={saving} onClick={checkIn}><ClipboardCheck className="h-4 w-4" />Hacer check-in</button> : null}
+          {canManage && appointment.visit_id ? <Link className="inline-flex h-10 items-center gap-2 rounded-md bg-brand-600 px-4 text-sm font-semibold text-white" to={`/clinic/admissions/visits/${appointment.visit_id}`}><ClipboardCheck className="h-4 w-4" />Ver visita</Link> : null}
           {roleName === "medico" && activeFlow ? <button className="inline-flex h-10 items-center gap-2 rounded-md bg-brand-600 px-4 text-sm font-semibold text-white" disabled={saving} onClick={startConsultation}>Iniciar consulta</button> : null}
           {canManage && activeFlow ? <button className="inline-flex h-10 items-center gap-2 rounded-md bg-brand-600 px-4 text-sm font-semibold text-white" disabled={saving} onClick={() => run(() => markAppointmentAttended(appointment.id), "Cita atendida.")}><UserCheck className="h-4 w-4" />Atendida</button> : null}
           {canManage && activeFlow ? <button className="inline-flex h-10 items-center gap-2 rounded-md bg-amber-600 px-4 text-sm font-semibold text-white" disabled={saving} onClick={() => run(() => markAppointmentNoShow(appointment.id), "Cita marcada como no asistio.")}><UserX className="h-4 w-4" />No asistio</button> : null}

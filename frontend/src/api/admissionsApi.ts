@@ -7,7 +7,8 @@ export async function getVisits(filters?: Record<string, string>) { const { data
 export async function getVisit(id: number | string) { const { data } = await api.get<PatientVisit>(`/admissions/visits/${id}/`); return data; }
 export async function createVisit(payload: Record<string, unknown>) { const { data } = await api.post<PatientVisit>("/admissions/visits/", payload); return data; }
 export async function registerWalkIn(payload: Record<string, unknown>) { const { data } = await api.post<PatientVisit>("/admissions/register-walk-in/", payload); return data; }
-export async function checkInAppointment(payload: Record<string, unknown>) { const { data } = await api.post<PatientVisit>("/admissions/check-in-appointment/", payload); return data; }
+export interface AppointmentCheckInResult { success: boolean; appointment_id: number; visit_id: number; visit: PatientVisit; created: boolean; message: string; }
+export async function checkInAppointment(payload: Record<string, unknown>) { const { data } = await api.post<AppointmentCheckInResult>("/admissions/check-in-appointment/", payload); return data; }
 export async function getTriageQueue(filters?: Record<string, string>) { const { data } = await api.get<PatientVisit[]>("/admissions/triage-queue/", { params: filters }); return data; }
 export async function startTriage(id: number | string) { const { data } = await api.patch<PatientVisit>(`/admissions/visits/${id}/start-triage/`); return data; }
 export async function completeTriage(id: number | string) { const { data } = await api.patch<PatientVisit>(`/admissions/visits/${id}/complete-triage/`); return data; }

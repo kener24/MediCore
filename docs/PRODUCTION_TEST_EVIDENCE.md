@@ -45,6 +45,7 @@ Despliegue y pruebas ejecutados el 2026-07-22 contra `https://kp-software.tech` 
 | REC-LOCAL-09 | Expo Doctor | Aprobado | 18/18 verificaciones |
 | REC-LOCAL-10 | Auditoría npm web | Aprobado | 0 vulnerabilidades de producción |
 | REC-LOCAL-11 | Auditoría npm móvil | Riesgo aceptado temporalmente | 15 moderadas transitivas; la corrección automática fuerza Expo 57 y requiere un sprint de actualización del SDK |
+| REC-LOCAL-12 | Inicio de Expo y bundle Android | Aprobado | Metro inició con caché limpia en 8081; manifest 200 y bundle Android 200 con 1,501 módulos |
 | REC-PROD-01 | Respaldo previo | Aprobado | Dump MySQL completo verificado en `backups/sprint11-20260722-054438/database-no-tablespaces.sql` |
 | REC-PROD-02 | Despliegue Sprint 1.1 | Aprobado | Commit `9ddba07`; migración `admissions.0003` aplicada; MediCore y Nginx activos |
 | REC-PROD-03 | Build web y HTTPS | Aprobado | Vite compiló en servidor; `nginx -t` válido y recarga correcta |

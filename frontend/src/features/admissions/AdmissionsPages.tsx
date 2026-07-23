@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { getErrorMessage } from "../../api/axios";
-import { cancelReceptionVisit, completeTriage, createVisitVitalSigns, generateInvoiceFromVisit, getAdmissionStatsToday, getDoctorWaitingRoom, getPendingBillingVisits, getTriageQueue, getVisit, getVisitVitalSigns, getVisits, registerWalkIn, sendVisitToDoctor, sendVisitToTriage, startTriage, startVisitConsultation } from "../../api/admissionsApi";
+import { cancelReceptionVisit, completeTriage, createVisitVitalSigns, generateInvoiceFromVisit, getAdmissionStatsToday, getCompletedTriages, getDoctorWaitingRoom, getPendingBillingVisits, getTriageQueue, getVisit, getVisitVitalSigns, getVisits, registerWalkIn, sendVisitToDoctor, sendVisitToTriage, startTriage, startVisitConsultation } from "../../api/admissionsApi";
 import { getDoctors } from "../../api/doctorsApi";
 import { getPatients } from "../../api/patientsApi";
 import { getClinicWorkflowSettings } from "../../api/clinicSettingsApi";
@@ -15,7 +15,7 @@ import { Modal, ModalCloseButton } from "../../components/ui/Modal";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { StatCard } from "../../components/ui/StatCard";
 import { Table } from "../../components/ui/Table";
-import type { AdmissionStats, PatientVisit } from "../../types/admission";
+import type { AdmissionStats, CompleteTriagePayload, PatientVisit, VisitPriority } from "../../types/admission";
 import type { DoctorProfile } from "../../types/doctor";
 import type { VitalSigns, VitalSignsPayload } from "../../types/medicalRecord";
 import type { Patient } from "../../types/patient";
@@ -43,9 +43,10 @@ function VisitBadge({ value }: { value: string }) {
 function VisitTable({ visits, actions }: { visits: PatientVisit[]; actions?: (visit: PatientVisit) => ReactNode }) {
   return visits.length ? <Table data={visits} columns={[
     { key: "arrival", header: "Llegada", render: (v) => new Date(v.arrival_time).toLocaleTimeString("es-HN", { hour: "2-digit", minute: "2-digit" }) },
-    { key: "patient", header: "Paciente", render: (v) => v.patient_nombre },
+    { key: "patient", header: "Paciente", render: (v) => <div><p className="font-semibold">{v.patient_nombre}</p><p className="text-xs text-slate-500">{v.visit_number} · {v.visit_type === "appointment" ? "Cita" : "Sin cita"}</p></div> },
     { key: "reason", header: "Motivo", render: (v) => v.reason },
-    { key: "priority", header: "Prioridad", render: (v) => v.priority },
+    { key: "wait", header: "Espera", render: (v) => `${v.waiting_minutes ?? 0} min` },
+    { key: "priority", header: "Prioridad", render: (v) => ({ normal: "Normal", priority: "Prioritario", urgent: "Urgente", emergency: "Emergencia" }[v.priority] || v.priority) },
     { key: "doctor", header: "Medico", render: (v) => v.assigned_doctor_nombre || "-" },
     { key: "status", header: "Estado", render: (v) => <VisitBadge value={v.status} /> },
     { key: "actions", header: "Acciones", render: (v) => actions ? actions(v) : <Link className="rounded-md border px-3 py-1 text-xs font-semibold" to={`/clinic/admissions/visits/${v.id}`}>Ver</Link> },
@@ -176,18 +177,182 @@ export function AdmissionVisitDetailsPage() {
   return <div className="space-y-6"><PageHeader title={`Atencion ${visit.visit_number}`} description={visit.patient_nombre || ""} actions={<div className="flex flex-wrap gap-2"><Link className="inline-flex h-10 items-center rounded-md border px-4 text-sm font-semibold" to="/clinic/admissions">Volver</Link>{canSendTriage ? <Button disabled={busy} variant="outline" onClick={() => run("triage")}>Enviar a triaje</Button> : null}{canSendDoctor ? <Button disabled={busy} variant="outline" onClick={() => run("doctor")}>Enviar a medico</Button> : null}{canInvoice ? <Button disabled={busy} onClick={() => run("invoice")}>Generar factura</Button> : null}{canCancel ? <Button disabled={busy} variant="danger" onClick={() => setCancelOpen(true)}>Cancelar admision</Button> : null}</div>} /><Card><div className="grid gap-3 text-sm md:grid-cols-3"><p><b>Estado:</b> {statusLabel[visit.status]}</p><p><b>Prioridad:</b> {visit.priority}</p><p><b>Motivo:</b> {visit.reason}</p><p><b>Sintomas:</b> {visit.symptoms || "-"}</p><p><b>Medico:</b> {visit.assigned_doctor_nombre || "-"}</p><p><b>Enfermera:</b> {visit.assigned_nurse_nombre || "-"}</p><p><b>Factura:</b> {visit.invoice ? `#${visit.invoice}` : "Sin factura"}</p></div></Card><Card title="Signos vitales">{signs.length ? <Table data={signs} columns={[{ key: "date", header: "Fecha", render: (s) => s.recorded_at?.slice(0, 16).replace("T", " ") }, { key: "bp", header: "Presion", render: (s) => `${s.blood_pressure_systolic || "-"} / ${s.blood_pressure_diastolic || "-"}` }, { key: "temp", header: "Temp.", render: (s) => s.temperature || "-" }, { key: "ox", header: "Oxigeno", render: (s) => s.oxygen_saturation || "-" }, { key: "bmi", header: "IMC", render: (s) => s.bmi || "-" }]} /> : <EmptyState title="Sin signos vitales." description="La evaluacion de enfermeria aparecera aqui." />}</Card><Modal open={cancelOpen} title="Cancelar admision" onClose={() => setCancelOpen(false)} actions={<><ModalCloseButton onClick={() => setCancelOpen(false)} /><Button disabled={busy} variant="danger" onClick={() => run("cancel")}>Confirmar cancelacion</Button></>}><div className="space-y-3"><p className="text-sm text-slate-600">Escribe el motivo. La cancelacion quedara registrada en auditoria.</p><textarea className="min-h-28 w-full rounded-md border px-3 py-2 text-sm" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="Ej. Paciente decide retirarse antes de ser atendido" /></div></Modal></div>;
 }
 
+type VitalFormState = {
+  blood_pressure_systolic: string;
+  blood_pressure_diastolic: string;
+  temperature: string;
+  heart_rate: string;
+  respiratory_rate: string;
+  oxygen_saturation: string;
+  weight: string;
+  height: string;
+  glucose: string;
+  pain_scale: string;
+  notes: string;
+};
+
+const emptyVitalForm: VitalFormState = {
+  blood_pressure_systolic: "",
+  blood_pressure_diastolic: "",
+  temperature: "",
+  heart_rate: "",
+  respiratory_rate: "",
+  oxygen_saturation: "",
+  weight: "",
+  height: "",
+  glucose: "",
+  pain_scale: "",
+  notes: "",
+};
+
 function VitalSignsMiniForm({ visit, onSaved }: { visit: PatientVisit; onSaved: () => void }) {
-  const [form, setForm] = useState<VitalSignsPayload & { pain_scale?: number }>({});
-  async function submit(e: FormEvent) { e.preventDefault(); try { await createVisitVitalSigns(visit.id, form); toast.success("Signos vitales registrados."); onSaved(); } catch (err) { toast.error(getErrorMessage(err)); } }
-  return <form className="grid gap-3 md:grid-cols-3" onSubmit={submit}>{["blood_pressure_systolic", "blood_pressure_diastolic", "temperature", "heart_rate", "respiratory_rate", "oxygen_saturation", "weight", "height", "glucose", "pain_scale"].map((key) => <input key={key} className="h-10 rounded-md border px-3 text-sm" inputMode="decimal" placeholder={key} value={(form as Record<string, string | number | undefined>)[key] ?? ""} onChange={(e) => setForm({ ...form, [key]: cleanDecimal(e.target.value, key === "temperature" ? 1 : 2) })} />)}<input className="h-10 rounded-md border px-3 text-sm md:col-span-2" placeholder="Observaciones" value={form.notes ?? ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} /><Button type="submit">Guardar signos</Button></form>;
+  const current = visit.vital_signs;
+  const [form, setForm] = useState<VitalFormState>({
+    ...emptyVitalForm,
+    blood_pressure_systolic: current?.blood_pressure_systolic?.toString() ?? "",
+    blood_pressure_diastolic: current?.blood_pressure_diastolic?.toString() ?? "",
+    temperature: current?.temperature ?? "",
+    heart_rate: current?.heart_rate?.toString() ?? "",
+    respiratory_rate: current?.respiratory_rate?.toString() ?? "",
+    oxygen_saturation: current?.oxygen_saturation?.toString() ?? "",
+    weight: current?.weight ?? "",
+    height: current?.height ?? "",
+    glucose: current?.glucose?.toString() ?? "",
+    pain_scale: current?.pain_scale?.toString() ?? "",
+    notes: current?.notes ?? "",
+  });
+  const [saving, setSaving] = useState(false);
+  const fields: { key: keyof VitalFormState; label: string; decimal?: boolean }[] = [
+    { key: "temperature", label: "Temperatura (°C)", decimal: true },
+    { key: "blood_pressure_systolic", label: "Presión sistólica" },
+    { key: "blood_pressure_diastolic", label: "Presión diastólica" },
+    { key: "heart_rate", label: "Frecuencia cardíaca" },
+    { key: "respiratory_rate", label: "Frecuencia respiratoria" },
+    { key: "oxygen_saturation", label: "Saturación de oxígeno (%)" },
+    { key: "weight", label: "Peso (kg)", decimal: true },
+    { key: "height", label: "Altura (m)", decimal: true },
+    { key: "glucose", label: "Glucosa" },
+    { key: "pain_scale", label: "Dolor (0 a 10)" },
+  ];
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (saving) return;
+    const number = (key: keyof VitalFormState) => form[key] === "" ? undefined : Number(form[key]);
+    const systolic = number("blood_pressure_systolic");
+    const diastolic = number("blood_pressure_diastolic");
+    const weight = number("weight");
+    const height = number("height");
+    if (!fields.some(({ key }) => form[key] !== "")) return toast.error("Registra al menos un signo vital.");
+    if ((systolic === undefined) !== (diastolic === undefined)) return toast.error("Registra ambos valores de presión arterial.");
+    if (systolic !== undefined && diastolic !== undefined && systolic <= diastolic) return toast.error("La presión sistólica debe ser mayor que la diastólica.");
+    if ((weight === undefined) !== (height === undefined)) return toast.error("Registra peso y altura juntos para calcular el IMC.");
+    const oxygen = number("oxygen_saturation");
+    const pain = number("pain_scale");
+    if (oxygen !== undefined && (oxygen < 0 || oxygen > 100)) return toast.error("La saturación debe estar entre 0 y 100.");
+    if (pain !== undefined && (pain < 0 || pain > 10)) return toast.error("La escala de dolor debe estar entre 0 y 10.");
+    const warnings: string[] = [];
+    const temperature = number("temperature");
+    const heart = number("heart_rate");
+    const respiratory = number("respiratory_rate");
+    const glucose = number("glucose");
+    if (temperature !== undefined && (temperature < 35 || temperature >= 38)) warnings.push("Temperatura fuera del rango habitual");
+    if (oxygen !== undefined && oxygen < 92) warnings.push("Saturación de oxígeno fuera del rango habitual");
+    if (heart !== undefined && (heart < 50 || heart > 120)) warnings.push("Frecuencia cardíaca fuera del rango habitual");
+    if (respiratory !== undefined && (respiratory < 10 || respiratory > 24)) warnings.push("Frecuencia respiratoria fuera del rango habitual");
+    if (systolic !== undefined && diastolic !== undefined && (systolic < 90 || systolic >= 180 || diastolic >= 120)) warnings.push("Presión arterial requiere revisión");
+    if (pain !== undefined && pain >= 8) warnings.push("Dolor elevado");
+    if (glucose !== undefined && (glucose < 70 || glucose > 250)) warnings.push("Glucosa fuera del rango habitual");
+    if (warnings.length && !window.confirm(`${warnings.join(". ")}. Confirma el valor antes de continuar.`)) return;
+    const payload: VitalSignsPayload = {
+      temperature: form.temperature || undefined,
+      blood_pressure_systolic: systolic,
+      blood_pressure_diastolic: diastolic,
+      heart_rate: heart,
+      respiratory_rate: respiratory,
+      oxygen_saturation: oxygen,
+      weight: form.weight || undefined,
+      height: form.height || undefined,
+      glucose,
+      pain_scale: pain,
+      notes: form.notes.trim(),
+      confirm_out_of_range: warnings.length > 0,
+    };
+    try {
+      setSaving(true);
+      await createVisitVitalSigns(visit.id, payload);
+      toast.success(current ? "Signos vitales actualizados." : "Signos vitales registrados.");
+      onSaved();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return <form className="grid gap-3 md:grid-cols-2" onSubmit={submit}>{fields.map(({ key, label, decimal }) => <label className="grid gap-1 text-sm font-semibold text-slate-700" key={key}>{label}<input className="h-10 rounded-md border px-3 text-sm font-normal" inputMode={decimal ? "decimal" : "numeric"} value={form[key]} onChange={(e) => setForm({ ...form, [key]: decimal ? cleanDecimal(e.target.value, 2) : onlyDigits(e.target.value) })} /></label>)}<label className="grid gap-1 text-sm font-semibold text-slate-700 md:col-span-2">Observaciones<textarea className="min-h-24 rounded-md border px-3 py-2 text-sm font-normal" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></label><div className="md:col-span-2"><Button type="submit" isLoading={saving}>{current ? "Actualizar signos" : "Guardar signos"}</Button></div></form>;
+}
+
+function CompleteTriageForm({ visit, onCompleted }: { visit: PatientVisit; onCompleted: () => void }) {
+  const [form, setForm] = useState<CompleteTriagePayload>({ chief_complaint: visit.reason || "", initial_assessment: visit.symptoms || "", priority: visit.priority || "normal", notes: visit.notes || "" });
+  const [saving, setSaving] = useState(false);
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (saving) return;
+    if (form.chief_complaint.trim().length < 5) return toast.error("El motivo principal debe tener al menos 5 caracteres.");
+    if (form.initial_assessment.trim().length < 10) return toast.error("La evaluación inicial debe tener al menos 10 caracteres.");
+    if (!visit.vital_signs) return toast.error("Registra signos vitales antes de completar el triaje.");
+    if (!window.confirm("El paciente será enviado a la sala médica. ¿Deseas completar el triaje?")) return;
+    try {
+      setSaving(true);
+      await completeTriage(visit.id, form);
+      toast.success("Triaje completado y paciente enviado a la sala médica.");
+      onCompleted();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+  return <form className="grid gap-4" onSubmit={submit}><div className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm"><p className="font-semibold text-rose-800">Alergias</p><p className="text-rose-700">{visit.patient_alergias || "No hay alergias registradas."}</p></div><div className="rounded-md border bg-slate-50 p-3 text-sm"><p className="font-semibold">Antecedentes críticos</p><p>{visit.patient_enfermedades_cronicas || "No hay antecedentes críticos registrados."}</p><p className="mt-2 font-semibold">Contacto de emergencia</p><p>{visit.patient_contacto_emergencia_nombre ? [visit.patient_contacto_emergencia_nombre, visit.patient_contacto_emergencia_parentesco, visit.patient_contacto_emergencia_telefono].filter(Boolean).join(" · ") : "No registrado"}</p></div><label className="grid gap-1 text-sm font-semibold">Motivo principal<textarea className="min-h-20 rounded-md border px-3 py-2 font-normal" required value={form.chief_complaint} onChange={(e) => setForm({ ...form, chief_complaint: e.target.value })} /></label><label className="grid gap-1 text-sm font-semibold">Evaluación inicial<textarea className="min-h-28 rounded-md border px-3 py-2 font-normal" required value={form.initial_assessment} onChange={(e) => setForm({ ...form, initial_assessment: e.target.value })} /></label><label className="grid gap-1 text-sm font-semibold">Prioridad<select className="h-10 rounded-md border px-3 font-normal" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value as VisitPriority })}><option value="normal">Normal</option><option value="priority">Prioritario</option><option value="urgent">Urgente</option><option value="emergency">Emergencia</option></select></label><label className="grid gap-1 text-sm font-semibold">Notas<textarea className="min-h-20 rounded-md border px-3 py-2 font-normal" value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></label><Button type="submit" isLoading={saving}>Completar triaje</Button></form>;
 }
 
 export function TriageQueuePage() {
   const [visits, setVisits] = useState<PatientVisit[]>([]);
-  const [selected, setSelected] = useState<PatientVisit | null>(null);
-  async function load() { setVisits(await getTriageQueue()); }
-  useEffect(() => { load().catch((e) => toast.error(getErrorMessage(e))); }, []);
-  return <div className="space-y-6"><PageHeader title="Triaje" description="Evaluacion inicial y signos vitales." /><Card title="Cola de triaje"><VisitTable visits={visits} actions={(v) => <div className="flex flex-wrap gap-2">{v.status === "waiting_triage" ? <Button className="h-8 px-3 text-xs" variant="outline" onClick={async () => { await startTriage(v.id); await load(); }}>Iniciar</Button> : null}<Button className="h-8 px-3 text-xs" variant="outline" onClick={() => setSelected(v)}>Signos</Button><Button className="h-8 px-3 text-xs" onClick={async () => { await completeTriage(v.id); toast.success("Paciente enviado a doctor."); await load(); }}>Enviar a doctor</Button></div>} /></Card><Modal open={Boolean(selected)} title={`Signos vitales ${selected?.patient_nombre ?? ""}`} onClose={() => setSelected(null)} actions={<ModalCloseButton onClick={() => setSelected(null)} />}>{selected ? <VitalSignsMiniForm visit={selected} onSaved={async () => { setSelected(null); await load(); }} /> : null}</Modal></div>;
+  const [completed, setCompleted] = useState<PatientVisit[]>([]);
+  const [selectedSigns, setSelectedSigns] = useState<PatientVisit | null>(null);
+  const [selectedComplete, setSelectedComplete] = useState<PatientVisit | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  async function load() {
+    try {
+      setError("");
+      const [queue, history] = await Promise.all([getTriageQueue(), getCompletedTriages()]);
+      setVisits(queue);
+      setCompleted(history);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  }
+  useEffect(() => { void load(); }, []);
+  async function begin(visit: PatientVisit) {
+    if (busyId) return;
+    try {
+      setBusyId(visit.id);
+      await startTriage(visit.id);
+      toast.success("Triaje iniciado.");
+      await load();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setBusyId(null);
+    }
+  }
+  if (loading) return <Loader />;
+  return <div className="space-y-6"><PageHeader title="Triaje" description="Evaluación inicial, signos vitales y prioridad clínica." actions={<Button variant="outline" onClick={() => void load()}>Actualizar</Button>} />{error ? <Card><div className="space-y-3 text-center"><p className="font-semibold text-red-700">No se pudo cargar la información.</p><p className="text-sm text-slate-600">{error}</p><Button variant="outline" onClick={() => void load()}>Reintentar</Button></div></Card> : <><Card title="Cola de triaje"><VisitTable visits={visits} actions={(v) => <div className="flex flex-wrap gap-2">{v.status === "waiting_triage" ? <Button className="h-8 px-3 text-xs" isLoading={busyId === v.id} variant="outline" onClick={() => void begin(v)}>Iniciar triaje</Button> : null}{v.status === "in_triage" ? <Button className="h-8 px-3 text-xs" variant="outline" onClick={() => setSelectedSigns(v)}>{v.vital_signs ? "Corregir signos" : "Registrar signos"}</Button> : null}{v.status === "in_triage" ? <Button className="h-8 px-3 text-xs" disabled={!v.vital_signs} onClick={() => v.vital_signs ? setSelectedComplete(v) : toast.error("Registra signos vitales antes de completar el triaje.")}>Completar</Button> : null}</div>} /></Card><Card title="Triajes completados"><VisitTable visits={completed} actions={(v) => <Link className="rounded-md border px-3 py-1 text-xs font-semibold" to={`/clinic/admissions/visits/${v.id}`}>Ver detalle</Link>} /></Card></>}<Modal open={Boolean(selectedSigns)} title={`Signos vitales · ${selectedSigns?.patient_nombre ?? ""}`} onClose={() => setSelectedSigns(null)} actions={<ModalCloseButton onClick={() => setSelectedSigns(null)} />}>{selectedSigns ? <VitalSignsMiniForm visit={selectedSigns} onSaved={async () => { setSelectedSigns(null); await load(); }} /> : null}</Modal><Modal open={Boolean(selectedComplete)} title={`Completar triaje · ${selectedComplete?.patient_nombre ?? ""}`} onClose={() => setSelectedComplete(null)} actions={<ModalCloseButton onClick={() => setSelectedComplete(null)} />}>{selectedComplete ? <CompleteTriageForm visit={selectedComplete} onCompleted={async () => { setSelectedComplete(null); await load(); }} /> : null}</Modal></div>;
 }
 
 export function DoctorWaitingRoomPage() {

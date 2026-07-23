@@ -123,7 +123,7 @@ export interface ConsultationPayload {
   status?: ConsultationStatus;
 }
 
-export type VitalSignsPayload = Partial<Omit<VitalSigns, "id" | "consultation" | "bmi" | "registrado_por" | "registrado_por_nombre" | "creado_en" | "actualizado_en">>;
+export type VitalSignsPayload = Partial<Omit<VitalSigns, "id" | "consultation" | "bmi" | "registrado_por" | "registrado_por_nombre" | "creado_en" | "actualizado_en">> & { confirm_out_of_range?: boolean };
 
 export interface ClinicalHistory {
   patient: Record<string, unknown>;

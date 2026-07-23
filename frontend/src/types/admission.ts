@@ -11,6 +11,13 @@ export interface PatientVisit {
   patient_nombre?: string;
   patient_codigo?: string;
   patient_identidad?: string;
+  patient_telefono?: string;
+  patient_genero?: string;
+  patient_alergias?: string;
+  patient_enfermedades_cronicas?: string;
+  patient_contacto_emergencia_nombre?: string;
+  patient_contacto_emergencia_telefono?: string;
+  patient_contacto_emergencia_parentesco?: string;
   appointment: number | null;
   medical_record: number;
   consultation: number | null;
@@ -28,6 +35,9 @@ export interface PatientVisit {
   status: VisitStatus;
   reason: string;
   symptoms: string;
+  chief_complaint?: string;
+  initial_assessment?: string;
+  waiting_minutes?: number;
   notes: string;
   assigned_doctor: number | null;
   assigned_doctor_nombre?: string;
@@ -35,6 +45,13 @@ export interface PatientVisit {
   assigned_nurse_nombre?: string;
   vital_signs?: VitalSigns | null;
   active: boolean;
+}
+
+export interface CompleteTriagePayload {
+  chief_complaint: string;
+  initial_assessment: string;
+  priority: VisitPriority;
+  notes?: string;
 }
 
 export interface AdmissionStats {

@@ -74,6 +74,7 @@ export function NewWalkInVisitPage() {
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (saving) return;
+    let duplicateWarningConfirmed = false;
     if (workflow && !workflow.allow_walk_in_patients) {
       toast.error("La clínica no permite admisiones sin cita.");
       return;
@@ -81,17 +82,32 @@ export function NewWalkInVisitPage() {
     if (mode === "new") {
       const identity = onlyDigits(patientData.identidad);
       const phone = onlyDigits(patientData.telefono);
-      const duplicate = patients.find((item) => (identity && onlyDigits(item.identidad || "") === identity) || (phone && onlyDigits(item.telefono || "") === phone));
-      if (duplicate) {
+      const identityDuplicate = patients.find((item) => identity && onlyDigits(item.identidad || "") === identity);
+      if (identityDuplicate) {
         setMode("existing");
-        setPatient(String(duplicate.id));
-        toast.warning("Encontramos un paciente con información similar. Revisa el registro antes de crear uno nuevo.");
+        setPatient(String(identityDuplicate.id));
+        toast.warning("Ya existe un paciente con esa identidad. Se seleccionó el registro existente.");
         return;
+      }
+      const fullName = `${patientData.nombres} ${patientData.apellidos}`.trim().toLocaleLowerCase();
+      const probableDuplicate = patients.find((item) =>
+        (phone && onlyDigits(item.telefono || "") === phone)
+        || Boolean(patientData.fecha_nacimiento && item.fecha_nacimiento === patientData.fecha_nacimiento && item.nombre_completo.trim().toLocaleLowerCase() === fullName)
+      );
+      if (probableDuplicate) {
+        const useExisting = window.confirm("Encontramos un paciente con información similar. Acepta para usar el registro existente o cancela para revisar si debes crear uno nuevo.");
+        if (useExisting) {
+          setMode("existing");
+          setPatient(String(probableDuplicate.id));
+          return;
+        }
+        duplicateWarningConfirmed = window.confirm("¿Confirmas que deseas crear un paciente nuevo pese a la coincidencia encontrada?");
+        if (!duplicateWarningConfirmed) return;
       }
     }
     setSaving(true);
     try {
-      const created = await registerWalkIn({ patient: mode === "existing" ? Number(patient) : null, patient_data: mode === "new" ? patientData : undefined, visit: { ...visit, assigned_doctor: visit.assigned_doctor ? Number(visit.assigned_doctor) : null } });
+      const created = await registerWalkIn({ patient: mode === "existing" ? Number(patient) : null, patient_data: mode === "new" ? { ...patientData, duplicate_warning_confirmed: duplicateWarningConfirmed } : undefined, visit: { ...visit, assigned_doctor: visit.assigned_doctor ? Number(visit.assigned_doctor) : null } });
       toast.success("Atencion registrada correctamente.");
       navigate(`/clinic/admissions/visits/${created.id}`);
     } catch (err) { toast.error(getErrorMessage(err)); } finally { setSaving(false); }

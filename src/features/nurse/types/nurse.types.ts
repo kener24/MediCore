@@ -1,4 +1,4 @@
-export type TriagePriority = 'critical' | 'urgent' | 'preferential' | 'normal' | 'low';
+export type TriagePriority = 'emergency' | 'urgent' | 'priority' | 'normal';
 export type TriageStatus = 'waiting' | 'in_triage' | 'completed' | 'sent_to_doctor' | 'cancelled';
 
 export interface ApiListResponse<T> {
@@ -38,6 +38,12 @@ export interface NursePatientSummary {
   status?: TriageStatus | string;
   priority?: TriagePriority | string;
   doctorName?: string;
+  allergies?: string;
+  chronicDiseases?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelationship?: string;
+  waitingMinutes?: number;
 }
 
 export interface NurseVitalSigns {
@@ -105,6 +111,7 @@ export interface VitalSignsPayload {
   pain_scale?: number;
   glucose?: number;
   notes?: string;
+  confirm_out_of_range?: boolean;
 }
 
 export interface CompleteTriagePayload {

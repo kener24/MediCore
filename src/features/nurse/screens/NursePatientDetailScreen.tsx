@@ -24,7 +24,9 @@ export function NursePatientDetailScreen() {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isInTriage = useMemo(() => ['in_triage', 'waiting_doctor', 'waiting_payment'].includes(String(patient?.status ?? '')), [patient?.status]);
+  const status = String(patient?.status ?? '');
+  const canStart = useMemo(() => status === 'waiting_triage', [status]);
+  const canEditTriage = useMemo(() => status === 'in_triage', [status]);
 
   const load = useCallback(async () => {
     if (!visitId) {
@@ -56,7 +58,7 @@ export function NursePatientDetailScreen() {
       Alert.alert('Visita no encontrada', 'No se encontró la visita del paciente.');
       return;
     }
-    if (starting || isInTriage) return;
+    if (starting || !canStart) return;
     Alert.alert('Iniciar triaje', '¿Confirmas que iniciarás el triaje de este paciente?', [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Iniciar', onPress: () => void start() },
@@ -93,11 +95,18 @@ export function NursePatientDetailScreen() {
           <Text style={styles.body}>{patient?.phone || 'No registrado'}</Text>
           <Text style={styles.label}>Médico asignado</Text>
           <Text style={styles.body}>{patient?.doctorName || 'No asignado'}</Text>
+          <Text style={styles.label}>Alergias</Text>
+          <Text style={patient?.allergies ? styles.critical : styles.body}>{patient?.allergies || 'No hay alergias registradas.'}</Text>
+          <Text style={styles.label}>Antecedentes críticos</Text>
+          <Text style={styles.body}>{patient?.chronicDiseases || 'No hay antecedentes críticos registrados.'}</Text>
+          <Text style={styles.label}>Contacto de emergencia</Text>
+          <Text style={styles.body}>{patient?.emergencyContactName ? [patient.emergencyContactName, patient.emergencyContactRelationship, patient.emergencyContactPhone].filter(Boolean).join(' · ') : 'No registrado'}</Text>
         </AppCard>
         <VitalSignsSummary vitalSigns={vitalSigns} />
-        <AppButton disabled={!visitId || starting || isInTriage} label={isInTriage ? 'Triaje iniciado' : 'Iniciar triaje'} loading={starting} onPress={handleStart} />
-        <AppButton disabled={!visitId} label="Registrar signos vitales" onPress={() => navigation.navigate('NurseVitalSignsForm', { patient, visitId })} variant="secondary" />
-        <AppButton disabled={!visitId} label="Completar triaje" onPress={() => navigation.navigate('NurseTriageForm', { patient, visitId, vitalSigns })} variant="secondary" />
+        {canStart ? <AppButton disabled={!visitId || starting} label="Iniciar triaje" loading={starting} onPress={handleStart} /> : null}
+        {canEditTriage ? <AppButton disabled={!visitId} label={vitalSigns ? 'Corregir signos vitales' : 'Registrar signos vitales'} onPress={() => navigation.navigate('NurseVitalSignsForm', { patient, visitId })} variant="secondary" /> : null}
+        {canEditTriage ? <AppButton disabled={!visitId} label="Completar triaje" onPress={() => navigation.navigate('NurseTriageForm', { patient, visitId, vitalSigns })} variant="secondary" /> : null}
+        {status === 'waiting_doctor' ? <Text style={styles.completed}>Triaje completado. Paciente enviado a la sala médica.</Text> : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -112,6 +121,19 @@ const styles = StyleSheet.create({
   },
   card: {
     gap: 6,
+  },
+  completed: {
+    color: colors.success,
+    fontSize: 14,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  critical: {
+    color: colors.danger,
+    fontSize: 15,
+    fontWeight: '800',
+    lineHeight: 21,
+    marginTop: 4,
   },
   content: {
     gap: 14,

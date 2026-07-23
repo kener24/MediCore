@@ -48,7 +48,7 @@ export function NurseCompletedTriagesScreen() {
     const term = search.trim().toLowerCase();
     return triages.filter((triage) => {
       const priority = String(triage.priority ?? '').toLowerCase();
-      const matchesFilter = filter === 'all' || (filter === 'urgent' && ['critical', 'urgent', 'critica', 'urgente'].includes(priority)) || (filter === 'normal' && ['normal', 'preferential', 'preferente', 'low', 'baja'].includes(priority));
+      const matchesFilter = filter === 'all' || (filter === 'urgent' && ['emergency', 'urgent', 'priority'].includes(priority)) || (filter === 'normal' && priority === 'normal');
       const matchesSearch = !term || [triage.patient.name, triage.patient.document, triage.chiefComplaint, triage.initialAssessment, triage.doctorName].filter(Boolean).join(' ').toLowerCase().includes(term);
       return matchesFilter && matchesSearch;
     });

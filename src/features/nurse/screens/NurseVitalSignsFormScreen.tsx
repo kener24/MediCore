@@ -1,5 +1,5 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -32,7 +32,18 @@ export function NurseVitalSignsFormScreen() {
   const visitId = route.params?.visitId;
   const [form, setForm] = useState(initialForm);
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const bmi = useMemo(() => calculateBmi(parseOptionalNumber(form.weightKg), parseOptionalNumber(form.heightCm)), [form.heightCm, form.weightKg]);
+  const dirty = useMemo(() => Object.values(form).some((value) => value.trim().length > 0), [form]);
+
+  useEffect(() => navigation.addListener('beforeRemove', (event: any) => {
+    if (!dirty || saved || saving) return;
+    event.preventDefault();
+    Alert.alert('Cambios sin guardar', 'Tienes cambios sin guardar. ¿Deseas salir?', [
+      { text: 'Continuar editando', style: 'cancel' },
+      { text: 'Salir', style: 'destructive', onPress: () => navigation.dispatch(event.data.action) },
+    ]);
+  }), [dirty, navigation, saved, saving]);
 
   function setNumeric(field: keyof typeof initialForm, value: string, decimal = false) {
     setForm((current) => ({ ...current, [field]: onlyNumericText(value, decimal) }));
@@ -68,7 +79,7 @@ export function NurseVitalSignsFormScreen() {
     if (alerts.length) {
       Alert.alert('Alertas clínicas', `${alerts.join('\n')}\n\n¿Deseas guardar de todas formas?`, [
         { text: 'Revisar', style: 'cancel' },
-        { text: 'Guardar', onPress: () => void submitPayload(payload) },
+        { text: 'Guardar', onPress: () => void submitPayload({ ...payload, confirm_out_of_range: true }) },
       ]);
       return;
     }
@@ -79,6 +90,7 @@ export function NurseVitalSignsFormScreen() {
     try {
       setSaving(true);
       await createVitalSigns(payload);
+      setSaved(true);
       Alert.alert('Listo', 'Signos vitales registrados correctamente.', [{ text: 'Aceptar', onPress: () => navigation.goBack() }]);
     } catch (err) {
       Alert.alert('No se pudo guardar', err instanceof Error ? err.message : 'No se pudieron registrar los signos vitales.');

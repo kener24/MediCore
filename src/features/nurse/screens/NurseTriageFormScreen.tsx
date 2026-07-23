@@ -1,5 +1,5 @@
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -24,6 +24,17 @@ export function NurseTriageFormScreen() {
   const [priority, setPriority] = useState<TriagePriority>('normal');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [completed, setCompleted] = useState(false);
+  const dirty = useMemo(() => Boolean(chiefComplaint.trim() || initialAssessment.trim() || notes.trim() || priority !== 'normal'), [chiefComplaint, initialAssessment, notes, priority]);
+
+  useEffect(() => navigation.addListener('beforeRemove', (event: any) => {
+    if (!dirty || completed || saving) return;
+    event.preventDefault();
+    Alert.alert('Cambios sin guardar', 'Tienes cambios sin guardar. ¿Deseas salir?', [
+      { text: 'Continuar editando', style: 'cancel' },
+      { text: 'Salir', style: 'destructive', onPress: () => navigation.dispatch(event.data.action) },
+    ]);
+  }), [completed, dirty, navigation, saving]);
 
   useFocusEffect(useCallback(() => {
     if (!visitId) return undefined;
@@ -74,6 +85,7 @@ export function NurseTriageFormScreen() {
     try {
       setSaving(true);
       await completeTriage(payload);
+      setCompleted(true);
       Alert.alert('Triaje completado', 'El paciente fue enviado al médico correctamente.', [
         { text: 'Aceptar', onPress: () => navigation.navigate('NurseCompletedTriages') },
       ]);

@@ -45,6 +45,12 @@ export function mapNursePatient(raw: unknown): NursePatientSummary {
     status: pick<string>(source, ['status', 'estado']) ?? 'waiting',
     priority: pick<string>(source, ['priority', 'prioridad']),
     doctorName: pick<string>(source, ['assigned_doctor_nombre', 'doctor_name', 'medico_nombre']),
+    allergies: pick<string>(source, ['patient_alergias', 'allergies', 'alergias']),
+    chronicDiseases: pick<string>(source, ['patient_enfermedades_cronicas', 'chronic_diseases', 'enfermedades_cronicas']),
+    emergencyContactName: pick<string>(source, ['patient_contacto_emergencia_nombre', 'emergency_contact_name']),
+    emergencyContactPhone: pick<string>(source, ['patient_contacto_emergencia_telefono', 'emergency_contact_phone']),
+    emergencyContactRelationship: pick<string>(source, ['patient_contacto_emergencia_parentesco', 'emergency_contact_relationship']),
+    waitingMinutes: asNumber(pick(source, ['waiting_minutes', 'tiempo_espera_minutos'])),
   };
 }
 

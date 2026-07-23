@@ -1,11 +1,10 @@
 import type { CompleteTriagePayload, NurseVitalSigns, TriagePriority, VitalSignsPayload } from '@/features/nurse/types/nurse.types';
 
 export const priorityOptions: { label: string; value: TriagePriority }[] = [
-  { label: 'Crítica', value: 'critical' },
+  { label: 'Emergencia', value: 'emergency' },
   { label: 'Urgente', value: 'urgent' },
-  { label: 'Preferente', value: 'preferential' },
+  { label: 'Prioritario', value: 'priority' },
   { label: 'Normal', value: 'normal' },
-  { label: 'Baja', value: 'low' },
 ];
 
 export function calculateBmi(weightKg?: number, heightCm?: number) {

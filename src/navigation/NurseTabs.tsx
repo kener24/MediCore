@@ -77,6 +77,7 @@ function NurseTriageStack() {
       <Stack.Screen component={NursePatientDetailScreen} name="NursePatientDetail" />
       <Stack.Screen component={NurseVitalSignsFormScreen} name="NurseVitalSignsForm" />
       <Stack.Screen component={NurseTriageFormScreen} name="NurseTriageForm" />
+      <Stack.Screen component={NurseCompletedTriagesScreen} name="NurseCompletedTriages" />
       <Stack.Screen component={NurseTriageDetailScreen} name="NurseTriageDetail" />
     </Stack.Navigator>
   );

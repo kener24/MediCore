@@ -16,7 +16,7 @@ import { mapDashboard, mapNotification, mapNursePatient, mapTriage, mapVitalSign
 
 const queueEndpoints = ['/nursing/triage-queue/', '/admissions/triage-queue/', '/admissions/visits/triage-queue/', '/nurse/triage/queue/', '/triage/queue/'];
 const inTriageEndpoints = ['/admissions/visits/?status=in_triage', '/nursing/triage-queue/', '/admissions/triage-queue/', '/nurse/triage/in-progress/', '/triage/in-progress/'];
-const completedEndpoints = ['/admissions/visits/?status=waiting_doctor', '/admissions/visits/?status=in_consultation', '/nurse/triage/completed/', '/triage/completed/', '/triages/?status=completed'];
+const completedEndpoints = ['/admissions/visits/?status=waiting_doctor&triage_completed=true', '/nurse/triage/completed/', '/triage/completed/', '/triages/?status=completed'];
 const dashboardEndpoints = ['/nursing/dashboard/', '/nurse/dashboard/', '/triage/dashboard/', '/clinic/nurse/dashboard/'];
 const notificationEndpoints = ['/notifications/', '/nurse/notifications/'];
 const unreadEndpoints = ['/notifications/unread-count/', '/nurse/notifications/unread-count/'];
@@ -35,7 +35,7 @@ export async function getNurseDashboard(): Promise<NurseDashboardSummary> {
       waitingCount: queue.length,
       inTriageCount: inTriage.length,
       completedTodayCount: completed.length,
-      priorityCount: queue.filter((item) => ['critical', 'urgent', 'critica', 'urgente'].includes(String(item.priority))).length,
+      priorityCount: queue.filter((item) => ['emergency', 'urgent', 'priority'].includes(String(item.priority))).length,
       unreadNotifications: unread,
     };
   }
@@ -95,7 +95,7 @@ export async function getLatestVitalSigns(visitId: number | string): Promise<Nur
     `/clinical/vital-signs/?visit=${visitId}`,
   ]);
   const rows = normalizeListResponse(data);
-  return rows.length ? mapVitalSigns(rows[0]) : mapVitalSigns(data);
+  return rows.length ? mapVitalSigns(rows[0]) : null;
 }
 
 export async function startTriage(visitId: number | string): Promise<NursePatientSummary> {
@@ -118,6 +118,7 @@ function normalizeVitalSignsPayload(payload: VitalSignsPayload) {
     glucose: payload.glucose,
     pain_scale: payload.pain_scale,
     notes: payload.notes?.trim() ?? '',
+    confirm_out_of_range: payload.confirm_out_of_range ?? false,
   };
 }
 

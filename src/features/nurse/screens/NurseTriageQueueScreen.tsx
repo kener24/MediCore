@@ -13,21 +13,19 @@ import { PatientQueueCard } from '@/features/nurse/components/NurseCards';
 import { getTriageQueue } from '@/features/nurse/services/nurseApi';
 import type { NursePatientSummary } from '@/features/nurse/types/nurse.types';
 
-type QueueFilter = 'all' | 'urgent' | 'normal' | 'low';
+type QueueFilter = 'all' | 'urgent' | 'normal';
 
 const filters: { label: string; value: QueueFilter }[] = [
   { label: 'Todos', value: 'all' },
   { label: 'Urgentes', value: 'urgent' },
   { label: 'Normales', value: 'normal' },
-  { label: 'Baja', value: 'low' },
 ];
 
 function matchesFilter(patient: NursePatientSummary, filter: QueueFilter) {
   const priority = String(patient.priority ?? '').toLowerCase();
   if (filter === 'all') return true;
-  if (filter === 'urgent') return ['critical', 'urgent', 'critica', 'urgente', 'priority', 'prioritario'].includes(priority);
-  if (filter === 'normal') return !priority || priority === 'normal' || priority === 'preferential' || priority === 'preferente';
-  return priority === 'low' || priority === 'baja';
+  if (filter === 'urgent') return ['emergency', 'urgent', 'priority'].includes(priority);
+  return !priority || priority === 'normal';
 }
 
 function matchesSearch(patient: NursePatientSummary, search: string) {

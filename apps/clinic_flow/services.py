@@ -8,7 +8,7 @@ from apps.audit.models import AuditLog
 from apps.audit.services import log_audit_event
 from apps.billing.models import Invoice
 from apps.clinic_settings.models import get_or_create_workflow_settings
-from apps.medical_records.models import ClinicalConsultation, MedicalRecord
+from apps.medical_records.models import ClinicalConsultation, MedicalRecord, VitalSigns
 
 
 RECEPTION_ROLES = {"admin", "recepcionista"}
@@ -31,7 +31,9 @@ def _assert_clinic(user, clinic):
         raise ValidationError("No tienes permiso sobre esta clinica.")
 
 
-def _audit(request, visit, action, description, old_status=None):
+def _audit(request, visit, action, description, old_status=None, new_values=None):
+    values = {"status": visit.status}
+    values.update(new_values or {})
     log_audit_event(
         request=request,
         clinic=visit.clinic,
@@ -42,7 +44,7 @@ def _audit(request, visit, action, description, old_status=None):
         object_repr=visit.visit_number,
         description=description,
         old_values={"status": old_status} if old_status else {},
-        new_values={"status": visit.status},
+        new_values=values,
     )
 
 
@@ -51,6 +53,13 @@ def next_entry_status(clinic, visit_type):
     if visit_type == PatientVisit.VisitType.APPOINTMENT:
         return PatientVisit.Status.WAITING_TRIAGE if workflow.appointment_requires_triage else PatientVisit.Status.WAITING_DOCTOR
     return PatientVisit.Status.WAITING_TRIAGE if workflow.walk_in_requires_triage else PatientVisit.Status.WAITING_DOCTOR
+
+
+def _requires_triage(visit):
+    workflow = get_or_create_workflow_settings(visit.clinic)
+    if visit.visit_type == PatientVisit.VisitType.APPOINTMENT:
+        return workflow.appointment_requires_triage
+    return workflow.walk_in_requires_triage
 
 
 @transaction.atomic
@@ -140,26 +149,101 @@ def send_to_triage(visit, *, user, request=None):
     return visit
 
 
+@transaction.atomic
 def start_triage(visit, *, user, request=None):
     _assert_role(user, TRIAGE_ROLES, "No tienes permiso para iniciar triaje.")
-    if visit.status not in [PatientVisit.Status.REGISTERED, PatientVisit.Status.WAITING_TRIAGE]:
+    visit = PatientVisit.objects.select_for_update().select_related("clinic", "assigned_nurse").get(pk=visit.pk)
+    _assert_clinic(user, visit.clinic)
+    if visit.status == PatientVisit.Status.IN_TRIAGE:
+        if visit.assigned_nurse_id == user.id:
+            return visit, False
+        raise ValidationError("El triaje ya fue iniciado por otro usuario.")
+    if visit.status != PatientVisit.Status.WAITING_TRIAGE:
         raise ValidationError("La visita no esta esperando triaje.")
+    if not _requires_triage(visit):
+        raise ValidationError("La configuracion de la clinica no requiere triaje para esta visita.")
     old = visit.status
     visit.touch_status(PatientVisit.Status.IN_TRIAGE, user=user)
     _audit(request, visit, AuditLog.Action.UPDATE, "Triaje iniciado.", old)
-    return visit
+    return visit, True
 
 
-def complete_triage(visit, *, user, request=None):
+@transaction.atomic
+def record_vital_signs(visit, *, user, request=None, clinical_warnings=None, warning_confirmed=False, **data):
+    _assert_role(user, TRIAGE_ROLES, "No tienes permiso para registrar signos vitales.")
+    visit = PatientVisit.objects.select_for_update().select_related("clinic").get(pk=visit.pk)
+    _assert_clinic(user, visit.clinic)
+    if visit.status != PatientVisit.Status.IN_TRIAGE:
+        raise ValidationError("Los signos vitales de triaje solo pueden registrarse durante un triaje activo.")
+
+    signs = VitalSigns.objects.select_for_update().filter(patient_visit=visit).order_by("id").first()
+    created = signs is None
+    signs = signs or VitalSigns(patient_visit=visit)
+    changed_fields = []
+    for field, value in data.items():
+        if hasattr(signs, field):
+            setattr(signs, field, value)
+            changed_fields.append(field)
+    signs.registrado_por = user
+    signs.recorded_at = timezone.now()
+    signs.save()
+
+    log_audit_event(
+        request=request,
+        clinic=visit.clinic,
+        action=AuditLog.Action.CREATE if created else AuditLog.Action.UPDATE,
+        module=AuditLog.Module.MEDICAL_RECORDS,
+        model_name="VitalSigns",
+        object_id=signs.id,
+        object_repr=visit.visit_number,
+        description="Signos vitales registrados." if created else "Signos vitales de triaje corregidos.",
+        new_values={"visit": visit.id, "fields": sorted(changed_fields)},
+    )
+    if clinical_warnings and warning_confirmed:
+        log_audit_event(
+            request=request,
+            clinic=visit.clinic,
+            action=AuditLog.Action.UPDATE,
+            module=AuditLog.Module.MEDICAL_RECORDS,
+            model_name="VitalSigns",
+            object_id=signs.id,
+            object_repr=visit.visit_number,
+            description="Advertencia de signos vitales confirmada por enfermeria.",
+            new_values={"visit": visit.id, "warning_count": len(clinical_warnings)},
+        )
+    return signs, created
+
+
+@transaction.atomic
+def complete_triage(
+    visit,
+    *,
+    user,
+    chief_complaint,
+    initial_assessment,
+    priority,
+    notes="",
+    request=None,
+):
     _assert_role(user, TRIAGE_ROLES, "No tienes permiso para finalizar triaje.")
+    visit = PatientVisit.objects.select_for_update().select_related("clinic", "assigned_nurse").get(pk=visit.pk)
+    _assert_clinic(user, visit.clinic)
+    if visit.status == PatientVisit.Status.WAITING_DOCTOR and visit.triage_completed_at:
+        return visit, False
     if visit.status != PatientVisit.Status.IN_TRIAGE:
         raise ValidationError("La visita no esta en triaje.")
+    if _role(user) == "enfermera" and visit.assigned_nurse_id and visit.assigned_nurse_id != user.id:
+        raise ValidationError("El triaje fue iniciado por otra enfermera.")
     if not visit.vital_signs.exists():
         raise ValidationError("Registra signos vitales antes de finalizar triaje.")
     old = visit.status
+    visit.reason = chief_complaint
+    visit.symptoms = initial_assessment
+    visit.priority = priority
+    visit.notes = notes
     visit.touch_status(PatientVisit.Status.WAITING_DOCTOR, user=user)
-    _audit(request, visit, AuditLog.Action.FINALIZE, "Triaje finalizado.", old)
-    return visit
+    _audit(request, visit, AuditLog.Action.FINALIZE, "Triaje finalizado.", old, {"priority": priority})
+    return visit, True
 
 
 @transaction.atomic

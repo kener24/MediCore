@@ -180,6 +180,12 @@ class VitalSigns(TimeStampedModel):
             errors["blood_pressure_systolic"] = "La presion sistolica debe ser positiva."
         if self.blood_pressure_diastolic is not None and self.blood_pressure_diastolic <= 0:
             errors["blood_pressure_diastolic"] = "La presion diastolica debe ser positiva."
+        if (
+            self.blood_pressure_systolic is not None
+            and self.blood_pressure_diastolic is not None
+            and self.blood_pressure_systolic <= self.blood_pressure_diastolic
+        ):
+            errors["blood_pressure_systolic"] = "La presion sistolica debe ser mayor que la diastolica."
         if not self.consultation_id and not self.patient_visit_id:
             errors["patient_visit"] = "Los signos vitales deben relacionarse a una visita o consulta."
         for value, low, high, field in ranges:

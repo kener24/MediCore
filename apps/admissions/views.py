@@ -1,7 +1,7 @@
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db.models import Q
+from django.db.models import Case, IntegerField, Q, Value, When
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -12,6 +12,7 @@ from apps.accounts.permissions import get_role_name
 from apps.admissions.models import PatientVisit
 from apps.admissions.serializers import (
     AppointmentCheckInSerializer,
+    CompleteTriageSerializer,
     PatientVisitCreateSerializer,
     PatientVisitSerializer,
     VisitVitalSignsSerializer,
@@ -23,6 +24,7 @@ from apps.audit.services import log_audit_event
 from apps.billing.models import Invoice, InvoiceItem
 from apps.clinic_flow import services as flow
 from apps.billing.serializers import InvoiceDetailSerializer
+from apps.clinic_settings.models import get_or_create_workflow_settings
 from apps.medical_records.models import ClinicalConsultation, MedicalRecord, VitalSigns
 from apps.medical_records.serializers import VitalSignsSerializer
 from apps.notifications.models import Notification
@@ -80,6 +82,8 @@ class PatientVisitViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(visit_date__lte=p["date_to"])
         if p.get("today", "").lower() in ["1", "true", "yes", "si"]:
             queryset = queryset.filter(visit_date=timezone.localdate())
+        if p.get("triage_completed", "").lower() in ["1", "true", "yes", "si"]:
+            queryset = queryset.filter(triage_completed_at__isnull=False)
         if p.get("search"):
             search = p["search"]
             queryset = queryset.filter(Q(patient__nombre_completo__icontains=search) | Q(patient__identidad__icontains=search) | Q(patient__codigo_paciente__icontains=search) | Q(reason__icontains=search))
@@ -137,8 +141,27 @@ class PatientVisitViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"], url_path="triage-queue")
     def triage_queue(self, request):
-        queryset = self.get_queryset().filter(status__in=[PatientVisit.Status.WAITING_TRIAGE, PatientVisit.Status.IN_TRIAGE])
-        return Response(PatientVisitSerializer(queryset, many=True).data)
+        if get_role_name(request.user) not in TRIAGE_ROLES:
+            return Response({"detail": "No tienes permiso para consultar la cola de triaje."}, status=status.HTTP_403_FORBIDDEN)
+        workflow = get_or_create_workflow_settings(request.user.clinica)
+        priority_order = Case(
+            When(priority=PatientVisit.Priority.EMERGENCY, then=Value(0)),
+            When(priority=PatientVisit.Priority.URGENT, then=Value(1)),
+            When(priority=PatientVisit.Priority.PRIORITY, then=Value(2)),
+            default=Value(3),
+            output_field=IntegerField(),
+        )
+        queryset = self.get_queryset().filter(
+            status__in=[PatientVisit.Status.WAITING_TRIAGE, PatientVisit.Status.IN_TRIAGE]
+        )
+        triage_types = Q()
+        if workflow.appointment_requires_triage:
+            triage_types |= Q(visit_type=PatientVisit.VisitType.APPOINTMENT)
+        if workflow.walk_in_requires_triage:
+            triage_types |= ~Q(visit_type=PatientVisit.VisitType.APPOINTMENT)
+        queryset = queryset.filter(triage_types) if triage_types else queryset.none()
+        queryset = queryset.annotate(priority_order=priority_order).order_by("priority_order", "arrival_time")
+        return Response(PatientVisitSerializer(queryset, many=True, context={"request": request}).data)
 
     @action(detail=True, methods=["patch"], url_path="start-triage")
     def start_triage(self, request, pk=None):
@@ -146,44 +169,75 @@ class PatientVisitViewSet(viewsets.ModelViewSet):
             return Response({"detail": "No tienes permiso para iniciar triaje."}, status=status.HTTP_403_FORBIDDEN)
         visit = self.get_object()
         try:
-            flow.start_triage(visit, user=request.user, request=request)
+            visit, started = flow.start_triage(visit, user=request.user, request=request)
         except DjangoValidationError as exc:
             return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(PatientVisitSerializer(visit).data)
+        data = PatientVisitSerializer(visit, context={"request": request}).data
+        data.update({"triage_started": started, "message": "Triaje iniciado." if started else "El triaje ya estaba iniciado por este usuario."})
+        return Response(data)
 
     @action(detail=True, methods=["patch"], url_path="complete-triage")
     def complete_triage(self, request, pk=None):
         if get_role_name(request.user) not in TRIAGE_ROLES:
             return Response({"detail": "No tienes permiso para finalizar triaje."}, status=status.HTTP_403_FORBIDDEN)
         visit = self.get_object()
+        retry = visit.status == PatientVisit.Status.WAITING_DOCTOR and bool(visit.triage_completed_at)
+        payload = request.data if not retry else {
+            "chief_complaint": visit.reason,
+            "initial_assessment": visit.symptoms,
+            "priority": visit.priority,
+            "notes": visit.notes,
+        }
+        serializer = CompleteTriageSerializer(data=payload)
+        serializer.is_valid(raise_exception=True)
         try:
-            flow.complete_triage(visit, user=request.user, request=request)
+            visit, completed = flow.complete_triage(
+                visit,
+                user=request.user,
+                request=request,
+                **serializer.validated_data,
+            )
         except DjangoValidationError as exc:
             return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
-        notify_role_users(visit.clinic, ["medico"], "Paciente esperando consulta", f"{visit.patient.nombre_completo} esta listo para consulta.", module=Notification.Module.APPOINTMENTS, priority=Notification.Priority.NORMAL, notification_type=Notification.Type.INFO, related_model="PatientVisit", related_object_id=visit.id, action_url="/doctor/waiting-room")
-        return Response(PatientVisitSerializer(visit).data)
+        if completed:
+            notify_role_users(visit.clinic, ["medico"], "Paciente esperando consulta", f"{visit.patient.nombre_completo} esta listo para consulta.", module=Notification.Module.APPOINTMENTS, priority=Notification.Priority.NORMAL, notification_type=Notification.Type.INFO, related_model="PatientVisit", related_object_id=visit.id, action_url="/doctor/waiting-room")
+        data = PatientVisitSerializer(visit, context={"request": request}).data
+        data.update({"triage_completed": completed, "message": "Triaje completado." if completed else "El triaje ya fue completado."})
+        return Response(data)
 
     @action(detail=True, methods=["get", "post"], url_path="vital-signs")
     def vital_signs(self, request, pk=None):
         visit = self.get_object()
         if request.method == "GET":
+            if get_role_name(request.user) not in TRIAGE_ROLES + DOCTOR_ROLES:
+                return Response({"detail": "No tienes permiso para consultar signos vitales."}, status=status.HTTP_403_FORBIDDEN)
             signs = visit.vital_signs.order_by("-creado_en")
             return Response(VitalSignsSerializer(signs, many=True).data)
-        if get_role_name(request.user) not in TRIAGE_ROLES + ["medico"]:
+        if get_role_name(request.user) not in TRIAGE_ROLES:
             return Response({"detail": "No tienes permiso para registrar signos vitales."}, status=status.HTTP_403_FORBIDDEN)
         serializer = VisitVitalSignsSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            signs = serializer.save(patient_visit=visit, registrado_por=request.user)
+            signs, created = flow.record_vital_signs(
+                visit,
+                user=request.user,
+                request=request,
+                clinical_warnings=getattr(serializer, "clinical_warnings", []),
+                warning_confirmed=getattr(serializer, "warning_confirmed", False),
+                **serializer.validated_data,
+            )
         except DjangoValidationError as exc:
             return Response(exc.message_dict if hasattr(exc, "message_dict") else {"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
-        log_audit_event(request=request, clinic=visit.clinic, action=AuditLog.Action.CREATE, module=AuditLog.Module.MEDICAL_RECORDS, model_name="VitalSigns", object_id=signs.id, object_repr=visit.visit_number, description="Signos vitales registrados.")
-        return Response(VitalSignsSerializer(signs).data, status=status.HTTP_201_CREATED)
+        data = VitalSignsSerializer(signs).data
+        data.update({"created": created, "clinical_warnings": getattr(serializer, "clinical_warnings", []), "message": "Signos vitales guardados."})
+        return Response(data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
     @action(detail=False, methods=["get"], url_path="doctor-waiting-room")
     def doctor_waiting_room(self, request):
+        if get_role_name(request.user) not in ["admin"] + DOCTOR_ROLES:
+            return Response({"detail": "No tienes permiso para consultar la sala médica."}, status=status.HTTP_403_FORBIDDEN)
         queryset = self.get_queryset().filter(status__in=[PatientVisit.Status.WAITING_DOCTOR, PatientVisit.Status.IN_CONSULTATION])
-        return Response(PatientVisitSerializer(queryset, many=True).data)
+        return Response(PatientVisitSerializer(queryset, many=True, context={"request": request}).data)
 
     @action(detail=True, methods=["patch"], url_path="start-consultation")
     def start_consultation(self, request, pk=None):

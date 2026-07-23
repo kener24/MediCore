@@ -1,5 +1,6 @@
 from django.db import transaction
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.utils import timezone
 from rest_framework import serializers
 
 from apps.accounts.permissions import get_role_name
@@ -29,6 +30,16 @@ class PatientVisitSerializer(serializers.ModelSerializer):
     assigned_doctor_nombre = serializers.CharField(source="assigned_doctor.user.nombre_completo", read_only=True)
     assigned_nurse_nombre = serializers.CharField(source="assigned_nurse.nombre_completo", read_only=True)
     created_by_nombre = serializers.CharField(source="created_by.nombre_completo", read_only=True)
+    patient_telefono = serializers.CharField(source="patient.telefono", read_only=True)
+    patient_genero = serializers.CharField(source="patient.genero", read_only=True)
+    patient_alergias = serializers.SerializerMethodField()
+    patient_enfermedades_cronicas = serializers.SerializerMethodField()
+    patient_contacto_emergencia_nombre = serializers.SerializerMethodField()
+    patient_contacto_emergencia_telefono = serializers.SerializerMethodField()
+    patient_contacto_emergencia_parentesco = serializers.SerializerMethodField()
+    chief_complaint = serializers.CharField(source="reason", read_only=True)
+    initial_assessment = serializers.CharField(source="symptoms", read_only=True)
+    waiting_minutes = serializers.SerializerMethodField()
     vital_signs = serializers.SerializerMethodField()
 
     class Meta:
@@ -41,6 +52,13 @@ class PatientVisitSerializer(serializers.ModelSerializer):
             "patient_nombre",
             "patient_codigo",
             "patient_identidad",
+            "patient_telefono",
+            "patient_genero",
+            "patient_alergias",
+            "patient_enfermedades_cronicas",
+            "patient_contacto_emergencia_nombre",
+            "patient_contacto_emergencia_telefono",
+            "patient_contacto_emergencia_parentesco",
             "appointment",
             "medical_record",
             "consultation",
@@ -62,6 +80,9 @@ class PatientVisitSerializer(serializers.ModelSerializer):
             "status",
             "reason",
             "symptoms",
+            "chief_complaint",
+            "initial_assessment",
+            "waiting_minutes",
             "notes",
             "cancellation_reason",
             "assigned_doctor",
@@ -92,8 +113,33 @@ class PatientVisitSerializer(serializers.ModelSerializer):
         return attrs
 
     def get_vital_signs(self, obj):
+        if not self._can_view_clinical_data():
+            return None
         signs = VitalSigns.objects.filter(patient_visit=obj).order_by("-creado_en").first() if hasattr(VitalSigns, "patient_visit") else None
         return VitalSignsSerializer(signs).data if signs else None
+
+    def get_waiting_minutes(self, obj):
+        end = obj.triage_started_at or obj.consultation_started_at or obj.completed_at or timezone.now()
+        return max(0, int((end - obj.arrival_time).total_seconds() // 60))
+
+    def _can_view_clinical_data(self):
+        request = self.context.get("request")
+        return bool(request and get_role_name(request.user) in ["admin", "enfermera", "medico"])
+
+    def get_patient_alergias(self, obj):
+        return obj.patient.alergias if self._can_view_clinical_data() else None
+
+    def get_patient_enfermedades_cronicas(self, obj):
+        return obj.patient.enfermedades_cronicas if self._can_view_clinical_data() else None
+
+    def get_patient_contacto_emergencia_nombre(self, obj):
+        return obj.patient.contacto_emergencia_nombre if self._can_view_clinical_data() else None
+
+    def get_patient_contacto_emergencia_telefono(self, obj):
+        return obj.patient.contacto_emergencia_telefono if self._can_view_clinical_data() else None
+
+    def get_patient_contacto_emergencia_parentesco(self, obj):
+        return obj.patient.contacto_emergencia_parentesco if self._can_view_clinical_data() else None
 
 
 class PatientVisitCreateSerializer(serializers.ModelSerializer):
@@ -212,7 +258,80 @@ class AppointmentCheckInSerializer(serializers.Serializer):
 
 class VisitVitalSignsSerializer(VitalSignsSerializer):
     pain_scale = serializers.IntegerField(required=False, min_value=0, max_value=10, write_only=True)
+    confirm_out_of_range = serializers.BooleanField(required=False, default=False, write_only=True)
+
+    CLINICAL_FIELDS = [
+        "temperature",
+        "blood_pressure_systolic",
+        "blood_pressure_diastolic",
+        "heart_rate",
+        "respiratory_rate",
+        "oxygen_saturation",
+        "weight",
+        "height",
+        "glucose",
+        "pain_scale",
+    ]
 
     class Meta(VitalSignsSerializer.Meta):
-        fields = VitalSignsSerializer.Meta.fields + ["patient_visit", "pain_scale", "recorded_at"]
-        read_only_fields = VitalSignsSerializer.Meta.read_only_fields + ["patient_visit", "recorded_at"]
+        fields = VitalSignsSerializer.Meta.fields + ["confirm_out_of_range"]
+        read_only_fields = VitalSignsSerializer.Meta.read_only_fields
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        if not any(attrs.get(field) is not None for field in self.CLINICAL_FIELDS):
+            raise serializers.ValidationError({"detail": "Registra al menos un signo vital."})
+
+        systolic = attrs.get("blood_pressure_systolic")
+        diastolic = attrs.get("blood_pressure_diastolic")
+        if (systolic is None) != (diastolic is None):
+            raise serializers.ValidationError({"blood_pressure_systolic": "Registra ambos valores de presión arterial."})
+        if systolic is not None and systolic <= diastolic:
+            raise serializers.ValidationError({"blood_pressure_systolic": "La presión sistólica debe ser mayor que la diastólica."})
+
+        weight = attrs.get("weight")
+        height = attrs.get("height")
+        if (weight is None) != (height is None):
+            raise serializers.ValidationError({"weight": "Registra peso y altura juntos para calcular el IMC."})
+
+        warnings = []
+        temperature = attrs.get("temperature")
+        oxygen = attrs.get("oxygen_saturation")
+        heart_rate = attrs.get("heart_rate")
+        respiratory_rate = attrs.get("respiratory_rate")
+        pain = attrs.get("pain_scale")
+        glucose = attrs.get("glucose")
+        if temperature is not None and (temperature < 35 or temperature >= 38):
+            warnings.append("La temperatura está fuera del rango habitual.")
+        if oxygen is not None and oxygen < 92:
+            warnings.append("La saturación de oxígeno está fuera del rango habitual.")
+        if heart_rate is not None and (heart_rate < 50 or heart_rate > 120):
+            warnings.append("La frecuencia cardíaca está fuera del rango habitual.")
+        if respiratory_rate is not None and (respiratory_rate < 10 or respiratory_rate > 24):
+            warnings.append("La frecuencia respiratoria está fuera del rango habitual.")
+        if systolic is not None and (systolic < 90 or systolic >= 180 or diastolic >= 120):
+            warnings.append("La presión arterial requiere revisión.")
+        if pain is not None and pain >= 8:
+            warnings.append("La escala de dolor está fuera del rango habitual.")
+        if glucose is not None and (glucose < 70 or glucose > 250):
+            warnings.append("La glucosa está fuera del rango habitual.")
+
+        confirmed = attrs.pop("confirm_out_of_range", False)
+        self.clinical_warnings = warnings
+        self.warning_confirmed = bool(confirmed)
+        if warnings and not confirmed:
+            raise serializers.ValidationError(
+                {
+                    "detail": "El valor está fuera del rango habitual. Confirma antes de guardar.",
+                    "clinical_warnings": warnings,
+                    "confirmation_required": True,
+                }
+            )
+        return attrs
+
+
+class CompleteTriageSerializer(serializers.Serializer):
+    chief_complaint = serializers.CharField(min_length=5, max_length=250)
+    initial_assessment = serializers.CharField(min_length=10)
+    priority = serializers.ChoiceField(choices=PatientVisit.Priority.choices)
+    notes = serializers.CharField(required=False, allow_blank=True, default="")

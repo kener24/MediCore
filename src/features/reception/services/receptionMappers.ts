@@ -30,6 +30,7 @@ export function mapMinimalPatientPayload(payload: MinimalPatientPayload) {
     telefono: payload.phone?.trim() || '',
     genero: payload.gender || '',
     fecha_nacimiento: payload.birth_date || null,
+    duplicate_warning_confirmed: payload.duplicate_warning_confirmed ?? false,
   };
 }
 

@@ -68,7 +68,7 @@ export function ReceptionPatientCreateScreen() {
           : [
               { style: 'cancel' as const, text: 'Revisar datos' },
               { text: 'Ver paciente', onPress: () => navigation.navigate('ReceptionPatientDetail', { patientId: duplicate.patient.id }) },
-              { text: 'Crear de todos modos', onPress: () => void persistPatient(payload) },
+              { text: 'Crear de todos modos', onPress: () => void persistPatient({ ...payload, duplicate_warning_confirmed: true }) },
             ];
         Alert.alert(
           duplicate.exactIdentity ? 'Paciente ya registrado' : 'Paciente posiblemente existente',

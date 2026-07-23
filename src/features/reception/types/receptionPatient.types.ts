@@ -39,4 +39,5 @@ export type MinimalPatientPayload = {
   phone?: string;
   gender?: string;
   birth_date?: string;
+  duplicate_warning_confirmed?: boolean;
 };

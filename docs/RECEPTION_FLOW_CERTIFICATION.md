@@ -55,6 +55,11 @@ Recepción y administración de clínica pueden ejecutar las acciones operativas
 - Se evitó omitir triaje obligatorio y se exigió médico para flujo directo.
 - Se limitaron cancelaciones a estados operativos de recepción.
 - Web y móvil ocultan o bloquean acciones deshabilitadas por la clínica.
+- Se mantuvieron los campos históricos de la API de citas y se agregaron alias compatibles con la web para mostrar paciente, código, médico y especialidad sin romper los consumidores móviles existentes.
+
+## Revisión visual reanudada
+
+El 2026-07-23 se recorrió el flujo web de producción con un usuario de recepción. Se validaron el menú operativo, pacientes, admisiones, nueva atención, citas, detalle de cita y apertura de la visita vinculada. La revisión detectó columnas vacías de paciente y médico en la agenda por una diferencia de nombres entre el serializer y la web. La corrección quedó cubierta por una prueba de regresión y desplegada en producción.
 
 ## Resultado local
 
@@ -63,5 +68,6 @@ Recepción y administración de clínica pueden ejecutar las acciones operativas
 - Migraciones: sin cambios adicionales pendientes.
 - Web: lint sin errores y build de producción aprobado.
 - Móvil: TypeScript aprobado, lint aprobado y Expo Doctor 18/18.
+- Regresión reanudada: 105/105 pruebas de citas, admisiones, pacientes, cuentas y auditoría aprobadas.
 
 La prueba en Android físico no se considera aprobada hasta ser ejecutada por una persona en el dispositivo.

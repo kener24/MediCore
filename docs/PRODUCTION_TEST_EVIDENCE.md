@@ -58,6 +58,11 @@ Despliegue y pruebas ejecutados el 2026-07-22 contra `https://kp-software.tech` 
 | REC-PROD-10 | Búsqueda cruzada | Aprobado | Búsqueda exacta del paciente B desde Clínica A respondió lista vacía |
 | REC-PROD-11 | Paciente y médico cruzados | Aprobado | Creación de admisión respondió 400 sin crear registros |
 | REC-PROD-12 | Posible paciente duplicado | Aprobado | Coincidencia probable respondió 400; confirmación explícita respondió 201; identidad exacta siguió bloqueada y se creó una sola auditoría |
+| REC-LOCAL-13 | Regresión tras revisión visual | Aprobado | 105/105 pruebas de citas, admisiones, pacientes, cuentas y auditoría; prueba específica del contrato web aprobada |
+| REC-PROD-13 | Respaldo de reanudación | Aprobado | Dump MySQL verificado en `backups/sprint11-resume-20260723-052332/database.sql` y commit previo registrado |
+| REC-PROD-14 | Despliegue de corrección visual | Aprobado | Commit `850d7c5`; sin migraciones pendientes; MediCore y Nginx activos |
+| REC-PROD-15 | Navegación web de recepción | Aprobado | Menú operativo, pacientes, admisiones, nueva atención y citas cargaron bajo el rol recepcionista |
+| REC-PROD-16 | Datos de agenda y detalle | Aprobado | Agenda mostró paciente, código, médico y especialidad; detalle abrió la visita vinculada en `waiting_triage` |
 | REC-PHYSICAL-01 | Android físico | Pendiente | No se marca aprobado por inferencia; requiere prueba manual con Expo Go |
 
 ## Observaciones de despliegue

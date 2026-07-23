@@ -25,6 +25,6 @@
 
 ## Evidencia local
 
-El archivo `apps/admissions/test_reception_certification.py` contiene 14 escenarios de certificación. La suite dirigida de pacientes, citas, admisiones y configuración aprobó 55/55 pruebas; la suite global aprobó 263/263.
+El archivo `apps/admissions/test_reception_certification.py` contiene 15 escenarios de certificación. La suite dirigida de pacientes, citas, admisiones y configuración aprobó 56/56 pruebas; la suite global aprobó 264/264.
 
 Las comprobaciones en producción deben repetirse después del despliegue usando registros sintéticos de Clínica A y Clínica B. No se documentan identificaciones, tokens ni datos clínicos.

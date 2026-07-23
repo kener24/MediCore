@@ -11,10 +11,11 @@ Se certificó el flujo existente de pacientes, citas, check-in y admisiones sin 
 
 1. Recepción busca por nombre, identidad, teléfono o código.
 2. Puede abrir un paciente existente o crear un registro mínimo si la clínica lo permite.
-3. La interfaz advierte coincidencias por identidad, teléfono o nombre y fecha de nacimiento. Una identidad exacta no permite continuar con otro registro desde la app.
-4. Se crea una visita sin cita únicamente para un paciente de la clínica autenticada.
-5. Si el flujo requiere triaje, queda en `waiting_triage`; si va directo, exige médico de la misma clínica y queda en `waiting_doctor`.
-6. Una segunda visita activa del paciente en el día es rechazada con un mensaje controlado.
+3. La interfaz y el backend advierten coincidencias por identidad, teléfono o nombre y fecha de nacimiento. Una identidad exacta no permite continuar con otro registro desde la app.
+4. Si recepción confirma crear pese a una coincidencia probable, la decisión queda registrada en auditoría.
+5. Se crea una visita sin cita únicamente para un paciente de la clínica autenticada.
+6. Si el flujo requiere triaje, queda en `waiting_triage`; si va directo, exige médico de la misma clínica y queda en `waiting_doctor`.
+7. Una segunda visita activa del paciente en el día es rechazada con un mensaje controlado.
 
 ## Paciente con cita
 
@@ -57,7 +58,7 @@ Recepción y administración de clínica pueden ejecutar las acciones operativas
 
 ## Resultado local
 
-- Django: 263/263 pruebas aprobadas.
+- Django: 264/264 pruebas aprobadas.
 - `manage.py check`: sin errores.
 - Migraciones: sin cambios adicionales pendientes.
 - Web: lint sin errores y build de producción aprobado.

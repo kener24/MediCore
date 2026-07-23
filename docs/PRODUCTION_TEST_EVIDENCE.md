@@ -34,8 +34,8 @@ Despliegue y pruebas ejecutados el 2026-07-22 contra `https://kp-software.tech` 
 
 | ID | Prueba | Resultado | Evidencia segura |
 | --- | --- | --- | --- |
-| REC-LOCAL-01 | Suite dirigida de recepción | Aprobado | 55/55 pruebas |
-| REC-LOCAL-02 | Suite completa Django | Aprobado | 263/263 pruebas en 411.710 s |
+| REC-LOCAL-01 | Suite dirigida de recepción | Aprobado | 56/56 pruebas |
+| REC-LOCAL-02 | Suite completa Django | Aprobado | 264/264 pruebas en 421.672 s |
 | REC-LOCAL-03 | Django system check | Aprobado | Sin errores ni advertencias silenciadas |
 | REC-LOCAL-04 | Coherencia de migraciones | Aprobado | `makemigrations --check --dry-run`: sin cambios pendientes |
 | REC-LOCAL-05 | Build web | Aprobado | Vite produjo assets de producción |

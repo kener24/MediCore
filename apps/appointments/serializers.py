@@ -19,6 +19,10 @@ class AppointmentListSerializer(serializers.ModelSerializer):
     patient_codigo = serializers.CharField(source="patient.codigo_paciente", read_only=True)
     doctor_nombre = serializers.CharField(source="doctor.user.nombre_completo", read_only=True)
     specialty_nombre = serializers.CharField(source="doctor.specialty.nombre", read_only=True)
+    patient_name = serializers.CharField(source="patient.nombre_completo", read_only=True)
+    patient_code = serializers.CharField(source="patient.codigo_paciente", read_only=True)
+    doctor_name = serializers.CharField(source="doctor.user.nombre_completo", read_only=True)
+    doctor_specialty = serializers.CharField(source="doctor.specialty.nombre", read_only=True)
     created_by_nombre = serializers.CharField(source="created_by.nombre_completo", read_only=True)
     visit_id = serializers.SerializerMethodField()
 
@@ -37,9 +41,13 @@ class AppointmentListSerializer(serializers.ModelSerializer):
             "patient",
             "patient_nombre",
             "patient_codigo",
+            "patient_name",
+            "patient_code",
             "doctor",
             "doctor_nombre",
             "specialty_nombre",
+            "doctor_name",
+            "doctor_specialty",
             "created_by",
             "created_by_nombre",
             "scheduled_date",

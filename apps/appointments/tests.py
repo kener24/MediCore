@@ -124,6 +124,21 @@ class AppointmentsModuleTests(APITestCase):
         response = self.client.post("/api/appointments/", self.payload(), format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
+    def test_listado_incluye_nombres_compatibles_con_web(self):
+        appointment = self.create_appointment()
+        self.auth(self.recepcion)
+
+        response = self.client.get("/api/appointments/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data[0]["id"], appointment.id)
+        self.assertEqual(response.data[0]["patient_name"], self.patient.nombre_completo)
+        self.assertEqual(response.data[0]["patient_code"], self.patient.codigo_paciente)
+        self.assertEqual(response.data[0]["doctor_name"], self.doctor_user.nombre_completo)
+        self.assertEqual(response.data[0]["doctor_specialty"], self.specialty.nombre)
+        self.assertEqual(response.data[0]["patient_nombre"], self.patient.nombre_completo)
+        self.assertEqual(response.data[0]["doctor_nombre"], self.doctor_user.nombre_completo)
+
     def test_medico_puede_ver_sus_citas(self):
         self.create_appointment()
         self.auth(self.doctor_user)

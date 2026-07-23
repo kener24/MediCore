@@ -12,6 +12,8 @@ from apps.medical_records.models import ClinicalConsultation, MedicalRecord, Vit
 from apps.medical_records.serializers import VitalSignsSerializer
 from apps.patients.models import Patient
 from apps.patients.serializers import PatientCreateSerializer
+from apps.audit.models import AuditLog
+from apps.audit.services import log_audit_event
 
 
 def can_access_clinic(user, clinic_id):
@@ -174,6 +176,8 @@ class WalkInRegistrationSerializer(serializers.Serializer):
                 serializer = PatientCreateSerializer(data=patient_data, context={"request": request})
                 serializer.is_valid(raise_exception=True)
                 patient = serializer.save()
+                if patient_data.get("duplicate_warning_confirmed") is True:
+                    log_audit_event(request=request, clinic=clinic, action=AuditLog.Action.CREATE, module=AuditLog.Module.PATIENTS, model_name="Patient", object_id=patient.id, object_repr=patient.nombre_completo, description="Paciente creado tras confirmar advertencia de posible duplicado.")
         visit_data = validated_data["visit"]
         visit_serializer = PatientVisitCreateSerializer(data={**visit_data, "patient": patient.id, "visit_type": visit_data.get("visit_type", PatientVisit.VisitType.WALK_IN)}, context={"request": request})
         visit_serializer.is_valid(raise_exception=True)

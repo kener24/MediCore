@@ -52,6 +52,8 @@ class PatientDetailSerializer(PatientListSerializer):
 
 
 class PatientCreateSerializer(serializers.ModelSerializer):
+    duplicate_warning_confirmed = serializers.BooleanField(write_only=True, required=False, default=False)
+
     class Meta:
         model = Patient
         fields = [
@@ -78,6 +80,7 @@ class PatientCreateSerializer(serializers.ModelSerializer):
             "enfermedades_cronicas",
             "observaciones",
             "activo",
+            "duplicate_warning_confirmed",
         ]
         read_only_fields = ["id"]
         extra_kwargs = {
@@ -124,6 +127,22 @@ class PatientCreateSerializer(serializers.ModelSerializer):
         codigo = attrs.get("codigo_paciente")
         if identidad and Patient.objects.filter(clinic=clinic, identidad=identidad).exists():
             raise serializers.ValidationError({"identidad": "Ya existe un paciente con esa identidad en esta clinica."})
+        possible_duplicates = Patient.objects.filter(clinic=clinic, activo=True)
+        telefono = attrs.get("telefono")
+        probable = Patient.objects.none()
+        if telefono:
+            probable = possible_duplicates.filter(telefono=telefono)
+        fecha_nacimiento = attrs.get("fecha_nacimiento")
+        if attrs.get("nombres") and attrs.get("apellidos") and fecha_nacimiento:
+            probable = probable | possible_duplicates.filter(
+                nombres__iexact=attrs["nombres"].strip(),
+                apellidos__iexact=attrs["apellidos"].strip(),
+                fecha_nacimiento=fecha_nacimiento,
+            )
+        if probable.exists() and not attrs.get("duplicate_warning_confirmed"):
+            raise serializers.ValidationError({
+                "possible_duplicate": "Encontramos un paciente con información similar. Revisa el registro antes de crear uno nuevo."
+            })
         if codigo and Patient.objects.filter(clinic=clinic, codigo_paciente=codigo).exists():
             raise serializers.ValidationError({"codigo_paciente": "Ya existe un paciente con ese codigo en esta clinica."})
         user = attrs.get("user")
@@ -137,6 +156,10 @@ class PatientCreateSerializer(serializers.ModelSerializer):
         except ValueError as exc:
             raise serializers.ValidationError({"clinic": str(exc)})
         return attrs
+
+    def create(self, validated_data):
+        validated_data.pop("duplicate_warning_confirmed", None)
+        return super().create(validated_data)
 
 
 class PatientUpdateSerializer(PatientCreateSerializer):

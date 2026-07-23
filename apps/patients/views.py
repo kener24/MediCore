@@ -100,6 +100,8 @@ class PatientViewSet(viewsets.ModelViewSet):
         response = super().create(request, *args, **kwargs)
         if response.status_code == status.HTTP_201_CREATED:
             log_audit_event(request=request, action=AuditLog.Action.CREATE, module=AuditLog.Module.PATIENTS, model_name="Patient", object_id=response.data.get("id"), object_repr=response.data.get("nombre_completo", ""), description="Paciente creado.", new_values=request.data)
+            if request.data.get("duplicate_warning_confirmed") is True:
+                log_audit_event(request=request, action=AuditLog.Action.CREATE, module=AuditLog.Module.PATIENTS, model_name="Patient", object_id=response.data.get("id"), object_repr=response.data.get("nombre_completo", ""), description="Paciente creado tras confirmar advertencia de posible duplicado.")
         return response
 
     def update(self, request, *args, **kwargs):

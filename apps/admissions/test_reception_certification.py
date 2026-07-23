@@ -255,6 +255,30 @@ class ReceptionCertificationTests(APITestCase):
         )
         self.assertEqual(denied.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_probable_duplicate_requires_confirmation_and_is_audited(self):
+        self.auth()
+        payload = {
+            "nombres": "Ana Similar",
+            "apellidos": "Prueba",
+            "telefono": self.patient_a.telefono,
+            "genero": "no_especificado",
+        }
+        warning = self.client.post("/api/reception/patients/minimal/", payload, format="json")
+        self.assertEqual(warning.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("possible_duplicate", warning.data)
+        confirmed = self.client.post(
+            "/api/reception/patients/minimal/",
+            {**payload, "duplicate_warning_confirmed": True},
+            format="json",
+        )
+        self.assertEqual(confirmed.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(
+            AuditLog.objects.filter(
+                object_id=str(confirmed.data["id"]),
+                description="Paciente creado tras confirmar advertencia de posible duplicado.",
+            ).exists()
+        )
+
     def test_reception_cannot_skip_required_triage(self):
         visit = self.create_visit(status=PatientVisit.Status.WAITING_TRIAGE)
         self.auth()

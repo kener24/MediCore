@@ -208,10 +208,24 @@ class ClinicalConsultationViewSet(viewsets.ModelViewSet):
             return Response({"detail": "No tienes permiso para listar consultas clinicas."}, status=status.HTTP_403_FORBIDDEN)
         return super().list(request, *args, **kwargs)
 
-    def _get_locked_consultation(self, pk):
+    def _audit_scope_denial(self, request, pk):
+        log_audit_event(
+            request=request,
+            clinic=getattr(request.user, "clinica", None),
+            action=AuditLog.Action.PERMISSION_DENIED,
+            module=AuditLog.Module.CONSULTATIONS,
+            model_name="ClinicalConsultation",
+            object_id=pk,
+            object_repr=f"Consulta #{pk}",
+            description="Intento de acceso a consulta fuera del alcance autorizado.",
+            metadata={"requested_consultation": str(pk)},
+        )
+
+    def _get_locked_consultation(self, request, pk):
         try:
             return self.get_queryset().select_for_update().get(pk=pk)
         except ClinicalConsultation.DoesNotExist as exc:
+            self._audit_scope_denial(request, pk)
             raise Http404 from exc
 
     @staticmethod
@@ -228,7 +242,7 @@ class ClinicalConsultationViewSet(viewsets.ModelViewSet):
 
     def _save_update(self, request, pk, *, partial, audit_description):
         with transaction.atomic():
-            consultation = self._get_locked_consultation(pk)
+            consultation = self._get_locked_consultation(request, pk)
             if get_role_name(request.user) != "medico" or consultation.doctor.user_id != request.user.id:
                 return Response({"detail": "No tienes permiso para editar esta consulta."}, status=status.HTTP_403_FORBIDDEN)
             if consultation.status == ClinicalConsultation.Status.FINALIZADA:
@@ -321,7 +335,7 @@ class ClinicalConsultationViewSet(viewsets.ModelViewSet):
 
     def _finalize_consultation(self, request, pk):
         with transaction.atomic():
-            consultation = self._get_locked_consultation(pk)
+            consultation = self._get_locked_consultation(request, pk)
             if get_role_name(request.user) != "medico":
                 return Response({"detail": "Solo medicos pueden finalizar consultas."}, status=status.HTTP_403_FORBIDDEN)
             if consultation.doctor.user_id != request.user.id:
@@ -378,7 +392,11 @@ class ClinicalConsultationViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["get"], url_path="clinical-context")
     def clinical_context(self, request, pk=None):
-        consultation = self.get_object()
+        try:
+            consultation = self.get_queryset().get(pk=pk)
+        except ClinicalConsultation.DoesNotExist as exc:
+            self._audit_scope_denial(request, pk)
+            raise Http404 from exc
         role = get_role_name(request.user)
         if role != "medico" or consultation.doctor.user_id != request.user.id:
             return Response({"detail": "No tienes permiso para acceder al contexto de esta consulta."}, status=status.HTTP_403_FORBIDDEN)

@@ -197,6 +197,13 @@ class DoctorConsultationCertificationTests(APITestCase):
         self.auth(self.doctor_b_user)
         crossed = self.client.get(f"/api/consultations/{started.data['consultation_id']}/clinical-context/")
         self.assertEqual(crossed.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertTrue(
+            AuditLog.objects.filter(
+                user=self.doctor_b_user,
+                action=AuditLog.Action.PERMISSION_DENIED,
+                description="Intento de acceso a consulta fuera del alcance autorizado.",
+            ).exists()
+        )
 
     def test_finalize_is_idempotent_updates_visit_and_blocks_editing(self):
         visit = self.visit()

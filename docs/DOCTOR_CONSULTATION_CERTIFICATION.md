@@ -54,6 +54,7 @@ Este sprint certifica el flujo existente desde la sala médica hasta la finaliza
 - Lint móvil: aprobado sin advertencias.
 - Expo Doctor: 18/18.
 - Export Android: aprobado; 1,510 módulos y bundle Hermes generado.
+- Expo LAN: activo; manifest Android y bundle respondieron 200 desde `192.168.101.27:8081`.
 
 ## Evidencia de producción
 

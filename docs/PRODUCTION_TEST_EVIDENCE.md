@@ -108,6 +108,7 @@ Despliegue y pruebas ejecutados el 2026-07-24 contra `https://kp-software.tech` 
 | DOC-LOCAL-05 | Web | Aprobado con observaciones | Build Vite correcto; lint con 0 errores y 62 advertencias heredadas |
 | DOC-LOCAL-06 | Móvil | Aprobado | TypeScript y lint sin errores; Expo Doctor 18/18 |
 | DOC-LOCAL-07 | Bundle Android | Aprobado | Export Android completo con 1,510 módulos y bundle Hermes |
+| DOC-LOCAL-08 | Expo en LAN | Aprobado | Metro activo en 8081; manifest Android 200 y bundle 200 desde `192.168.101.27` |
 | DOC-PROD-01 | Respaldo previo | Aprobado | Dump MySQL y bundle Git verificados por SHA-256 en `backups/sprint13a-final-20260724-181559` |
 | DOC-PROD-02 | Compatibilidad de migración | Aprobado | Cero visitas con consultas duplicadas antes de crear la restricción única |
 | DOC-PROD-03 | Despliegue | Aprobado | Revisión final `1c131f1`; migración `medical_records.0004` aplicada; MediCore y Nginx activos |

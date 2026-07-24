@@ -55,6 +55,16 @@ Este sprint certifica el flujo existente desde la sala médica hasta la finaliza
 - Expo Doctor: 18/18.
 - Export Android: aprobado; 1,510 módulos y bundle Hermes generado.
 
+## Evidencia de producción
+
+- Respaldo MySQL y Git validado antes de migrar.
+- Migración de versión y unicidad aplicada sin consultas duplicadas preexistentes.
+- Clínica A y Clínica B completaron sala, inicio, contexto, guardado, conflicto y finalización por HTTPS.
+- Los intentos cruzados devolvieron 404 y quedaron auditados sin contenido clínico externo.
+- La consulta finalizada abrió en solo lectura y la consola web no mostró errores.
+- Revisión final desplegada: `1c131f1`.
+- Android físico permanece pendiente de confirmación manual; bundle y Expo Doctor sí están aprobados.
+
 ## Pendiente de Sprint 1.3B
 
 - Validación avanzada de alergias contra medicamentos.
@@ -63,4 +73,3 @@ Este sprint certifica el flujo existente desde la sala médica hasta la finaliza
 - Consumo automático de inventario.
 - Adjuntos clínicos adicionales.
 - Certificación profunda de facturación originada en consulta.
-

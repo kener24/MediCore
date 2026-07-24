@@ -95,6 +95,39 @@ Despliegue y pruebas ejecutados el 2026-07-24 contra `https://kp-software.tech` 
 - Android físico no se marca como aprobado por inferencia.
 - Caja comparte actualmente el rol de recepción; no existe un usuario de caja separado por decisión funcional del proyecto.
 
+## Sprint 1.3A: consulta médica, contexto clínico y autosave
+
+Despliegue y pruebas ejecutados el 2026-07-24 contra `https://kp-software.tech` con visitas y contenido clínico sintéticos.
+
+| ID | Prueba | Resultado | Evidencia segura |
+| --- | --- | --- | --- |
+| DOC-LOCAL-01 | Suite completa Django | Aprobado | 283/283 pruebas en 878.952 s |
+| DOC-LOCAL-02 | Regresión de admisiones y flujo médico | Aprobado | 41/41 pruebas después de centralizar la transición de visita |
+| DOC-LOCAL-03 | Auditoría de acceso fuera de alcance | Aprobado | 10/10 pruebas después del ajuste final |
+| DOC-LOCAL-04 | Django y migraciones | Aprobado | `manage.py check` correcto y `makemigrations --check` sin cambios pendientes |
+| DOC-LOCAL-05 | Web | Aprobado con observaciones | Build Vite correcto; lint con 0 errores y 62 advertencias heredadas |
+| DOC-LOCAL-06 | Móvil | Aprobado | TypeScript y lint sin errores; Expo Doctor 18/18 |
+| DOC-LOCAL-07 | Bundle Android | Aprobado | Export Android completo con 1,510 módulos y bundle Hermes |
+| DOC-PROD-01 | Respaldo previo | Aprobado | Dump MySQL y bundle Git verificados por SHA-256 en `backups/sprint13a-final-20260724-181559` |
+| DOC-PROD-02 | Compatibilidad de migración | Aprobado | Cero visitas con consultas duplicadas antes de crear la restricción única |
+| DOC-PROD-03 | Despliegue | Aprobado | Revisión final `1c131f1`; migración `medical_records.0004` aplicada; MediCore y Nginx activos |
+| DOC-PROD-04 | Clínica A | Aprobado | Sala, inicio, reintento idempotente, contexto, borrador, conflicto, finalización y solo lectura |
+| DOC-PROD-05 | Clínica B | Aprobado | Flujo equivalente ejecutado de forma independiente |
+| DOC-PROD-06 | Conflicto de versión | Aprobado | Cliente obsoleto recibió HTTP 409 y no sobrescribió la consulta |
+| DOC-PROD-07 | Finalización idempotente | Aprobado | Segundo intento devolvió la consulta existente sin repetir transición |
+| DOC-PROD-08 | Edición posterior | Aprobado | PATCH de consulta finalizada respondió HTTP 409 |
+| DOC-PROD-09 | Aislamiento A/B | Aprobado | Contexto y edición cruzados devolvieron HTTP 404 en ambas direcciones |
+| DOC-PROD-10 | Auditoría cruzada | Aprobado | Intento A→B generó un único evento `permission_denied` sin contenido clínico externo |
+| DOC-PROD-11 | Revisión visual web | Aprobado | Contexto y triaje integrados, formulario deshabilitado y consola sin errores |
+| DOC-PROD-12 | HTTPS y sesión | Aprobado | Login 200, API anónima 401 y flujo autenticado por HTTPS |
+| DOC-PHYSICAL-01 | Android físico | Pendiente | Requiere ejecutar el recorrido manual en Expo Go; no se infiere desde el bundle |
+
+### Riesgo residual de dependencias
+
+- `react-router-dom` se actualizó a 7.18.1, última versión publicada durante la certificación.
+- npm conserva dos alertas altas asociadas al modo React Server Components. MediCore web es una SPA Vite y no habilita RSC, por lo que la ruta afectada no está expuesta en esta arquitectura.
+- No existía una versión corregida publicada al cierre del sprint. Debe actualizarse cuando el proveedor libere el parche y repetirse build, lint, auditoría y navegación.
+
 ## Política de evidencia
 
 - Las evidencias no muestran tokens, contraseñas ni información clínica real.

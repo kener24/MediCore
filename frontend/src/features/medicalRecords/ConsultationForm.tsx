@@ -55,19 +55,19 @@ export function ConsultationForm({ consultation, isSubmitting, payload, onChange
       <Card>
         <div className="grid gap-4 lg:grid-cols-2">
           <label className="space-y-1 text-sm font-medium text-slate-700">Paciente<select className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm" disabled={disabled || Boolean(consultation)} required value={payload.patient} onChange={(event) => update("patient", event.target.value)}><option value="">Seleccionar paciente</option>{patients.map((patient) => <option key={patient.id} value={patient.id}>{patient.nombre_completo}</option>)}</select></label>
-          <label className="space-y-1 text-sm font-medium text-slate-700">Medico<select className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm" disabled={disabled || Boolean(consultation)} required value={payload.doctor} onChange={(event) => update("doctor", event.target.value)}><option value="">Seleccionar medico</option>{doctors.map((doctor) => <option key={doctor.id} value={doctor.id}>{doctor.user_nombre}</option>)}</select></label>
+          <label className="space-y-1 text-sm font-medium text-slate-700">Médico<select className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm" disabled={disabled || Boolean(consultation)} required value={payload.doctor} onChange={(event) => update("doctor", event.target.value)}><option value="">Seleccionar médico</option>{doctors.map((doctor) => <option key={doctor.id} value={doctor.id}>{doctor.user_nombre}</option>)}</select></label>
           <label className="space-y-1 text-sm font-medium text-slate-700">Fecha<input className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm" disabled={disabled} required type="date" value={payload.consultation_date} onChange={(event) => update("consultation_date", event.target.value)} /></label>
           <div className="grid grid-cols-2 gap-3"><label className="space-y-1 text-sm font-medium text-slate-700">Inicio<input className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm" disabled={disabled} type="time" value={payload.start_time ?? ""} onChange={(event) => update("start_time", event.target.value)} /></label><label className="space-y-1 text-sm font-medium text-slate-700">Fin<input className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm" disabled={disabled} type="time" value={payload.end_time ?? ""} onChange={(event) => update("end_time", event.target.value)} /></label></div>
         </div>
       </Card>
-      <Card title="Evaluacion clinica">
+      <Card title="Evaluación clínica">
         <div className="grid gap-4">
           {[
             ["chief_complaint", "Motivo de consulta"],
-            ["symptoms", "Sintomas"],
-            ["physical_exam", "Examen fisico"],
-            ["clinical_assessment", "Evaluacion medica"],
-            ["preliminary_diagnosis", "Impresion diagnostica inicial"],
+            ["symptoms", "Síntomas"],
+            ["physical_exam", "Examen físico"],
+            ["clinical_assessment", "Evaluación médica"],
+            ["preliminary_diagnosis", "Impresión diagnóstica inicial"],
             ["treatment_plan", "Tratamiento o indicaciones"],
             ["recommendations", "Recomendaciones"],
             ["private_notes", "Notas privadas"],

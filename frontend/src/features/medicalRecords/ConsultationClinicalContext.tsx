@@ -21,9 +21,9 @@ export function ConsultationClinicalContextPanel({ context }: { context: Consult
           <Fact label="Contacto de emergencia" value={emergencyContact(patient)} />
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <Risk label="Alergias" value={context.allergies} warning />
-          <Risk label="Enfermedades crónicas" value={context.chronic_conditions} />
-          <Risk label="Medicamentos crónicos" value={context.chronic_medications} />
+          <Risk empty="No hay alergias registradas." label="Alergias" value={context.allergies} warning />
+          <Risk empty="No hay enfermedades crónicas registradas." label="Enfermedades crónicas" value={context.chronic_conditions} />
+          <Risk empty="No hay medicamentos crónicos registrados." label="Medicamentos crónicos" value={context.chronic_medications} />
         </div>
       </Card>
 
@@ -84,8 +84,8 @@ function Fact({ icon, label, value }: { icon?: ReactNode; label: string; value: 
   return <div><p className="flex items-center gap-1 text-xs font-semibold uppercase text-slate-500">{icon}{label}</p><p className="mt-1 whitespace-pre-wrap text-slate-800">{value}</p></div>;
 }
 
-function Risk({ label, value, warning = false }: { label: string; value: string; warning?: boolean }) {
-  return <div className={`rounded-md border p-3 ${warning && value ? "border-rose-200 bg-rose-50" : "border-slate-200 bg-slate-50"}`}><p className={`flex items-center gap-1 text-xs font-semibold uppercase ${warning && value ? "text-rose-700" : "text-slate-600"}`}>{warning ? <AlertTriangle className="h-4 w-4" /> : null}{label}</p><p className="mt-1 text-sm text-slate-800">{value || `No hay ${label.toLowerCase()} registrados.`}</p></div>;
+function Risk({ empty, label, value, warning = false }: { empty: string; label: string; value: string; warning?: boolean }) {
+  return <div className={`rounded-md border p-3 ${warning && value ? "border-rose-200 bg-rose-50" : "border-slate-200 bg-slate-50"}`}><p className={`flex items-center gap-1 text-xs font-semibold uppercase ${warning && value ? "text-rose-700" : "text-slate-600"}`}>{warning ? <AlertTriangle className="h-4 w-4" /> : null}{label}</p><p className="mt-1 text-sm text-slate-800">{value || empty}</p></div>;
 }
 
 function HistoryGroup({ empty, items, title }: { empty: string; items: Array<{ id: number; meta: string; title: string; body: string }>; title: string }) {

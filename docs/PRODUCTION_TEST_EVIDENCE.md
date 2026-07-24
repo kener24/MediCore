@@ -65,6 +65,29 @@ Despliegue y pruebas ejecutados el 2026-07-22 contra `https://kp-software.tech` 
 | REC-PROD-16 | Datos de agenda y detalle | Aprobado | Agenda mostró paciente, código, médico y especialidad; detalle abrió la visita vinculada en `waiting_triage` |
 | REC-PHYSICAL-01 | Android físico | Pendiente | No se marca aprobado por inferencia; requiere prueba manual con Expo Go |
 
+## Sprint 1.2: enfermería y triaje
+
+Despliegue y pruebas ejecutados el 2026-07-24 contra `https://kp-software.tech` con pacientes y visitas sintéticos.
+
+| ID | Prueba | Resultado | Evidencia segura |
+| --- | --- | --- | --- |
+| TRI-LOCAL-01 | Pruebas específicas de triaje | Aprobado | 16/16 pruebas |
+| TRI-LOCAL-02 | Suite clínica dirigida | Aprobado | 105/105 pruebas de admisiones, expedientes, pacientes, cuentas y auditoría |
+| TRI-LOCAL-03 | Suite completa Django | Aprobado | 274/274 pruebas en 422.294 s |
+| TRI-LOCAL-04 | Build y lint web | Aprobado con observaciones | Build Vite correcto; lint con 0 errores y 62 advertencias heredadas |
+| TRI-LOCAL-05 | Calidad móvil | Aprobado | TypeScript y lint sin errores; Expo Doctor 18/18 |
+| TRI-PROD-01 | Respaldo previo | Aprobado | Respaldo verificable en `backups/sprint12-20260723-063959` |
+| TRI-PROD-02 | Despliegue de flujo clínico | Aprobado | Commits `c202fff`, `eb607f1` y `4220f5b`; sin migraciones nuevas |
+| TRI-PROD-03 | Triaje completo en Clínica A | Aprobado | Recepción, cola, toma, signos, IMC, evaluación, prioridad y finalización comprobados |
+| TRI-PROD-04 | Triaje completo en Clínica B | Aprobado | Flujo equivalente comprobado de forma independiente |
+| TRI-PROD-05 | Aislamiento multiclínica | Aprobado | Acceso cruzado a detalle, signos, inicio y finalización respondió 404 |
+| TRI-PROD-06 | Idempotencia | Aprobado | Reintento de finalización no duplicó transición, auditoría ni datos |
+| TRI-PROD-07 | Sala médica | Aprobado | El médico asignado recibió evaluación inicial y signos vitales tras el triaje |
+| TRI-PROD-08 | Selección de médico en recepción | Aprobado | Recepción lista únicamente médicos activos de su clínica |
+| TRI-PROD-09 | Detalle web para enfermería | Aprobado | Commit `e0c00ed`; detalle completado abre en Triaje, conserva la ruta y no genera errores de consola |
+| TRI-PROD-10 | Servicios de producción | Aprobado | Revisión `e0c00ed`; Nginx y MediCore activos; `nginx -t` válido |
+| TRI-PHYSICAL-01 | Android físico | Pendiente | Requiere completar el flujo manualmente desde Expo Go; no se infiere desde compilación |
+
 ## Observaciones de despliegue
 
 - MySQL advirtió que no aplica siete restricciones únicas condicionales de Django. No bloqueó el despliegue, pero deben mantenerse cubiertas por validación transaccional y pruebas.

@@ -173,6 +173,7 @@ class ClinicalConsultationListSerializer(serializers.ModelSerializer):
             "chief_complaint",
             "preliminary_diagnosis",
             "status",
+            "version",
             "activo",
             "creado_en",
             "actualizado_en",
@@ -261,6 +262,8 @@ class ClinicalConsultationCreateSerializer(serializers.ModelSerializer):
 
 
 class ClinicalConsultationUpdateSerializer(serializers.ModelSerializer):
+    expected_version = serializers.IntegerField(write_only=True, required=False, min_value=1)
+
     class Meta:
         model = ClinicalConsultation
         fields = [
@@ -275,6 +278,7 @@ class ClinicalConsultationUpdateSerializer(serializers.ModelSerializer):
             "treatment_plan",
             "recommendations",
             "private_notes",
+            "expected_version",
         ]
 
     def validate(self, attrs):
@@ -287,17 +291,33 @@ class ClinicalConsultationUpdateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("No puedes editar consultas de otro medico.")
         return attrs
 
+    def update(self, instance, validated_data):
+        validated_data.pop("expected_version", None)
+        return super().update(instance, validated_data)
+
 
 class ClinicalConsultationFinalizeSerializer(serializers.Serializer):
     chief_complaint = serializers.CharField(required=False, allow_blank=True)
     clinical_assessment = serializers.CharField(required=False, allow_blank=True)
+    preliminary_diagnosis = serializers.CharField(required=False, allow_blank=True)
+    treatment_plan = serializers.CharField(required=False, allow_blank=True)
+    expected_version = serializers.IntegerField(required=False, min_value=1, write_only=True)
 
     def validate(self, attrs):
         instance = self.context["consultation"]
         complaint = attrs.get("chief_complaint", instance.chief_complaint)
         assessment = attrs.get("clinical_assessment", instance.clinical_assessment)
-        if not complaint or not assessment:
-            raise serializers.ValidationError("Motivo de consulta y evaluacion clinica son obligatorios para finalizar.")
+        diagnosis = attrs.get("preliminary_diagnosis", instance.preliminary_diagnosis)
+        plan = attrs.get("treatment_plan", instance.treatment_plan)
+        errors = {}
+        if not complaint.strip():
+            errors["chief_complaint"] = "Debes registrar el motivo de consulta."
+        if not (assessment.strip() or diagnosis.strip()):
+            errors["clinical_assessment"] = "Debes registrar una evaluacion o diagnostico."
+        if not plan.strip():
+            errors["treatment_plan"] = "Debes registrar el plan de atencion."
+        if errors:
+            raise serializers.ValidationError(errors)
         return attrs
 
 

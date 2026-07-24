@@ -236,7 +236,16 @@ class PatientVisitViewSet(viewsets.ModelViewSet):
     def doctor_waiting_room(self, request):
         if get_role_name(request.user) not in ["admin"] + DOCTOR_ROLES:
             return Response({"detail": "No tienes permiso para consultar la sala médica."}, status=status.HTTP_403_FORBIDDEN)
-        queryset = self.get_queryset().filter(status__in=[PatientVisit.Status.WAITING_DOCTOR, PatientVisit.Status.IN_CONSULTATION])
+        priority_order = Case(
+            When(priority=PatientVisit.Priority.EMERGENCY, then=Value(0)),
+            When(priority=PatientVisit.Priority.URGENT, then=Value(1)),
+            When(priority=PatientVisit.Priority.PRIORITY, then=Value(2)),
+            default=Value(3),
+            output_field=IntegerField(),
+        )
+        queryset = self.get_queryset().filter(
+            status__in=[PatientVisit.Status.WAITING_DOCTOR, PatientVisit.Status.IN_CONSULTATION]
+        ).order_by(priority_order, "arrival_time")
         return Response(PatientVisitSerializer(queryset, many=True, context={"request": request}).data)
 
     @action(detail=True, methods=["patch"], url_path="start-consultation")
@@ -245,10 +254,18 @@ class PatientVisitViewSet(viewsets.ModelViewSet):
             return Response({"detail": "No tienes permiso para iniciar consulta."}, status=status.HTTP_403_FORBIDDEN)
         visit = self.get_object()
         try:
-            visit, consultation = flow.start_consultation(visit, user=request.user, request=request)
+            visit, consultation, created = flow.start_consultation(visit, user=request.user, request=request)
         except DjangoValidationError as exc:
             return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
-        return Response({"visit": PatientVisitSerializer(visit).data, "consultation": consultation.id})
+        return Response({
+            "success": True,
+            "visit": PatientVisitSerializer(visit, context={"request": request}).data,
+            "visit_id": visit.id,
+            "consultation": consultation.id,
+            "consultation_id": consultation.id,
+            "created": created,
+            "message": "Consulta iniciada." if created else "La consulta ya estaba iniciada.",
+        })
 
     @action(detail=True, methods=["patch"], url_path="complete-consultation")
     def complete_consultation(self, request, pk=None):

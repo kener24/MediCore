@@ -24,6 +24,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(SESSION_KEY);
+    for (let index = sessionStorage.length - 1; index >= 0; index -= 1) {
+      const key = sessionStorage.key(index);
+      if (key?.startsWith("medicore.consultationDraft.")) sessionStorage.removeItem(key);
+    }
     setUser(null);
   }, []);
 

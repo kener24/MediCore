@@ -1,5 +1,5 @@
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from apps.accounts.permissions import get_role_name
@@ -270,38 +270,58 @@ def send_to_doctor(visit, *, user, request=None):
 @transaction.atomic
 def start_consultation(visit, *, user, request=None):
     _assert_role(user, DOCTOR_ROLES, "Solo medicos pueden iniciar consulta.")
+    visit = PatientVisit.objects.select_for_update().select_related(
+        "clinic", "patient", "medical_record", "appointment", "assigned_doctor__user", "consultation"
+    ).get(pk=visit.pk)
+    _assert_clinic(user, visit.clinic)
     if visit.status not in [PatientVisit.Status.WAITING_DOCTOR, PatientVisit.Status.IN_CONSULTATION]:
         raise ValidationError("La visita no esta esperando doctor.")
+    if _requires_triage(visit) and not visit.triage_completed_at:
+        raise ValidationError("Debes completar el triaje antes de iniciar la consulta.")
     if visit.assigned_doctor_id and visit.assigned_doctor.user_id != user.id:
         raise ValidationError("Esta visita esta asignada a otro medico.")
     doctor = visit.assigned_doctor or getattr(user, "doctor_profile", None)
     if not doctor:
         raise ValidationError("No hay medico asignado.")
-    consultation = visit.consultation
+    consultation = visit.consultation or ClinicalConsultation.objects.filter(patient_visit=visit).first()
+    created = False
     if not consultation:
-        consultation = ClinicalConsultation.objects.create(
-            clinic=visit.clinic,
-            medical_record=visit.medical_record,
-            patient=visit.patient,
-            doctor=doctor,
-            appointment=visit.appointment,
-            patient_visit=visit,
-            consultation_date=visit.visit_date,
-            chief_complaint=visit.reason,
-            symptoms=visit.symptoms,
-            created_by=user,
-        )
-        visit.consultation = consultation
+        try:
+            with transaction.atomic():
+                consultation = ClinicalConsultation.objects.create(
+                    clinic=visit.clinic,
+                    medical_record=visit.medical_record,
+                    patient=visit.patient,
+                    doctor=doctor,
+                    appointment=visit.appointment,
+                    patient_visit=visit,
+                    consultation_date=visit.visit_date,
+                    chief_complaint=visit.reason,
+                    symptoms=visit.symptoms,
+                    created_by=user,
+                )
+            created = True
+        except IntegrityError:
+            consultation = ClinicalConsultation.objects.get(patient_visit=visit)
+    if consultation.doctor.user_id != user.id:
+        raise ValidationError("Esta consulta pertenece a otro medico.")
+    visit.consultation = consultation
     old = visit.status
     visit.assigned_doctor = doctor
     visit.touch_status(PatientVisit.Status.IN_CONSULTATION, user=user)
     visit.save(update_fields=["assigned_doctor", "consultation", "status", "consultation_started_at", "actualizado_en"])
-    _audit(request, visit, AuditLog.Action.CREATE, "Consulta iniciada desde visita.", old)
-    return visit, consultation
+    if created or old != PatientVisit.Status.IN_CONSULTATION:
+        _audit(request, visit, AuditLog.Action.CREATE, "Consulta iniciada desde visita.", old, {"consultation": consultation.id})
+    return visit, consultation, created
 
 
+@transaction.atomic
 def complete_consultation(visit, *, user, request=None):
     _assert_role(user, DOCTOR_ROLES, "Solo medicos pueden completar consulta.")
+    visit = PatientVisit.objects.select_for_update().select_related("clinic", "consultation", "assigned_doctor__user").get(pk=visit.pk)
+    _assert_clinic(user, visit.clinic)
+    if visit.assigned_doctor_id and visit.assigned_doctor.user_id != user.id:
+        raise ValidationError("Esta visita esta asignada a otro medico.")
     if not visit.consultation_id:
         raise ValidationError("La visita no tiene consulta iniciada.")
     if visit.consultation.status != ClinicalConsultation.Status.FINALIZADA:
@@ -309,9 +329,11 @@ def complete_consultation(visit, *, user, request=None):
     workflow = get_or_create_workflow_settings(visit.clinic)
     old = visit.status
     next_status = PatientVisit.Status.WAITING_BILLING if workflow.auto_send_to_billing_after_consultation else PatientVisit.Status.CONSULTATION_FINISHED
+    if visit.status == next_status:
+        return visit, False
     visit.touch_status(next_status, user=user)
     _audit(request, visit, AuditLog.Action.COMPLETE, "Consulta completada en flujo de visita.", old)
-    return visit
+    return visit, True
 
 
 def send_to_billing(visit, *, user, request=None):

@@ -19,7 +19,7 @@ export async function cancelReceptionVisit(id: number | string, reason: string) 
 export async function getVisitVitalSigns(id: number | string) { const { data } = await api.get<VitalSigns[]>(`/admissions/visits/${id}/vital-signs/`); return data; }
 export async function createVisitVitalSigns(id: number | string, payload: VitalSignsPayload) { const { data } = await api.post<VitalSigns>(`/admissions/visits/${id}/vital-signs/`, payload); return data; }
 export async function getDoctorWaitingRoom(filters?: Record<string, string>) { const { data } = await api.get<PatientVisit[]>("/admissions/doctor-waiting-room/", { params: filters }); return data; }
-export async function startVisitConsultation(id: number | string) { const { data } = await api.patch<{ visit: PatientVisit; consultation: number }>(`/admissions/visits/${id}/start-consultation/`); return data; }
+export async function startVisitConsultation(id: number | string) { const { data } = await api.patch<{ visit: PatientVisit; consultation: number; consultation_id: number; created: boolean; message: string }>(`/admissions/visits/${id}/start-consultation/`); return data; }
 export async function completeVisitConsultation(id: number | string) { const { data } = await api.patch<PatientVisit>(`/admissions/visits/${id}/complete-consultation/`); return data; }
 export async function getAdmissionStatsToday() { const { data } = await api.get<AdmissionStats>("/admissions/stats/today/"); return data; }
 export async function getPendingBillingVisits(filters?: Record<string, string>) { const { data } = await api.get<PatientVisit[]>("/billing/pending-visits/", { params: filters }); return data; }

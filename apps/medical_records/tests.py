@@ -77,7 +77,9 @@ class MedicalRecordsModuleTests(APITestCase):
         ClinicalConsultation.objects.create(clinic=self.clinic, medical_record=record, patient=self.patient, doctor=self.doctor, appointment=self.appointment, created_by=self.doctor_user)
         self.auth(self.doctor_user)
         response = self.client.post(f"/api/appointments/{self.appointment.id}/start-consultation/")
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data["created"])
+        self.assertEqual(ClinicalConsultation.objects.filter(appointment=self.appointment).count(), 1)
 
     def test_no_finalizar_sin_minimos(self):
         record = MedicalRecord.objects.create(patient=self.patient)
@@ -88,7 +90,7 @@ class MedicalRecordsModuleTests(APITestCase):
 
     def test_finalizar_marca_cita_atendida(self):
         record = MedicalRecord.objects.create(patient=self.patient)
-        consultation = ClinicalConsultation.objects.create(clinic=self.clinic, medical_record=record, patient=self.patient, doctor=self.doctor, appointment=self.appointment, chief_complaint="Dolor", clinical_assessment="Estable", created_by=self.doctor_user)
+        consultation = ClinicalConsultation.objects.create(clinic=self.clinic, medical_record=record, patient=self.patient, doctor=self.doctor, appointment=self.appointment, chief_complaint="Dolor", clinical_assessment="Estable", preliminary_diagnosis="Cefalea", treatment_plan="Hidratacion y control", created_by=self.doctor_user)
         self.auth(self.doctor_user)
         response = self.client.patch(f"/api/consultations/{consultation.id}/finalize/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)

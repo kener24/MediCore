@@ -275,7 +275,8 @@ class AdmissionsFlowTests(APITestCase):
     def test_medico_sala_inicia_consulta_y_finaliza_a_caja(self):
         visit = self.register_visit()
         visit.status = PatientVisit.Status.WAITING_DOCTOR
-        visit.save(update_fields=["status"])
+        visit.triage_completed_at = timezone.now()
+        visit.save(update_fields=["status", "triage_completed_at"])
         self.auth(self.doctor_user)
         waiting = self.client.get("/api/admissions/doctor-waiting-room/")
         self.assertEqual(len(waiting.data), 1)
@@ -284,9 +285,17 @@ class AdmissionsFlowTests(APITestCase):
         visit.refresh_from_db()
         self.assertTrue(ClinicalConsultation.objects.filter(patient_visit=visit).exists())
         consultation = visit.consultation
-        consultation.chief_complaint = "Dolor"
-        consultation.clinical_assessment = "Estable"
-        consultation.finalize(self.doctor_user)
+        completed = self.client.post(
+            f"/api/consultations/{consultation.id}/complete/",
+            {
+                "chief_complaint": "Dolor",
+                "clinical_assessment": "Estable",
+                "treatment_plan": "Control y seguimiento",
+                "expected_version": consultation.version,
+            },
+            format="json",
+        )
+        self.assertEqual(completed.status_code, status.HTTP_200_OK)
         visit.refresh_from_db()
         self.assertEqual(visit.status, PatientVisit.Status.WAITING_BILLING)
 

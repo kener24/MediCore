@@ -89,6 +89,7 @@ class ClinicalConsultation(TimeStampedModel):
     created_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="consultations_created")
     finalized_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="consultations_finalized")
     finalized_at = models.DateTimeField(null=True, blank=True)
+    version = models.PositiveIntegerField(default=1)
     activo = models.BooleanField(default=True)
 
     class Meta:
@@ -98,6 +99,9 @@ class ClinicalConsultation(TimeStampedModel):
             models.Index(fields=["patient", "consultation_date"]),
             models.Index(fields=["doctor", "consultation_date"]),
             models.Index(fields=["status"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(fields=["patient_visit"], name="unique_consultation_per_visit"),
         ]
 
     def clean(self):
@@ -124,17 +128,18 @@ class ClinicalConsultation(TimeStampedModel):
         return super().save(*args, **kwargs)
 
     def finalize(self, user):
+        if self.status == self.Status.FINALIZADA:
+            return False
         self.status = self.Status.FINALIZADA
         self.finalized_by = user
         self.finalized_at = timezone.now()
         self.activo = True
         self.save()
-        if self.patient_visit_id:
-            self.patient_visit.touch_status("waiting_billing", user=user)
         if self.appointment_id and self.appointment.status != Appointment.Status.ATENDIDA:
             self.appointment.status = Appointment.Status.ATENDIDA
             self.appointment.attended_at = timezone.now()
             self.appointment.save(update_fields=["status", "attended_at"])
+        return True
 
     def __str__(self):
         return f"{self.patient.nombre_completo} - {self.consultation_date}"

@@ -360,8 +360,8 @@ export function DoctorWaitingRoomPage() {
   const [visits, setVisits] = useState<PatientVisit[]>([]);
   const navigate = useNavigate();
   useEffect(() => { getDoctorWaitingRoom().then(setVisits).catch((e) => toast.error(getErrorMessage(e))); }, []);
-  async function start(visit: PatientVisit) { const data = await startVisitConsultation(visit.id); toast.success("Consulta iniciada."); navigate(`/clinic/consultations/${data.consultation}`); }
-  return <div className="space-y-6"><PageHeader title="Sala de espera" description="Pacientes listos para consulta medica." /><Card><VisitTable visits={visits} actions={(v) => <div className="flex flex-wrap gap-2"><Link className="rounded-md border px-3 py-1 text-xs font-semibold" to={`/clinic/admissions/visits/${v.id}`}>Ver</Link><Button className="h-8 px-3 text-xs" onClick={() => start(v)}>Iniciar consulta</Button></div>} /></Card></div>;
+  async function start(visit: PatientVisit) { const data = await startVisitConsultation(visit.id); toast.success(data.created === false ? "Consulta recuperada." : "Consulta iniciada."); navigate(`/doctor/consultations/${data.consultation}/edit`); }
+  return <div className="space-y-6"><PageHeader title="Sala de espera" description="Pacientes listos para consulta medica." /><Card><VisitTable visits={visits} actions={(v) => <div className="flex flex-wrap gap-2"><Link className="rounded-md border px-3 py-1 text-xs font-semibold" to={`/clinic/admissions/visits/${v.id}`}>Ver</Link><Button className="h-8 px-3 text-xs" onClick={() => start(v)}>{v.status === "in_consultation" ? "Continuar consulta" : "Iniciar consulta"}</Button></div>} /></Card></div>;
 }
 
 export function PendingBillingVisitsPage() {

@@ -1,5 +1,4 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { getErrorMessage } from "../../api/axios";
@@ -9,34 +8,18 @@ import { Card } from "../../components/ui/Card";
 import type { DoctorProfile } from "../../types/doctor";
 import type { ConsultationPayload, ClinicalConsultation } from "../../types/medicalRecord";
 import type { Patient } from "../../types/patient";
-import { todayIso } from "./medicalRecordUtils";
 
 interface ConsultationFormProps {
   consultation?: ClinicalConsultation | null;
   isSubmitting: boolean;
+  payload: ConsultationPayload;
+  onChange: (payload: ConsultationPayload) => void;
   onSubmit: (payload: ConsultationPayload) => Promise<void>;
 }
 
-export function ConsultationForm({ consultation, isSubmitting, onSubmit }: ConsultationFormProps) {
-  const [searchParams] = useSearchParams();
-  const initialPatient = searchParams.get("patient") ?? "";
+export function ConsultationForm({ consultation, isSubmitting, payload, onChange, onSubmit }: ConsultationFormProps) {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [doctors, setDoctors] = useState<DoctorProfile[]>([]);
-  const [payload, setPayload] = useState<ConsultationPayload>({
-    patient: consultation?.patient ?? initialPatient,
-    doctor: consultation?.doctor ?? "",
-    consultation_date: consultation?.consultation_date ?? todayIso(),
-    start_time: consultation?.start_time?.slice(0, 5) ?? "",
-    end_time: consultation?.end_time?.slice(0, 5) ?? "",
-    chief_complaint: consultation?.chief_complaint ?? "",
-    symptoms: consultation?.symptoms ?? "",
-    physical_exam: consultation?.physical_exam ?? "",
-    clinical_assessment: consultation?.clinical_assessment ?? "",
-    preliminary_diagnosis: consultation?.preliminary_diagnosis ?? "",
-    treatment_plan: consultation?.treatment_plan ?? "",
-    recommendations: consultation?.recommendations ?? "",
-    private_notes: consultation?.private_notes ?? "",
-  });
   const disabled = consultation?.status === "finalizada";
 
   useEffect(() => {
@@ -53,7 +36,7 @@ export function ConsultationForm({ consultation, isSubmitting, onSubmit }: Consu
   }, []);
 
   function update(key: keyof ConsultationPayload, value: string) {
-    setPayload((current) => ({ ...current, [key]: value }));
+    onChange({ ...payload, [key]: value });
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {

@@ -59,6 +59,7 @@ export interface ClinicalConsultation {
   doctor_nombre?: string;
   specialty_nombre?: string;
   appointment: number | null;
+  patient_visit: number | null;
   consultation_date: string;
   start_time: string | null;
   end_time: string | null;
@@ -71,6 +72,7 @@ export interface ClinicalConsultation {
   recommendations: string;
   private_notes: string;
   status: ConsultationStatus;
+  version: number;
   void_reason?: string;
   created_by?: number | null;
   created_by_nombre?: string;
@@ -121,6 +123,26 @@ export interface ConsultationPayload {
   recommendations?: string;
   private_notes?: string;
   status?: ConsultationStatus;
+  expected_version?: number;
+}
+
+export interface ConsultationClinicalContext {
+  consultation_id: number;
+  version: number;
+  patient: Record<string, unknown>;
+  current_triage: Record<string, unknown> | null;
+  medical_record: MedicalRecord;
+  allergies: string;
+  chronic_conditions: string;
+  chronic_medications: string;
+  important_history: {
+    surgical: string;
+    family: string;
+    general_notes: string;
+  };
+  recent_diagnoses: Array<Record<string, unknown>>;
+  recent_vital_signs: VitalSigns[];
+  recent_consultations: ClinicalConsultation[];
 }
 
 export type VitalSignsPayload = Partial<Omit<VitalSigns, "id" | "consultation" | "bmi" | "registrado_por" | "registrado_por_nombre" | "creado_en" | "actualizado_en">> & { confirm_out_of_range?: boolean };

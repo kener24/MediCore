@@ -1,5 +1,5 @@
 import api from "./axios";
-import type { ClinicalConsultation, ClinicalHistory, ClinicalSupplyUsage, ConsultationFilters, ConsultationPayload, MedicalRecord, MedicalRecordFilters, MedicalRecordPayload, MedicalRecordStats, VitalSigns, VitalSignsPayload } from "../types/medicalRecord";
+import type { ClinicalConsultation, ClinicalHistory, ClinicalSupplyUsage, ConsultationClinicalContext, ConsultationFilters, ConsultationPayload, MedicalRecord, MedicalRecordFilters, MedicalRecordPayload, MedicalRecordStats, VitalSigns, VitalSignsPayload } from "../types/medicalRecord";
 
 export async function getMedicalRecords(filters?: MedicalRecordFilters) {
   const { data } = await api.get<MedicalRecord[]>("/medical-records/", { params: filters });
@@ -53,6 +53,16 @@ export async function createConsultation(payload: ConsultationPayload) {
 
 export async function updateConsultation(id: number | string, payload: ConsultationPayload) {
   const { data } = await api.patch<ClinicalConsultation>(`/consultations/${id}/`, payload);
+  return data;
+}
+
+export async function saveConsultationDraft(id: number | string, payload: ConsultationPayload) {
+  const { data } = await api.post<ClinicalConsultation>(`/consultations/${id}/save-draft/`, payload);
+  return data;
+}
+
+export async function getConsultationClinicalContext(id: number | string) {
+  const { data } = await api.get<ConsultationClinicalContext>(`/consultations/${id}/clinical-context/`);
   return data;
 }
 

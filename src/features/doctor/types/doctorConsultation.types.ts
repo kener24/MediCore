@@ -88,6 +88,7 @@ export type ConsultationPayload = {
   notes?: string;
   private_notes?: string;
   status?: ConsultationStatus;
+  expected_version?: number;
 };
 
 export type DoctorConsultation = ConsultationPayload & {
@@ -120,6 +121,26 @@ export type DoctorConsultation = ConsultationPayload & {
   creado_en?: string;
   actualizado_en?: string;
   updated_at?: string;
+  version?: number;
+};
+
+export type DoctorConsultationClinicalContext = {
+  consultation_id: number;
+  version: number;
+  patient: DoctorPatientSummary;
+  current_triage?: Record<string, unknown> | null;
+  medical_record?: Record<string, unknown> | null;
+  allergies?: string | null;
+  chronic_conditions?: string | null;
+  chronic_medications?: string | null;
+  important_history?: {
+    family?: string | null;
+    general_notes?: string | null;
+    surgical?: string | null;
+  };
+  recent_diagnoses?: Record<string, unknown>[];
+  recent_vital_signs?: DoctorVitalSigns[];
+  recent_consultations?: DoctorConsultation[];
 };
 
 export type StartConsultationResponse = {

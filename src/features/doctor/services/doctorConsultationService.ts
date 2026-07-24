@@ -7,6 +7,7 @@ import type {
   ConsultationFiltersState,
   ConsultationPayload,
   DoctorConsultation,
+  DoctorConsultationClinicalContext,
   DoctorPatientSummary,
   DoctorVitalSigns,
   StartConsultationResponse,
@@ -111,6 +112,16 @@ export async function getConsultationDetail(consultationId: number | string) {
   }
 }
 
+export async function getConsultationClinicalContext(consultationId: number | string) {
+  try {
+    return await getFirstAvailable<DoctorConsultationClinicalContext>([
+      endpoints.doctor.consultationClinicalContext(consultationId),
+    ]);
+  } catch (err) {
+    throw normalizeConsultationError(err);
+  }
+}
+
 export async function getConsultation(id: number | string) {
   return getConsultationDetail(id);
 }
@@ -181,10 +192,10 @@ export async function updateConsultation(consultationId: number | string, payloa
 }
 
 export async function saveConsultationDraft(consultationId: number | string, payload: ConsultationPayload) {
-  const draftPayload = sanitizePayload({ ...payload, status: 'draft' });
+  const draftPayload = sanitizePayload(payload);
   try {
     return await postFirstAvailable<DoctorConsultation>(
-      [`${endpoints.doctor.consultation(consultationId)}save-draft/`],
+      [endpoints.doctor.consultationSaveDraft(consultationId)],
       draftPayload,
     );
   } catch (err) {
@@ -205,14 +216,10 @@ export async function completeConsultation(visitId: number | string, payload?: C
 }
 
 export async function completeConsultationById(consultationId: number | string, payload?: ConsultationPayload) {
-  try {
-    return await postFirstAvailable<DoctorConsultation>(
-      [`${endpoints.doctor.consultation(consultationId)}complete/`],
-      payload ? sanitizePayload(payload) : undefined,
-    );
-  } catch {
-    return updateConsultation(consultationId, { ...(payload ?? {}), status: 'completed' });
-  }
+  return postFirstAvailable<DoctorConsultation>(
+    [endpoints.doctor.consultationComplete(consultationId)],
+    payload ? sanitizePayload(payload) : undefined,
+  );
 }
 
 export function sanitizePayload(payload: ConsultationPayload) {
@@ -248,6 +255,7 @@ function normalizeConsultationError(err: unknown) {
   if (err instanceof ApiClientError) {
     if (err.status === 403) return new Error('No tienes permiso para ver esta consulta.');
     if (err.status === 404) return new Error(unavailableMessage);
+    if (err.status === 409) return new ApiClientError('La consulta fue modificada desde otra sesión. Actualiza antes de continuar.', 409, err.payload, 'consultation_version_conflict');
     if (err.status && err.status >= 500) return new Error('No se pudo procesar la consulta en el servidor. Intenta nuevamente antes de salir de la pantalla.');
     return err;
   }

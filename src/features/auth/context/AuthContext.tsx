@@ -12,6 +12,7 @@ import {
 } from '@/core/storage/sessionStorage';
 import { resolveSupportedAppRole } from '@/core/utils/roleUtils';
 import { getMeService, loginService, logoutService } from '@/features/auth/services/authService';
+import { clearAllDoctorConsultationDrafts } from '@/features/doctor/services/doctorLocalDraftService';
 import type { AppRole, LoginPayload, RoleName, User } from '@/features/auth/types/auth.types';
 
 interface AuthContextValue {
@@ -92,6 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       await clearSession();
       await clearApiCache();
+      await clearAllDoctorConsultationDrafts();
       resetSessionExpiredNotification();
       setUser(null);
     }

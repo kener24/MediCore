@@ -63,6 +63,8 @@ class DoctorProfileViewSet(viewsets.ModelViewSet):
             queryset = queryset.none()
         elif role == "admin":
             queryset = queryset.filter(clinic_id=user.clinica_id)
+        elif role in ["recepcionista", "recepcionista_caja"]:
+            queryset = queryset.filter(clinic_id=user.clinica_id, activo=True, user__is_active=True)
         elif role == "medico":
             queryset = queryset.filter(user=user)
         else:

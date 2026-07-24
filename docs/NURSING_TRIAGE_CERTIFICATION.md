@@ -58,7 +58,7 @@ signos vitales asociados a la visita
 
 - Pruebas específicas de admisiones/triaje: 16/16.
 - Pruebas dirigidas de admisiones, expedientes, pacientes, cuentas y auditoría: 105/105.
-- Suite completa Django: 273/273 en 547.575 segundos con cuatro bases aisladas.
+- Suite completa Django final: 274/274 en 422.294 segundos con cuatro bases aisladas.
 - `manage.py check`: aprobado.
 - Migraciones pendientes: ninguna.
 - Build web: aprobado.

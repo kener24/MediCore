@@ -187,6 +187,40 @@ class DoctorsModuleTests(APITestCase):
         response = self.client.post("/api/doctors/", self.payload(), format="json")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_recepcionista_lista_solo_medicos_activos_de_su_clinica(self):
+        own = DoctorProfile.objects.create(
+            clinic=self.clinic,
+            user=self.doctor_user,
+            specialty=self.specialty,
+            numero_colegiacion="CMH-12345",
+        )
+        other = DoctorProfile.objects.create(
+            clinic=self.other_clinic,
+            user=self.other_doctor_user,
+            specialty=self.specialty,
+            numero_colegiacion="CMH-999",
+        )
+        inactive_user = User.objects.create_user(
+            email="doctor-inactivo@clinic.com",
+            password="Doctor12345*",
+            nombre_completo="Doctor Inactivo",
+            role=self.medico_role,
+            clinica=self.clinic,
+        )
+        inactive = DoctorProfile.objects.create(
+            clinic=self.clinic,
+            user=inactive_user,
+            specialty=self.specialty,
+            numero_colegiacion="CMH-000",
+            activo=False,
+        )
+        self.auth(self.recepcion)
+        response = self.client.get("/api/doctors/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual([row["id"] for row in response.data], [own.id])
+        self.assertEqual(self.client.get(f"/api/doctors/{other.id}/").status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(self.client.get(f"/api/doctors/{inactive.id}/").status_code, status.HTTP_404_NOT_FOUND)
+
     def test_superadmin_no_lista_ni_crea_perfiles_medicos(self):
         DoctorProfile.objects.create(
             clinic=self.clinic,

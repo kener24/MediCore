@@ -16,6 +16,7 @@ import { formatDateOnly, formatTime, roleNameFrom } from "./medicalRecordUtils";
 import { VitalSignsForm } from "./VitalSignsForm";
 import { ClinicalOrdersSection } from "./ClinicalOrdersSection";
 import { ConsultationSupplyUsageSection } from "./ConsultationSupplyUsageSection";
+import { ConsultationDocumentsSection } from "./ConsultationDocumentsSection";
 
 export function ConsultationDetailsPage() {
   const { id } = useParams();
@@ -76,6 +77,7 @@ export function ConsultationDetailsPage() {
       </Card>
       <ConsultationSupplyUsageSection consultationId={consultation.id} canEdit={["medico", "enfermera"].includes(roleName) && consultation.status === "borrador"} />
       <ClinicalOrdersSection consultationId={consultation.id} canEdit={roleName === "medico" && consultation.status === "borrador"} />
+      <ConsultationDocumentsSection consultationId={consultation.id} patientId={consultation.patient} canEdit={roleName === "medico" && consultation.status === "borrador"} />
       <Modal open={finalizeOpen} title="Finalizar consulta" onClose={() => setFinalizeOpen(false)} actions={<><ModalCloseButton onClick={() => setFinalizeOpen(false)} /><button className="h-10 rounded-md bg-brand-600 px-4 text-sm font-semibold text-white" onClick={finalize} type="button">Finalizar</button></>}>
         <p className="text-sm text-slate-600">La consulta quedara cerrada y pasara al historial clinico.</p>
       </Modal>

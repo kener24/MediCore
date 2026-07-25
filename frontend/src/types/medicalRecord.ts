@@ -193,8 +193,15 @@ export interface ClinicalSupplyUsage {
   invoice: number | null;
   invoice_item: number | null;
   inventory_movement: number | null;
+  idempotency_key?: string | null;
+  consumption_group?: string;
+  group_quantity?: string;
+  group_parts?: Array<{ id: number; inventory_lot?: number | null; inventory_lot_number?: string | null; quantity: string; status: string }>;
   applied_by_nombre?: string;
   applied_at: string;
+  cancelled_by?: number | null;
+  cancelled_at?: string | null;
+  cancellation_reason?: string;
   status: ClinicalSupplyUsageStatus;
   active: boolean;
 }

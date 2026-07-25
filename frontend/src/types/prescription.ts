@@ -1,6 +1,6 @@
 export type DiagnosisType = "presuntivo" | "confirmado" | "diferencial";
 export type PrescriptionStatus = "borrador" | "emitida" | "anulada";
-export type MedicalOrderStatus = "pendiente" | "completada" | "cancelada";
+export type MedicalOrderStatus = "pendiente" | "en_proceso" | "completada" | "revisada" | "cancelada" | "vencida";
 export type MedicalOrderType = "laboratorio" | "imagenologia" | "procedimiento" | "interconsulta" | "otro";
 export type MedicalOrderPriority = "baja" | "normal" | "alta" | "urgente";
 
@@ -35,6 +35,7 @@ export interface PrescriptionItem {
   quantity: string;
   route: string;
   instructions: string;
+  allergy_warnings?: string[];
   activo: boolean;
 }
 
@@ -51,6 +52,12 @@ export interface Prescription {
   issue_date: string;
   general_instructions: string;
   status: PrescriptionStatus;
+  prescription_type?: "unica" | "repetible";
+  max_dispenses?: number | null;
+  refill_interval_days?: number | null;
+  expires_at?: string | null;
+  dispenses_used?: number;
+  issued_at?: string | null;
   medications?: string[];
   items?: PrescriptionItem[];
   activo: boolean;
@@ -74,15 +81,25 @@ export interface MedicalOrder {
   instructions: string;
   priority: MedicalOrderPriority;
   status: MedicalOrderStatus;
+  expires_at?: string | null;
+  scheduled_at?: string | null;
+  responsible_user?: number | null;
+  execution_area?: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+  result_summary?: string;
+  reviewed_at?: string | null;
+  review_notes?: string;
+  cancellation_reason?: string;
   activo: boolean;
   creado_en: string;
   actualizado_en: string;
 }
 
 export type DiagnosisPayload = Partial<Pick<Diagnosis, "consultation" | "code" | "name" | "description" | "diagnosis_type" | "is_primary" | "notes" | "activo">>;
-export type PrescriptionPayload = Partial<Pick<Prescription, "consultation" | "prescription_number" | "issue_date" | "general_instructions" | "status" | "activo">>;
+export type PrescriptionPayload = Partial<Pick<Prescription, "consultation" | "prescription_number" | "issue_date" | "general_instructions" | "status" | "prescription_type" | "max_dispenses" | "refill_interval_days" | "expires_at" | "activo">>;
 export type PrescriptionItemPayload = Partial<Omit<PrescriptionItem, "id" | "prescription">>;
-export type MedicalOrderPayload = Partial<Pick<MedicalOrder, "consultation" | "order_number" | "order_type" | "title" | "description" | "instructions" | "priority" | "status" | "activo">>;
+export type MedicalOrderPayload = Partial<Pick<MedicalOrder, "consultation" | "order_number" | "order_type" | "title" | "description" | "instructions" | "priority" | "expires_at" | "scheduled_at" | "execution_area" | "activo">>;
 
 export interface PrescriptionFilters {
   patient?: string;

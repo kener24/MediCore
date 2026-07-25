@@ -45,8 +45,8 @@ export async function createPrescription(payload: PrescriptionPayload) {
   const { data } = await api.post<Prescription>("/prescriptions/", payload);
   return data;
 }
-export async function issuePrescription(id: number | string) {
-  const { data } = await api.patch<Prescription>(`/prescriptions/${id}/issue/`);
+export async function issuePrescription(id: number | string, payload?: { confirm_allergies?: boolean; allergy_override_reason?: string }) {
+  const { data } = await api.patch<Prescription>(`/prescriptions/${id}/issue/`, payload ?? {});
   return data;
 }
 export async function voidPrescription(id: number | string, reason: string) {
@@ -73,6 +73,12 @@ export async function getMyPrescriptions() {
   const { data } = await api.get<Prescription[]>("/prescriptions/my-prescriptions/");
   return data;
 }
+export async function openPrescriptionPdf(id: number | string) {
+  const { data } = await api.get<Blob>(`/prescriptions/${id}/pdf/`, { responseType: "blob" });
+  const url = URL.createObjectURL(data);
+  window.open(url, "_blank", "noopener,noreferrer");
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
 
 export async function getMedicalOrders(filters?: MedicalOrderFilters) {
   const { data } = await api.get<MedicalOrder[]>("/medical-orders/", { params: filters });
@@ -87,11 +93,23 @@ export async function createConsultationMedicalOrder(consultationId: number | st
   return data;
 }
 export async function completeMedicalOrder(id: number | string) {
-  const { data } = await api.patch<MedicalOrder>(`/medical-orders/${id}/complete/`);
+  const { data } = await api.patch<MedicalOrder>(`/medical-orders/${id}/complete/`, { result_summary: "Resultado registrado." });
   return data;
 }
-export async function cancelMedicalOrder(id: number | string) {
-  const { data } = await api.patch<MedicalOrder>(`/medical-orders/${id}/cancel/`);
+export async function startMedicalOrder(id: number | string) {
+  const { data } = await api.patch<MedicalOrder>(`/medical-orders/${id}/start/`, {});
+  return data;
+}
+export async function completeMedicalOrderWithResult(id: number | string, resultSummary: string) {
+  const { data } = await api.patch<MedicalOrder>(`/medical-orders/${id}/complete/`, { result_summary: resultSummary });
+  return data;
+}
+export async function reviewMedicalOrder(id: number | string, notes = "") {
+  const { data } = await api.patch<MedicalOrder>(`/medical-orders/${id}/review/`, { notes });
+  return data;
+}
+export async function cancelMedicalOrder(id: number | string, reason: string) {
+  const { data } = await api.patch<MedicalOrder>(`/medical-orders/${id}/cancel/`, { reason });
   return data;
 }
 export async function getMyMedicalOrders() {

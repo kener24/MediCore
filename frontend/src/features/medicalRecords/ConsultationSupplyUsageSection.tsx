@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
 import { getErrorMessage } from "../../api/axios";
@@ -18,30 +18,33 @@ export function ConsultationSupplyUsageSection({ consultationId, canEdit }: { co
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [lots, setLots] = useState<InventoryLot[]>([]);
   const [usages, setUsages] = useState<ClinicalSupplyUsage[]>([]);
+  const [saving, setSaving] = useState(false);
+  const pendingKey = useRef("");
+  const submitting = useRef(false);
   const [form, setForm] = useState({ inventory_item: "", inventory_lot: "", quantity: "1", usage_type: "medication", billable: true, description: "", notes: "" });
   const selectedItem = items.find((item) => String(item.id) === form.inventory_item);
 
-  async function load() {
+  const load = useCallback(async () => {
     try {
       const [usageData, itemData] = await Promise.all([
         getConsultationConsumptions(consultationId),
-        getInventoryItems({ active: "true" }),
+        getInventoryItems({ active: "true", available: "true" }),
       ]);
       setUsages(usageData);
       setItems(itemData);
     } catch (e) {
       toast.error(getErrorMessage(e));
     }
-  }
+  }, [consultationId]);
 
-  useEffect(() => { load(); }, [consultationId]);
+  useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
     if (!form.inventory_item) {
       setLots([]);
       return;
     }
-    getInventoryLots({ item: form.inventory_item, active: "true" }).then(setLots).catch(() => setLots([]));
+    getInventoryLots({ item: form.inventory_item, active: "true" }).then((entries) => setLots(entries.filter((lot) => Number(lot.quantity_current) > 0 && (!lot.expiration_date || new Date(`${lot.expiration_date}T23:59:59`) >= new Date())))).catch(() => setLots([]));
   }, [form.inventory_item]);
 
   function selectItem(itemId: string) {
@@ -51,11 +54,15 @@ export function ConsultationSupplyUsageSection({ consultationId, canEdit }: { co
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    if (submitting.current) return;
     if (!selectedItem) return;
     if (Number(form.quantity) <= 0) {
       toast.error("La cantidad debe ser mayor que cero.");
       return;
     }
+    submitting.current = true;
+    setSaving(true);
+    pendingKey.current ||= crypto.randomUUID();
     try {
       await createConsultationConsumption(consultationId, {
         inventory_item: Number(form.inventory_item),
@@ -65,13 +72,15 @@ export function ConsultationSupplyUsageSection({ consultationId, canEdit }: { co
         billable: form.billable,
         description: form.description || selectedItem.name,
         notes: form.notes,
+        idempotency_key: pendingKey.current,
       });
       toast.success("Consumo registrado y stock descontado.");
       setForm({ inventory_item: "", inventory_lot: "", quantity: "1", usage_type: "medication", billable: true, description: "", notes: "" });
+      pendingKey.current = "";
       await load();
     } catch (e) {
       toast.error(getErrorMessage(e));
-    }
+    } finally { submitting.current = false; setSaving(false); }
   }
 
   async function cancelUsage(usage: ClinicalSupplyUsage) {
@@ -92,11 +101,11 @@ export function ConsultationSupplyUsageSection({ consultationId, canEdit }: { co
         <form className="mb-5 grid gap-3 lg:grid-cols-[1fr_150px_130px_130px_auto]" onSubmit={submit}>
           <select className="h-10 rounded-md border border-slate-300 px-3 text-sm" required value={form.inventory_item} onChange={(e) => selectItem(e.target.value)}>
             <option value="">Producto de inventario</option>
-            {items.map((item) => <option key={item.id} value={item.id}>{item.name} | Stock {item.stock_current} | {money(item.sale_price)}</option>)}
+            {items.filter((item) => Number(item.stock_current) > 0).map((item) => <option key={item.id} value={item.id}>{item.name} | Stock {item.stock_current} | {money(item.sale_price)}</option>)}
           </select>
           <select className="h-10 rounded-md border border-slate-300 px-3 text-sm" value={form.inventory_lot} onChange={(e) => setForm({ ...form, inventory_lot: e.target.value })}>
-            <option value="">Sin lote/FIFO</option>
-            {lots.map((lot) => <option key={lot.id} value={lot.id}>{lot.lot_number} | {lot.quantity_current}</option>)}
+            <option value="">Selección automática FEFO</option>
+            {lots.map((lot) => <option key={lot.id} value={lot.id}>{lot.lot_number} | {lot.quantity_current} | vence {lot.expiration_date || "sin fecha"}</option>)}
           </select>
           <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" inputMode="decimal" min="0.01" required step="0.01" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: cleanDecimal(e.target.value) })} />
           <select className="h-10 rounded-md border border-slate-300 px-3 text-sm" value={form.usage_type} onChange={(e) => setForm({ ...form, usage_type: e.target.value })}>
@@ -108,7 +117,7 @@ export function ConsultationSupplyUsageSection({ consultationId, canEdit }: { co
             <option value="nebulization">Nebulizacion</option>
             <option value="other">Otro</option>
           </select>
-          <Button type="submit">Aplicar</Button>
+          <Button disabled={saving} isLoading={saving} type="submit">Aplicar</Button>
           <input className="h-10 rounded-md border border-slate-300 px-3 text-sm lg:col-span-2" placeholder="Descripcion para factura/historial" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           <input className="h-10 rounded-md border border-slate-300 px-3 text-sm lg:col-span-2" placeholder="Notas clinicas" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           <label className="flex h-10 items-center gap-2 text-sm"><input checked={form.billable} type="checkbox" onChange={(e) => setForm({ ...form, billable: e.target.checked })} />Facturable</label>
@@ -116,7 +125,7 @@ export function ConsultationSupplyUsageSection({ consultationId, canEdit }: { co
       ) : null}
       {usages.length ? <Table data={usages} columns={[
         { key: "item", header: "Producto", render: (usage) => usage.description || usage.inventory_item_nombre },
-        { key: "qty", header: "Cant.", render: (usage) => usage.quantity },
+        { key: "qty", header: "Cant.", render: (usage) => usage.group_quantity || usage.quantity },
         { key: "price", header: "Precio", render: (usage) => money(usage.unit_price) },
         { key: "status", header: "Estado", render: (usage) => usage.invoiced ? "Facturado" : usage.status },
         { key: "billable", header: "Facturable", render: (usage) => usage.billable ? "Si" : "No" },

@@ -153,3 +153,27 @@ Fecha: 2026-07-25
 | RX-PHYSICAL-01 | Android físico | Pendiente | Debe ejecutarse manualmente en Expo Go; no se infiere desde TypeScript o Metro |
 
 La evidencia de despliegue, migraciones MySQL, servicios, pruebas A/B y HTTPS se agrega después de actualizar producción. No se incluyen contraseñas, tokens ni contenido clínico.
+
+### Despliegue y pruebas de producción
+
+| ID | Prueba | Resultado | Evidencia segura |
+| --- | --- | --- | --- |
+| RX-PROD-01 | Respaldo previo | Aprobado | Dump MySQL, bundle Git y media verificados por SHA-256 en `/var/backups/medicore/sprint13b-20260725-165757` |
+| RX-PROD-02 | Despliegue | Aprobado | Revisión `71e0a79` desplegada con `git pull --ff-only`; `.env` conservó su hash |
+| RX-PROD-03 | Migraciones MySQL | Aprobado | `medical_records.0005` y `prescriptions.0002` aplicadas |
+| RX-PROD-04 | Build y servicios | Aprobado | Vite compiló; MediCore y Nginx activos; `nginx -t` válido |
+| RX-PROD-05 | HTTPS y sesión | Aprobado | Login HTTPS operativo; endpoint anónimo protegido respondió 401 |
+| RX-PROD-06 | Receta Clínica A y B | Aprobado | Creación 201, alergia 409, emisión confirmada 200, reemisión 409 y PDF 200 |
+| RX-PROD-07 | Orden Clínica A y B | Aprobado | Creación, inicio, resultado y revisión respondieron correctamente; estado persistido `revisada` |
+| RX-PROD-08 | Consumo Clínica A y B | Aprobado | Creación 201 y reintento 200 con el mismo consumo; un movimiento por clínica y stock final 8.00 |
+| RX-PROD-09 | Adjuntos Clínica A y B | Aprobado | Carga PDF, descarga autorizada y cambio de visibilidad respondieron 200/201 |
+| RX-PROD-10 | Aislamiento multi-clínica | Aprobado | Contexto, receta, orden y documentos cruzados devolvieron 404; producto cruzado devolvió 400 |
+| RX-PROD-11 | Finalización | Aprobado | Ambas consultas sintéticas finalizaron y conservaron receta, orden, consumo y adjunto |
+| RX-PROD-12 | Persistencia y auditoría | Aprobado | MySQL confirmó relaciones, dos movimientos y eventos de auditoría sin duplicación |
+
+### Riesgos de dependencias
+
+- La SPA web conserva dos avisos altos de React Router asociados al modo RSC. MediCore no habilita RSC y `7.18.1` continúa siendo la última versión publicada; `npm audit fix --dry-run` no ofrece cambio compatible.
+- Expo SDK 54 conserva avisos transitivos de herramientas. La corrección total propuesta fuerza Expo 57, por lo que se difiere a un sprint de actualización del SDK con pruebas completas.
+- El bundle web mantiene una advertencia de tamaño y debe dividirse por rutas en una mejora de rendimiento posterior.
+- Android físico permanece pendiente hasta que una persona ejecute el recorrido en Expo Go; no se marca aprobado por inferencia.

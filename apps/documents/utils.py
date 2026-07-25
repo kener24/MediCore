@@ -1,12 +1,25 @@
 import hashlib
 import os
 import uuid
+import zipfile
 
 from django.conf import settings
 from django.utils.text import slugify
 
 
 DANGEROUS_EXTENSIONS = {"exe", "bat", "cmd", "js", "php", "sh", "msi", "dll", "com", "scr", "ps1", "vbs"}
+
+MIME_BY_EXTENSION = {
+    "pdf": "application/pdf",
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "png": "image/png",
+    "webp": "image/webp",
+    "doc": "application/msword",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "xls": "application/vnd.ms-excel",
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+}
 
 
 def allowed_extensions():
@@ -51,10 +64,46 @@ def calculate_checksum(file_obj):
     return sha.hexdigest()
 
 
+def detect_real_mime(uploaded_file, ext):
+    position = uploaded_file.tell() if hasattr(uploaded_file, "tell") else 0
+    try:
+        uploaded_file.seek(0)
+        header = uploaded_file.read(32)
+        if ext == "pdf" and header.startswith(b"%PDF-"):
+            return MIME_BY_EXTENSION[ext]
+        if ext in {"jpg", "jpeg"} and header.startswith(b"\xff\xd8\xff"):
+            return MIME_BY_EXTENSION[ext]
+        if ext == "png" and header.startswith(b"\x89PNG\r\n\x1a\n"):
+            return MIME_BY_EXTENSION[ext]
+        if ext == "webp" and header.startswith(b"RIFF") and header[8:12] == b"WEBP":
+            return MIME_BY_EXTENSION[ext]
+        if ext in {"doc", "xls"} and header.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
+            return MIME_BY_EXTENSION[ext]
+        if ext in {"docx", "xlsx"} and header.startswith(b"PK"):
+            uploaded_file.seek(0)
+            with zipfile.ZipFile(uploaded_file) as archive:
+                names = set(archive.namelist())
+                if "[Content_Types].xml" not in names:
+                    return ""
+                if ext == "docx" and any(name.startswith("word/") for name in names):
+                    return MIME_BY_EXTENSION[ext]
+                if ext == "xlsx" and any(name.startswith("xl/") for name in names):
+                    return MIME_BY_EXTENSION[ext]
+        return ""
+    except (OSError, zipfile.BadZipFile):
+        return ""
+    finally:
+        uploaded_file.seek(position)
+
+
 def validate_document_file(uploaded_file):
     ext = file_extension(uploaded_file.name)
     if ext in DANGEROUS_EXTENSIONS or ext not in allowed_extensions():
         raise ValueError("Tipo de archivo no permitido.")
     if uploaded_file.size > max_upload_size_bytes():
         raise ValueError("El archivo excede el tamano maximo permitido.")
+    real_mime = detect_real_mime(uploaded_file, ext)
+    if not real_mime:
+        raise ValueError("El contenido real del archivo no coincide con un tipo permitido.")
+    uploaded_file._medicore_mime_type = real_mime
     return ext

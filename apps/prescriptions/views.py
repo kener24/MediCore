@@ -1,4 +1,8 @@
+from io import BytesIO
+
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
+from django.http import HttpResponse
 from django.db.models import Q
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -16,6 +20,8 @@ from apps.prescriptions.serializers import (
     DiagnosisListSerializer,
     DiagnosisUpdateSerializer,
     MedicalOrderCreateSerializer,
+    MedicalOrderCancelSerializer,
+    MedicalOrderCompleteSerializer,
     MedicalOrderDetailSerializer,
     MedicalOrderListSerializer,
     MedicalOrderUpdateSerializer,
@@ -23,14 +29,49 @@ from apps.prescriptions.serializers import (
     PrescriptionDetailSerializer,
     PrescriptionItemSerializer,
     PrescriptionListSerializer,
+    PrescriptionIssueSerializer,
     PrescriptionStatsSerializer,
     PrescriptionUpdateSerializer,
+    PrescriptionVoidSerializer,
 )
 from apps.notifications.models import Notification
 from apps.notifications.services import create_notification
 
 
 VIEW_ROLES = ["admin", "medico", "enfermera", "paciente"]
+
+
+def render_prescription_pdf(prescription):
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table as PdfTable
+
+    output = BytesIO()
+    doc = SimpleDocTemplate(output, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=32, bottomMargin=32)
+    styles = getSampleStyleSheet()
+    doctor = prescription.doctor
+    story = [
+        Paragraph(str(getattr(prescription.clinic, "nombre", "MediCore")), styles["Title"]),
+        Paragraph("RECETA MEDICA", styles["Heading2"]),
+        Spacer(1, 8),
+        Paragraph(f"Receta: {prescription.prescription_number}", styles["BodyText"]),
+        Paragraph(f"Estado: {prescription.get_status_display()}", styles["BodyText"]),
+        Paragraph(f"Paciente: {prescription.patient.nombre_completo}", styles["BodyText"]),
+        Paragraph(f"Medico: {doctor.user.nombre_completo}", styles["BodyText"]),
+        Paragraph(f"Colegiacion: {getattr(doctor, 'numero_colegiacion', '') or 'No indicada'}", styles["BodyText"]),
+        Paragraph(f"Fecha: {prescription.issue_date:%d/%m/%Y}", styles["BodyText"]),
+        Spacer(1, 14),
+    ]
+    rows = [["Medicamento", "Dosis", "Via", "Frecuencia", "Duracion", "Cantidad"]]
+    for item in prescription.items.filter(activo=True):
+        rows.append([item.medication_name, item.dosage, item.get_route_display(), item.frequency, item.duration or "-", item.quantity or "-"])
+    story.append(PdfTable(rows, repeatRows=1, colWidths=[130, 70, 65, 90, 70, 55]))
+    story.append(Spacer(1, 12))
+    story.append(Paragraph(f"Indicaciones: {prescription.general_instructions or 'Sin indicaciones adicionales.'}", styles["BodyText"]))
+    story.append(Spacer(1, 22))
+    story.append(Paragraph("Documento generado por MediCore. Valide identidad, estado y numero de receta.", styles["BodyText"]))
+    doc.build(story)
+    return output.getvalue()
 
 
 def scoped_queryset(request, queryset):
@@ -139,35 +180,45 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         if get_role_name(request.user) != "medico":
             return Response({"detail": "Solo medicos pueden crear recetas."}, status=status.HTTP_403_FORBIDDEN)
-        response = super().create(request, *args, **kwargs)
-        if response.status_code == status.HTTP_201_CREATED:
-            prescription = Prescription.objects.select_related("clinic").filter(id=response.data.get("id")).first()
-            log_audit_event(request=request, clinic=getattr(prescription, "clinic", None), action=AuditLog.Action.CREATE, module=AuditLog.Module.PRESCRIPTIONS, model_name="Prescription", object_id=response.data.get("id"), object_repr=response.data.get("prescription_number", ""), description="Receta creada.", new_values=request.data)
-        return response
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        prescription = serializer.save()
+        log_audit_event(
+            request=request, clinic=prescription.clinic, action=AuditLog.Action.CREATE,
+            module=AuditLog.Module.PRESCRIPTIONS, model_name="Prescription", object_id=prescription.id,
+            object_repr=prescription.prescription_number, description="Receta creada.",
+            new_values={"consultation": prescription.consultation_id, "items_count": prescription.items.filter(activo=True).count(), "status": prescription.status},
+        )
+        return Response(PrescriptionDetailSerializer(prescription).data, status=status.HTTP_201_CREATED)
 
     def destroy(self, request, *args, **kwargs):
-        prescription = self.get_object()
-        if get_role_name(request.user) != "medico" or prescription.doctor.user_id != request.user.id:
-            return Response({"detail": "No tienes permiso para anular esta receta."}, status=status.HTTP_403_FORBIDDEN)
-        prescription.status = Prescription.Status.ANULADA
-        prescription.activo = False
-        prescription.void_reason = "Anulada desde DELETE."
-        prescription.save(update_fields=["status", "activo", "void_reason"])
-        log_audit_event(request=request, clinic=prescription.clinic, action=AuditLog.Action.CANCEL, module=AuditLog.Module.PRESCRIPTIONS, model_name="Prescription", object_id=prescription.id, object_repr=prescription.prescription_number, description="Receta anulada.", new_values={"status": prescription.status, "void_reason": prescription.void_reason})
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response({"detail": "Las recetas no se eliminan. Usa la accion de anulacion e indica un motivo."}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
     @action(detail=True, methods=["patch"])
     def issue(self, request, pk=None):
+        payload = PrescriptionIssueSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
         prescription = self.get_object()
         if get_role_name(request.user) != "medico" or prescription.doctor.user_id != request.user.id:
             return Response({"detail": "No tienes permiso para emitir esta receta."}, status=status.HTTP_403_FORBIDDEN)
-        try:
-            prescription.issue()
-        except DjangoValidationError as exc:
-            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+        with transaction.atomic():
+            prescription = Prescription.objects.select_for_update().select_related("clinic", "patient__user", "doctor__user", "consultation").get(pk=prescription.pk)
+            if prescription.status == Prescription.Status.EMITIDA:
+                return Response({"detail": "La receta ya fue emitida."}, status=status.HTTP_409_CONFLICT)
+            try:
+                prescription.issue(
+                    user=request.user,
+                    confirm_allergies=payload.validated_data["confirm_allergies"],
+                    allergy_override_reason=payload.validated_data.get("allergy_override_reason", ""),
+                )
+            except DjangoValidationError as exc:
+                detail = exc.messages[0]
+                if "alergia" in detail.lower():
+                    log_audit_event(request=request, clinic=prescription.clinic, action=AuditLog.Action.VIEW, module=AuditLog.Module.PRESCRIPTIONS, model_name="Prescription", object_id=prescription.id, object_repr=prescription.prescription_number, description="Alerta de alergia presentada antes de emitir.", status=AuditLog.Status.WARNING, severity=AuditLog.Severity.WARNING)
+                return Response({"detail": detail}, status=status.HTTP_409_CONFLICT if "alergia" in detail.lower() else status.HTTP_400_BAD_REQUEST)
         if prescription.patient.user:
             create_notification(prescription.patient.user, "Receta emitida", "Tienes una nueva receta disponible.", clinic=prescription.clinic, notification_type=Notification.Type.INFO, module=Notification.Module.PRESCRIPTIONS, priority=Notification.Priority.NORMAL, related_model="Prescription", related_object_id=prescription.id, action_url="/patient/prescriptions")
-        log_audit_event(request=request, clinic=prescription.clinic, action=AuditLog.Action.ISSUE, module=AuditLog.Module.PRESCRIPTIONS, model_name="Prescription", object_id=prescription.id, object_repr=prescription.prescription_number, description="Receta emitida.", new_values={"status": prescription.status})
+        log_audit_event(request=request, clinic=prescription.clinic, action=AuditLog.Action.ISSUE, module=AuditLog.Module.PRESCRIPTIONS, model_name="Prescription", object_id=prescription.id, object_repr=prescription.prescription_number, description="Receta emitida.", new_values={"status": prescription.status, "allergy_override_confirmed": bool(prescription.allergy_reviewed_at)})
         return Response(PrescriptionDetailSerializer(prescription).data)
 
     @action(detail=True, methods=["patch"])
@@ -175,12 +226,24 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
         prescription = self.get_object()
         if get_role_name(request.user) != "medico" or prescription.doctor.user_id != request.user.id:
             return Response({"detail": "No tienes permiso para anular esta receta."}, status=status.HTTP_403_FORBIDDEN)
-        prescription.status = Prescription.Status.ANULADA
-        prescription.activo = False
-        prescription.void_reason = request.data.get("reason", "")
-        prescription.save(update_fields=["status", "activo", "void_reason"])
+        payload = PrescriptionVoidSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        try:
+            prescription.void(user=request.user, reason=payload.validated_data["reason"])
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=status.HTTP_409_CONFLICT)
         log_audit_event(request=request, clinic=prescription.clinic, action=AuditLog.Action.CANCEL, module=AuditLog.Module.PRESCRIPTIONS, model_name="Prescription", object_id=prescription.id, object_repr=prescription.prescription_number, description="Receta anulada.", new_values={"status": prescription.status, "reason": prescription.void_reason})
         return Response(PrescriptionDetailSerializer(prescription).data)
+
+    @action(detail=True, methods=["get"])
+    def pdf(self, request, pk=None):
+        prescription = self.get_object()
+        if prescription.status != Prescription.Status.EMITIDA:
+            return Response({"detail": "Solo las recetas emitidas tienen PDF disponible."}, status=status.HTTP_409_CONFLICT)
+        response = HttpResponse(render_prescription_pdf(prescription), content_type="application/pdf")
+        response["Content-Disposition"] = f'inline; filename="receta-{prescription.prescription_number}.pdf"'
+        log_audit_event(request=request, clinic=prescription.clinic, action=AuditLog.Action.VIEW, module=AuditLog.Module.PRESCRIPTIONS, model_name="Prescription", object_id=prescription.id, object_repr=prescription.prescription_number, description="PDF de receta consultado.")
+        return response
 
     @action(detail=True, methods=["get", "post"], url_path="items")
     def items(self, request, pk=None):
@@ -192,6 +255,8 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
         serializer = PrescriptionItemSerializer(data=request.data, context={"prescription": prescription})
         serializer.is_valid(raise_exception=True)
         serializer.save(prescription=prescription)
+        if serializer.data.get("allergy_warnings"):
+            log_audit_event(request=request, clinic=prescription.clinic, action=AuditLog.Action.VIEW, module=AuditLog.Module.PRESCRIPTIONS, model_name="Prescription", object_id=prescription.id, object_repr=prescription.prescription_number, description="Alerta de alergia presentada al agregar medicamento.", status=AuditLog.Status.WARNING, severity=AuditLog.Severity.WARNING)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["patch", "delete"], url_path=r"items/(?P<item_id>[^/.]+)")
@@ -203,6 +268,8 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
         if get_role_name(request.user) != "medico" or prescription.doctor.user_id != request.user.id:
             return Response({"detail": "No tienes permiso para modificar medicamentos."}, status=status.HTTP_403_FORBIDDEN)
         if request.method == "DELETE":
+            if prescription.status != Prescription.Status.BORRADOR:
+                return Response({"detail": "No puedes eliminar medicamentos de una receta emitida o anulada."}, status=status.HTTP_409_CONFLICT)
             item.activo = False
             item.save(update_fields=["activo"])
             return Response(status=status.HTTP_204_NO_CONTENT)
@@ -267,36 +334,59 @@ class MedicalOrderViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         if get_role_name(request.user) != "medico":
             return Response({"detail": "Solo medicos pueden crear ordenes medicas."}, status=status.HTTP_403_FORBIDDEN)
-        response = super().create(request, *args, **kwargs)
-        if response.status_code == status.HTTP_201_CREATED:
-            order = MedicalOrder.objects.select_related("clinic", "patient__user").filter(id=response.data.get("id")).first()
-            log_audit_event(request=request, clinic=getattr(order, "clinic", None), action=AuditLog.Action.CREATE, module=AuditLog.Module.MEDICAL_ORDERS, model_name="MedicalOrder", object_id=response.data.get("id"), object_repr=response.data.get("order_number", ""), description="Orden medica creada.", new_values=request.data)
-            if order and order.patient.user:
-                create_notification(order.patient.user, "Orden medica creada", "Tienes una nueva orden medica disponible.", clinic=order.clinic, notification_type=Notification.Type.INFO, module=Notification.Module.PRESCRIPTIONS, priority=Notification.Priority.NORMAL, related_model="MedicalOrder", related_object_id=order.id, action_url="/patient/medical-orders")
-        return response
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        order = serializer.save()
+        log_audit_event(request=request, clinic=order.clinic, action=AuditLog.Action.CREATE, module=AuditLog.Module.MEDICAL_ORDERS, model_name="MedicalOrder", object_id=order.id, object_repr=order.order_number, description="Orden medica creada y emitida.", new_values={"consultation": order.consultation_id, "order_type": order.order_type, "priority": order.priority, "status": order.status})
+        if order.patient.user:
+            create_notification(order.patient.user, "Orden medica creada", "Tienes una nueva orden medica disponible.", clinic=order.clinic, notification_type=Notification.Type.INFO, module=Notification.Module.PRESCRIPTIONS, priority=Notification.Priority.NORMAL, related_model="MedicalOrder", related_object_id=order.id, action_url="/patient/medical-orders")
+        return Response(MedicalOrderDetailSerializer(order).data, status=status.HTTP_201_CREATED)
 
     def destroy(self, request, *args, **kwargs):
+        return Response({"detail": "Las ordenes medicas no se eliminan. Usa cancelar e indica un motivo."}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    @action(detail=True, methods=["patch"])
+    def start(self, request, pk=None):
         order = self.get_object()
-        if get_role_name(request.user) != "medico" or order.doctor.user_id != request.user.id:
-            return Response({"detail": "No tienes permiso para cancelar esta orden médica."}, status=status.HTTP_403_FORBIDDEN)
-        order.status = MedicalOrder.Status.CANCELADA
-        order.activo = False
-        order.save(update_fields=["status", "activo"])
-        log_audit_event(request=request, clinic=order.clinic, action=AuditLog.Action.CANCEL, module=AuditLog.Module.MEDICAL_ORDERS, model_name="MedicalOrder", object_id=order.id, object_repr=order.order_number, description="Orden medica cancelada.", new_values={"status": order.status})
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        if get_role_name(request.user) not in ["medico", "enfermera", "admin"]:
+            return Response({"detail": "No tienes permiso para iniciar esta orden medica."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            order.start(request.user)
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=status.HTTP_409_CONFLICT)
+        log_audit_event(request=request, clinic=order.clinic, action=AuditLog.Action.UPDATE, module=AuditLog.Module.MEDICAL_ORDERS, model_name="MedicalOrder", object_id=order.id, object_repr=order.order_number, description="Ejecucion de orden medica iniciada.", new_values={"status": order.status, "responsible_user": request.user.id})
+        return Response(MedicalOrderDetailSerializer(order).data)
 
     @action(detail=True, methods=["patch"])
     def complete(self, request, pk=None):
         order = self.get_object()
-        if get_role_name(request.user) != "medico" or order.doctor.user_id != request.user.id:
+        if get_role_name(request.user) not in ["medico", "enfermera", "admin"]:
             return Response({"detail": "No tienes permiso para completar esta orden médica."}, status=status.HTTP_403_FORBIDDEN)
-        if order.status == MedicalOrder.Status.CANCELADA:
-            return Response({"detail": "No puedes completar una orden cancelada."}, status=status.HTTP_400_BAD_REQUEST)
-        order.status = MedicalOrder.Status.COMPLETADA
-        order.save(update_fields=["status"])
+        payload = MedicalOrderCompleteSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        try:
+            order.complete(request.user, payload.validated_data["result_summary"])
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=status.HTTP_409_CONFLICT)
         if order.patient.user:
             create_notification(order.patient.user, "Orden medica completada", f"La orden {order.order_number} fue completada.", clinic=order.clinic, notification_type=Notification.Type.SUCCESS, module=Notification.Module.PRESCRIPTIONS, priority=Notification.Priority.NORMAL, related_model="MedicalOrder", related_object_id=order.id, action_url="/patient/medical-orders")
         log_audit_event(request=request, clinic=order.clinic, action=AuditLog.Action.COMPLETE, module=AuditLog.Module.MEDICAL_ORDERS, model_name="MedicalOrder", object_id=order.id, object_repr=order.order_number, description="Orden medica completada.", new_values={"status": order.status})
+        return Response(MedicalOrderDetailSerializer(order).data)
+
+    @action(detail=True, methods=["patch"])
+    def review(self, request, pk=None):
+        order = self.get_object()
+        if get_role_name(request.user) != "medico" or order.doctor.user_id != request.user.id:
+            return Response({"detail": "No tienes permiso para revisar esta orden medica."}, status=status.HTTP_403_FORBIDDEN)
+        from apps.prescriptions.serializers import MedicalOrderReviewSerializer
+
+        payload = MedicalOrderReviewSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        try:
+            order.review(request.user, payload.validated_data.get("notes", ""))
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=status.HTTP_409_CONFLICT)
+        log_audit_event(request=request, clinic=order.clinic, action=AuditLog.Action.APPROVE, module=AuditLog.Module.MEDICAL_ORDERS, model_name="MedicalOrder", object_id=order.id, object_repr=order.order_number, description="Resultado de orden medica revisado.", new_values={"status": order.status})
         return Response(MedicalOrderDetailSerializer(order).data)
 
     @action(detail=True, methods=["patch"])
@@ -304,11 +394,12 @@ class MedicalOrderViewSet(viewsets.ModelViewSet):
         order = self.get_object()
         if get_role_name(request.user) != "medico" or order.doctor.user_id != request.user.id:
             return Response({"detail": "No tienes permiso para cancelar esta orden médica."}, status=status.HTTP_403_FORBIDDEN)
-        if order.status == MedicalOrder.Status.COMPLETADA:
-            return Response({"detail": "No puedes cancelar una orden completada."}, status=status.HTTP_400_BAD_REQUEST)
-        order.status = MedicalOrder.Status.CANCELADA
-        order.activo = False
-        order.save(update_fields=["status", "activo"])
+        payload = MedicalOrderCancelSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        try:
+            order.cancel(request.user, payload.validated_data["reason"])
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=status.HTTP_409_CONFLICT)
         log_audit_event(request=request, clinic=order.clinic, action=AuditLog.Action.CANCEL, module=AuditLog.Module.MEDICAL_ORDERS, model_name="MedicalOrder", object_id=order.id, object_repr=order.order_number, description="Orden medica cancelada.", new_values={"status": order.status})
         return Response(MedicalOrderDetailSerializer(order).data)
 

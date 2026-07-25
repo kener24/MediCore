@@ -246,8 +246,13 @@ class ClinicalSupplyUsage(TimeStampedModel):
     invoice = models.ForeignKey("billing.Invoice", on_delete=models.SET_NULL, null=True, blank=True, related_name="clinical_consumptions")
     invoice_item = models.ForeignKey("billing.InvoiceItem", on_delete=models.SET_NULL, null=True, blank=True, related_name="clinical_consumptions")
     inventory_movement = models.ForeignKey("inventory.InventoryMovement", on_delete=models.SET_NULL, null=True, blank=True, related_name="clinical_consumptions")
+    idempotency_key = models.CharField(max_length=100, null=True, blank=True, default=None)
+    consumption_group = models.CharField(max_length=36, blank=True, default="", db_index=True)
     applied_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="clinical_supply_usages")
     applied_at = models.DateTimeField(default=timezone.now)
+    cancelled_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="cancelled_clinical_supply_usages")
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    cancellation_reason = models.TextField(blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.APPLIED)
     active = models.BooleanField(default=True)
 
@@ -258,6 +263,9 @@ class ClinicalSupplyUsage(TimeStampedModel):
             models.Index(fields=["patient", "applied_at"]),
             models.Index(fields=["consultation", "status"]),
             models.Index(fields=["billable", "invoiced", "status"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(fields=["clinic", "idempotency_key"], name="unique_clinical_consumption_idempotency_per_clinic"),
         ]
 
     def clean(self):
@@ -302,28 +310,41 @@ class ClinicalSupplyUsage(TimeStampedModel):
         return super().save(*args, **kwargs)
 
     def cancel(self, user=None, reason=""):
-        if self.invoiced or self.invoice_item_id:
-            raise ValidationError("No se puede cancelar un consumo ya facturado.")
-        if self.status == self.Status.CANCELLED:
-            raise ValidationError("El consumo ya esta cancelado.")
         from apps.inventory.models import InventoryMovement
 
         with transaction.atomic():
+            locked = ClinicalSupplyUsage.objects.select_for_update().select_related("inventory_item", "inventory_lot").get(pk=self.pk)
+            if locked.invoiced or locked.invoice_item_id:
+                raise ValidationError("No se puede cancelar un consumo ya facturado.")
+            if locked.status == self.Status.CANCELLED:
+                raise ValidationError("El consumo ya esta cancelado.")
+            if len((reason or "").strip()) < 5:
+                raise ValidationError("El motivo de cancelacion debe tener al menos 5 caracteres.")
             movement = InventoryMovement.objects.create(
-                clinic=self.clinic,
-                item=self.inventory_item,
-                lot=self.inventory_lot,
+                clinic=locked.clinic,
+                item=locked.inventory_item,
+                lot=locked.inventory_lot,
                 movement_type=InventoryMovement.Type.ENTRADA,
-                quantity=self.quantity,
-                unit_cost=self.unit_cost,
+                quantity=locked.quantity,
+                unit_cost=locked.unit_cost,
                 reason="clinical_consumption_cancel",
                 reference_type="clinical_consumption",
-                reference_id=str(self.id),
+                reference_id=str(locked.id),
                 notes=reason,
                 performed_by=user,
             )
-            self.status = self.Status.CANCELLED
-            self.active = False
-            self.notes = f"{self.notes}\nCancelado: {reason}".strip()
-            self.save(update_fields=["status", "active", "notes", "actualizado_en"])
+            locked.status = self.Status.CANCELLED
+            locked.active = False
+            locked.cancellation_reason = reason.strip()
+            locked.cancelled_by = user
+            locked.cancelled_at = timezone.now()
+            locked.save(update_fields=["status", "active", "cancellation_reason", "cancelled_by", "cancelled_at", "actualizado_en"])
+            self.status = locked.status
+            self.active = locked.active
+            self.cancellation_reason = locked.cancellation_reason
+            self.cancelled_by = locked.cancelled_by
+            self.cancelled_at = locked.cancelled_at
             return movement
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Los consumos clinicos no pueden eliminarse; deben revertirse.")

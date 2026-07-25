@@ -1,3 +1,5 @@
+import os
+
 from rest_framework import serializers
 
 from apps.appointments.models import Appointment
@@ -30,6 +32,8 @@ class ClinicalDocumentListSerializer(serializers.ModelSerializer):
     category_nombre = serializers.CharField(source="category.name", read_only=True)
     document_type = serializers.CharField(read_only=True)
     uploaded_by_nombre = serializers.CharField(source="uploaded_by.nombre_completo", read_only=True)
+    download_url = serializers.SerializerMethodField()
+    preview_url = serializers.SerializerMethodField()
 
     class Meta:
         model = ClinicalDocument
@@ -38,8 +42,20 @@ class ClinicalDocumentListSerializer(serializers.ModelSerializer):
             "category_nombre", "document_type", "title", "description", "original_filename", "file_type",
             "mime_type", "file_size", "file_extension", "storage_backend", "uploaded_by",
             "uploaded_by_nombre", "visible_to_patient", "is_sensitive", "status", "version",
-            "replaced_by", "tags", "active", "creado_en", "actualizado_en",
+            "replaced_by", "tags", "download_url", "preview_url", "active", "creado_en", "actualizado_en",
         ]
+
+    def get_download_url(self, obj):
+        request = self.context.get("request")
+        path = f"/api/documents/{obj.id}/download/"
+        return request.build_absolute_uri(path) if request else path
+
+    def get_preview_url(self, obj):
+        if obj.file_extension not in ["pdf", "jpg", "jpeg", "png", "webp"]:
+            return None
+        request = self.context.get("request")
+        path = f"/api/documents/{obj.id}/preview/"
+        return request.build_absolute_uri(path) if request else path
 
 
 class ClinicalDocumentDetailSerializer(ClinicalDocumentListSerializer):
@@ -118,10 +134,10 @@ class ClinicalDocumentCreateSerializer(serializers.ModelSerializer):
             validated_data["title"] = uploaded_file.name.rsplit(".", 1)[0][:220]
         validated_data["clinic"] = validated_data["patient"].clinic
         validated_data["uploaded_by"] = self.context["request"].user
-        validated_data["original_filename"] = uploaded_file.name
+        validated_data["original_filename"] = os.path.basename(uploaded_file.name)[:255]
         validated_data["file_extension"] = ext
         validated_data["file_type"] = ext
-        validated_data["mime_type"] = getattr(uploaded_file, "content_type", "") or ""
+        validated_data["mime_type"] = getattr(uploaded_file, "_medicore_mime_type", "")
         validated_data["file_size"] = uploaded_file.size
         validated_data["checksum"] = calculate_checksum(uploaded_file)
         return super().create(validated_data)

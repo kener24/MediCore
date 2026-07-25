@@ -11,6 +11,8 @@ from rest_framework.views import APIView
 from apps.accounts.permissions import get_role_name
 from apps.appointments.models import Appointment
 from apps.appointments.serializers import AppointmentDetailSerializer, AppointmentListSerializer, build_availability
+from apps.audit.models import AuditLog
+from apps.audit.services import log_audit_event
 from apps.billing.models import CreditNote, Invoice, Payment
 from apps.billing.serializers import InvoiceDetailSerializer, InvoiceListSerializer, PaymentDetailSerializer, PaymentListSerializer
 from apps.billing.views import render_credit_note_pdf
@@ -276,6 +278,27 @@ class PatientPortalPrescriptionsView(PatientPortalBaseView):
                 return Response({"detail": "Receta no encontrada."}, status=status.HTTP_404_NOT_FOUND)
             return Response(PrescriptionDetailSerializer(item).data)
         return Response(PrescriptionListSerializer(qs, many=True).data)
+
+
+class PatientPortalPrescriptionPdfView(PatientPortalBaseView):
+    def get(self, request, prescription_id):
+        if not self.clinic_settings.allow_patient_prescription_view:
+            return portal_denied()
+        prescription = Prescription.objects.select_related("clinic", "patient", "doctor__user").prefetch_related("items").filter(
+            id=prescription_id,
+            patient=self.patient,
+            clinic=self.patient.clinic,
+            status=Prescription.Status.EMITIDA,
+            activo=True,
+        ).first()
+        if not prescription:
+            return Response({"detail": "Receta no encontrada."}, status=status.HTTP_404_NOT_FOUND)
+        from apps.prescriptions.views import render_prescription_pdf
+
+        response = HttpResponse(render_prescription_pdf(prescription), content_type="application/pdf")
+        response["Content-Disposition"] = f'inline; filename="receta-{prescription.prescription_number}.pdf"'
+        log_audit_event(request=request, clinic=prescription.clinic, action=AuditLog.Action.VIEW, module=AuditLog.Module.PRESCRIPTIONS, model_name="Prescription", object_id=prescription.id, object_repr=prescription.prescription_number, description="Paciente consulto PDF de receta emitida.")
+        return response
 
 
 class PatientPortalMedicalOrdersView(PatientPortalBaseView):

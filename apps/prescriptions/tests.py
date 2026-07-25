@@ -1,9 +1,11 @@
-from datetime import date
+from datetime import date, timedelta
 
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import Role, User
+from apps.audit.models import AuditLog
 from apps.clinics.models import Clinic
 from apps.doctors.models import DoctorProfile, MedicalSpecialty
 from apps.medical_records.models import ClinicalConsultation, MedicalRecord
@@ -83,8 +85,8 @@ class PrescriptionsModuleTests(APITestCase):
         prescription = Prescription.objects.create(consultation=self.consultation)
         self.auth(self.doctor_user)
         response = self.client.post(f"/api/prescriptions/{prescription.id}/items/", {"medication_name": "Ibuprofeno", "dosage": "400mg", "frequency": "cada 12 horas"}, format="json")
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("alergia", str(response.data).lower())
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIn("ibuprofeno", response.data["allergy_warnings"])
 
     def test_emitir_receta_valida_alergias_actualizadas(self):
         prescription = Prescription.objects.create(consultation=self.consultation)
@@ -93,7 +95,7 @@ class PrescriptionsModuleTests(APITestCase):
         self.patient.save(update_fields=["alergias"])
         self.auth(self.doctor_user)
         response = self.client.patch(f"/api/prescriptions/{prescription.id}/issue/")
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
         self.assertIn("alergia", response.data["detail"].lower())
 
     def test_no_medicamento_vacio(self):
@@ -154,13 +156,13 @@ class PrescriptionsModuleTests(APITestCase):
             self.assertEqual(self.client.get(url).status_code, status.HTTP_404_NOT_FOUND)
 
     def test_paciente_no_puede_anular_datos_clinicos(self):
-        self.consultation.status = ClinicalConsultation.Status.FINALIZADA
-        self.consultation.save(update_fields=["status"])
         diagnosis = Diagnosis.objects.create(consultation=self.consultation, name="Gripe")
         prescription = Prescription.objects.create(consultation=self.consultation)
         prescription.items.create(medication_name="Acetaminofen", dosage="500mg", frequency="cada 8 horas")
-        prescription.issue()
+        prescription.issue(user=self.doctor_user)
         order = MedicalOrder.objects.create(consultation=self.consultation, title="Hemograma")
+        self.consultation.status = ClinicalConsultation.Status.FINALIZADA
+        self.consultation.save(update_fields=["status"])
         self.auth(self.patient_user)
         self.assertEqual(self.client.delete(f"/api/diagnoses/{diagnosis.id}/").status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(self.client.patch(f"/api/prescriptions/{prescription.id}/void/").status_code, status.HTTP_403_FORBIDDEN)
@@ -180,3 +182,115 @@ class PrescriptionsModuleTests(APITestCase):
         self.assertIn("diagnoses", response.data)
         self.assertIn("prescriptions", response.data)
         self.assertIn("medical_orders", response.data)
+
+    def test_creacion_movil_anidada_y_emision_idempotente(self):
+        self.auth(self.doctor_user)
+        response = self.client.post(
+            "/api/prescriptions/",
+            {
+                "consultation": self.consultation.id,
+                "medications": [{"medication_name": "Acetaminofen", "dosage": "500 mg", "frequency": "cada 8 horas", "duration": "3 dias", "quantity": "9"}],
+                "general_instructions": "Tomar con agua",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        prescription_id = response.data["id"]
+        issued = self.client.patch(f"/api/prescriptions/{prescription_id}/issue/", {}, format="json")
+        self.assertEqual(issued.status_code, status.HTTP_200_OK)
+        self.assertEqual(issued.data["status"], Prescription.Status.EMITIDA)
+        self.assertEqual(self.client.patch(f"/api/prescriptions/{prescription_id}/issue/", {}, format="json").status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(AuditLog.objects.filter(module=AuditLog.Module.PRESCRIPTIONS, action=AuditLog.Action.ISSUE, object_id=str(prescription_id)).count(), 1)
+
+    def test_alergia_requiere_confirmacion_y_justificacion(self):
+        self.patient.alergias = "Ibuprofeno"
+        self.patient.save(update_fields=["alergias"])
+        prescription = Prescription.objects.create(consultation=self.consultation)
+        prescription.items.create(medication_name="Ibuprofeno", dosage="400 mg", frequency="cada 12 horas")
+        self.auth(self.doctor_user)
+        blocked = self.client.patch(f"/api/prescriptions/{prescription.id}/issue/", {}, format="json")
+        self.assertEqual(blocked.status_code, status.HTTP_409_CONFLICT)
+        confirmed = self.client.patch(
+            f"/api/prescriptions/{prescription.id}/issue/",
+            {"confirm_allergies": True, "allergy_override_reason": "Beneficio clinico evaluado por el medico."},
+            format="json",
+        )
+        self.assertEqual(confirmed.status_code, status.HTTP_200_OK)
+        prescription.refresh_from_db()
+        self.assertEqual(prescription.allergy_reviewed_by, self.doctor_user)
+
+    def test_receta_emitida_pdf_cancelacion_y_portal_seguros(self):
+        prescription = Prescription.objects.create(consultation=self.consultation)
+        prescription.items.create(medication_name="Acetaminofen", dosage="500 mg", frequency="cada 8 horas")
+        prescription.issue(user=self.doctor_user)
+        self.auth(self.doctor_user)
+        self.assertEqual(self.client.get(f"/api/prescriptions/{prescription.id}/pdf/").status_code, status.HTTP_200_OK)
+        self.assertEqual(self.client.delete(f"/api/prescriptions/{prescription.id}/").status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+        self.auth(self.patient_user)
+        portal_pdf = self.client.get(f"/api/patient-portal/prescriptions/{prescription.id}/pdf/")
+        self.assertEqual(portal_pdf.status_code, status.HTTP_200_OK)
+        self.auth(self.other_patient_user)
+        self.assertEqual(self.client.get(f"/api/patient-portal/prescriptions/{prescription.id}/pdf/").status_code, status.HTTP_404_NOT_FOUND)
+        self.auth(self.doctor_user)
+        cancelled = self.client.patch(f"/api/prescriptions/{prescription.id}/void/", {"reason": "Correccion solicitada"}, format="json")
+        self.assertEqual(cancelled.status_code, status.HTTP_200_OK)
+        prescription.refresh_from_db()
+        self.assertEqual(prescription.voided_by, self.doctor_user)
+
+    def test_flujo_operativo_de_orden_medica(self):
+        self.auth(self.doctor_user)
+        created = self.client.post(
+            "/api/medical-orders/",
+            {"consultation": self.consultation.id, "description": "Hemograma completo", "order_type": "laboratorio", "priority": "prioritaria", "expires_at": (timezone.now() + timedelta(days=2)).isoformat()},
+            format="json",
+        )
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED)
+        order_id = created.data["id"]
+        self.auth(self.nurse)
+        self.assertEqual(self.client.patch(f"/api/medical-orders/{order_id}/start/", {}, format="json").status_code, status.HTTP_200_OK)
+        completed = self.client.patch(f"/api/medical-orders/{order_id}/complete/", {"result_summary": "Hemograma procesado y adjuntado."}, format="json")
+        self.assertEqual(completed.status_code, status.HTTP_200_OK)
+        self.auth(self.doctor_user)
+        reviewed = self.client.patch(f"/api/medical-orders/{order_id}/review/", {"notes": "Resultado revisado."}, format="json")
+        self.assertEqual(reviewed.status_code, status.HTTP_200_OK)
+        self.assertEqual(reviewed.data["status"], MedicalOrder.Status.REVISADA)
+
+    def test_cancelar_orden_requiere_motivo_y_no_borra(self):
+        order = MedicalOrder.objects.create(consultation=self.consultation, title="Radiografia")
+        self.auth(self.doctor_user)
+        self.assertEqual(self.client.patch(f"/api/medical-orders/{order.id}/cancel/", {}, format="json").status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self.client.patch(f"/api/medical-orders/{order.id}/cancel/", {"reason": "Orden duplicada"}, format="json").status_code, status.HTTP_200_OK)
+        self.assertEqual(self.client.delete(f"/api/medical-orders/{order.id}/").status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def test_orden_vencida_no_puede_iniciarse(self):
+        order = MedicalOrder.objects.create(consultation=self.consultation, title="Orden vencida", expires_at=timezone.now() + timedelta(hours=1))
+        MedicalOrder.objects.filter(pk=order.pk).update(expires_at=timezone.now() - timedelta(minutes=1))
+        self.auth(self.doctor_user)
+        detail = self.client.get(f"/api/medical-orders/{order.id}/")
+        self.assertEqual(detail.data["status"], MedicalOrder.Status.VENCIDA)
+        self.assertEqual(self.client.patch(f"/api/medical-orders/{order.id}/start/", {}, format="json").status_code, status.HTTP_409_CONFLICT)
+
+    def test_medico_no_abre_receta_ni_orden_de_otra_clinica(self):
+        other_prescription = Prescription.objects.create(consultation=self.other_consultation)
+        other_order = MedicalOrder.objects.create(consultation=self.other_consultation, title="Orden ajena")
+        self.auth(self.doctor_user)
+        self.assertEqual(self.client.get(f"/api/prescriptions/{other_prescription.id}/").status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(self.client.get(f"/api/medical-orders/{other_order.id}/").status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_consulta_no_finaliza_con_receta_en_borrador(self):
+        prescription = Prescription.objects.create(consultation=self.consultation)
+        prescription.items.create(medication_name="Acetaminofen", dosage="500 mg", frequency="cada 8 horas")
+        self.auth(self.doctor_user)
+        blocked = self.client.post(f"/api/consultations/{self.consultation.id}/complete/", {}, format="json")
+        self.assertEqual(blocked.status_code, status.HTTP_409_CONFLICT)
+        self.assertIn("borrador", blocked.data["detail"].lower())
+        self.assertEqual(self.client.patch(f"/api/prescriptions/{prescription.id}/issue/", {}, format="json").status_code, status.HTTP_200_OK)
+        completed = self.client.post(
+            f"/api/consultations/{self.consultation.id}/complete/",
+            {
+                "clinical_assessment": "Evaluacion clinica documentada.",
+                "treatment_plan": "Continuar el tratamiento indicado y seguimiento.",
+            },
+            format="json",
+        )
+        self.assertEqual(completed.status_code, status.HTTP_200_OK)

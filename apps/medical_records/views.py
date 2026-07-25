@@ -344,6 +344,9 @@ class ClinicalConsultationViewSet(viewsets.ModelViewSet):
                 data = ClinicalConsultationDetailSerializer(consultation).data
                 data.update({"message": "La consulta ya fue finalizada.", "created": False})
                 return Response(data)
+            draft_prescriptions = consultation.prescriptions.filter(activo=True, status="borrador")
+            if draft_prescriptions.exists():
+                return Response({"detail": "Hay recetas en borrador. Emítelas o anúlalas antes de finalizar la consulta."}, status=status.HTTP_409_CONFLICT)
             expected_version = request.data.get("expected_version")
             if expected_version is not None and str(expected_version) != str(consultation.version):
                 return self._version_conflict(consultation)
@@ -546,8 +549,10 @@ class ClinicalConsultationViewSet(viewsets.ModelViewSet):
             usage = serializer.save()
         except DjangoValidationError as exc:
             return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
-        log_audit_event(request=request, clinic=usage.clinic, action=AuditLog.Action.STOCK_OUT, module=AuditLog.Module.INVENTORY, model_name="ClinicalSupplyUsage", object_id=usage.id, object_repr=usage.description, description="Consumo clinico registrado.", new_values={"inventory_item": usage.inventory_item_id, "quantity": str(usage.quantity), "billable": usage.billable})
-        return Response(ClinicalSupplyUsageSerializer(usage).data, status=status.HTTP_201_CREATED)
+        replay = bool(getattr(usage, "_idempotent_replay", False))
+        if not replay:
+            log_audit_event(request=request, clinic=usage.clinic, action=AuditLog.Action.STOCK_OUT, module=AuditLog.Module.INVENTORY, model_name="ClinicalSupplyUsage", object_id=usage.id, object_repr=usage.description, description="Consumo clinico registrado.", new_values={"inventory_item": usage.inventory_item_id, "group_quantity": ClinicalSupplyUsageSerializer(usage).data["group_quantity"], "billable": usage.billable})
+        return Response(ClinicalSupplyUsageSerializer(usage).data, status=status.HTTP_200_OK if replay else status.HTTP_201_CREATED)
 
 
 class ClinicalSupplyUsageViewSet(viewsets.ModelViewSet):
@@ -613,11 +618,16 @@ class ClinicalSupplyUsageViewSet(viewsets.ModelViewSet):
             usage = serializer.save()
         except DjangoValidationError as exc:
             return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
-        log_audit_event(request=request, clinic=usage.clinic, action=AuditLog.Action.STOCK_OUT, module=AuditLog.Module.INVENTORY, model_name="ClinicalSupplyUsage", object_id=usage.id, object_repr=usage.description, description="Consumo clinico registrado.", new_values={"inventory_item": usage.inventory_item_id, "quantity": str(usage.quantity), "billable": usage.billable})
-        return Response(ClinicalSupplyUsageSerializer(usage).data, status=status.HTTP_201_CREATED)
+        replay = bool(getattr(usage, "_idempotent_replay", False))
+        if not replay:
+            log_audit_event(request=request, clinic=usage.clinic, action=AuditLog.Action.STOCK_OUT, module=AuditLog.Module.INVENTORY, model_name="ClinicalSupplyUsage", object_id=usage.id, object_repr=usage.description, description="Consumo clinico registrado.", new_values={"inventory_item": usage.inventory_item_id, "group_quantity": ClinicalSupplyUsageSerializer(usage).data["group_quantity"], "billable": usage.billable})
+        return Response(ClinicalSupplyUsageSerializer(usage).data, status=status.HTTP_200_OK if replay else status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
         return Response({"detail": "Los consumos aplicados no se editan; se cancelan si aun no estan facturados."}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def destroy(self, request, *args, **kwargs):
+        return Response({"detail": "Los consumos clinicos no se eliminan; usa cancelar para revertirlos."}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
     def partial_update(self, request, *args, **kwargs):
         return self.update(request, *args, **kwargs)

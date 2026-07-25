@@ -1,4 +1,7 @@
+import os
+
 from django.db.models import Count, Q, Sum
+from django.http import Http404
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import status, viewsets
@@ -299,6 +302,7 @@ class ClinicalDocumentViewSet(viewsets.ModelViewSet):
             return Response({"detail": "No tienes permiso para cambiar visibilidad."}, status=status.HTTP_403_FORBIDDEN)
         document.visible_to_patient = True
         document.save(update_fields=["visible_to_patient", "actualizado_en"])
+        log_audit_event(request=request, clinic=document.clinic, action=AuditLog.Action.UPDATE, module=AuditLog.Module.DOCUMENTS, model_name="ClinicalDocument", object_id=document.id, object_repr=document.title, description="Documento marcado como visible para el paciente.", new_values={"visible_to_patient": True})
         notify_patient_if_visible(document)
         return Response(ClinicalDocumentDetailSerializer(document, context={"request": request}).data)
 
@@ -309,6 +313,7 @@ class ClinicalDocumentViewSet(viewsets.ModelViewSet):
             return Response({"detail": "No tienes permiso para cambiar visibilidad."}, status=status.HTTP_403_FORBIDDEN)
         document.visible_to_patient = False
         document.save(update_fields=["visible_to_patient", "actualizado_en"])
+        log_audit_event(request=request, clinic=document.clinic, action=AuditLog.Action.UPDATE, module=AuditLog.Module.DOCUMENTS, model_name="ClinicalDocument", object_id=document.id, object_repr=document.title, description="Documento ocultado al paciente.", new_values={"visible_to_patient": False})
         return Response(ClinicalDocumentDetailSerializer(document, context={"request": request}).data)
 
     @action(detail=True, methods=["post"], url_path="replace")
@@ -332,9 +337,9 @@ class ClinicalDocumentViewSet(viewsets.ModelViewSet):
             title=serializer.validated_data.get("title") or old.title,
             description=serializer.validated_data.get("description", old.description),
             file=uploaded_file,
-            original_filename=uploaded_file.name,
+            original_filename=os.path.basename(uploaded_file.name)[:255],
             file_type=file_extension(uploaded_file.name),
-            mime_type=getattr(uploaded_file, "content_type", "") or "",
+            mime_type=getattr(uploaded_file, "_medicore_mime_type", ""),
             file_size=uploaded_file.size,
             file_extension=file_extension(uploaded_file.name),
             uploaded_by=request.user,
@@ -362,7 +367,12 @@ class RelatedDocumentsView(APIView):
     relation_field = ""
 
     def get_related_object(self):
-        return get_object_or_404(self.model, id=self.kwargs[self.lookup_kwarg])
+        obj = get_object_or_404(self.model, id=self.kwargs[self.lookup_kwarg])
+        patient = self.get_patient(obj)
+        user = self.request.user
+        if is_superadmin(user) or not can_list_documents(user) or user.clinica_id != patient.clinic_id:
+            raise Http404
+        return obj
 
     def get_patient(self, obj):
         return obj if isinstance(obj, Patient) else obj.patient
@@ -385,6 +395,7 @@ class RelatedDocumentsView(APIView):
         serializer = ClinicalDocumentCreateSerializer(data=data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         document = serializer.save()
+        log_audit_event(request=request, clinic=document.clinic, action=AuditLog.Action.CREATE, module=AuditLog.Module.DOCUMENTS, model_name="ClinicalDocument", object_id=document.id, object_repr=document.title, description="Documento clinico adjuntado a un recurso.", new_values={"patient": document.patient_id, "consultation": document.consultation_id, "medical_order": document.medical_order_id, "visible_to_patient": document.visible_to_patient})
         notify_patient_if_visible(document)
         return Response(ClinicalDocumentDetailSerializer(document, context={"request": request}).data, status=status.HTTP_201_CREATED)
 

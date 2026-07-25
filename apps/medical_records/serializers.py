@@ -347,6 +347,8 @@ class ClinicalSupplyUsageSerializer(serializers.ModelSerializer):
     inventory_item_stock = serializers.DecimalField(source="inventory_item.stock_current", max_digits=12, decimal_places=2, read_only=True)
     inventory_lot_number = serializers.CharField(source="inventory_lot.lot_number", read_only=True)
     applied_by_nombre = serializers.CharField(source="applied_by.nombre_completo", read_only=True)
+    group_quantity = serializers.SerializerMethodField()
+    group_parts = serializers.SerializerMethodField()
 
     class Meta:
         model = ClinicalSupplyUsage
@@ -380,24 +382,51 @@ class ClinicalSupplyUsageSerializer(serializers.ModelSerializer):
             "invoice",
             "invoice_item",
             "inventory_movement",
+            "idempotency_key",
+            "consumption_group",
+            "group_quantity",
+            "group_parts",
             "applied_by",
             "applied_by_nombre",
             "applied_at",
+            "cancelled_by",
+            "cancelled_at",
+            "cancellation_reason",
             "status",
             "active",
             "creado_en",
             "actualizado_en",
         ]
-        read_only_fields = ["clinic", "doctor", "nurse", "unit_cost", "total_price", "invoiced", "invoice", "invoice_item", "inventory_movement", "applied_by", "applied_at", "status"]
+        read_only_fields = ["clinic", "doctor", "nurse", "unit_cost", "total_price", "invoiced", "invoice", "invoice_item", "inventory_movement", "idempotency_key", "consumption_group", "group_quantity", "group_parts", "applied_by", "applied_at", "cancelled_by", "cancelled_at", "cancellation_reason", "status"]
+
+    def _group(self, obj):
+        if not obj.consumption_group:
+            return [obj]
+        if hasattr(obj, "_group_usages"):
+            return obj._group_usages
+        return list(ClinicalSupplyUsage.objects.filter(consumption_group=obj.consumption_group).select_related("inventory_lot").order_by("id"))
+
+    def get_group_quantity(self, obj):
+        return str(sum((part.quantity for part in self._group(obj)), Decimal("0")))
+
+    def get_group_parts(self, obj):
+        return [
+            {"id": part.id, "inventory_lot": part.inventory_lot_id, "inventory_lot_number": getattr(part.inventory_lot, "lot_number", None), "quantity": str(part.quantity), "status": part.status}
+            for part in self._group(obj)
+        ]
 
 
 class ClinicalSupplyUsageCreateSerializer(serializers.ModelSerializer):
+    inventory_item = serializers.PrimaryKeyRelatedField(queryset=InventoryItem.objects.all(), required=False)
+    item_id = serializers.PrimaryKeyRelatedField(source="inventory_item", queryset=InventoryItem.objects.all(), required=False, write_only=True)
+    visit = serializers.IntegerField(required=False, write_only=True)
+    idempotency_key = serializers.CharField(required=False, allow_blank=True, max_length=100, write_only=True)
     quantity = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0.01"))
     unit_price = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0.00"), required=False)
 
     class Meta:
         model = ClinicalSupplyUsage
-        fields = ["id", "patient", "consultation", "appointment", "inventory_item", "inventory_lot", "quantity", "unit_price", "usage_type", "description", "notes", "billable"]
+        fields = ["id", "patient", "consultation", "appointment", "visit", "inventory_item", "item_id", "inventory_lot", "quantity", "unit_price", "usage_type", "description", "notes", "billable", "idempotency_key"]
         read_only_fields = ["id"]
 
     def validate(self, attrs):
@@ -405,7 +434,10 @@ class ClinicalSupplyUsageCreateSerializer(serializers.ModelSerializer):
         role = get_role_name(request.user)
         if role not in ["admin", "medico", "enfermera"]:
             raise serializers.ValidationError("No tienes permiso para registrar consumos clinicos.")
-        item = attrs["inventory_item"]
+        attrs.pop("visit", None)
+        item = attrs.get("inventory_item")
+        if not item:
+            raise serializers.ValidationError({"inventory_item": "Selecciona un producto de inventario."})
         if not item.active:
             raise serializers.ValidationError({"inventory_item": "El producto esta inactivo."})
         if item.clinic_id != request.user.clinica_id:
@@ -426,8 +458,6 @@ class ClinicalSupplyUsageCreateSerializer(serializers.ModelSerializer):
         if patient.clinic_id != item.clinic_id:
             raise serializers.ValidationError("Paciente y producto deben pertenecer a la misma clinica.")
         lot = attrs.get("inventory_lot")
-        if item.requires_lot and not lot:
-            raise serializers.ValidationError({"inventory_lot": "Este producto requiere lote."})
         if lot:
             if lot.item_id != item.id or lot.clinic_id != item.clinic_id:
                 raise serializers.ValidationError({"inventory_lot": "El lote no corresponde al producto."})
@@ -445,30 +475,9 @@ class ClinicalSupplyUsageCreateSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data):
-        item = InventoryItem.objects.select_for_update().get(pk=validated_data["inventory_item"].id)
-        lot = validated_data.get("inventory_lot")
-        if lot:
-            lot = InventoryLot.objects.select_for_update().get(pk=lot.id)
-        usage = ClinicalSupplyUsage(**validated_data)
-        usage.unit_cost = lot.cost_price if lot else item.cost_price
-        usage.unit_price = usage.unit_price or item.sale_price
-        usage.save()
-        movement = InventoryMovement.objects.create(
-            clinic=usage.clinic,
-            item=item,
-            lot=lot,
-            movement_type=InventoryMovement.Type.SALIDA,
-            quantity=usage.quantity,
-            unit_cost=usage.unit_cost,
-            reason="clinical_consumption",
-            reference_type="clinical_consumption",
-            reference_id=str(usage.id),
-            notes=usage.notes,
-            performed_by=usage.applied_by,
-        )
-        usage.inventory_movement = movement
-        usage.save(update_fields=["inventory_movement", "actualizado_en"])
-        return usage
+        from apps.medical_records.services import consume_inventory_item
+
+        return consume_inventory_item(validated_data)
 
 
 class ClinicalSupplyUsageCancelSerializer(serializers.Serializer):

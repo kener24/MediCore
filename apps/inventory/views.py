@@ -96,6 +96,8 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(active=p["active"].lower() in ["1", "true", "yes", "si"])
         if p.get("low_stock") == "true":
             queryset = queryset.filter(stock_current__lte=F("stock_minimum"))
+        if p.get("available") == "true":
+            queryset = queryset.filter(active=True, stock_current__gt=0)
         return queryset
 
     def create(self, request, *args, **kwargs):

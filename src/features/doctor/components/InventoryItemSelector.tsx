@@ -27,7 +27,7 @@ export function InventoryItemSelector({
         return (
           <Pressable disabled={disabled} key={item.id} onPress={() => onSelect(item)} style={[styles.item, active && styles.itemActive, disabled && styles.disabled]}>
             <Text style={[styles.name, active && styles.nameActive]}>{item.name ?? item.nombre ?? `Insumo ${item.id}`}</Text>
-            <Text style={styles.meta}>Stock: {item.stock ?? 'N/D'} {item.unit ?? item.unidad ?? ''}</Text>
+            <Text style={styles.meta}>Stock: {item.stock_current ?? item.stock ?? 'N/D'} {item.unit ?? item.unidad ?? ''}</Text>
           </Pressable>
         );
       })}

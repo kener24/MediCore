@@ -440,6 +440,7 @@ export function DoctorConsultationScreen() {
           />
           <ConsultationActionBar
             disabled={!consultationId}
+            onAttachments={() => navigateAction('DoctorClinicalAttachments')}
             onClinicalConsumption={() => navigateAction('DoctorClinicalConsumption')}
             onMedicalOrder={() => navigateAction('DoctorMedicalOrder')}
             onPrescription={() => navigateAction('DoctorPrescription')}

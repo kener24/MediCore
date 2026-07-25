@@ -11,8 +11,10 @@ export function ClinicalConsumptionCard({ items }: { items: DoctorClinicalConsum
       {items.length ? (
         items.map((item, index) => (
           <View key={item.id ?? index} style={styles.item}>
-            <Text style={styles.itemTitle}>{item.item_name ?? `Consumo #${item.id ?? index + 1}`}</Text>
-            <Text style={styles.meta}>Cantidad: {item.quantity ?? 'No indicada'} {item.unit ?? ''}</Text>
+            <Text style={styles.itemTitle}>{item.inventory_item_nombre ?? item.item_name ?? `Consumo #${item.id ?? index + 1}`}</Text>
+            <Text style={styles.meta}>Cantidad: {item.group_quantity ?? item.quantity ?? 'No indicada'} {item.unit ?? ''}</Text>
+            {item.inventory_lot_number ? <Text style={styles.meta}>Lote: {item.inventory_lot_number}</Text> : null}
+            <Text style={styles.meta}>Estado: {item.status ?? 'aplicado'}</Text>
             <Text style={styles.meta}>{item.billable === false ? 'No facturable' : 'Facturable'}</Text>
           </View>
         ))

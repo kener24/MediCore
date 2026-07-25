@@ -25,7 +25,6 @@ export function ClinicalConsumptionForm({
 }) {
   const locked = Boolean(disabled || submitting);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
-  const [itemName, setItemName] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [notes, setNotes] = useState('');
   const [billable, setBillable] = useState(true);
@@ -33,14 +32,14 @@ export function ClinicalConsumptionForm({
   async function submit() {
     if (locked) return;
     const numericQuantity = Number(quantity);
-    const stock = selectedItem?.stock === undefined ? undefined : Number(selectedItem.stock);
-    if (!selectedItem && !itemName.trim()) return Alert.alert('Consumo clínico', 'Selecciona un insumo.');
+    const rawStock = selectedItem?.stock_current ?? selectedItem?.stock;
+    const stock = rawStock === undefined ? undefined : Number(rawStock);
+    if (!selectedItem) return Alert.alert('Consumo clínico', 'Selecciona un producto con existencia disponible.');
     if (!Number.isFinite(numericQuantity) || numericQuantity <= 0) return Alert.alert('Consumo clínico', 'La cantidad debe ser mayor que cero.');
     if (stock !== undefined && Number.isFinite(stock) && numericQuantity > stock) return Alert.alert('Consumo clínico', 'No hay stock suficiente.');
     await onSubmit({
       billable,
-      item_id: selectedItem?.id,
-      item_name: selectedItem ? selectedItem.name ?? selectedItem.nombre : itemName.trim(),
+      inventory_item: selectedItem.id,
       notes: notes.trim(),
       quantity: numericQuantity,
     });
@@ -51,7 +50,6 @@ export function ClinicalConsumptionForm({
       {onChangeSearch ? (
         <InventoryItemSelector disabled={locked} items={inventoryItems} onChangeSearch={onChangeSearch} onSelect={setSelectedItem} search={search} selected={selectedItem} />
       ) : null}
-      {!selectedItem ? <AppInput editable={!locked} label="Insumo o producto" onChangeText={setItemName} value={itemName} /> : null}
       <AppInput editable={!locked} keyboardType="numeric" label="Cantidad" onChangeText={(value) => setQuantity(value.replace(/[^0-9.]/g, ''))} value={quantity} />
       <AppInput editable={!locked} label="Notas" multiline onChangeText={setNotes} value={notes} />
       <View style={styles.row}>

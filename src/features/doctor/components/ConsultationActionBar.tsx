@@ -6,6 +6,7 @@ import { colors } from '@/core/theme/colors';
 
 export function ConsultationActionBar({
   disabled,
+  onAttachments,
   onClinicalConsumption,
   onMedicalOrder,
   onPrescription,
@@ -13,6 +14,7 @@ export function ConsultationActionBar({
   readOnly,
 }: {
   disabled?: boolean;
+  onAttachments: () => void;
   onClinicalConsumption: () => void;
   onMedicalOrder: () => void;
   onPrescription: () => void;
@@ -28,6 +30,7 @@ export function ConsultationActionBar({
       <AppButton disabled={disabled || readOnly} label="Crear receta" onPress={onPrescription} variant="secondary" />
       <AppButton disabled={disabled || readOnly} label="Crear orden médica" onPress={onMedicalOrder} variant="secondary" />
       <AppButton disabled={disabled || readOnly} label="Registrar consumo clínico" onPress={onClinicalConsumption} variant="secondary" />
+      <AppButton disabled={disabled || readOnly} label="Adjuntar documento" onPress={onAttachments} variant="secondary" />
       <AppButton disabled={disabled} label={readOnly ? 'Ver resumen' : 'Ver resumen y finalizar'} onPress={onSummary} />
     </AppCard>
   );

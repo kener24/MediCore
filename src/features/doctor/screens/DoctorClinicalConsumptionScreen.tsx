@@ -37,6 +37,7 @@ export function DoctorClinicalConsumptionScreen() {
   const [loading, setLoading] = useState(true);
   const [readOnly, setReadOnly] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [requestKey, setRequestKey] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -71,8 +72,11 @@ export function DoctorClinicalConsumptionScreen() {
     if (readOnly) return Alert.alert('Consumo clínico', 'Esta consulta ya fue finalizada.');
     if (!consultationId) return Alert.alert('Consumo clínico', 'Primero debes iniciar o guardar la consulta médica.');
     setSubmitting(true);
+    const idempotencyKey = requestKey || `mobile-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    setRequestKey(idempotencyKey);
     try {
-      await createClinicalConsumption(consultationId, { ...payload, visit: params.visitId });
+      await createClinicalConsumption(consultationId, { ...payload, visit: params.visitId, idempotency_key: idempotencyKey });
+      setRequestKey('');
       Alert.alert('Consumo clínico', 'Consumo clínico registrado correctamente.');
       await load();
     } catch (err) {

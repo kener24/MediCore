@@ -134,3 +134,22 @@ Despliegue y pruebas ejecutados el 2026-07-24 contra `https://kp-software.tech` 
 - Las evidencias no muestran tokens, contraseñas ni información clínica real.
 - Una prueba pendiente no se marca como aprobada sin ejecución directa.
 - Los accesos utilizados son de demostración y no quedan guardados en este documento.
+
+## Sprint 1.3B: certificación local previa al despliegue
+
+Fecha: 2026-07-25
+
+| ID | Prueba | Resultado | Evidencia segura |
+| --- | --- | --- | --- |
+| RX-LOCAL-01 | Recetas, órdenes, consumos y documentos | Aprobado | 40/40 pruebas enfocadas después del aislamiento adicional de adjuntos |
+| RX-LOCAL-02 | Cuentas | Aprobado | 37/37 pruebas |
+| RX-LOCAL-03 | Seguridad, auditoría y notificaciones | Aprobado | 37/37 pruebas |
+| RX-LOCAL-04 | Operación clínica | Aprobado | 113/113 pruebas |
+| RX-LOCAL-05 | Facturación, inventario, compras y reportes | Aprobado | 71/71 pruebas |
+| RX-LOCAL-06 | Suite Django total por grupos | Aprobado | 298/298 pruebas sin solapamiento |
+| RX-LOCAL-07 | Django y migraciones | Aprobado | `check` sin errores; `makemigrations --check --dry-run` sin cambios pendientes |
+| RX-LOCAL-08 | Web | Aprobado con observaciones | Build correcto; lint sin errores, con advertencias heredadas pendientes |
+| RX-LOCAL-09 | Móvil | Aprobado | TypeScript y lint sin errores; Expo Doctor 18/18 |
+| RX-PHYSICAL-01 | Android físico | Pendiente | Debe ejecutarse manualmente en Expo Go; no se infiere desde TypeScript o Metro |
+
+La evidencia de despliegue, migraciones MySQL, servicios, pruebas A/B y HTTPS se agrega después de actualizar producción. No se incluyen contraseñas, tokens ni contenido clínico.

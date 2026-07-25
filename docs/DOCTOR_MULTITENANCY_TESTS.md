@@ -21,7 +21,20 @@
 
 Web y móvil construyen la clave local con clínica, usuario, paciente, visita y consulta. Un borrador de un médico no coincide con la clave de otro usuario o clínica. El logout explícito elimina los borradores privados del dispositivo.
 
+## Sprint 1.3B: recursos asociados a consulta
+
+| Caso | Resultado esperado | Estado local |
+| --- | --- | --- |
+| Médico A abre receta u orden de Clínica B | 404 | Aprobado |
+| Médico A crea receta para consulta de Clínica B | Rechazado | Aprobado |
+| Médico A consume producto o lote de Clínica B | 400/404 sin movimiento | Aprobado |
+| Médico A lista o carga adjuntos en consulta B | 404 | Aprobado |
+| Paciente abre PDF de receta ajena | 404 | Aprobado |
+| Paciente descarga documento ajeno u oculto | 404 | Aprobado |
+| Reintento de consumo con la misma clave | Mismo consumo, sin segundo descuento | Aprobado |
+
+Las pruebas usan dos clínicas, usuarios y pacientes sintéticos. La aplicación móvil no envía un `clinicId` arbitrario en estos flujos; el backend deriva la clínica desde la sesión y la consulta.
+
 ## Prueba de producción
 
 La evidencia de Clínica A, Clínica B e intentos cruzados debe registrarse en `PRODUCTION_TEST_EVIDENCE.md` después del despliegue. No se deben guardar tokens, contraseñas, identidades ni texto clínico real.
-

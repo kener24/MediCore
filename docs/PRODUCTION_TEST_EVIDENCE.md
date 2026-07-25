@@ -150,6 +150,7 @@ Fecha: 2026-07-25
 | RX-LOCAL-07 | Django y migraciones | Aprobado | `check` sin errores; `makemigrations --check --dry-run` sin cambios pendientes |
 | RX-LOCAL-08 | Web | Aprobado con observaciones | Build correcto; lint sin errores, con advertencias heredadas pendientes |
 | RX-LOCAL-09 | Móvil | Aprobado | TypeScript y lint sin errores; Expo Doctor 18/18 |
+| RX-LOCAL-10 | Expo y bundle Android | Aprobado | Metro reiniciado con caché limpia; manifest y bundle respondieron 200 por Wi-Fi; API HTTPS de producción incluida |
 | RX-PHYSICAL-01 | Android físico | Pendiente | Debe ejecutarse manualmente en Expo Go; no se infiere desde TypeScript o Metro |
 
 La evidencia de despliegue, migraciones MySQL, servicios, pruebas A/B y HTTPS se agrega después de actualizar producción. No se incluyen contraseñas, tokens ni contenido clínico.

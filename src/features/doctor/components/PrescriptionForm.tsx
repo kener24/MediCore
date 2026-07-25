@@ -17,7 +17,9 @@ const emptyMedication: PrescriptionMedicationPayload = {
   frequency: '',
   instructions: '',
   medication_name: '',
+  presentation: '',
   quantity: '',
+  route: 'oral',
 };
 
 export function PrescriptionForm({
@@ -73,7 +75,9 @@ export function PrescriptionForm({
         frequency: item.frequency.trim(),
         instructions: item.instructions?.trim(),
         medication_name: item.medication_name.trim(),
+        presentation: item.presentation?.trim(),
         quantity: item.quantity ? String(item.quantity).trim() : undefined,
+        route: item.route || 'oral',
       })),
     });
   }

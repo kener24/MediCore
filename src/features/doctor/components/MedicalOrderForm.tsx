@@ -3,6 +3,7 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
+import { AppDateTimeInput } from '@/components/AppDateTimeInput';
 import { AppInput } from '@/components/AppInput';
 import { colors } from '@/core/theme/colors';
 import { MedicalOrderTypeSelector } from '@/features/doctor/components/MedicalOrderTypeSelector';
@@ -11,15 +12,16 @@ import type { CreateMedicalOrderPayload, MedicalOrderPriority, MedicalOrderType 
 
 const orderTypes: { label: string; value: MedicalOrderType }[] = [
   { label: 'Laboratorio', value: 'laboratorio' },
-  { label: 'Imagen', value: 'imagen' },
+  { label: 'Imagenología', value: 'imagenologia' },
   { label: 'Procedimiento', value: 'procedimiento' },
-  { label: 'Referencia', value: 'referencia' },
-  { label: 'Otra', value: 'otra' },
+  { label: 'Interconsulta', value: 'interconsulta' },
+  { label: 'Otra', value: 'otro' },
 ];
 
 const priorities: { label: string; value: MedicalOrderPriority }[] = [
   { label: 'Normal', value: 'normal' },
-  { label: 'Prioritaria', value: 'prioritaria' },
+  { label: 'Baja', value: 'baja' },
+  { label: 'Alta', value: 'alta' },
   { label: 'Urgente', value: 'urgente' },
 ];
 
@@ -44,6 +46,8 @@ export function MedicalOrderForm({
   const [description, setDescription] = useState('');
   const [instructions, setInstructions] = useState('');
   const [notes, setNotes] = useState('');
+  const [expiresAt, setExpiresAt] = useState('');
+  const [executionArea, setExecutionArea] = useState('');
 
   function applyOrder(values: Partial<CreateMedicalOrderPayload>) {
     if (values.order_type) setOrderType(values.order_type);
@@ -64,6 +68,8 @@ export function MedicalOrderForm({
       description: description.trim(),
       instructions: instructions.trim(),
       notes: notes.trim(),
+      expires_at: expiresAt || null,
+      execution_area: executionArea.trim(),
       order_type: orderType,
       priority,
     });
@@ -103,6 +109,8 @@ export function MedicalOrderForm({
         </View>
       ) : null}
       <AppInput editable={!locked} label="Instrucciones" multiline onChangeText={setInstructions} value={instructions} />
+      <AppInput editable={!locked} label="Área de ejecución" onChangeText={setExecutionArea} value={executionArea} />
+      {!locked ? <AppDateTimeInput label="Fecha y hora de vencimiento" minimumDate={new Date()} onChange={setExpiresAt} value={expiresAt} /> : null}
       <AppInput editable={!locked} label="Notas" multiline onChangeText={setNotes} value={notes} />
       <AppButton disabled={locked} label="Guardar orden médica" loading={submitting} onPress={submit} />
     </AppCard>

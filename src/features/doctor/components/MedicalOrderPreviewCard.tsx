@@ -21,9 +21,10 @@ export function MedicalOrderPreviewCard({
             key={item.id ?? index}
             onPress={() => onPressItem?.(item)}
             style={({ pressed }) => [styles.item, pressed && styles.pressed]}>
-            <Text style={styles.itemTitle}>{item.order_type ?? 'Orden médica'}</Text>
+            <Text style={styles.itemTitle}>{item.order_number ?? item.title ?? item.order_type ?? 'Orden médica'}</Text>
             <Text style={styles.meta}>{item.description ?? 'Sin descripción'}</Text>
             <Text style={styles.meta}>Prioridad: {item.priority ?? 'normal'}</Text>
+            <Text style={styles.meta}>Estado: {item.status ?? 'pendiente'}</Text>
           </Pressable>
         ))
       ) : (

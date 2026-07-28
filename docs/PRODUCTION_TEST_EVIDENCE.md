@@ -225,4 +225,3 @@ La evidencia de despliegue, migraciones MySQL, servicios, pruebas A/B y HTTPS se
 ### Android fisico
 
 Pendiente de confirmacion manual en dispositivo. TypeScript y Expo Doctor estan aprobados, pero la certificacion fisica requiere que el usuario confirme login, caja, pago parcial, pago final, recibo, movimiento, cierre, timeout, doble toque y perdida de red.
-

@@ -1,9 +1,9 @@
 from datetime import timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from io import BytesIO
 
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Q, Sum
 from django.http import HttpResponse
 from django.utils import timezone
@@ -15,6 +15,7 @@ from rest_framework.response import Response
 from apps.accounts.permissions import get_role_name
 from apps.billing.fiscal_services import issue_fiscal_invoice, validate_fiscal_invoice_readiness, void_fiscal_invoice_with_credit_note
 from apps.billing.models import BillableService, CashMovement, CashSession, ClinicFiscalProfile, CreditNote, FiscalDocumentRange, Invoice, InvoiceItem, Payment
+from apps.billing.services import register_invoice_payment, request_idempotency_key, void_payment
 from apps.billing.serializers import (
     BillableServiceSerializer,
     AddConsumptionToInvoiceSerializer,
@@ -69,6 +70,17 @@ def scope(request, queryset):
 
 def can_manage_billing(user):
     return get_role_name(user) in MANAGE_ROLES
+
+
+def can_apply_discount(user):
+    return get_role_name(user) == "admin"
+
+
+def requested_discount(data):
+    try:
+        return Decimal(str(data.get("discount_amount") or data.get("discount") or "0"))
+    except (InvalidOperation, TypeError, ValueError):
+        return None
 
 
 def can_config_fiscal(user):
@@ -248,6 +260,112 @@ def render_credit_note_pdf(credit_note, request=None):
         story.append(Paragraph(f"Emitida por: {credit_note.issued_by.nombre_completo or credit_note.issued_by.email}", styles["Normal"]))
     if credit_note.notes:
         story.append(Paragraph(f"Observaciones: {credit_note.notes}", styles["Normal"]))
+    doc.build(story)
+    return stream.getvalue()
+
+
+def render_invoice_pdf(invoice):
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table as PdfTable
+
+    settings = get_or_create_clinic_settings(invoice.clinic)
+    fiscal = invoice.fiscal_status in [Invoice.FiscalStatus.ISSUED, Invoice.FiscalStatus.CANCELLED]
+    stream = BytesIO()
+    doc = SimpleDocTemplate(stream, pagesize=letter, rightMargin=32, leftMargin=32, topMargin=32, bottomMargin=32)
+    styles = getSampleStyleSheet()
+    clinic_name = invoice.emitter_legal_name if fiscal else settings.fiscal_name or invoice.clinic.nombre
+    clinic_rtn = invoice.emitter_rtn if fiscal else settings.fiscal_rtn or invoice.clinic.rtn
+    clinic_address = invoice.emitter_address if fiscal else settings.fiscal_address or invoice.clinic.direccion
+    title = f"FACTURA FISCAL: {invoice.fiscal_number}" if fiscal else f"FACTURA: {invoice.invoice_number}"
+    story = [
+        Paragraph(clinic_name or invoice.clinic.nombre, styles["Title"]),
+        Paragraph(f"RTN: {clinic_rtn or '-'}", styles["Normal"]),
+        Paragraph(clinic_address or "", styles["Normal"]),
+        Paragraph(f"Telefono: {settings.fiscal_phone or invoice.clinic.telefono or '-'}", styles["Normal"]),
+        Paragraph(f"Correo: {settings.fiscal_email or invoice.clinic.correo or '-'}", styles["Normal"]),
+        Spacer(1, 8),
+        Paragraph(title, styles["Heading2"]),
+        Paragraph(f"Fecha: {invoice.issue_datetime or invoice.issue_date}", styles["Normal"]),
+        Paragraph(f"Estado: {invoice.get_status_display()}", styles["Normal"]),
+    ]
+    if fiscal:
+        story.extend(
+            [
+                Paragraph(f"CAI: {invoice.cai}", styles["Normal"]),
+                Paragraph(f"Rango autorizado: {invoice.fiscal_range_start} a {invoice.fiscal_range_end}", styles["Normal"]),
+                Paragraph(f"Fecha limite de emision: {invoice.fiscal_expiration_date}", styles["Normal"]),
+            ]
+        )
+    story.extend(
+        [
+            Spacer(1, 8),
+            Paragraph(f"Cliente: {invoice.customer_name or invoice.patient.nombre_completo}", styles["Normal"]),
+            Paragraph(f"Identidad / RTN: {invoice.customer_rtn or invoice.patient.identidad or '-'}", styles["Normal"]),
+            Spacer(1, 8),
+        ]
+    )
+    rows = [["Cant.", "Descripcion", "Precio", "Desc.", "ISV", "Total"]]
+    for item in invoice.items.filter(active=True):
+        rows.append([str(item.quantity), item.description, f"L {item.unit_price}", f"L {item.discount_amount}", f"L {item.tax_amount}", f"L {item.line_total}"])
+    story.extend([PdfTable(rows, repeatRows=1), Spacer(1, 10)])
+    totals = [
+        ["Subtotal", invoice.subtotal],
+        ["Importe exento", invoice.subtotal_exempt],
+        ["Importe exonerado", invoice.subtotal_exonerated],
+        ["Importe gravado 15%", invoice.subtotal_taxed_15],
+        ["Importe gravado 18%", invoice.subtotal_taxed_18],
+        ["ISV 15%", invoice.isv_15],
+        ["ISV 18%", invoice.isv_18],
+        ["Descuentos", invoice.discount_amount],
+        ["Total", invoice.total_amount],
+        ["Pagado", invoice.paid_amount],
+        ["Saldo", invoice.balance_due],
+    ]
+    story.append(PdfTable([[label, f"L {value}"] for label, value in totals]))
+    if invoice.amount_in_words:
+        story.extend([Spacer(1, 8), Paragraph(invoice.amount_in_words, styles["Normal"])])
+    payments = invoice.payments.filter(active=True, status=Payment.Status.APLICADO).order_by("payment_date", "id")
+    if payments:
+        story.extend([Spacer(1, 10), Paragraph("Pagos aplicados", styles["Heading3"])])
+        story.append(PdfTable([["Numero", "Fecha", "Metodo", "Monto"]] + [[p.payment_number, str(p.payment_date), p.get_method_display(), f"L {p.amount}"] for p in payments]))
+    if invoice.notes:
+        story.extend([Spacer(1, 8), Paragraph(f"Observaciones: {invoice.notes}", styles["Normal"])])
+    doc.build(story)
+    return stream.getvalue()
+
+
+def render_payment_receipt_pdf(payment):
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table as PdfTable
+
+    stream = BytesIO()
+    doc = SimpleDocTemplate(stream, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+    styles = getSampleStyleSheet()
+    receiver = payment.received_by.nombre_completo if payment.received_by else "Sistema"
+    story = [
+        Paragraph(payment.clinic.nombre, styles["Title"]),
+        Paragraph("RECIBO DE PAGO", styles["Heading2"]),
+        Spacer(1, 8),
+        PdfTable(
+            [
+                ["Numero de pago", payment.payment_number],
+                ["Factura", payment.invoice.invoice_number],
+                ["Paciente", payment.patient.nombre_completo],
+                ["Fecha", str(payment.payment_date)],
+                ["Monto", f"L {payment.amount}"],
+                ["Metodo", payment.get_method_display()],
+                ["Referencia", payment.reference or "-"],
+                ["Saldo anterior", f"L {payment.balance_before}"],
+                ["Saldo posterior", f"L {payment.balance_after}"],
+                ["Recibido por", receiver],
+                ["Estado", payment.get_status_display()],
+            ]
+        ),
+    ]
+    if payment.notes:
+        story.extend([Spacer(1, 8), Paragraph(f"Observaciones: {payment.notes}", styles["Normal"])])
     doc.build(story)
     return stream.getvalue()
 
@@ -445,8 +563,15 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             return Response(InvoiceItemSerializer(invoice.items.filter(active=True), many=True).data)
         if invoice.fiscal_status == Invoice.FiscalStatus.ISSUED:
             return Response({"detail": "No puedes agregar items a una factura fiscal emitida."}, status=status.HTTP_400_BAD_REQUEST)
+        if invoice.paid_amount > 0:
+            return Response({"detail": "No puedes modificar conceptos de una factura que ya tiene pagos aplicados."}, status=status.HTTP_409_CONFLICT)
         if not can_manage_billing(request.user):
             return Response({"detail": "No tienes permiso para agregar items."}, status=status.HTTP_403_FORBIDDEN)
+        discount = requested_discount(request.data)
+        if discount is None:
+            return Response({"detail": "El descuento debe ser un monto numerico valido."}, status=status.HTTP_400_BAD_REQUEST)
+        if discount > 0 and not can_apply_discount(request.user):
+            return Response({"detail": "No tienes permiso para aplicar descuentos."}, status=status.HTTP_403_FORBIDDEN)
         serializer = InvoiceItemSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save(invoice=invoice)
@@ -460,25 +585,28 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             return Response(PaymentListSerializer(queryset, many=True).data)
         if not can_manage_billing(request.user):
             return Response({"detail": "No tienes permiso para registrar pagos."}, status=status.HTTP_403_FORBIDDEN)
-        if invoice.fiscal_status == Invoice.FiscalStatus.ISSUED:
-            return Response({"detail": "No puedes modificar una factura fiscal emitida."}, status=status.HTTP_400_BAD_REQUEST)
-        payload = request.data.copy()
-        payload["invoice"] = invoice.id
         try:
-            with transaction.atomic():
-                locked_invoice = scope(request, Invoice.objects.select_for_update()).get(pk=invoice.id)
-                payload["invoice"] = locked_invoice.id
-                serializer = PaymentCreateSerializer(data=payload, context={"request": request})
-                serializer.is_valid(raise_exception=True)
-                payment = serializer.save()
+            key = request_idempotency_key(request)
+            payment, created = register_invoice_payment(
+                invoice=invoice,
+                user=request.user,
+                payload=request.data,
+                request=request,
+                idempotency_key=key,
+            )
         except Invoice.DoesNotExist:
             return Response({"detail": "Factura no encontrada."}, status=status.HTTP_404_NOT_FOUND)
         except DjangoValidationError as exc:
             return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
-        log_audit_event(request=request, clinic=payment.clinic, action=AuditLog.Action.PAYMENT, module=AuditLog.Module.PAYMENTS, model_name="Payment", object_id=payment.id, object_repr=payment.payment_number, description="Pago registrado.", new_values={"amount": str(payment.amount), "method": payment.method, "invoice": payment.invoice_id})
-        if payment.patient.user:
+        if created:
+            log_audit_event(request=request, clinic=payment.clinic, action=AuditLog.Action.PAYMENT, module=AuditLog.Module.PAYMENTS, model_name="Payment", object_id=payment.id, object_repr=payment.payment_number, description="Pago registrado.", new_values={"amount": str(payment.amount), "method": payment.method, "invoice": payment.invoice_id, "balance_before": str(payment.balance_before), "balance_after": str(payment.balance_after)})
+        else:
+            log_audit_event(request=request, clinic=payment.clinic, action=AuditLog.Action.VIEW, module=AuditLog.Module.PAYMENTS, model_name="Payment", object_id=payment.id, object_repr=payment.payment_number, description="Pago duplicado evitado mediante idempotencia.")
+        if created and payment.patient.user:
             create_notification(payment.patient.user, "Pago registrado", f"Se registro un pago por L {payment.amount}.", clinic=payment.clinic, notification_type=Notification.Type.SUCCESS, module=Notification.Module.PAYMENTS, priority=Notification.Priority.NORMAL, related_model="Payment", related_object_id=payment.id, action_url="/patient/payments")
-        return Response(PaymentDetailSerializer(payment).data, status=status.HTTP_201_CREATED)
+        data = PaymentDetailSerializer(payment).data
+        data.update({"created": created, "message": "Pago registrado correctamente." if created else "La operacion ya habia sido procesada."})
+        return Response(data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
     @action(detail=True, methods=["post"], url_path="add-consumption")
     def add_consumption(self, request, pk=None):
@@ -487,6 +615,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         invoice = self.get_object()
         if invoice.fiscal_status == Invoice.FiscalStatus.ISSUED:
             return Response({"detail": "No puedes modificar una factura fiscal emitida."}, status=status.HTTP_400_BAD_REQUEST)
+        if invoice.paid_amount > 0:
+            return Response({"detail": "No puedes modificar conceptos de una factura que ya tiene pagos aplicados."}, status=status.HTTP_409_CONFLICT)
         if invoice.status in [Invoice.Status.PAGADA, Invoice.Status.ANULADA]:
             return Response({"detail": "No puedes modificar una factura pagada o anulada."}, status=status.HTTP_400_BAD_REQUEST)
         serializer = AddConsumptionToInvoiceSerializer(data=request.data)
@@ -520,6 +650,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         invoice = self.get_object()
         if invoice.status in [Invoice.Status.PAGADA, Invoice.Status.ANULADA]:
             return Response({"detail": "No puedes modificar una factura pagada o anulada."}, status=status.HTTP_400_BAD_REQUEST)
+        if invoice.paid_amount > 0:
+            return Response({"detail": "No puedes modificar conceptos de una factura que ya tiene pagos aplicados."}, status=status.HTTP_409_CONFLICT)
         serializer = AddInventoryItemToInvoiceSerializer(data=request.data, context={"invoice": invoice})
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -561,6 +693,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             return Response({"detail": "No tienes permiso para modificar items."}, status=status.HTTP_403_FORBIDDEN)
         if invoice.fiscal_status == Invoice.FiscalStatus.ISSUED:
             return Response({"detail": "No puedes modificar items de una factura fiscal emitida."}, status=status.HTTP_400_BAD_REQUEST)
+        if invoice.paid_amount > 0:
+            return Response({"detail": "No puedes modificar conceptos de una factura que ya tiene pagos aplicados."}, status=status.HTTP_409_CONFLICT)
         item = invoice.items.filter(id=item_id).first()
         if not item:
             return Response({"detail": "Item no encontrado."}, status=status.HTTP_404_NOT_FOUND)
@@ -569,6 +703,11 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             item.save(update_fields=["active"])
             invoice.recalculate()
             return Response(status=status.HTTP_204_NO_CONTENT)
+        discount = requested_discount(request.data)
+        if discount is None:
+            return Response({"detail": "El descuento debe ser un monto numerico valido."}, status=status.HTTP_400_BAD_REQUEST)
+        if discount > 0 and not can_apply_discount(request.user):
+            return Response({"detail": "No tienes permiso para aplicar descuentos."}, status=status.HTTP_403_FORBIDDEN)
         serializer = InvoiceItemSerializer(item, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
@@ -753,45 +892,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         invoice = self.get_object()
         if invoice.fiscal_status != Invoice.FiscalStatus.ISSUED and invoice.fiscal_status != Invoice.FiscalStatus.CANCELLED:
             return Response({"detail": "No se puede generar PDF fiscal de una factura no emitida."}, status=status.HTTP_400_BAD_REQUEST)
-        from reportlab.lib.pagesizes import letter
-        from reportlab.lib.styles import getSampleStyleSheet
-        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table as PdfTable
-
-        stream = BytesIO()
-        doc = SimpleDocTemplate(stream, pagesize=letter, rightMargin=32, leftMargin=32, topMargin=32, bottomMargin=32)
-        styles = getSampleStyleSheet()
-        story = [
-            Paragraph(invoice.emitter_legal_name, styles["Title"]),
-            Paragraph(f"RTN: {invoice.emitter_rtn}", styles["Normal"]),
-            Paragraph(invoice.emitter_address, styles["Normal"]),
-            Spacer(1, 8),
-            Paragraph(f"FACTURA FISCAL: {invoice.fiscal_number}", styles["Heading2"]),
-            Paragraph(f"CAI: {invoice.cai}", styles["Normal"]),
-            Paragraph(f"Rango autorizado: {invoice.fiscal_range_start} a {invoice.fiscal_range_end}", styles["Normal"]),
-            Paragraph(f"Fecha limite de emision: {invoice.fiscal_expiration_date}", styles["Normal"]),
-            Spacer(1, 8),
-            Paragraph(f"Cliente: {invoice.customer_name}", styles["Normal"]),
-            Paragraph(f"RTN cliente: {invoice.customer_rtn or '-'}", styles["Normal"]),
-        ]
-        rows = [["Cant.", "Descripcion", "Precio", "Desc.", "ISV", "Total"]]
-        for item in invoice.items.filter(active=True):
-            rows.append([str(item.quantity), item.description, str(item.unit_price), str(item.discount_amount), str(item.tax_amount), str(item.line_total)])
-        story.extend([Spacer(1, 10), PdfTable(rows), Spacer(1, 10)])
-        totals = [
-            ["Importe exento", invoice.subtotal_exempt],
-            ["Importe exonerado", invoice.subtotal_exonerated],
-            ["Importe gravado 15%", invoice.subtotal_taxed_15],
-            ["Importe gravado 18%", invoice.subtotal_taxed_18],
-            ["ISV 15%", invoice.isv_15],
-            ["ISV 18%", invoice.isv_18],
-            ["Total", invoice.total_amount],
-        ]
-        story.append(PdfTable([[label, f"L {value}"] for label, value in totals]))
-        story.append(Spacer(1, 8))
-        story.append(Paragraph(invoice.amount_in_words or "", styles["Normal"]))
-        doc.build(story)
         log_audit_event(request=request, clinic=invoice.clinic, action=AuditLog.Action.DOWNLOAD, module=AuditLog.Module.BILLING, model_name="Invoice", object_id=invoice.id, object_repr=invoice.fiscal_number, description="PDF fiscal de factura descargado.")
-        response = HttpResponse(stream.getvalue(), content_type="application/pdf")
+        response = HttpResponse(render_invoice_pdf(invoice), content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="factura-fiscal-{invoice.fiscal_number}.pdf"'
         return response
 
@@ -799,7 +901,9 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     def pdf(self, request, pk=None):
         invoice = self.get_object()
         log_audit_event(request=request, clinic=invoice.clinic, action=AuditLog.Action.DOWNLOAD, module=AuditLog.Module.BILLING, model_name="Invoice", object_id=invoice.id, object_repr=invoice.invoice_number, description="PDF de factura solicitado.")
-        return Response({"detail": "La descarga PDF de factura aun no esta configurada."}, status=status.HTTP_501_NOT_IMPLEMENTED)
+        response = HttpResponse(render_invoice_pdf(invoice), content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="factura-{invoice.invoice_number}.pdf"'
+        return response
 
 
 class PaymentViewSet(viewsets.ModelViewSet):
@@ -833,44 +937,63 @@ class PaymentViewSet(viewsets.ModelViewSet):
         if not can_manage_billing(request.user):
             return Response({"detail": "No tienes permiso para registrar pagos."}, status=status.HTTP_403_FORBIDDEN)
         try:
-            payload = request.data.copy()
-            invoice_id = kwargs.get("invoice_pk") or payload.get("invoice") or payload.get("invoice_id")
-            with transaction.atomic():
-                if invoice_id:
-                    invoice = scope(request, Invoice.objects.select_for_update()).get(pk=invoice_id)
-                    payload["invoice"] = invoice.id
-                serializer = PaymentCreateSerializer(data=payload, context={"request": request})
-                serializer.is_valid(raise_exception=True)
-                payment = serializer.save()
+            invoice_id = kwargs.get("invoice_pk") or request.data.get("invoice") or request.data.get("invoice_id")
+            invoice = scope(request, Invoice.objects.all()).get(pk=invoice_id)
+            key = request_idempotency_key(request)
+            payment, created = register_invoice_payment(
+                invoice=invoice,
+                user=request.user,
+                payload=request.data,
+                request=request,
+                idempotency_key=key,
+            )
         except Invoice.DoesNotExist:
             return Response({"detail": "Factura no encontrada."}, status=status.HTTP_404_NOT_FOUND)
         except DjangoValidationError as exc:
             return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
-        log_audit_event(request=request, clinic=payment.clinic, action=AuditLog.Action.PAYMENT, module=AuditLog.Module.PAYMENTS, model_name="Payment", object_id=payment.id, object_repr=payment.payment_number, description="Pago registrado.", new_values={"amount": str(payment.amount), "method": payment.method, "invoice": payment.invoice_id})
-        if payment.patient.user:
+        if created:
+            log_audit_event(request=request, clinic=payment.clinic, action=AuditLog.Action.PAYMENT, module=AuditLog.Module.PAYMENTS, model_name="Payment", object_id=payment.id, object_repr=payment.payment_number, description="Pago registrado.", new_values={"amount": str(payment.amount), "method": payment.method, "invoice": payment.invoice_id, "balance_before": str(payment.balance_before), "balance_after": str(payment.balance_after)})
+        else:
+            log_audit_event(request=request, clinic=payment.clinic, action=AuditLog.Action.VIEW, module=AuditLog.Module.PAYMENTS, model_name="Payment", object_id=payment.id, object_repr=payment.payment_number, description="Pago duplicado evitado mediante idempotencia.")
+        if created and payment.patient.user:
             create_notification(payment.patient.user, "Pago registrado", f"Se registro un pago por L {payment.amount}.", clinic=payment.clinic, notification_type=Notification.Type.SUCCESS, module=Notification.Module.PAYMENTS, priority=Notification.Priority.NORMAL, related_model="Payment", related_object_id=payment.id, action_url="/patient/payments")
-        return Response(PaymentDetailSerializer(payment).data, status=status.HTTP_201_CREATED)
+        data = PaymentDetailSerializer(payment).data
+        data.update({"created": created, "message": "Pago registrado correctamente." if created else "La operacion ya habia sido procesada."})
+        return Response(data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
     @action(detail=True, methods=["patch"])
     def void(self, request, pk=None):
         if not can_manage_billing(request.user):
             return Response({"detail": "No tienes permiso para anular pagos."}, status=status.HTTP_403_FORBIDDEN)
         payment = self.get_object()
-        if payment.status == Payment.Status.ANULADO or not payment.active:
-            return Response({"detail": "El pago ya esta anulado."}, status=status.HTTP_400_BAD_REQUEST)
-        if payment.cash_session_id and payment.cash_session.status == CashSession.Status.CERRADA:
-            return Response({"detail": "No puedes anular un pago asociado a una caja cerrada. Registra un ajuste autorizado en una caja abierta."}, status=status.HTTP_400_BAD_REQUEST)
         serializer = PaymentVoidSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        payment.status = Payment.Status.ANULADO
-        payment.active = False
-        payment.cancelled_by = request.user
-        payment.cancelled_at = timezone.now()
-        payment.cancellation_reason = serializer.validated_data.get("reason", "")
-        payment.save(update_fields=["status", "active", "cancelled_by", "cancelled_at", "cancellation_reason"])
-        payment.invoice.recalculate()
-        log_audit_event(request=request, clinic=payment.clinic, action=AuditLog.Action.VOID, module=AuditLog.Module.PAYMENTS, model_name="Payment", object_id=payment.id, object_repr=payment.payment_number, description="Pago anulado.", new_values={"reason": payment.cancellation_reason})
-        return Response(PaymentDetailSerializer(payment).data)
+        try:
+            payment, voided = void_payment(payment=payment, user=request.user, reason=serializer.validated_data["reason"], request=request)
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+        if voided:
+            log_audit_event(request=request, clinic=payment.clinic, action=AuditLog.Action.VOID, module=AuditLog.Module.PAYMENTS, model_name="Payment", object_id=payment.id, object_repr=payment.payment_number, description="Pago anulado mediante reversion trazable.", new_values={"reason": payment.cancellation_reason})
+        data = PaymentDetailSerializer(payment).data
+        data.update({"voided": voided, "message": "Pago anulado correctamente." if voided else "El pago ya estaba anulado."})
+        return Response(data)
+
+    @action(detail=True, methods=["get"], url_path="receipt-pdf")
+    def receipt_pdf(self, request, pk=None):
+        payment = self.get_object()
+        log_audit_event(
+            request=request,
+            clinic=payment.clinic,
+            action=AuditLog.Action.DOWNLOAD,
+            module=AuditLog.Module.PAYMENTS,
+            model_name="Payment",
+            object_id=payment.id,
+            object_repr=payment.payment_number,
+            description="Recibo de pago descargado.",
+        )
+        response = HttpResponse(render_payment_receipt_pdf(payment), content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="recibo-{payment.payment_number}.pdf"'
+        return response
 
     @action(detail=False, methods=["get"], url_path="my-payments")
     def my_payments(self, request):
@@ -897,13 +1020,30 @@ class CashSessionViewSet(viewsets.ReadOnlyModelViewSet):
         serializer.is_valid(raise_exception=True)
         try:
             with transaction.atomic():
-                if CashSession.objects.select_for_update().filter(clinic=request.user.clinica, opened_by=request.user, status=CashSession.Status.ABIERTA).exists():
-                    return Response({"detail": "Ya tienes una caja abierta."}, status=status.HTTP_400_BAD_REQUEST)
+                from apps.clinics.models import Clinic
+
+                clinic = Clinic.objects.select_for_update().get(pk=request.user.clinica_id)
+                current = CashSession.objects.select_for_update().filter(clinic=clinic, opened_by=request.user, status=CashSession.Status.ABIERTA).first()
+                if current:
+                    return Response({"detail": "Ya tienes una sesion de caja abierta.", "cash_session_id": current.id}, status=status.HTTP_400_BAD_REQUEST)
                 session = CashSession.objects.create(clinic=request.user.clinica, opened_by=request.user, **serializer.validated_data)
+                if session.opening_amount > 0:
+                    CashMovement.objects.create(
+                        clinic=session.clinic,
+                        cash_session=session,
+                        movement_type=CashMovement.Type.APERTURA,
+                        amount=session.opening_amount,
+                        method=Payment.Method.EFECTIVO,
+                        idempotency_key=f"cash-open:{session.id}",
+                        reason="Monto inicial de apertura",
+                        created_by=request.user,
+                    )
         except DjangoValidationError as exc:
             return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
         log_audit_event(request=request, clinic=session.clinic, action=AuditLog.Action.CREATE, module=AuditLog.Module.CASH, model_name="CashSession", object_id=session.id, object_repr=f"Caja {session.id}", description="Caja abierta.", new_values=serializer.validated_data)
-        return Response(CashSessionDetailSerializer(session).data, status=status.HTTP_201_CREATED)
+        data = CashSessionDetailSerializer(session).data
+        data.update({"created": True, "message": "Caja abierta correctamente."})
+        return Response(data, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=["get"])
     def current(self, request):
@@ -917,6 +1057,10 @@ class CashSessionViewSet(viewsets.ReadOnlyModelViewSet):
         if not can_manage_billing(request.user):
             return Response({"detail": "No tienes permiso para cerrar caja."}, status=status.HTTP_403_FORBIDDEN)
         session = self.get_object()
+        if session.status == CashSession.Status.CERRADA:
+            data = CashSessionDetailSerializer(session).data
+            data.update({"closed": False, "message": "La caja ya estaba cerrada."})
+            return Response(data)
         serializer = CashSessionCloseSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
@@ -928,11 +1072,25 @@ class CashSessionViewSet(viewsets.ReadOnlyModelViewSet):
                 notes = serializer.validated_data.get("notes", "")
                 if difference != 0 and not notes.strip():
                     return Response({"notes": ["Debes agregar una nota cuando el arqueo tenga diferencia."]}, status=status.HTTP_400_BAD_REQUEST)
+                if serializer.validated_data["closing_amount"] > 0:
+                    CashMovement.objects.create(
+                        clinic=session.clinic,
+                        cash_session=session,
+                        movement_type=CashMovement.Type.CIERRE,
+                        amount=serializer.validated_data["closing_amount"],
+                        method=Payment.Method.EFECTIVO,
+                        idempotency_key=f"cash-close:{session.id}",
+                        reason="Efectivo contado al cierre",
+                        notes=notes,
+                        created_by=request.user,
+                    )
                 session.close(request.user, serializer.validated_data["closing_amount"], notes)
         except DjangoValidationError as exc:
             return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
         log_audit_event(request=request, clinic=session.clinic, action=AuditLog.Action.UPDATE, module=AuditLog.Module.CASH, model_name="CashSession", object_id=session.id, object_repr=f"Caja {session.id}", description="Caja cerrada.", new_values=serializer.validated_data)
-        return Response(CashSessionDetailSerializer(session).data)
+        data = CashSessionDetailSerializer(session).data
+        data.update({"closed": True, "message": "Caja cerrada correctamente."})
+        return Response(data)
 
     @action(detail=True, methods=["get", "post"])
     def movements(self, request, pk=None):
@@ -941,14 +1099,31 @@ class CashSessionViewSet(viewsets.ReadOnlyModelViewSet):
             return Response(CashMovementSerializer(session.movements.filter(active=True), many=True).data)
         if not can_manage_billing(request.user):
             return Response({"detail": "No tienes permiso para registrar movimientos."}, status=status.HTTP_403_FORBIDDEN)
-        serializer = CashMovementSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
         try:
-            movement = serializer.save(cash_session=session, created_by=request.user)
+            key = request_idempotency_key(request)
+            with transaction.atomic():
+                session = self.get_queryset().select_for_update().get(pk=session.pk)
+                if key:
+                    existing = CashMovement.objects.select_for_update().filter(clinic=session.clinic, idempotency_key=key).first()
+                    if existing:
+                        if existing.cash_session_id != session.id:
+                            return Response({"detail": "La clave de idempotencia ya fue usada en otra sesion."}, status=status.HTTP_409_CONFLICT)
+                        data = CashMovementSerializer(existing).data
+                        data.update({"created": False, "message": "La operacion ya habia sido procesada."})
+                        return Response(data)
+                payload = request.data.copy()
+                payload.pop("idempotency_key", None)
+                serializer = CashMovementSerializer(data=payload)
+                serializer.is_valid(raise_exception=True)
+                movement = serializer.save(cash_session=session, created_by=request.user, idempotency_key=key)
         except DjangoValidationError as exc:
             return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+        except IntegrityError:
+            return Response({"detail": "La operacion ya fue procesada o la informacion cambio."}, status=status.HTTP_409_CONFLICT)
         log_audit_event(request=request, clinic=movement.clinic, action=AuditLog.Action.CREATE, module=AuditLog.Module.CASH, model_name="CashMovement", object_id=movement.id, object_repr=movement.reason, description="Movimiento de caja registrado.", new_values=serializer.validated_data)
-        return Response(CashMovementSerializer(movement).data, status=status.HTTP_201_CREATED)
+        data = CashMovementSerializer(movement).data
+        data.update({"created": True, "message": "Movimiento registrado correctamente."})
+        return Response(data, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=["get"])
     def summary(self, request):

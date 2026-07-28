@@ -128,18 +128,18 @@ def calculate_fiscal_totals(invoice):
     discount = Decimal("0.00")
     subtotal = Decimal("0.00")
     for item in items:
-        item.save()
         base = money(item.quantity * item.unit_price)
         line_discount = money(item.discount_amount)
         net = money(max(base - line_discount, Decimal("0.00")))
+        tax_amount = money(net * (item.tax_rate / Decimal("100"))) if item.tax_type in [InvoiceItem.TaxType.TAXED_15, InvoiceItem.TaxType.TAXED_18] else Decimal("0.00")
         subtotal += base
         discount += line_discount
         if item.tax_type == InvoiceItem.TaxType.TAXED_15:
             subtotal_taxed_15 += net
-            isv_15 += item.tax_amount
+            isv_15 += tax_amount
         elif item.tax_type == InvoiceItem.TaxType.TAXED_18:
             subtotal_taxed_18 += net
-            isv_18 += item.tax_amount
+            isv_18 += tax_amount
         elif item.tax_type == InvoiceItem.TaxType.EXONERATED:
             subtotal_exonerated += net
         else:

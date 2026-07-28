@@ -48,8 +48,8 @@ class InvoiceItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = InvoiceItem
-        fields = ["id", "invoice", "item_type", "service", "service_name", "inventory_item", "inventory_item_name", "inventory_lot", "inventory_lot_number", "related_consultation", "related_consumption", "consumption", "description", "quantity", "unit_price", "discount_amount", "discount", "tax_type", "tax_rate", "subtotal", "tax_amount", "total", "line_total", "active", "creado_en", "actualizado_en"]
-        read_only_fields = ["id", "invoice", "subtotal", "tax_amount", "total", "line_total", "creado_en", "actualizado_en"]
+        fields = ["id", "invoice", "item_type", "service", "service_name", "inventory_item", "inventory_item_name", "inventory_lot", "inventory_lot_number", "related_consultation", "related_consumption", "consumption", "source_type", "source_id", "description", "quantity", "unit_price", "discount_amount", "discount", "tax_type", "tax_rate", "subtotal", "tax_amount", "total", "line_total", "active", "creado_en", "actualizado_en"]
+        read_only_fields = ["id", "invoice", "source_type", "source_id", "subtotal", "tax_amount", "total", "line_total", "creado_en", "actualizado_en"]
         extra_kwargs = {"description": {"required": False, "allow_blank": True}, "service": {"required": False, "allow_null": True}, "inventory_item": {"required": False, "allow_null": True}, "inventory_lot": {"required": False, "allow_null": True}, "related_consumption": {"required": False, "allow_null": True}}
 
     def validate(self, attrs):
@@ -112,7 +112,7 @@ class PaymentListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Payment
-        fields = ["id", "clinic", "invoice", "invoice_number", "patient", "patient_nombre", "cash_session", "payment_number", "payment_date", "amount", "method", "reference", "notes", "status", "received_by", "received_by_nombre", "active", "creado_en", "actualizado_en"]
+        fields = ["id", "clinic", "invoice", "invoice_number", "patient", "patient_nombre", "cash_session", "payment_number", "payment_date", "amount", "method", "reference", "notes", "status", "received_by", "received_by_nombre", "balance_before", "balance_after", "active", "creado_en", "actualizado_en"]
 
 
 class CreditNoteSerializer(serializers.ModelSerializer):
@@ -218,6 +218,10 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
         consumption_ids = [item["related_consumption"].id for item in value if item.get("related_consumption")]
         if len(consumption_ids) != len(set(consumption_ids)):
             raise serializers.ValidationError("No puedes agregar el mismo consumo mas de una vez.")
+        request = self.context.get("request")
+        if request and get_role_name(request.user) != "admin":
+            if any((item.get("discount_amount") or item.get("discount") or Decimal("0.00")) > 0 for item in value):
+                raise serializers.ValidationError("No tienes permiso para aplicar descuentos.")
         for item in value:
             service = item.get("service")
             if service and "patient" in self.initial_data:
@@ -324,13 +328,19 @@ class PaymentCreateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({"cash_session": "La caja debe pertenecer a la misma clinica."})
             if cash_session.status != CashSession.Status.ABIERTA:
                 raise serializers.ValidationError({"cash_session": "La caja seleccionada esta cerrada."})
+            if cash_session.opened_by_id != request.user.id:
+                raise serializers.ValidationError({"cash_session": "Solo puedes registrar operaciones en tu propia sesion de caja."})
         elif method == Payment.Method.EFECTIVO:
             cash_session = CashSession.objects.filter(clinic=invoice.clinic, opened_by=request.user, status=CashSession.Status.ABIERTA).first()
             if not cash_session:
                 raise serializers.ValidationError({"cash_session": "Debes abrir caja antes de registrar pagos en efectivo."})
             attrs["cash_session"] = cash_session
-        elif not str(attrs.get("reference", "")).strip():
-            raise serializers.ValidationError({"reference": "La referencia es obligatoria para pagos que no son en efectivo."})
+        else:
+            current_session = CashSession.objects.filter(clinic=invoice.clinic, opened_by=request.user, status=CashSession.Status.ABIERTA).first()
+            if current_session:
+                attrs["cash_session"] = current_session
+            if not str(attrs.get("reference", "")).strip():
+                raise serializers.ValidationError({"reference": "La referencia es obligatoria para pagos que no son en efectivo."})
         amount = attrs.get("amount")
         if amount is None or amount <= 0:
             raise serializers.ValidationError({"amount": "El monto debe ser mayor que cero."})
@@ -400,12 +410,23 @@ class CashMovementSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CashMovement
-        fields = ["id", "clinic", "cash_session", "movement_type", "amount", "reason", "notes", "created_by", "created_by_nombre", "active", "creado_en", "actualizado_en"]
-        read_only_fields = ["id", "clinic", "cash_session", "created_by", "creado_en", "actualizado_en"]
+        fields = ["id", "clinic", "cash_session", "payment", "invoice", "reversed_movement", "movement_type", "amount", "method", "reference", "idempotency_key", "reason", "notes", "created_by", "created_by_nombre", "active", "creado_en", "actualizado_en"]
+        read_only_fields = ["id", "clinic", "cash_session", "payment", "invoice", "reversed_movement", "created_by", "creado_en", "actualizado_en"]
+        extra_kwargs = {"idempotency_key": {"write_only": True, "required": False, "allow_null": True}}
 
     def validate_amount(self, value):
         if value <= 0:
             raise serializers.ValidationError("El monto debe ser mayor que cero.")
+        return value
+
+    def validate_reason(self, value):
+        if len(value.strip()) < 5:
+            raise serializers.ValidationError("Indica un motivo claro de al menos 5 caracteres.")
+        return value.strip()
+
+    def validate_movement_type(self, value):
+        if value not in [CashMovement.Type.INGRESO, CashMovement.Type.EGRESO]:
+            raise serializers.ValidationError("Solo se permiten ingresos o egresos manuales desde esta operacion.")
         return value
 
 

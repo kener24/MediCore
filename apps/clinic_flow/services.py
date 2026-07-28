@@ -346,27 +346,76 @@ def send_to_billing(visit, *, user, request=None):
     return visit
 
 
+@transaction.atomic
 def register_payment(visit, *, user, request=None):
     _assert_role(user, CASHIER_ROLES, "No tienes permiso para registrar pago de visita.")
+    visit = PatientVisit.objects.select_for_update().select_related("clinic", "invoice", "consultation").get(pk=visit.pk)
+    _assert_clinic(user, visit.clinic)
     if not visit.invoice_id:
         raise ValidationError("No hay factura para esta visita.")
     if visit.invoice.status not in [Invoice.Status.PAGADA, Invoice.Status.PARCIAL]:
         raise ValidationError("La factura no tiene pagos aplicados.")
-    old = visit.status
-    visit.touch_status(PatientVisit.Status.PAID, user=user)
-    _audit(request, visit, AuditLog.Action.PAYMENT, "Pago registrado en visita.", old)
+    sync_visit_financial_state(visit.invoice, user=user, request=request)
+    visit.refresh_from_db()
     return visit
 
 
+@transaction.atomic
 def complete_visit(visit, *, user, request=None):
     _assert_role(user, CASHIER_ROLES | RECEPTION_ROLES, "No tienes permiso para completar visita.")
+    visit = PatientVisit.objects.select_for_update().select_related("clinic", "invoice", "consultation").get(pk=visit.pk)
+    _assert_clinic(user, visit.clinic)
+    if visit.status == PatientVisit.Status.COMPLETED:
+        return visit, False
+    if visit.status == PatientVisit.Status.CANCELLED:
+        raise ValidationError("No puedes completar una visita cancelada.")
     workflow = get_or_create_workflow_settings(visit.clinic)
-    if workflow.billing_after_consultation and visit.invoice_id and visit.invoice.balance_due > 0:
-        raise ValidationError("No puedes completar una visita con factura pendiente.")
+    if not visit.consultation_id or visit.consultation.status != ClinicalConsultation.Status.FINALIZADA:
+        raise ValidationError("La consulta debe estar finalizada antes de completar la visita.")
+    if workflow.billing_after_consultation:
+        if not visit.invoice_id:
+            raise ValidationError("No puedes completar una visita sin factura.")
+        if visit.invoice.balance_due > 0 or visit.invoice.status != Invoice.Status.PAGADA:
+            raise ValidationError("No puedes completar una visita con factura pendiente.")
     old = visit.status
     visit.touch_status(PatientVisit.Status.COMPLETED, user=user)
     _audit(request, visit, AuditLog.Action.COMPLETE, "Visita completada.", old)
-    return visit
+    return visit, True
+
+
+@transaction.atomic
+def sync_visit_financial_state(invoice, *, user, request=None):
+    invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
+    visits = list(
+        PatientVisit.objects.select_for_update()
+        .select_related("clinic", "invoice", "consultation")
+        .filter(invoice=invoice)
+    )
+    for visit in visits:
+        _assert_clinic(user, visit.clinic)
+        if visit.status == PatientVisit.Status.CANCELLED:
+            continue
+        old = visit.status
+        if invoice.balance_due > 0 or invoice.status != Invoice.Status.PAGADA:
+            visit.status = PatientVisit.Status.WAITING_PAYMENT
+            visit.active = True
+            visit.completed_at = None
+            visit.checkout_at = None
+            visit.billing_started_at = visit.billing_started_at or timezone.now()
+            visit.save(update_fields=["status", "active", "completed_at", "checkout_at", "billing_started_at", "actualizado_en"])
+            if old != visit.status:
+                _audit(request, visit, AuditLog.Action.PAYMENT, "Visita pendiente de completar pago.", old, {"invoice": invoice.id, "balance": str(invoice.balance_due)})
+            continue
+
+        if not visit.consultation_id or visit.consultation.status != ClinicalConsultation.Status.FINALIZADA:
+            continue
+        visit.touch_status(PatientVisit.Status.PAID, user=user)
+        if old != visit.status:
+            _audit(request, visit, AuditLog.Action.PAYMENT, "Factura de visita pagada.", old, {"invoice": invoice.id, "balance": "0.00"})
+        workflow = get_or_create_workflow_settings(visit.clinic)
+        if workflow.auto_complete_visit_after_payment:
+            complete_visit(visit, user=user, request=request)
+    return visits
 
 
 @transaction.atomic

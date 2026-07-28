@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Case, IntegerField, Q, Value, When
 from django.utils import timezone
@@ -21,8 +19,8 @@ from apps.admissions.serializers import (
 from apps.appointments.models import Appointment
 from apps.audit.models import AuditLog
 from apps.audit.services import log_audit_event
-from apps.billing.models import Invoice, InvoiceItem
 from apps.clinic_flow import services as flow
+from apps.billing.services import get_or_create_visit_invoice
 from apps.billing.serializers import InvoiceDetailSerializer
 from apps.clinic_settings.models import get_or_create_workflow_settings
 from apps.medical_records.models import ClinicalConsultation, MedicalRecord, VitalSigns
@@ -300,7 +298,7 @@ class PatientVisitViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"], url_path="pending-billing")
     def pending_billing(self, request):
-        queryset = self.get_queryset().filter(status=PatientVisit.Status.WAITING_BILLING)
+        queryset = self.get_queryset().filter(status__in=[PatientVisit.Status.WAITING_BILLING, PatientVisit.Status.WAITING_PAYMENT])
         return Response(PatientVisitSerializer(queryset, many=True).data)
 
     @action(detail=True, methods=["patch", "post"], url_path="send-to-triage")
@@ -350,23 +348,30 @@ class PatientVisitViewSet(viewsets.ModelViewSet):
         if get_role_name(request.user) not in BILLING_ROLES:
             return Response({"detail": "No tienes permiso para generar factura desde visita."}, status=status.HTTP_403_FORBIDDEN)
         visit = self.get_object()
-        if visit.invoice_id:
-            return Response({"detail": "Esta visita ya tiene factura generada."}, status=status.HTTP_400_BAD_REQUEST)
-        if visit.status != PatientVisit.Status.WAITING_BILLING:
-            return Response({"detail": "La visita debe estar pendiente de cobro."}, status=status.HTTP_400_BAD_REQUEST)
-        invoice = Invoice.objects.create(clinic=visit.clinic, patient=visit.patient, appointment=visit.appointment, consultation=visit.consultation, created_by=request.user, notes=f"Factura generada desde visita {visit.visit_number}")
-        for consumption in visit.patient.clinical_supply_usages.filter(clinic=visit.clinic, billable=True, invoiced=False, active=True).exclude(status="cancelled"):
-            if visit.consultation_id and consumption.consultation_id and consumption.consultation_id != visit.consultation_id:
-                continue
-            item = InvoiceItem.objects.create(invoice=invoice, related_consumption=consumption, description=consumption.description, quantity=consumption.quantity, unit_price=consumption.unit_price)
-            consumption.invoiced = True
-            consumption.invoice = invoice
-            consumption.invoice_item = item
-            consumption.status = "invoiced"
-            consumption.save(update_fields=["invoiced", "invoice", "invoice_item", "status", "actualizado_en"])
-        if not invoice.items.filter(active=True).exists():
-            InvoiceItem.objects.create(invoice=invoice, item_type=InvoiceItem.Type.MANUAL, description=visit.reason or "Atencion medica", quantity=1, unit_price=Decimal("0.00"))
-        visit.invoice = invoice
-        visit.save(update_fields=["invoice", "actualizado_en"])
-        log_audit_event(request=request, clinic=visit.clinic, action=AuditLog.Action.CREATE, module=AuditLog.Module.BILLING, model_name="Invoice", object_id=invoice.id, object_repr=invoice.invoice_number, description="Factura generada desde visita.", new_values={"visit": visit.id})
-        return Response(InvoiceDetailSerializer(invoice).data, status=status.HTTP_201_CREATED)
+        try:
+            invoice, created = get_or_create_visit_invoice(visit=visit, user=request.user, request=request)
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+        data = InvoiceDetailSerializer(invoice).data
+        data.update(
+            {
+                "success": True,
+                "invoice_id": invoice.id,
+                "created": created,
+                "message": "Factura creada desde la visita." if created else "La visita ya tiene una factura asociada.",
+            }
+        )
+        return Response(data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="complete-billing")
+    def complete_billing(self, request, pk=None):
+        if get_role_name(request.user) not in BILLING_ROLES:
+            return Response({"detail": "No tienes permiso para completar la visita."}, status=status.HTTP_403_FORBIDDEN)
+        visit = self.get_object()
+        try:
+            visit, completed = flow.complete_visit(visit, user=request.user, request=request)
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+        data = PatientVisitSerializer(visit).data
+        data.update({"completed": completed, "message": "Visita completada." if completed else "La visita ya fue completada."})
+        return Response(data)

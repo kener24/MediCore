@@ -380,6 +380,8 @@ class InvoiceItem(TimeStampedModel):
     related_consultation = models.ForeignKey("medical_records.ClinicalConsultation", on_delete=models.SET_NULL, null=True, blank=True, related_name="invoice_items")
     related_consumption = models.ForeignKey("medical_records.ClinicalSupplyUsage", on_delete=models.SET_NULL, null=True, blank=True, related_name="invoice_items")
     inventory_movement = models.ForeignKey("inventory.InventoryMovement", on_delete=models.SET_NULL, null=True, blank=True, related_name="invoice_items")
+    source_type = models.CharField(max_length=50, null=True, blank=True, default=None)
+    source_id = models.CharField(max_length=80, null=True, blank=True, default=None)
     description = models.CharField(max_length=250)
     quantity = models.DecimalField(max_digits=10, decimal_places=2, default=1)
     unit_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -393,11 +395,18 @@ class InvoiceItem(TimeStampedModel):
     line_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     active = models.BooleanField(default=True)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["invoice", "source_type", "source_id"], name="unique_invoice_item_source"),
+        ]
+
     def clean(self):
         if self.invoice_id and self.invoice.fiscal_status == Invoice.FiscalStatus.ISSUED:
             raise ValidationError("No puedes modificar items de una factura fiscal emitida.")
         if self.invoice_id and self.invoice.status in [Invoice.Status.PAGADA, Invoice.Status.ANULADA]:
             raise ValidationError("No puedes modificar items de una factura pagada o anulada.")
+        if self.invoice_id and self.invoice.paid_amount > 0:
+            raise ValidationError("No puedes modificar conceptos de una factura que ya tiene pagos aplicados.")
         if self.item_type == self.Type.SERVICE and not self.service_id:
             raise ValidationError("Los items de servicio requieren un servicio.")
         if self.item_type in [self.Type.INVENTORY_ITEM, self.Type.MEDICATION, self.Type.SUPPLY] and not self.inventory_item_id:
@@ -434,6 +443,8 @@ class InvoiceItem(TimeStampedModel):
                 self.tax_rate = self.service.tax_rate
         if self.related_consumption_id:
             self.item_type = self.Type.CONSUMPTION
+            self.source_type = "clinical_consumption"
+            self.source_id = str(self.related_consumption_id)
             self.inventory_item = self.related_consumption.inventory_item
             self.inventory_lot = self.related_consumption.inventory_lot
             self.related_consultation = self.related_consumption.consultation
@@ -547,10 +558,16 @@ class Payment(TimeStampedModel):
     cancelled_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="payments_cancelled")
     cancelled_at = models.DateTimeField(null=True, blank=True)
     cancellation_reason = models.TextField(blank=True)
+    idempotency_key = models.CharField(max_length=100, null=True, blank=True, default=None)
+    balance_before = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    balance_after = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     active = models.BooleanField(default=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["clinic", "payment_number"], name="unique_payment_number_per_clinic")]
+        constraints = [
+            models.UniqueConstraint(fields=["clinic", "payment_number"], name="unique_payment_number_per_clinic"),
+            models.UniqueConstraint(fields=["clinic", "idempotency_key"], name="unique_payment_idempotency_per_clinic"),
+        ]
 
     @classmethod
     def next_payment_number(cls, clinic):
@@ -562,11 +579,18 @@ class Payment(TimeStampedModel):
         if self.amount <= 0:
             raise ValidationError("El pago debe ser mayor que cero.")
         if self.invoice_id:
+            if self.clinic_id and self.invoice.clinic_id != self.clinic_id:
+                raise ValidationError("La factura y el pago deben pertenecer a la misma clinica.")
             if self.invoice.status == Invoice.Status.ANULADA:
                 raise ValidationError("No se puede pagar una factura anulada.")
             balance = self.invoice.balance_due
             if not self.pk and self.amount > balance:
                 raise ValidationError("El pago no puede ser mayor al saldo pendiente.")
+        if self.cash_session_id:
+            if self.cash_session.clinic_id != self.invoice.clinic_id:
+                raise ValidationError("La caja y la factura deben pertenecer a la misma clinica.")
+            if self.cash_session.status != CashSession.Status.ABIERTA and self.status == self.Status.APLICADO:
+                raise ValidationError("No se puede aplicar un pago en una caja cerrada.")
 
     def save(self, *args, **kwargs):
         if self.invoice_id:
@@ -582,23 +606,44 @@ class Payment(TimeStampedModel):
 
 class CashMovement(TimeStampedModel):
     class Type(models.TextChoices):
+        APERTURA = "apertura", "Apertura"
+        PAGO = "pago", "Pago"
         INGRESO = "ingreso", "Ingreso"
         EGRESO = "egreso", "Egreso"
+        REVERSO = "reverso", "Reverso"
+        AJUSTE = "ajuste", "Ajuste"
+        CIERRE = "cierre", "Cierre"
 
     clinic = models.ForeignKey("clinics.Clinic", on_delete=models.PROTECT, related_name="cash_movements")
     cash_session = models.ForeignKey(CashSession, on_delete=models.CASCADE, related_name="movements")
+    payment = models.OneToOneField(Payment, on_delete=models.PROTECT, null=True, blank=True, related_name="cash_movement")
+    invoice = models.ForeignKey(Invoice, on_delete=models.PROTECT, null=True, blank=True, related_name="cash_movements")
+    reversed_movement = models.ForeignKey("self", on_delete=models.PROTECT, null=True, blank=True, related_name="reversal_movements")
     movement_type = models.CharField(max_length=20, choices=Type.choices)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
+    method = models.CharField(max_length=30, choices=Payment.Method.choices, blank=True)
+    reference = models.CharField(max_length=120, blank=True)
+    idempotency_key = models.CharField(max_length=100, null=True, blank=True, default=None)
     reason = models.CharField(max_length=180)
     notes = models.TextField(blank=True)
     created_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="cash_movements_created")
     active = models.BooleanField(default=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["clinic", "idempotency_key"], name="unique_cash_movement_idempotency_per_clinic"),
+        ]
 
     def clean(self):
         if self.amount <= 0:
             raise ValidationError("El movimiento debe ser mayor que cero.")
         if self.cash_session_id and self.cash_session.status != CashSession.Status.ABIERTA:
             raise ValidationError("No se puede registrar movimiento en caja cerrada.")
+        if self.payment_id:
+            if self.payment.clinic_id != self.cash_session.clinic_id or self.payment.invoice_id != self.invoice_id:
+                raise ValidationError("El pago, la factura y la caja deben pertenecer al mismo contexto.")
+        if self.invoice_id and self.invoice.clinic_id != self.cash_session.clinic_id:
+            raise ValidationError("La factura y la caja deben pertenecer a la misma clinica.")
 
     def save(self, *args, **kwargs):
         if self.cash_session_id:

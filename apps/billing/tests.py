@@ -91,7 +91,7 @@ class BillingModuleTests(APITestCase):
         self.assertEqual(inv.total_amount, Decimal("500.00"))
 
     def test_crear_factura_con_items_anidados(self):
-        self.auth(self.rec)
+        self.auth(self.admin)
         service = BillableService.objects.create(clinic=self.clinic, name="Consulta", price=Decimal("500.00"), taxable=True, tax_rate=Decimal("15.00"))
         res = self.client.post(
             "/api/billing/invoices/",

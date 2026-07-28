@@ -312,7 +312,9 @@ class AdmissionsFlowTests(APITestCase):
         usage.refresh_from_db()
         self.assertTrue(usage.invoiced)
         duplicate = self.client.post(f"/api/billing/visits/{visit.id}/generate-invoice/")
-        self.assertEqual(duplicate.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(duplicate.status_code, status.HTTP_200_OK)
+        self.assertFalse(duplicate.data["created"])
+        self.assertEqual(duplicate.data["id"], res.data["id"])
 
     def test_usuario_no_ve_visitas_de_otra_clinica(self):
         visit = PatientVisit.objects.create(clinic=self.other_clinic, patient=self.other_patient, medical_record=MedicalRecord.objects.create(patient=self.other_patient), reason="X")

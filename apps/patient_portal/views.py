@@ -15,7 +15,7 @@ from apps.audit.models import AuditLog
 from apps.audit.services import log_audit_event
 from apps.billing.models import CreditNote, Invoice, Payment
 from apps.billing.serializers import InvoiceDetailSerializer, InvoiceListSerializer, PaymentDetailSerializer, PaymentListSerializer
-from apps.billing.views import render_credit_note_pdf
+from apps.billing.views import render_credit_note_pdf, render_payment_receipt_pdf
 from apps.clinic_settings.models import get_or_create_clinic_settings
 from apps.doctors.models import DoctorProfile, MedicalSpecialty
 from apps.medical_records.models import ClinicalConsultation, MedicalRecord
@@ -359,6 +359,29 @@ class PatientPortalPaymentsView(PatientPortalBaseView):
                 return Response({"detail": "Pago no encontrado."}, status=status.HTTP_404_NOT_FOUND)
             return Response(PaymentDetailSerializer(payment).data)
         return Response(PaymentListSerializer(qs, many=True).data)
+
+
+class PatientPortalPaymentReceiptView(PatientPortalBaseView):
+    def get(self, request, payment_id):
+        if not self.clinic_settings.allow_patient_invoice_view:
+            return portal_denied()
+        payment = (
+            Payment.objects.filter(
+                id=payment_id,
+                patient=self.patient,
+                clinic=self.patient.clinic,
+                active=True,
+                status=Payment.Status.APLICADO,
+            )
+            .select_related("clinic", "invoice", "patient", "received_by")
+            .first()
+        )
+        if not payment:
+            return Response({"detail": "Pago no encontrado."}, status=status.HTTP_404_NOT_FOUND)
+        log_audit_event(request=request, clinic=payment.clinic, action=AuditLog.Action.DOWNLOAD, module=AuditLog.Module.PAYMENTS, model_name="Payment", object_id=payment.id, object_repr=payment.payment_number, description="Paciente descargo recibo de pago.")
+        response = HttpResponse(render_payment_receipt_pdf(payment), content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="recibo-{payment.payment_number}.pdf"'
+        return response
 
 
 class PatientPortalInvoiceFiscalPdfView(PatientPortalBaseView):

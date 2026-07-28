@@ -17,6 +17,9 @@ export type CashierPayment = {
   paid_at?: string;
   payment_date?: string;
   created_at?: string;
+  payment_number?: string;
+  balance_before?: number | string;
+  balance_after?: number | string;
 };
 
 export type RegisterPaymentPayload = {

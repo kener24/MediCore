@@ -1,6 +1,6 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
@@ -11,7 +11,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { colors } from '@/core/theme/colors';
 import { formatDateTime } from '@/core/utils/dateUtils';
 import { formatCurrency } from '@/core/utils/moneyUtils';
-import { getPatientPayment } from '@/features/patient/services/patientPaymentsService';
+import { getPatientPayment, sharePatientPaymentReceipt } from '@/features/patient/services/patientPaymentsService';
 import type { PatientPayment } from '@/features/patient/types/patientPayments.types';
 
 export function PatientPaymentDetailScreen() {
@@ -23,6 +23,7 @@ export function PatientPaymentDetailScreen() {
   const [payment, setPayment] = useState<PatientPayment | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [sharing, setSharing] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -46,6 +47,18 @@ export function PatientPaymentDetailScreen() {
   if (loading) return <LoadingState label="Cargando pago..." />;
   if (error || !payment) return <ErrorState message={error || 'No hay información disponible.'} onRetry={load} />;
 
+  async function openReceipt() {
+    if (sharing) return;
+    setSharing(true);
+    try {
+      await sharePatientPaymentReceipt(id, payment?.payment_number);
+    } catch (err) {
+      Alert.alert('Recibo', err instanceof Error ? err.message : 'No se pudo abrir el recibo.');
+    } finally {
+      setSharing(false);
+    }
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -66,6 +79,7 @@ export function PatientPaymentDetailScreen() {
             <Text style={styles.text}>{payment.notes}</Text>
           </AppCard>
         ) : null}
+        <AppButton label="Abrir recibo PDF" loading={sharing} onPress={openReceipt} />
       </ScrollView>
     </SafeAreaView>
   );

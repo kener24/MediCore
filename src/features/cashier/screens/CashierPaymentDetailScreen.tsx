@@ -1,6 +1,6 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
@@ -12,7 +12,7 @@ import { toPositiveId } from '@/core/utils/idUtils';
 import { CashierHeader } from '@/features/cashier/components/CashierHeader';
 import { PaymentMethodBadge } from '@/features/cashier/components/PaymentMethodBadge';
 import { PaymentStatusBadge } from '@/features/cashier/components/PaymentStatusBadge';
-import { getPaymentDetail } from '@/features/cashier/services/cashierPaymentService';
+import { getPaymentDetail, sharePaymentReceipt } from '@/features/cashier/services/cashierPaymentService';
 import type { CashierPayment } from '@/features/cashier/types/cashierPayment.types';
 import { formatCurrency, formatDateTime } from '@/features/cashier/types/commonCashier.types';
 
@@ -25,6 +25,7 @@ export function CashierPaymentDetailScreen() {
   const [payment, setPayment] = useState<CashierPayment | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [sharing, setSharing] = useState(false);
 
   const load = useCallback(async () => {
     if (!paymentId) {
@@ -48,6 +49,18 @@ export function CashierPaymentDetailScreen() {
   if (loading) return <LoadingState label="Cargando pago..." />;
   if (error || !payment) return <ErrorState message={error || 'Pago no disponible.'} onRetry={() => void load()} title="Pago no disponible" />;
 
+  async function openReceipt() {
+    if (!paymentId || sharing) return;
+    setSharing(true);
+    try {
+      await sharePaymentReceipt(paymentId, payment?.payment_number);
+    } catch (err) {
+      Alert.alert('Recibo', err instanceof Error ? err.message : 'No se pudo abrir el recibo.');
+    } finally {
+      setSharing(false);
+    }
+  }
+
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -62,7 +75,10 @@ export function CashierPaymentDetailScreen() {
           <Text style={styles.meta}>Referencia: {payment.reference ?? 'No registrada'}</Text>
           <Text style={styles.meta}>Recibido por: {payment.received_by_name ?? 'No indicado'}</Text>
           <Text style={styles.meta}>Notas: {payment.notes ?? 'Sin notas'}</Text>
+          <Text style={styles.meta}>Saldo anterior: {formatCurrency(payment.balance_before)}</Text>
+          <Text style={styles.meta}>Saldo posterior: {formatCurrency(payment.balance_after)}</Text>
         </AppCard>
+        <AppButton label="Abrir recibo PDF" loading={sharing} onPress={openReceipt} />
         {invoiceId ? <AppButton label="Volver a factura" onPress={() => navigation.navigate('CashierInvoiceDetail', { invoiceId })} /> : null}
         <AppButton label="Volver" onPress={() => navigation.goBack()} variant="secondary" />
       </ScrollView>

@@ -1,12 +1,12 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert, StyleSheet } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
+import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen';
 import { colors } from '@/core/theme/colors';
 import { CashierHeader } from '@/features/cashier/components/CashierHeader';
 import { InvoiceTotalsCard } from '@/features/cashier/components/InvoiceTotalsCard';
@@ -32,6 +32,7 @@ export function CashierRegisterPaymentScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [requestKey, setRequestKey] = useState('');
 
   const load = useCallback(async () => {
     if (!params.invoiceId) {
@@ -47,6 +48,7 @@ export function CashierRegisterPaymentScreen() {
       setCashSession(session);
       const balance = numericValue(data.balance_due ?? data.balance);
       setAmount(balance > 0 ? balance.toFixed(2) : '');
+      setRequestKey((current) => current || `mobile-payment-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar la factura.');
     } finally {
@@ -62,6 +64,8 @@ export function CashierRegisterPaymentScreen() {
     const validation = validate();
     if (validation) return Alert.alert('Pago', validation);
     setSaving(true);
+    const idempotencyKey = requestKey || `mobile-payment-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    setRequestKey(idempotencyKey);
     try {
       const payment = await registerPayment(params.invoiceId, {
         amount: Number(amount),
@@ -70,7 +74,8 @@ export function CashierRegisterPaymentScreen() {
         method,
         notes: notes.trim(),
         reference: reference.trim(),
-      });
+      }, idempotencyKey);
+      setRequestKey('');
       Alert.alert('Pago', 'Pago registrado correctamente.', [
         { text: 'Ver factura', onPress: () => navigation.navigate('CashierInvoiceDetail', { invoiceId: params.invoiceId }) },
         { text: 'Ver pago', onPress: () => payment?.id ? navigation.navigate('CashierPaymentDetail', { invoiceId: params.invoiceId, paymentId: payment.id }) : navigation.navigate('CashierInvoiceDetail', { invoiceId: params.invoiceId }) },
@@ -101,9 +106,7 @@ export function CashierRegisterPaymentScreen() {
   const currency = invoice.currency ?? 'L';
 
   return (
-    <SafeAreaView edges={['top']} style={styles.safe}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboard}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <KeyboardAwareScreen contentContainerStyle={styles.content}>
           <CashierHeader subtitle="Registra un pago total o parcial." title="Registrar pago" />
           <InvoiceTotalsCard invoice={invoice} />
           <AppCard>
@@ -127,14 +130,10 @@ export function CashierRegisterPaymentScreen() {
             />
           </AppCard>
           <AppButton label="Cancelar" onPress={() => navigation.goBack()} variant="secondary" />
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+    </KeyboardAwareScreen>
   );
 }
 
 const styles = StyleSheet.create({
   content: { gap: 14, padding: 18, paddingBottom: 140 },
-  keyboard: { flex: 1 },
-  safe: { backgroundColor: colors.background, flex: 1 },
 });

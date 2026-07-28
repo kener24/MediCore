@@ -1,6 +1,6 @@
 export type CashSessionStatus = 'abierta' | 'cerrada' | string;
 
-export type CashMovementType = 'ingreso' | 'egreso';
+export type CashMovementType = 'apertura' | 'pago' | 'ingreso' | 'egreso' | 'reverso' | 'ajuste' | 'cierre';
 
 export type CashMovement = {
   id?: number;
@@ -59,7 +59,7 @@ export type CloseCashSessionPayload = {
 };
 
 export type CreateCashMovementPayload = {
-  movement_type: CashMovementType;
+  movement_type: Extract<CashMovementType, 'ingreso' | 'egreso'>;
   amount: number | string;
   reason: string;
   notes?: string;

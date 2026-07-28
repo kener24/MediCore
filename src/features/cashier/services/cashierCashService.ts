@@ -31,7 +31,7 @@ export async function closeCashSession(sessionId: number | string, payload: Clos
   return data;
 }
 
-export async function createCashMovement(sessionId: number | string, payload: CreateCashMovementPayload): Promise<CashMovement> {
-  const { data } = await apiClient.post<CashMovement>(`/billing/cash-sessions/${sessionId}/movements/`, payload);
+export async function createCashMovement(sessionId: number | string, payload: CreateCashMovementPayload, idempotencyKey: string): Promise<CashMovement> {
+  const { data } = await apiClient.post<CashMovement>(`/billing/cash-sessions/${sessionId}/movements/`, payload, { headers: { 'Idempotency-Key': idempotencyKey } });
   return data;
 }

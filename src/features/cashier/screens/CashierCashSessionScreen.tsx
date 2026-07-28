@@ -1,7 +1,6 @@
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
@@ -9,11 +8,12 @@ import { AppInput } from '@/components/AppInput';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
+import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen';
 import { colors } from '@/core/theme/colors';
 import { isNonNegativeMoney, isPositiveMoney } from '@/core/utils/formValidation';
 import { CashierHeader } from '@/features/cashier/components/CashierHeader';
 import { closeCashSession, createCashMovement, getCashSessions, getCashSummary, getCurrentCashSession, openCashSession } from '@/features/cashier/services/cashierCashService';
-import type { CashMovementType, CashSession, CashSummary } from '@/features/cashier/types/cashierCash.types';
+import type { CashSession, CashSummary } from '@/features/cashier/types/cashierCash.types';
 import { formatCurrency, formatDateTime, numericValue } from '@/features/cashier/types/commonCashier.types';
 
 type Mode = 'open' | 'close' | 'ingreso' | 'egreso';
@@ -31,6 +31,7 @@ export function CashierCashSessionScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [requestKey, setRequestKey] = useState('');
 
   const load = useCallback(async (refresh = false) => {
     if (refresh) setRefreshing(true);
@@ -73,6 +74,8 @@ export function CashierCashSessionScreen() {
     }
 
     setSaving(true);
+    const idempotencyKey = requestKey || `mobile-cash-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    setRequestKey(idempotencyKey);
     try {
       if (mode === 'open') {
         await openCashSession({ opening_amount: value, notes: notes.trim() });
@@ -81,11 +84,12 @@ export function CashierCashSessionScreen() {
         await closeCashSession(current.id, { closing_amount: value, notes: notes.trim() });
         Alert.alert('Caja', 'Caja cerrada correctamente.');
       } else if ((mode === 'ingreso' || mode === 'egreso') && current?.id) {
-        await createCashMovement(current.id, { amount: value, movement_type: mode as CashMovementType, notes: notes.trim(), reason: reason.trim() });
+        await createCashMovement(current.id, { amount: value, movement_type: mode, notes: notes.trim(), reason: reason.trim() }, idempotencyKey);
         Alert.alert('Caja', 'Movimiento registrado correctamente.');
       }
       setReason('');
       setNotes('');
+      setRequestKey('');
       await load(true);
     } catch (err) {
       Alert.alert('Caja', err instanceof Error ? err.message : 'No se pudo guardar la operación.');
@@ -98,6 +102,7 @@ export function CashierCashSessionScreen() {
     setMode(nextMode);
     setReason('');
     setNotes('');
+    setRequestKey(`mobile-cash-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
     if (nextMode === 'close') setAmount(String(current?.expected_amount_live ?? current?.expected_amount ?? '0.00'));
     if (nextMode === 'open') setAmount('0.00');
     if (nextMode === 'ingreso' || nextMode === 'egreso') setAmount('0.00');
@@ -110,9 +115,7 @@ export function CashierCashSessionScreen() {
   const difference = mode === 'close' ? closing - expected : 0;
 
   return (
-    <SafeAreaView edges={['top']} style={styles.safe}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboard}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl onRefresh={() => void load(true)} refreshing={refreshing} />}>
+    <KeyboardAwareScreen contentContainerStyle={styles.content} refreshControl={<RefreshControl onRefresh={() => void load(true)} refreshing={refreshing} />}>
           <CashierHeader subtitle="Apertura, cobros en efectivo, movimientos y cierre." title="Caja y arqueo" />
           {error ? <ErrorState message={error} onRetry={() => void load()} title="No se pudo cargar" /> : null}
           <AppCard style={styles.statusCard}>
@@ -175,9 +178,7 @@ export function CashierCashSessionScreen() {
             )) : <EmptyState description="No hay sesiones registradas." title="Sin historial" />}
           </AppCard>
           <AppButton label="Volver" onPress={() => navigation.goBack()} variant="secondary" />
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+    </KeyboardAwareScreen>
   );
 }
 
@@ -204,7 +205,6 @@ const styles = StyleSheet.create({
   emphasisText: { color: colors.white },
   form: { gap: 12 },
   hint: { color: colors.muted, fontSize: 12, fontWeight: '700', lineHeight: 18 },
-  keyboard: { flex: 1 },
   meta: { color: colors.muted, fontSize: 12, lineHeight: 17 },
   miniStat: { flexBasis: '47%', flexGrow: 1, gap: 5, minHeight: 76 },
   modeButton: { backgroundColor: colors.surfaceMuted, borderColor: colors.border, borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 9 },
@@ -217,7 +217,6 @@ const styles = StyleSheet.create({
   movementCopy: { flex: 1, gap: 3 },
   movementTitle: { color: colors.ink, fontSize: 14, fontWeight: '900' },
   negative: { color: colors.danger },
-  safe: { backgroundColor: colors.background, flex: 1 },
   sectionTitle: { color: colors.ink, fontSize: 16, fontWeight: '900' },
   sessionRow: { alignItems: 'center', borderTopColor: colors.border, borderTopWidth: 1, flexDirection: 'row', gap: 10, paddingTop: 10 },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },

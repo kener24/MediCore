@@ -4,7 +4,7 @@ import type { CashierInvoice, CashierInvoiceDetail } from '@/features/cashier/ty
 
 export async function getPendingInvoices(params?: QueryParams): Promise<CashierInvoice[]> {
   const pending = await getFirstAvailable<ApiListResponse<CashierInvoice>>(['/billing/invoices/', '/invoices/'], { status: 'pendiente', ...(params ?? {}) });
-  const partial = await getFirstAvailable<ApiListResponse<CashierInvoice>>(['/billing/invoices/', '/invoices/'], { status: 'parcial', ...(params ?? {}) }).catch(() => []);
+  const partial = await getFirstAvailable<ApiListResponse<CashierInvoice>>(['/billing/invoices/', '/invoices/'], { status: 'parcialmente_pagada', ...(params ?? {}) }).catch(() => []);
   return [...normalizeListResponse(pending), ...normalizeListResponse(partial)];
 }
 

@@ -1,0 +1,11 @@
+Hola {{ recipient_name }},
+
+Confirma que este correo te pertenece abriendo el siguiente enlace:
+{{ verification_url }}
+
+El enlace vence en {{ expires_minutes }} minutos y solo puede utilizarse una vez.
+
+Si no creaste esta cuenta, ignora el mensaje.
+
+Equipo MediCore
+Soporte: {{ support_email }}

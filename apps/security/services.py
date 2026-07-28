@@ -4,12 +4,12 @@ import secrets
 
 from django.conf import settings
 from django.contrib.auth import password_validation
-from django.core.mail import send_mail
 from django.utils import timezone
 
 from apps.audit.models import AuditLog
 from apps.audit.services import log_audit_event
 from apps.notifications.models import Notification
+from apps.notifications.email_service import send_email_verification, send_password_reset_email
 from apps.notifications.services import create_notification
 from apps.security.models import AccountLock, EmailVerificationToken, LoginAttempt, PasswordResetToken, SecuritySetting, UserSession
 
@@ -85,10 +85,11 @@ def validate_password_policy(password, user=None, clinic=None):
 def create_password_reset_token(user, request=None):
     PasswordResetToken.objects.filter(user=user, used_at__isnull=True).update(used_at=timezone.now())
     token = generate_secure_token()
-    expires = timezone.now() + timezone.timedelta(minutes=get_security_settings(user.clinica).password_reset_token_minutes)
+    expires_minutes = get_security_settings(user.clinica).password_reset_token_minutes
+    expires = timezone.now() + timezone.timedelta(minutes=expires_minutes)
     PasswordResetToken.objects.create(user=user, token_hash=hash_token(token), expires_at=expires, ip_address=get_client_ip(request), user_agent=get_user_agent(request))
     reset_url = f"{settings.FRONTEND_URL}/reset-password?token={token}"
-    send_mail("Recupera tu contrasena en MediCore", f"Usa este enlace para restablecer tu contrasena: {reset_url}", settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=True)
+    send_password_reset_email(user, reset_url, expires_minutes)
     log_audit_event(request=request, user=user, clinic=user.clinica, action=AuditLog.Action.PASSWORD_RESET, module=AuditLog.Module.AUTH, model_name="User", object_id=user.id, object_repr=user.email, description="Solicitud de recuperacion de contrasena.")
     create_notification(user, "Recuperacion de contrasena solicitada", "Se solicito recuperar tu contrasena.", clinic=user.clinica, module=Notification.Module.AUTH, notification_type=Notification.Type.INFO)
     return token, reset_url
@@ -112,17 +113,18 @@ def confirm_password_reset(token, new_password, request=None):
     reset.save(update_fields=["used_at"])
     revoke_all_user_sessions(user)
     log_audit_event(request=request, user=user, clinic=user.clinica, action=AuditLog.Action.PASSWORD_RESET, module=AuditLog.Module.AUTH, model_name="User", object_id=user.id, object_repr=user.email, description="Recuperacion de contrasena completada.")
-    create_notification(user, "Contrasena actualizada", "Tu contrasena fue actualizada correctamente.", clinic=user.clinica, module=Notification.Module.AUTH, notification_type=Notification.Type.SUCCESS)
+    create_notification(user, "Contraseña actualizada", "Tu contraseña fue actualizada correctamente.", clinic=user.clinica, module=Notification.Module.AUTH, notification_type=Notification.Type.SUCCESS, force_email=True)
     return user
 
 
 def create_email_verification_token(user, request=None):
     EmailVerificationToken.objects.filter(user=user, used_at__isnull=True).update(used_at=timezone.now())
     token = generate_secure_token()
-    expires = timezone.now() + timezone.timedelta(minutes=get_security_settings(user.clinica).email_verification_token_minutes)
+    expires_minutes = get_security_settings(user.clinica).email_verification_token_minutes
+    expires = timezone.now() + timezone.timedelta(minutes=expires_minutes)
     EmailVerificationToken.objects.create(user=user, token_hash=hash_token(token), expires_at=expires)
     url = f"{settings.FRONTEND_URL}/verify-email?token={token}"
-    send_mail("Verifica tu correo en MediCore", f"Usa este enlace para verificar tu correo: {url}", settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=True)
+    send_email_verification(user, url, expires_minutes)
     log_audit_event(request=request, user=user, clinic=user.clinica, action=AuditLog.Action.UPDATE, module=AuditLog.Module.AUTH, model_name="User", object_id=user.id, object_repr=user.email, description="Token de verificacion de correo enviado.")
     return token, url
 
@@ -174,7 +176,7 @@ def register_failed_login(user, request):
             },
         )
         log_audit_event(request=request, user=user, clinic=user.clinica, action=AuditLog.Action.PERMISSION_DENIED, module=AuditLog.Module.AUTH, model_name="AccountLock", object_id=lock.id, object_repr=user.email, description="Cuenta bloqueada por intentos fallidos.", severity=AuditLog.Severity.WARNING)
-        create_notification(user, "Cuenta bloqueada", "Tu cuenta fue bloqueada temporalmente por intentos fallidos.", clinic=user.clinica, module=Notification.Module.AUTH, notification_type=Notification.Type.WARNING, priority=Notification.Priority.HIGH)
+        create_notification(user, "Cuenta bloqueada", "Tu cuenta fue bloqueada temporalmente por intentos fallidos.", clinic=user.clinica, module=Notification.Module.AUTH, notification_type=Notification.Type.WARNING, priority=Notification.Priority.HIGH, force_email=True)
         return lock
     return None
 

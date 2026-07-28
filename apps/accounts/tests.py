@@ -1,3 +1,5 @@
+from django.core import mail
+from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -8,6 +10,12 @@ from apps.security.models import UserSession
 from django.utils import timezone
 
 
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    DEFAULT_FROM_EMAIL="MediCore <no-reply@medicore.test>",
+    EMAIL_REPLY_TO="soporte@medicore.test",
+    FRONTEND_URL="https://medicore.test",
+)
 class AuthAndUsersTests(APITestCase):
     def setUp(self):
         self.superadmin_role = Role.objects.create(nombre="superadmin")
@@ -70,6 +78,23 @@ class AuthAndUsersTests(APITestCase):
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_cambio_de_contrasena_envia_alerta_de_seguridad(self):
+        self.authenticate(self.normal_user)
+        response = self.client.post(
+            "/api/auth/change-password/",
+            {
+                "old_password": "Medico12345*",
+                "new_password": "NuevaMedico12345*",
+                "confirm_password": "NuevaMedico12345*",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.normal_user.refresh_from_db()
+        self.assertTrue(self.normal_user.check_password("NuevaMedico12345*"))
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("Contraseña actualizada", mail.outbox[0].subject)
 
     def test_login_correcto_para_todos_los_roles_principales(self):
         users = [self.superadmin, self.clinic_admin, self.normal_user]

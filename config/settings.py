@@ -131,6 +131,20 @@ ACCOUNT_LOCKOUT_MINUTES = config("ACCOUNT_LOCKOUT_MINUTES", default=15, cast=int
 SESSION_LIFETIME_MINUTES = config("SESSION_LIFETIME_MINUTES", default=1440, cast=int)
 AUDIT_RETENTION_DAYS = config("AUDIT_RETENTION_DAYS", default=365, cast=int)
 EMAIL_BACKEND = config("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
+EMAIL_HOST = config("EMAIL_HOST", default="")
+EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
+EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
+EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
+EMAIL_USE_SSL = config("EMAIL_USE_SSL", default=False, cast=bool)
+EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=10, cast=int)
+EMAIL_REPLY_TO = config("EMAIL_REPLY_TO", default="")
+EMAIL_NOTIFICATIONS_ENABLED = config("EMAIL_NOTIFICATIONS_ENABLED", default=True, cast=bool)
+EMAIL_NOTIFICATION_MODULES = config(
+    "EMAIL_NOTIFICATION_MODULES",
+    default="appointments,billing,payments,cash,inventory,purchases,audit,system",
+    cast=Csv(),
+)
 
 CORS_ALLOWED_ORIGINS = config(
     "CORS_ALLOWED_ORIGINS",
@@ -156,6 +170,10 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
     ),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_THROTTLE_RATES": {
+        "password_reset": config("PASSWORD_RESET_THROTTLE_RATE", default="5/hour"),
+        "email_verification": config("EMAIL_VERIFICATION_THROTTLE_RATE", default="5/hour"),
+    },
 }
 
 SIMPLE_JWT = {

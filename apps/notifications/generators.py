@@ -21,10 +21,10 @@ def recent_notification_exists(recipient, title, related_model, related_object_i
     ).exists()
 
 
-def notify_once(recipients, title, message, related_model, related_object_id, **kwargs):
+def notify_once(recipients, title, message, related_model, related_object_id, dedupe_hours=24, **kwargs):
     count = 0
     for recipient in recipients:
-        if recent_notification_exists(recipient, title, related_model, related_object_id):
+        if recent_notification_exists(recipient, title, related_model, related_object_id, hours=dedupe_hours):
             continue
         notification = create_notification(recipient, title, message, related_model=related_model, related_object_id=related_object_id, **kwargs)
         count += 1 if notification else 0
@@ -55,8 +55,7 @@ def generate_appointment_reminders(hours=24):
         message = f"Cita programada el {appointment.scheduled_date} a las {appointment.start_time}."
         for user in [appointment.doctor.user, appointment.patient.user]:
             if user:
-                notification = create_notification(user, "Recordatorio de cita", message, clinic=appointment.clinic, notification_type=Notification.Type.REMINDER, module=Notification.Module.APPOINTMENTS, priority=Notification.Priority.NORMAL, related_model="Appointment", related_object_id=appointment.id, action_url=f"/clinic/appointments/{appointment.id}")
-                count += 1 if notification else 0
+                count += notify_once([user], "Recordatorio de cita", message, clinic=appointment.clinic, notification_type=Notification.Type.REMINDER, module=Notification.Module.APPOINTMENTS, priority=Notification.Priority.NORMAL, related_model="Appointment", related_object_id=appointment.id, action_url=f"/clinic/appointments/{appointment.id}")
     return count
 
 

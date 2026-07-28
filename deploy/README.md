@@ -19,6 +19,25 @@ Basic server flow:
 8. Install `deploy/nginx/medicore.conf` into `/etc/nginx/sites-available/`.
 9. Enable the Nginx site and reload services.
 
+## Transactional email
+
+Use an authenticated SMTP provider. Configure the `EMAIL_*` variables from
+`.env.production.example`; never commit SMTP credentials. Validate delivery with:
+
+```bash
+sudo -u www-data /var/www/medicore/venv/bin/python /var/www/medicore/manage.py test_email_delivery --to destination@example.com
+```
+
+Install the notification timer to generate appointment, billing, cash, fiscal,
+and inventory alerts automatically:
+
+```bash
+sudo cp deploy/systemd/medicore-notifications.service /etc/systemd/system/
+sudo cp deploy/systemd/medicore-notifications.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now medicore-notifications.timer
+```
+
 Use Certbot after the domain points to the server:
 
 ```bash

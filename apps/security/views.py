@@ -3,6 +3,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.accounts.models import User
@@ -40,6 +41,8 @@ def can_manage_user(request_user, target_user):
 class PasswordResetRequestView(APIView):
     permission_classes = [AllowAny]
     serializer_class = PasswordResetRequestSerializer
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "password_reset"
 
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
@@ -72,6 +75,8 @@ class PasswordResetConfirmView(APIView):
 class EmailVerificationSendView(APIView):
     permission_classes = [IsAuthenticated]
     serializer_class = EmptySerializer
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "email_verification"
 
     def post(self, request):
         token, url = create_email_verification_token(request.user, request)

@@ -1,0 +1,11 @@
+[Unit]
+Description=MediCore notification generators
+After=network.target mysql.service medicore.service
+
+[Service]
+Type=oneshot
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/medicore
+EnvironmentFile=/var/www/medicore/.env
+ExecStart=/var/www/medicore/venv/bin/python manage.py generate_notifications --hours 24

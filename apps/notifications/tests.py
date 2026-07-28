@@ -1,6 +1,8 @@
 from datetime import date, time, timedelta
 from decimal import Decimal
 
+from django.core import mail
+from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
@@ -20,6 +22,14 @@ def weekday_name(value):
     return ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"][value.weekday()]
 
 
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    DEFAULT_FROM_EMAIL="MediCore <no-reply@medicore.test>",
+    EMAIL_REPLY_TO="soporte@medicore.test",
+    FRONTEND_URL="https://medicore.test",
+    EMAIL_NOTIFICATIONS_ENABLED=True,
+    EMAIL_NOTIFICATION_MODULES=["appointments", "billing", "payments", "cash", "inventory", "purchases", "audit", "system"],
+)
 class NotificationTests(APITestCase):
     def setUp(self):
         self.role_admin = Role.objects.create(nombre="admin")
@@ -46,6 +56,23 @@ class NotificationTests(APITestCase):
         n = create_notification(self.admin, "Prueba", "Mensaje", clinic=self.clinic, metadata={"token": "abc", "safe": "ok"})
         self.assertIsNotNone(n)
         self.assertEqual(n.metadata["token"], "********")
+
+    def test_email_notification_respects_channel_preference(self):
+        preferences, _ = NotificationPreference.objects.get_or_create(user=self.admin)
+        preferences.email_enabled = True
+        preferences.save(update_fields=["email_enabled"])
+        create_notification(self.admin, "Alerta de caja", "Revisa el cierre pendiente.", module="cash", priority="high", action_url="/clinic/billing/cash")
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("Alerta de caja", mail.outbox[0].subject)
+        self.assertIn("https://medicore.test/clinic/billing/cash", mail.outbox[0].body)
+
+    def test_email_notification_is_not_sent_when_channel_is_disabled(self):
+        create_notification(self.admin, "Alerta de caja", "Revisa el cierre pendiente.", module="cash", priority="high")
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_forced_security_email_bypasses_optional_preference(self):
+        create_notification(self.admin, "Cuenta bloqueada", "Revisa la actividad de tu cuenta.", module="auth", priority="high", force_email=True)
+        self.assertEqual(len(mail.outbox), 1)
 
     def test_user_sees_only_own_notifications(self):
         create_notification(self.admin, "Mia", "Mensaje")

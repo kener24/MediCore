@@ -1,0 +1,14 @@
+Hola {{ recipient_name }},
+
+{{ title }}
+{{ message }}
+
+Prioridad: {{ priority }}
+
+Revisa los detalles dentro de MediCore:
+{{ action_url }}
+
+Por seguridad, no respondas con información clínica o contraseñas.
+
+Equipo MediCore
+Soporte: {{ support_email }}

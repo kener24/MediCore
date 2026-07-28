@@ -27,6 +27,8 @@ from apps.accounts.serializers import (
 )
 from apps.clinics.models import Clinic
 from apps.audit.models import AuditLog
+from apps.notifications.models import Notification
+from apps.notifications.services import create_notification
 from apps.doctors.serializers import DoctorProfileCreateSerializer, DoctorProfileDetailSerializer
 from apps.audit.services import get_object_audit_data, log_audit_event
 from apps.security.models import UserSession
@@ -164,7 +166,17 @@ class ChangePasswordView(APIView):
         current_session = request.headers.get("X-Session-Key")
         revoke_all_user_sessions(user, keep_current=current_session, revoked_by=user)
         log_audit_event(request=request, action=AuditLog.Action.PASSWORD_CHANGE, module=AuditLog.Module.AUTH, model_name="User", object_id=request.user.id, object_repr=request.user.email, description="Cambio de contrasena.")
-        return Response({"detail": "Contrasena actualizada correctamente."})
+        create_notification(
+            user,
+            "Contraseña actualizada",
+            "Tu contraseña fue actualizada correctamente. Si no realizaste este cambio, contacta al administrador de tu clínica.",
+            clinic=user.clinica,
+            module=Notification.Module.AUTH,
+            notification_type=Notification.Type.SUCCESS,
+            priority=Notification.Priority.HIGH,
+            force_email=True,
+        )
+        return Response({"detail": "Contraseña actualizada correctamente."})
 
 
 class SuperAdminDashboardView(APIView):

@@ -1,0 +1,11 @@
+[Unit]
+Description=Run MediCore notification generators hourly
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+RandomizedDelaySec=120
+Unit=medicore-notifications.service
+
+[Install]
+WantedBy=timers.target

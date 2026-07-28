@@ -10,6 +10,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from apps.accounts.models import User
+from apps.notifications.email_service import send_notification_email
 from apps.notifications.models import Notification, NotificationPreference, PushDevice
 
 
@@ -72,11 +73,12 @@ def create_notification(
     action_url=None,
     metadata=None,
     expires_at=None,
+    force_email=False,
 ):
     try:
         if not recipient or not recipient.is_active:
             return None
-        if not preference_allows(recipient, module):
+        if not force_email and not preference_allows(recipient, module):
             return None
         notification = Notification.objects.create(
             clinic=clinic or getattr(recipient, "clinica", None),
@@ -93,6 +95,7 @@ def create_notification(
             expires_at=expires_at,
         )
         send_push_for_notification(notification)
+        send_notification_email(notification, force=force_email)
         return notification
     except Exception as exc:
         logger.warning("Notification failed: %s", exc)

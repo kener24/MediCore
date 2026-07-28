@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{ title }}</title></head>
+<body style="margin:0;background:#f3f6f9;font-family:Arial,sans-serif;color:#172033">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3f6f9;padding:28px 12px">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border:1px solid #dce3ea;border-radius:8px;overflow:hidden">
+        <tr><td style="background:#101827;color:#ffffff;padding:22px 28px;font-size:24px;font-weight:bold">MediCore</td></tr>
+        <tr><td style="padding:30px 28px">
+          <p style="margin:0 0 12px;color:#58677a">Hola {{ recipient_name }},</p>
+          <h1 style="margin:0 0 16px;font-size:23px;color:#101827">{{ title }}</h1>
+          <p style="margin:0 0 18px;line-height:1.6">{{ message }}</p>
+          <p style="margin:0 0 22px;color:#58677a;font-size:14px">Prioridad: {{ priority }}</p>
+          <p style="margin:0"><a href="{{ action_url }}" style="display:inline-block;background:#118b82;color:#ffffff;text-decoration:none;padding:13px 22px;border-radius:6px;font-weight:bold">Abrir MediCore</a></p>
+          <p style="margin:24px 0 0;color:#657286;font-size:13px;line-height:1.5">Por seguridad, no respondas con información clínica o contraseñas.</p>
+        </td></tr>
+        <tr><td style="border-top:1px solid #e2e8ee;padding:18px 28px;color:#657286;font-size:13px">Equipo MediCore · {{ support_email }}</td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

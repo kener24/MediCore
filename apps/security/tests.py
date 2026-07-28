@@ -1,3 +1,5 @@
+from django.core import mail
+from django.core.cache import cache
 from django.test import override_settings
 from django.utils import timezone
 from rest_framework import status
@@ -8,8 +10,15 @@ from apps.clinics.models import Clinic
 from apps.security.models import AccountLock, PasswordResetToken, SecuritySetting, UserSession
 
 
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    DEFAULT_FROM_EMAIL="MediCore <no-reply@medicore.test>",
+    EMAIL_REPLY_TO="soporte@medicore.test",
+    FRONTEND_URL="https://medicore.test",
+)
 class SecurityApiTests(APITestCase):
     def setUp(self):
+        cache.clear()
         self.superadmin_role = Role.objects.create(nombre="superadmin")
         self.admin_role = Role.objects.create(nombre="admin")
         self.medico_role = Role.objects.create(nombre="medico")
@@ -55,6 +64,17 @@ class SecurityApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertNotIn("token", response.data)
         self.assertIn("Si el correo existe", response.data["detail"])
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_password_reset_envia_enlace_html_sin_exponer_token_en_api(self):
+        response = self.client.post("/api/security/password-reset/request/", {"email": self.user.email}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotIn("token", response.data)
+        self.assertEqual(len(mail.outbox), 1)
+        message = mail.outbox[0]
+        self.assertEqual(message.to, [self.user.email])
+        self.assertIn("https://medicore.test/reset-password?token=", message.body)
+        self.assertTrue(any(mimetype == "text/html" for _, mimetype in message.alternatives))
 
     @override_settings(DEBUG=True)
     def test_password_reset_confirm_cambia_contrasena_y_usa_token_una_vez(self):
@@ -96,6 +116,8 @@ class SecurityApiTests(APITestCase):
         self.authenticate(self.user)
         response = self.client.post("/api/security/email-verification/send/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("https://medicore.test/verify-email?token=", mail.outbox[0].body)
 
         self.client.force_authenticate(user=None)
         confirm = self.client.post("/api/security/email-verification/confirm/", {"token": response.data["token"]}, format="json")

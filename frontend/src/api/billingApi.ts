@@ -32,7 +32,8 @@ export async function addInventoryItemToInvoice(invoiceId: number | string, payl
 export async function getMyInvoices() { const { data } = await api.get<Invoice[]>("/billing/invoices/my-invoices/"); return data; }
 
 export async function getPayments(filters?: Record<string, string>) { const { data } = await api.get<Payment[]>("/billing/payments/", { params: filters }); return data; }
-export async function createPayment(payload: Partial<Payment>) { const { data } = await api.post<Payment>("/billing/payments/", payload); return data; }
+export async function createPayment(payload: Partial<Payment>, idempotencyKey?: string) { const { data } = await api.post<Payment>("/billing/payments/", payload, { headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined }); return data; }
+export async function getPaymentReceiptPdf(id: number | string, patientPortal = false) { const path = patientPortal ? `/patient-portal/payments/${id}/receipt-pdf/` : `/billing/payments/${id}/receipt-pdf/`; const { data } = await api.get<Blob>(path, { responseType: "blob" }); return data; }
 export async function voidPayment(id: number | string, reason: string) { const { data } = await api.patch<Payment>(`/billing/payments/${id}/void/`, { reason }); return data; }
 export async function getMyPayments() { const { data } = await api.get<Payment[]>("/billing/payments/my-payments/"); return data; }
 
@@ -41,7 +42,7 @@ export async function getCurrentCashSession() { const { data } = await api.get<C
 export async function getCashSummary(date?: string) { const { data } = await api.get<CashSummary>("/billing/cash-sessions/summary/", { params: date ? { date } : undefined }); return data; }
 export async function openCashSession(payload: { opening_amount: string; notes?: string }) { const { data } = await api.post<CashSession>("/billing/cash-sessions/open/", payload); return data; }
 export async function closeCashSession(id: number | string, payload: { closing_amount: string; notes?: string }) { const { data } = await api.patch<CashSession>(`/billing/cash-sessions/${id}/close/`, payload); return data; }
-export async function createCashMovement(id: number | string, payload: Partial<CashMovement>) { const { data } = await api.post<CashMovement>(`/billing/cash-sessions/${id}/movements/`, payload); return data; }
+export async function createCashMovement(id: number | string, payload: Partial<CashMovement>, idempotencyKey?: string) { const { data } = await api.post<CashMovement>(`/billing/cash-sessions/${id}/movements/`, payload, { headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined }); return data; }
 
 export async function getBillingStats(filters?: Record<string, string>) { const { data } = await api.get<BillingStats>("/billing/stats/", { params: filters }); return data; }
 export async function getFiscalReadiness() { const { data } = await api.get<FiscalReadiness>("/billing/fiscal-readiness/"); return data; }

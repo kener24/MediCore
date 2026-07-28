@@ -35,9 +35,9 @@ export function Modal({ title, open, children, actions, onClose }: ModalProps) {
   );
 }
 
-export function ModalCloseButton({ onClick }: { onClick: () => void }) {
+export function ModalCloseButton({ onClick, disabled = false }: { onClick: () => void; disabled?: boolean }) {
   return (
-    <Button type="button" variant="secondary" onClick={onClick}>
+    <Button type="button" variant="secondary" disabled={disabled} onClick={onClick}>
       Cancelar
     </Button>
   );

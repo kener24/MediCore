@@ -3,7 +3,7 @@ import { ArrowLeft, DollarSign, Plus, Printer, Trash2 } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
-import { addConsumptionToInvoice, addInventoryItemToInvoice, createBillableService, createCashMovement, createFiscalRange, createInvoice, createPayment, downloadBlob, getBillableServices, getBillingStats, getCashSessions, getCashSummary, getCreditNotePdf, getCreditNotes, getCurrentCashSession, getFiscalInvoicePdf, getFiscalProfile, getFiscalRanges, getFiscalReadiness, getInvoice, getInvoicePayments, getInvoicePrintData, getInvoices, getMyInvoices, getMyPayments, getPayments, getPendingConsumptions, getTodayInvoiceSummary, getTodayInvoices, issueFiscalInvoice, openCashSession, closeCashSession, updateFiscalProfile, updateFiscalRange, voidFiscalInvoice, voidInvoice } from "../../api/billingApi";
+import { createBillableService, createCashMovement, createFiscalRange, createInvoice, createPayment, downloadBlob, getBillableServices, getCashSessions, getCashSummary, getCreditNotePdf, getCreditNotes, getCurrentCashSession, getFiscalInvoicePdf, getFiscalProfile, getFiscalRanges, getFiscalReadiness, getInvoice, getInvoicePayments, getInvoicePrintData, getInvoicePdf, getInvoices, getMyInvoices, getMyPayments, getPaymentReceiptPdf, getPayments, getPendingConsumptions, getTodayInvoiceSummary, getTodayInvoices, issueFiscalInvoice, openCashSession, closeCashSession, updateFiscalProfile, updateFiscalRange, voidFiscalInvoice, voidInvoice } from "../../api/billingApi";
 import { getInventoryItems } from "../../api/inventoryApi";
 import { getErrorMessage } from "../../api/axios";
 import { getPatients } from "../../api/patientsApi";
@@ -16,10 +16,11 @@ import { Modal, ModalCloseButton } from "../../components/ui/Modal";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { StatCard } from "../../components/ui/StatCard";
 import { Table } from "../../components/ui/Table";
-import type { BillableService, BillingStats, CashSession, CashSummary, ClinicFiscalProfile, CreditNote, FiscalDocumentRange, Invoice, InvoicePrintData, Payment, TodayInvoiceSummary } from "../../types/billing";
+import type { BillableService, CashSession, CashSummary, ClinicFiscalProfile, CreditNote, FiscalDocumentRange, Invoice, InvoicePrintData, Payment, TodayInvoiceSummary } from "../../types/billing";
 import type { Patient } from "../../types/patient";
 import type { InventoryItem } from "../../types/inventory";
 import type { ClinicalSupplyUsage } from "../../types/medicalRecord";
+import { useAuth } from "../../hooks/useAuth";
 
 const money = (value?: string | number | null) => `L ${Number(value ?? 0).toFixed(2)}`;
 const today = () => new Date().toISOString().slice(0, 10);
@@ -27,6 +28,7 @@ const addDays = (days: number) => new Date(Date.now() + days * 24 * 60 * 60 * 10
 const formatPlainMoney = (value?: string | number | null) => Number(value ?? 0).toFixed(2);
 const formatInvoiceDate = (value?: string | null) => value || today();
 const formatInvoiceTime = () => new Date().toLocaleTimeString("es-HN", { hour12: false });
+const newOperationKey = (scope: string) => `${scope}:${Date.now()}:${typeof crypto.randomUUID === "function" ? crypto.randomUUID() : Math.random().toString(36).slice(2)}`;
 
 function amountToLempiras(value?: string | number | null) {
   const total = Number(value ?? 0);
@@ -79,7 +81,8 @@ function cleanDecimal(value: string, fallback = "0.00") {
   const next = value.replace(/[^\d.]/g, "");
   const parts = next.split(".");
   if (parts.length <= 1) return next;
-  return `${parts[0]}.${parts.slice(1).join("").slice(0, 2)}` || fallback;
+  const normalized = `${parts[0]}.${parts.slice(1).join("").slice(0, 2)}`;
+  return /\d/.test(normalized) ? normalized : fallback;
 }
 
 export function BillingDashboardPage() {
@@ -87,6 +90,8 @@ export function BillingDashboardPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [paying, setPaying] = useState<Invoice | null>(null);
   const [payment, setPayment] = useState({ amount: "", method: "efectivo", reference: "", notes: "" });
+  const [paymentKey, setPaymentKey] = useState("");
+  const [submittingPayment, setSubmittingPayment] = useState(false);
   const navigate = useNavigate();
 
   async function load() {
@@ -104,6 +109,7 @@ export function BillingDashboardPage() {
   function openPayment(inv: Invoice) {
     setPaying(inv);
     setPayment({ amount: inv.balance_due, method: "efectivo", reference: "", notes: "" });
+    setPaymentKey(newOperationKey("web-payment"));
   }
 
   async function submitPayment(e: FormEvent) {
@@ -113,13 +119,16 @@ export function BillingDashboardPage() {
       toast.error("El monto debe ser mayor que cero y no puede exceder el saldo.");
       return;
     }
+    setSubmittingPayment(true);
     try {
-      await createPayment({ invoice: paying.id, amount: payment.amount, method: payment.method as Payment["method"], reference: payment.reference, notes: payment.notes });
+      await createPayment({ invoice: paying.id, amount: payment.amount, method: payment.method as Payment["method"], reference: payment.reference, notes: payment.notes }, paymentKey || newOperationKey("web-payment"));
       toast.success("Pago registrado correctamente.");
       setPaying(null);
       navigate(`/clinic/billing/invoices/${paying.id}/print`);
     } catch (e) {
       toast.error(getErrorMessage(e));
+    } finally {
+      setSubmittingPayment(false);
     }
   }
 
@@ -150,7 +159,7 @@ export function BillingDashboardPage() {
           { key: "actions", header: "Acciones", render: (i) => <div className="flex flex-wrap gap-2"><Link className="inline-flex h-8 items-center rounded-md border px-3 text-xs font-semibold text-slate-700" to={`/clinic/billing/invoices/${i.id}`}>Ver</Link><Link className="inline-flex h-8 items-center rounded-md border px-3 text-xs font-semibold text-slate-700" to={`/clinic/billing/invoices/${i.id}/print`}>Imprimir</Link>{Number(i.balance_due) > 0 && i.status !== "anulada" ? <Button className="h-8 px-3 text-xs" variant="outline" onClick={() => openPayment(i)}>Registrar pago</Button> : null}</div> },
         ]} /> : <EmptyState title="No hay facturas emitidas hoy." description="Cuando emitas facturas hoy apareceran aqui." />}
       </Card>
-      <Modal open={Boolean(paying)} title={`Registrar pago ${paying?.invoice_number ?? ""}`} onClose={() => setPaying(null)} actions={<><Button variant="outline" onClick={() => { if (paying) navigate(`/clinic/billing/invoices/${paying.id}`); }}>Omitir pago por ahora</Button><Button form="dashboard-payment-form" type="submit">Registrar pago</Button></>}>
+      <Modal open={Boolean(paying)} title={`Registrar pago ${paying?.invoice_number ?? ""}`} onClose={() => { if (!submittingPayment) setPaying(null); }} actions={<><Button variant="outline" disabled={submittingPayment} onClick={() => { if (paying) navigate(`/clinic/billing/invoices/${paying.id}`); }}>Omitir pago por ahora</Button><Button disabled={submittingPayment} form="dashboard-payment-form" type="submit">{submittingPayment ? "Procesando..." : "Registrar pago"}</Button></>}>
         <form id="dashboard-payment-form" className="grid gap-4" onSubmit={submitPayment}>
           <p className="text-sm text-slate-600">Saldo pendiente: <b>{money(paying?.balance_due)}</b></p>
           <label className="block space-y-1.5"><span className="text-sm font-medium text-slate-700">Monto</span><input className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm" inputMode="decimal" max={paying?.balance_due} min="0.01" required step="0.01" value={payment.amount} onChange={(e) => setPayment({ ...payment, amount: cleanDecimal(e.target.value) })} /></label>
@@ -338,6 +347,9 @@ export function CreditNotesPage() {
 }
 
 export function InvoicesPage({ patientOnly = false }: { patientOnly?: boolean }) {
+  const { user } = useAuth();
+  const roleName = user?.role_nombre ?? (typeof user?.role === "object" ? user.role.nombre : "");
+  const canApplyDiscount = roleName === "admin";
   const [searchParams] = useSearchParams();
   const initialPatient = searchParams.get("patient") ?? "";
   const [items, setItems] = useState<Invoice[]>([]);
@@ -351,6 +363,8 @@ export function InvoicesPage({ patientOnly = false }: { patientOnly?: boolean })
   const [saving, setSaving] = useState(false);
   const [paying, setPaying] = useState<Invoice | null>(null);
   const [payment, setPayment] = useState({ amount: "", method: "efectivo", reference: "", notes: "" });
+  const [paymentKey, setPaymentKey] = useState("");
+  const [submittingPayment, setSubmittingPayment] = useState(false);
   const navigate = useNavigate();
   async function load(nextFilters = filters) {
     try {
@@ -464,6 +478,7 @@ export function InvoicesPage({ patientOnly = false }: { patientOnly?: boolean })
       await load();
       setPaying(invoice);
       setPayment({ amount: invoice.balance_due, method: "efectivo", reference: "", notes: "" });
+      setPaymentKey(newOperationKey("web-payment"));
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
@@ -474,6 +489,7 @@ export function InvoicesPage({ patientOnly = false }: { patientOnly?: boolean })
   function openPayment(inv: Invoice) {
     setPaying(inv);
     setPayment({ amount: inv.balance_due, method: "efectivo", reference: "", notes: "" });
+    setPaymentKey(newOperationKey("web-payment"));
   }
 
   async function submitPayment(e: FormEvent) {
@@ -483,13 +499,16 @@ export function InvoicesPage({ patientOnly = false }: { patientOnly?: boolean })
       toast.error("El monto debe ser mayor que cero y no puede exceder el saldo.");
       return;
     }
+    setSubmittingPayment(true);
     try {
-      await createPayment({ invoice: paying.id, amount: payment.amount, method: payment.method as Payment["method"], reference: payment.reference, notes: payment.notes });
+      await createPayment({ invoice: paying.id, amount: payment.amount, method: payment.method as Payment["method"], reference: payment.reference, notes: payment.notes }, paymentKey || newOperationKey("web-payment"));
       toast.success("Pago registrado correctamente.");
       setPaying(null);
       navigate(`/clinic/billing/invoices/${paying.id}/print`);
     } catch (e) {
       toast.error(getErrorMessage(e));
+    } finally {
+      setSubmittingPayment(false);
     }
   }
 
@@ -522,7 +541,7 @@ export function InvoicesPage({ patientOnly = false }: { patientOnly?: boolean })
                           <td className="px-3 py-2"><input className="h-10 min-w-56 rounded-md border border-slate-300 px-2 text-sm" required value={item.description} onChange={(e) => updateDraftItem(index, { description: e.target.value })} /></td>
                           <td className="px-3 py-2"><input className="h-10 w-20 rounded-md border border-slate-300 px-2 text-sm" inputMode="decimal" min="0.01" step="0.01" value={item.quantity} onChange={(e) => updateDraftItem(index, { quantity: cleanDecimal(e.target.value, "1") })} /></td>
                           <td className="px-3 py-2"><input className="h-10 w-28 rounded-md border border-slate-300 px-2 text-sm" inputMode="decimal" min="0" step="0.01" value={item.unit_price} onChange={(e) => updateDraftItem(index, { unit_price: cleanDecimal(e.target.value) })} /></td>
-                          <td className="px-3 py-2"><input className="h-10 w-28 rounded-md border border-slate-300 px-2 text-sm" inputMode="decimal" min="0" step="0.01" value={item.discount_amount} onChange={(e) => updateDraftItem(index, { discount_amount: cleanDecimal(e.target.value) })} /></td>
+                          <td className="px-3 py-2"><input aria-label={canApplyDiscount ? "Descuento" : "Descuento no autorizado"} className="h-10 w-28 rounded-md border border-slate-300 px-2 text-sm disabled:bg-slate-100" disabled={!canApplyDiscount} inputMode="decimal" min="0" step="0.01" value={item.discount_amount} onChange={(e) => updateDraftItem(index, { discount_amount: cleanDecimal(e.target.value) })} /></td>
                           <td className="px-3 py-2"><input className="h-10 w-24 rounded-md border border-slate-300 px-2 text-sm" inputMode="decimal" max="100" min="0" step="0.01" value={item.tax_rate} onChange={(e) => updateDraftItem(index, { tax_rate: cleanDecimal(e.target.value) })} /></td>
                           <td className="px-3 py-2 font-semibold text-slate-900">{money(total)}</td>
                           <td className="px-3 py-2 text-right"><button className="rounded-md p-2 text-rose-600 hover:bg-rose-50" disabled={draftItems.length === 1} type="button" onClick={() => setDraftItems(draftItems.filter((_, itemIndex) => itemIndex !== index))} title="Eliminar item"><Trash2 className="h-4 w-4" /></button></td>
@@ -584,7 +603,7 @@ export function InvoicesPage({ patientOnly = false }: { patientOnly?: boolean })
         open={Boolean(paying)}
         title={`Registrar pago ${paying?.invoice_number ?? ""}`}
         onClose={() => setPaying(null)}
-        actions={<><Button variant="outline" onClick={() => { if (paying) navigate(`/clinic/billing/invoices/${paying.id}`); }}>Omitir pago por ahora</Button><ModalCloseButton onClick={() => setPaying(null)} /><Button form="payment-form" type="submit">Registrar pago</Button></>}
+        actions={<><Button variant="outline" disabled={submittingPayment} onClick={() => { if (paying) navigate(`/clinic/billing/invoices/${paying.id}`); }}>Omitir pago por ahora</Button><ModalCloseButton disabled={submittingPayment} onClick={() => setPaying(null)} /><Button disabled={submittingPayment} form="payment-form" type="submit">{submittingPayment ? "Procesando..." : "Registrar pago"}</Button></>}
       >
         <form id="payment-form" className="grid gap-4" onSubmit={submitPayment}>
           <p className="text-sm text-slate-600">Saldo pendiente: <b>{money(paying?.balance_due)}</b></p>
@@ -815,6 +834,8 @@ export function InvoiceDetailPage() {
   const [voidingFiscal, setVoidingFiscal] = useState(false);
   const [voidReason, setVoidReason] = useState("");
   const [payment, setPayment] = useState({ amount: "", method: "efectivo", reference: "", notes: "" });
+  const [paymentKey, setPaymentKey] = useState("");
+  const [submittingPayment, setSubmittingPayment] = useState(false);
   const navigate = useNavigate();
 
   async function load() {
@@ -840,13 +861,16 @@ export function InvoiceDetailPage() {
       toast.error("El monto debe ser mayor que cero y no puede exceder el saldo.");
       return;
     }
+    setSubmittingPayment(true);
     try {
-      await createPayment({ invoice: invoice.id, amount: payment.amount, method: payment.method as Payment["method"], reference: payment.reference, notes: payment.notes });
+      await createPayment({ invoice: invoice.id, amount: payment.amount, method: payment.method as Payment["method"], reference: payment.reference, notes: payment.notes }, paymentKey || newOperationKey("web-payment"));
       toast.success("Pago registrado correctamente.");
       setPaying(false);
       navigate(`/clinic/billing/invoices/${invoice.id}/print`);
     } catch (e) {
       toast.error(getErrorMessage(e));
+    } finally {
+      setSubmittingPayment(false);
     }
   }
 
@@ -915,6 +939,23 @@ export function InvoiceDetailPage() {
     }
   }
 
+  async function invoicePdf() {
+    if (!invoice) return;
+    try {
+      downloadBlob(await getInvoicePdf(invoice.id), `factura-${invoice.invoice_number}.pdf`);
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+    }
+  }
+
+  async function paymentReceipt(paymentItem: Payment) {
+    try {
+      downloadBlob(await getPaymentReceiptPdf(paymentItem.id), `recibo-${paymentItem.payment_number}.pdf`);
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+    }
+  }
+
   async function creditNotePdf() {
     const note = invoice?.related_credit_note;
     if (!note) return;
@@ -931,7 +972,7 @@ export function InvoiceDetailPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={`Factura ${invoice.invoice_number}`} description={invoice.patient_nombre || "Detalle de factura"} actions={<div className="flex flex-wrap gap-2"><Link className="inline-flex h-10 items-center rounded-md border px-4 text-sm font-semibold text-slate-700" to="/clinic/billing/invoices">Volver</Link><Link className="inline-flex h-10 items-center rounded-md border px-4 text-sm font-semibold text-slate-700" to={`/clinic/billing/invoices/${invoice.id}/print`}>Imprimir</Link>{invoice.fiscal_status === "issued" ? <Button variant="outline" onClick={fiscalPdf}>PDF fiscal</Button> : null}{invoice.related_credit_note ? <Button variant="outline" onClick={creditNotePdf}>PDF nota de credito</Button> : null}{invoice.fiscal_status === "draft" ? <Button onClick={issueFiscal}>Emitir fiscal</Button> : null}{invoice.fiscal_status === "issued" ? <Button variant="danger" onClick={() => setVoidingFiscal(true)}>Anular fiscal</Button> : null}{Number(invoice.balance_due) > 0 && invoice.status !== "anulada" ? <Button onClick={() => { setPaying(true); setPayment({ amount: invoice.balance_due, method: "efectivo", reference: "", notes: "" }); }}>Registrar pago</Button> : null}</div>} />
+      <PageHeader title={`Factura ${invoice.invoice_number}`} description={invoice.patient_nombre || "Detalle de factura"} actions={<div className="flex flex-wrap gap-2"><Link className="inline-flex h-10 items-center rounded-md border px-4 text-sm font-semibold text-slate-700" to="/clinic/billing/invoices">Volver</Link><Link className="inline-flex h-10 items-center rounded-md border px-4 text-sm font-semibold text-slate-700" to={`/clinic/billing/invoices/${invoice.id}/print`}>Imprimir</Link><Button variant="outline" onClick={invoicePdf}>PDF</Button>{invoice.fiscal_status === "issued" ? <Button variant="outline" onClick={fiscalPdf}>PDF fiscal</Button> : null}{invoice.related_credit_note ? <Button variant="outline" onClick={creditNotePdf}>PDF nota de credito</Button> : null}{invoice.fiscal_status === "draft" ? <Button onClick={issueFiscal}>Emitir fiscal</Button> : null}{invoice.fiscal_status === "issued" ? <Button variant="danger" onClick={() => setVoidingFiscal(true)}>Anular fiscal</Button> : null}{Number(invoice.balance_due) > 0 && invoice.status !== "anulada" ? <Button onClick={() => { setPaying(true); setPaymentKey(newOperationKey("web-payment")); setPayment({ amount: invoice.balance_due, method: "efectivo", reference: "", notes: "" }); }}>Registrar pago</Button> : null}</div>} />
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard label="Total" value={money(invoice.total_amount)} icon={<DollarSign className="h-5 w-5" />} />
         <StatCard label="Pagado" value={money(invoice.paid_amount)} icon={<DollarSign className="h-5 w-5" />} />
@@ -965,9 +1006,9 @@ export function InvoiceDetailPage() {
         {invoice.items?.length ? <Table data={invoice.items.filter((item) => item.active)} columns={[{ key: "description", header: "Descripcion", render: (i) => i.description }, { key: "qty", header: "Cant.", render: (i) => i.quantity }, { key: "price", header: "Precio", render: (i) => money(i.unit_price) }, { key: "tax", header: "Imp.", render: (i) => money(i.tax_amount) }, { key: "total", header: "Total", render: (i) => money(i.line_total) }]} /> : <EmptyState title="No hay items." description="Esta factura no tiene items activos." />}
       </Card>
       <Card title="Pagos aplicados">
-        {payments.length ? <Table data={payments} columns={[{ key: "number", header: "Pago", render: (i) => i.payment_number }, { key: "date", header: "Fecha", render: (i) => i.payment_date }, { key: "method", header: "Metodo", render: (i) => <PaymentMethodBadge method={i.method} /> }, { key: "amount", header: "Monto", render: (i) => money(i.amount) }, { key: "status", header: "Estado", render: (i) => <PaymentStatusBadge status={i.status} /> }]} /> : <EmptyState title="No hay pagos aplicados." description="Registra un pago para esta factura." />}
+        {payments.length ? <Table data={payments} columns={[{ key: "number", header: "Pago", render: (i) => i.payment_number }, { key: "date", header: "Fecha", render: (i) => i.payment_date }, { key: "method", header: "Metodo", render: (i) => <PaymentMethodBadge method={i.method} /> }, { key: "amount", header: "Monto", render: (i) => money(i.amount) }, { key: "balance", header: "Saldo posterior", render: (i) => money(i.balance_after) }, { key: "status", header: "Estado", render: (i) => <PaymentStatusBadge status={i.status} /> }, { key: "receipt", header: "Recibo", render: (i) => <Button className="h-8 px-3 text-xs" variant="outline" onClick={() => paymentReceipt(i)}>PDF</Button> }]} /> : <EmptyState title="No hay pagos aplicados." description="Registra un pago para esta factura." />}
       </Card>
-      <Modal open={paying} title={`Registrar pago ${invoice.invoice_number}`} onClose={() => setPaying(false)} actions={<><ModalCloseButton onClick={() => setPaying(false)} /><Button form="invoice-detail-payment-form" type="submit">Registrar pago</Button></>}>
+      <Modal open={paying} title={`Registrar pago ${invoice.invoice_number}`} onClose={() => { if (!submittingPayment) setPaying(false); }} actions={<><ModalCloseButton disabled={submittingPayment} onClick={() => setPaying(false)} /><Button disabled={submittingPayment} form="invoice-detail-payment-form" type="submit">{submittingPayment ? "Procesando..." : "Registrar pago"}</Button></>}>
         <form id="invoice-detail-payment-form" className="grid gap-4" onSubmit={submitPayment}>
           <p className="text-sm text-slate-600">Saldo pendiente: <b>{money(invoice.balance_due)}</b></p>
           <label className="block space-y-1.5"><span className="text-sm font-medium text-slate-700">Monto</span><input className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm" inputMode="decimal" max={invoice.balance_due} min="0.01" required step="0.01" value={payment.amount} onChange={(e) => setPayment({ ...payment, amount: cleanDecimal(e.target.value) })} /></label>
@@ -990,7 +1031,14 @@ export function InvoiceDetailPage() {
 export function PaymentsPage({ patientOnly = false }: { patientOnly?: boolean }) {
   const [items, setItems] = useState<Payment[]>([]);
   useEffect(() => { (patientOnly ? getMyPayments() : getPayments()).then(setItems).catch((e) => toast.error(getErrorMessage(e))); }, [patientOnly]);
-  return <div className="space-y-6"><PageHeader title={patientOnly ? "Mis pagos" : "Pagos"} description="Pagos aplicados a facturas." /><Card><Table data={items} columns={[{ key: "num", header: "Pago", render: (i) => i.payment_number }, { key: "invoice", header: "Factura", render: (i) => i.invoice_number }, { key: "patient", header: "Paciente", render: (i) => i.patient_nombre }, { key: "method", header: "Metodo", render: (i) => <PaymentMethodBadge method={i.method} /> }, { key: "amount", header: "Monto", render: (i) => money(i.amount) }, { key: "status", header: "Estado", render: (i) => <PaymentStatusBadge status={i.status} /> }]} /></Card></div>;
+  async function receipt(item: Payment) {
+    try {
+      downloadBlob(await getPaymentReceiptPdf(item.id, patientOnly), `recibo-${item.payment_number}.pdf`);
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+    }
+  }
+  return <div className="space-y-6"><PageHeader title={patientOnly ? "Mis pagos" : "Pagos"} description="Pagos aplicados a facturas." /><Card>{items.length ? <Table data={items} columns={[{ key: "num", header: "Pago", render: (i) => i.payment_number }, { key: "invoice", header: "Factura", render: (i) => i.invoice_number }, { key: "patient", header: "Paciente", render: (i) => i.patient_nombre }, { key: "method", header: "Metodo", render: (i) => <PaymentMethodBadge method={i.method} /> }, { key: "amount", header: "Monto", render: (i) => money(i.amount) }, { key: "balance", header: "Saldo posterior", render: (i) => money(i.balance_after) }, { key: "status", header: "Estado", render: (i) => <PaymentStatusBadge status={i.status} /> }, { key: "receipt", header: "Recibo", render: (i) => <Button className="h-8 px-3 text-xs" variant="outline" onClick={() => receipt(i)}>PDF</Button> }]} /> : <EmptyState title="No hay pagos registrados." description="Los pagos aplicados apareceran aqui." />}</Card></div>;
 }
 
 export function CashPage() {
@@ -999,6 +1047,8 @@ export function CashPage() {
   const [summary, setSummary] = useState<CashSummary | null>(null);
   const [cashModal, setCashModal] = useState<"open" | "close" | "movement" | null>(null);
   const [cashForm, setCashForm] = useState({ opening_amount: "0.00", closing_amount: "0.00", movement_type: "ingreso", amount: "0.00", reason: "", notes: "" });
+  const [operationKey, setOperationKey] = useState("");
+  const [submittingCash, setSubmittingCash] = useState(false);
   async function load() {
     const [sessionList, daySummary] = await Promise.all([getCashSessions(), getCashSummary()]);
     setSessions(sessionList);
@@ -1006,20 +1056,23 @@ export function CashPage() {
     try { setCurrent(await getCurrentCashSession()); } catch { setCurrent(null); }
   }
   useEffect(() => { load().catch((e) => toast.error(getErrorMessage(e))); }, []);
-  function showOpen() { setCashForm({ opening_amount: "0.00", closing_amount: "0.00", movement_type: "ingreso", amount: "0.00", reason: "", notes: "" }); setCashModal("open"); }
-  function showClose() { setCashForm({ opening_amount: "0.00", closing_amount: current?.expected_amount_live ?? current?.expected_amount ?? "0.00", movement_type: "ingreso", amount: "0.00", reason: "", notes: "" }); setCashModal("close"); }
-  function showMovement(type: "ingreso" | "egreso") { setCashForm({ opening_amount: "0.00", closing_amount: "0.00", movement_type: type, amount: "0.00", reason: type === "ingreso" ? "Ingreso manual" : "Egreso manual", notes: "" }); setCashModal("movement"); }
+  function showOpen() { setOperationKey(newOperationKey("web-cash-open")); setCashForm({ opening_amount: "0.00", closing_amount: "0.00", movement_type: "ingreso", amount: "0.00", reason: "", notes: "" }); setCashModal("open"); }
+  function showClose() { setOperationKey(newOperationKey("web-cash-close")); setCashForm({ opening_amount: "0.00", closing_amount: current?.expected_amount_live ?? current?.expected_amount ?? "0.00", movement_type: "ingreso", amount: "0.00", reason: "", notes: "" }); setCashModal("close"); }
+  function showMovement(type: "ingreso" | "egreso") { setOperationKey(newOperationKey("web-cash-movement")); setCashForm({ opening_amount: "0.00", closing_amount: "0.00", movement_type: type, amount: "0.00", reason: type === "ingreso" ? "Ingreso manual" : "Egreso manual", notes: "" }); setCashModal("movement"); }
   async function submitCash(e: FormEvent) {
     e.preventDefault();
+    setSubmittingCash(true);
     try {
       if (cashModal === "open") await openCashSession({ opening_amount: cashForm.opening_amount });
       if (cashModal === "close" && current) await closeCashSession(current.id, { closing_amount: cashForm.closing_amount, notes: cashForm.notes });
-      if (cashModal === "movement" && current) await createCashMovement(current.id, { movement_type: cashForm.movement_type as "ingreso" | "egreso", amount: cashForm.amount, reason: cashForm.reason, notes: cashForm.notes });
+      if (cashModal === "movement" && current) await createCashMovement(current.id, { movement_type: cashForm.movement_type as "ingreso" | "egreso", amount: cashForm.amount, reason: cashForm.reason, notes: cashForm.notes }, operationKey || newOperationKey("web-cash-movement"));
       toast.success(cashModal === "open" ? "Caja abierta correctamente." : cashModal === "close" ? "Caja cerrada correctamente." : "Movimiento registrado.");
       setCashModal(null);
       await load();
     } catch (e) {
       toast.error(getErrorMessage(e));
+    } finally {
+      setSubmittingCash(false);
     }
   }
   const expected = current?.expected_amount_live ?? current?.expected_amount ?? "0.00";
@@ -1057,7 +1110,7 @@ export function CashPage() {
           { key: "status", header: "Estado", render: (i) => <CashStatusBadge status={i.status} /> },
         ]} />
       </Card>
-      <Modal open={Boolean(cashModal)} title={cashModal === "open" ? "Abrir caja" : cashModal === "close" ? "Cerrar caja" : "Registrar movimiento"} onClose={() => setCashModal(null)} actions={<><ModalCloseButton onClick={() => setCashModal(null)} /><Button form="cash-form" type="submit">{cashModal === "open" ? "Abrir" : cashModal === "close" ? "Cerrar" : "Registrar"}</Button></>}>
+      <Modal open={Boolean(cashModal)} title={cashModal === "open" ? "Abrir caja" : cashModal === "close" ? "Cerrar caja" : "Registrar movimiento"} onClose={() => { if (!submittingCash) setCashModal(null); }} actions={<><ModalCloseButton disabled={submittingCash} onClick={() => setCashModal(null)} /><Button disabled={submittingCash} form="cash-form" type="submit">{submittingCash ? "Procesando..." : cashModal === "open" ? "Abrir" : cashModal === "close" ? "Cerrar" : "Registrar"}</Button></>}>
         <form id="cash-form" className="grid gap-4" onSubmit={submitCash}>
           {cashModal === "open" ? <label className="block space-y-1.5"><span className="text-sm font-medium text-slate-700">Monto de apertura</span><input className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm" min="0" required step="0.01" value={cashForm.opening_amount} onChange={(e) => setCashForm({ ...cashForm, opening_amount: cleanDecimal(e.target.value) })} /></label> : null}
           {cashModal === "close" ? <><p className="text-sm text-slate-600">Monto esperado: <b>{money(expected)}</b></p><p className={closeDifference === 0 ? "text-sm text-emerald-700" : "text-sm text-rose-700"}>Diferencia: <b>{money(closeDifference)}</b>{closeDifference !== 0 ? " · agrega una nota obligatoria." : ""}</p><label className="block space-y-1.5"><span className="text-sm font-medium text-slate-700">Monto contado</span><input className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm" min="0" required step="0.01" value={cashForm.closing_amount} onChange={(e) => setCashForm({ ...cashForm, closing_amount: cleanDecimal(e.target.value) })} /></label><label className="block space-y-1.5"><span className="text-sm font-medium text-slate-700">Notas de cierre</span><textarea className="min-h-24 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" required={closeDifference !== 0} value={cashForm.notes} onChange={(e) => setCashForm({ ...cashForm, notes: e.target.value })} /></label></> : null}

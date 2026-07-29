@@ -25,6 +25,8 @@ import { DoctorScheduleProfileScreen } from '@/features/doctor/screens/DoctorSch
 import { DoctorSecurityScreen } from '@/features/doctor/screens/DoctorSecurityScreen';
 import { DoctorTriageDetailScreen } from '@/features/doctor/screens/DoctorTriageDetailScreen';
 import { DoctorWaitingRoomScreen } from '@/features/doctor/screens/DoctorWaitingRoomScreen';
+import { DoctorHospitalizationDetailScreen } from '@/features/doctor/hospitalization/DoctorHospitalizationDetailScreen';
+import { DoctorHospitalizationsScreen } from '@/features/doctor/hospitalization/DoctorHospitalizationsScreen';
 import { createTabOptions, tabIcon } from '@/navigation/tabOptions';
 
 const Tab = createBottomTabNavigator();
@@ -35,6 +37,8 @@ function DoctorHomeStack() {
   return (
     <Stack.Navigator screenOptions={stackOptions}>
       <Stack.Screen component={DoctorDashboardScreen} name="DoctorDashboard" />
+      <Stack.Screen component={DoctorHospitalizationsScreen} name="DoctorHospitalizations" />
+      <Stack.Screen component={DoctorHospitalizationDetailScreen} name="DoctorHospitalizationDetail" />
       <Stack.Screen component={DoctorNotificationsScreen} name="DoctorNotifications" />
       <Stack.Screen component={DoctorPatientDetailScreen} name="DoctorPatientDetail" />
       <Stack.Screen component={DoctorTriageDetailScreen} name="DoctorTriageDetail" />

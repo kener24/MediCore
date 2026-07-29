@@ -67,6 +67,10 @@ export type NurseHospitalizationListItem = {
   patient_id?: number;
   patient_name?: string;
   patient_code?: string;
+  patient_identity?: string;
+  patient_birth_date?: string | null;
+  patient_allergies?: string | null;
+  patient_chronic_diseases?: string | null;
   patient_age?: number | string;
   patient_gender?: string;
   current_bed?: number | HospitalBed | null;
@@ -109,6 +113,8 @@ export type InpatientVitalSigns = InpatientVitalSignsPayload & {
   recorded_at?: string;
   created_at?: string;
   creado_en?: string;
+  is_abnormal?: boolean;
+  alert_summary?: string;
 };
 
 export type NursingNotePriority = 'normal' | 'important' | 'urgent' | string;
@@ -131,6 +137,7 @@ export type NursingNotePayload = {
   priority?: NursingNotePriority;
   content: string;
   title?: string;
+  shift?: string;
 };
 
 export type NursingNote = NursingNotePayload & {
@@ -152,12 +159,50 @@ export type HospitalizationEvent = {
   id?: number;
   event_type?: string;
   description?: string;
+  severity?: 'info' | 'warning' | 'critical' | string;
+  event_datetime?: string;
   previous_status?: string | null;
   new_status?: string | null;
   created_by_name?: string;
   created_at?: string;
   creado_en?: string;
   metadata?: Record<string, unknown>;
+};
+
+export type MedicalInstruction = {
+  id: number;
+  instruction_type?: string;
+  priority?: string;
+  title: string;
+  details: string;
+  status: string;
+  doctor_name?: string;
+  acknowledged_by_name?: string;
+  acknowledged_at?: string | null;
+  completed_at?: string | null;
+  creado_en?: string;
+};
+
+export type TreatmentPlan = {
+  id: number;
+  version: number;
+  status: string;
+  goals?: string;
+  treatment?: string;
+  monitoring?: string;
+  precautions?: string;
+  doctor_name?: string;
+  creado_en?: string;
+};
+
+export type HospitalTimelineEntry = {
+  id: string;
+  type: string;
+  title: string;
+  description: string;
+  severity: string;
+  occurred_at: string;
+  user?: string;
 };
 
 export type NurseHospitalizationDetail = NurseHospitalizationListItem & {
@@ -171,6 +216,8 @@ export type NurseHospitalizationDetail = NurseHospitalizationListItem & {
   recent_nursing_notes?: NursingNote[];
   recent_events?: HospitalizationEvent[];
   events?: HospitalizationEvent[];
+  active_treatment_plan?: TreatmentPlan | null;
+  active_instructions?: MedicalInstruction[];
 };
 
 export type NurseHospitalizationDashboard = {

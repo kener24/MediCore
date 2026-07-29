@@ -3,10 +3,12 @@ import { ApiClientError } from '@/core/api/authInterceptor';
 import type {
   HospitalBed,
   HospitalizationEvent,
+  HospitalTimelineEntry,
   InpatientVitalSigns,
   InpatientVitalSignsPayload,
   MedicationAdministration,
   MedicationAdministrationPayload,
+  MedicalInstruction,
   NurseHospitalizationDashboard,
   NurseHospitalizationDetail,
   NurseHospitalizationListItem,
@@ -60,6 +62,7 @@ function normalizeNotePayload(payload: NursingNotePayload) {
     note_type,
     title: payload.title?.trim() || noteTypeLabel(payload.note_type),
     note: payload.content.trim(),
+    shift: payload.shift || 'other',
   };
 }
 
@@ -81,8 +84,11 @@ export function noteTypeLabel(type?: string) {
 
 function normalizeError(error: unknown) {
   if (error instanceof ApiClientError) {
+    if (error.status === 400) return new Error(error.message || 'Revisa la información ingresada.');
+    if (error.status === 401) return new Error('Tu sesión expiró. Inicia sesión nuevamente.');
     if (error.status === 403) return new Error('No tienes acceso al módulo de hospitalización.');
     if (error.status === 404) return new Error(unavailableMessage);
+    if (error.status === 409) return new Error(error.message || 'La información cambió. Actualiza e intenta nuevamente.');
   }
   return error instanceof Error ? error : new Error(unavailableMessage);
 }
@@ -96,9 +102,9 @@ async function getOrUnavailable<T>(url: string, params?: QueryParams) {
   }
 }
 
-async function postOrUnavailable<T>(url: string, payload: unknown) {
+async function postOrUnavailable<T>(url: string, payload: unknown, idempotencyKey?: string) {
   try {
-    const { data } = await apiClient.post<T>(url, payload);
+    const { data } = await apiClient.post<T>(url, payload, idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : undefined);
     return data;
   } catch (error) {
     throw normalizeError(error);
@@ -164,6 +170,31 @@ export async function getHospitalizationEvents(hospitalizationId: number): Promi
   return normalizeListResponse<HospitalizationEvent>(data);
 }
 
+export async function createHospitalizationEvent(hospitalizationId: number, payload: { event_type: string; description: string; severity: string }): Promise<HospitalizationEvent> {
+  if (!hospitalizationId) throw new Error('No se puede registrar un evento sin internamiento.');
+  return postOrUnavailable<HospitalizationEvent>(`/hospitalization/admissions/${hospitalizationId}/events/`, payload);
+}
+
+export async function getHospitalTimeline(hospitalizationId: number): Promise<HospitalTimelineEntry[]> {
+  if (!hospitalizationId) throw new Error('No se puede consultar la línea de tiempo sin internamiento.');
+  const data = await getOrUnavailable<{ results?: HospitalTimelineEntry[] }>(`/hospitalization/admissions/${hospitalizationId}/timeline/`);
+  return data.results ?? [];
+}
+
+export async function getMedicalInstructions(hospitalizationId: number): Promise<MedicalInstruction[]> {
+  if (!hospitalizationId) throw new Error('No se pueden consultar indicaciones sin internamiento.');
+  const data = await getOrUnavailable<MedicalInstruction[] | { results?: MedicalInstruction[] }>(`/hospitalization/admissions/${hospitalizationId}/instructions/`);
+  return normalizeListResponse<MedicalInstruction>(data);
+}
+
+export async function acknowledgeMedicalInstruction(id: number): Promise<MedicalInstruction> {
+  return postOrUnavailable<MedicalInstruction>(`/hospitalization/instructions/${id}/acknowledge/`, {});
+}
+
+export async function updateMedicalInstruction(id: number, action: 'start' | 'complete'): Promise<MedicalInstruction> {
+  return postOrUnavailable<MedicalInstruction>(`/hospitalization/instructions/${id}/${action}/`, {});
+}
+
 export async function getBedStatus(params?: QueryParams): Promise<HospitalBed[]> {
   const data = await getOrUnavailable<HospitalBed[] | { results?: HospitalBed[] }>('/hospitalization/beds/', params);
   return normalizeListResponse<HospitalBed>(data);
@@ -182,7 +213,8 @@ export async function getNursingRounds(hospitalizationId: number): Promise<Nursi
 
 export async function createNursingRound(hospitalizationId: number, payload: NursingRoundPayload): Promise<NursingRound> {
   if (!hospitalizationId) throw new Error('No se puede crear una ronda sin internamiento.');
-  return postOrUnavailable<NursingRound>(`/hospitalization/admissions/${hospitalizationId}/nursing-rounds/`, payload);
+  const idempotencyKey = `nursing-round-${hospitalizationId}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return postOrUnavailable<NursingRound>(`/hospitalization/admissions/${hospitalizationId}/nursing-rounds/`, payload, idempotencyKey);
 }
 
 export async function getMedicationAdministrations(hospitalizationId: number): Promise<MedicationAdministration[]> {

@@ -1,6 +1,6 @@
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
@@ -21,8 +21,8 @@ import {
   resolvePatientName,
 } from '@/features/nurse/hospitalization/components/HospitalizationCards';
 import { HospitalizationStatusBadge } from '@/features/nurse/hospitalization/components/HospitalizationBadges';
-import { getHospitalizationDetail } from '@/features/nurse/hospitalization/services/nurseHospitalizationService';
-import type { NurseHospitalizationDetail } from '@/features/nurse/hospitalization/types/nurseHospitalization.types';
+import { acknowledgeMedicalInstruction, getHospitalizationDetail, getMedicalInstructions, updateMedicalInstruction } from '@/features/nurse/hospitalization/services/nurseHospitalizationService';
+import type { MedicalInstruction, NurseHospitalizationDetail } from '@/features/nurse/hospitalization/types/nurseHospitalization.types';
 
 export function NurseHospitalizationDetailScreen() {
   const navigation = useNavigation<any>();
@@ -32,6 +32,8 @@ export function NurseHospitalizationDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [instructions, setInstructions] = useState<MedicalInstruction[]>([]);
+  const [updatingInstruction, setUpdatingInstruction] = useState<number | null>(null);
 
   const load = useCallback(async (refresh = false) => {
     if (!hospitalizationId) {
@@ -44,7 +46,9 @@ export function NurseHospitalizationDetailScreen() {
     else setLoading(true);
     setError('');
     try {
-      setDetail(await getHospitalizationDetail(hospitalizationId));
+      const [hospitalization, instructionRows] = await Promise.all([getHospitalizationDetail(hospitalizationId), getMedicalInstructions(hospitalizationId)]);
+      setDetail(hospitalization);
+      setInstructions(instructionRows);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar el internamiento.');
     } finally {
@@ -54,6 +58,21 @@ export function NurseHospitalizationDetailScreen() {
   }, [hospitalizationId]);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
+
+  async function instructionAction(item: MedicalInstruction) {
+    if (updatingInstruction) return;
+    setUpdatingInstruction(item.id);
+    try {
+      if (item.status === 'active') await acknowledgeMedicalInstruction(item.id);
+      else if (item.status === 'acknowledged') await updateMedicalInstruction(item.id, 'start');
+      else if (item.status === 'in_progress') await updateMedicalInstruction(item.id, 'complete');
+      await load(true);
+    } catch (err) {
+      Alert.alert('Indicaciones médicas', err instanceof Error ? err.message : 'No se pudo actualizar la indicación.');
+    } finally {
+      setUpdatingInstruction(null);
+    }
+  }
 
   if (loading) return <LoadingState label="Cargando internamiento..." />;
   const isClosed = detail ? ['discharged', 'cancelled'].includes(String(detail.status)) : false;
@@ -80,8 +99,17 @@ export function NurseHospitalizationDetailScreen() {
               <Text style={styles.description}>Diagnóstico de ingreso: {detail.diagnosis_at_admission || 'No registrado'}</Text>
               <Text style={styles.description}>Médico responsable: {detail.responsible_doctor_name || 'No asignado'}</Text>
               <Text style={styles.description}>Ingreso: {formatDateTime(detail.admission_datetime)}</Text>
+              <Text style={[styles.description, detail.patient_allergies ? styles.alertText : undefined]}>Alergias: {detail.patient_allergies || 'No registradas'}</Text>
+              <Text style={styles.description}>Antecedentes crónicos: {detail.patient_chronic_diseases || 'No registrados'}</Text>
             </AppCard>
             <CurrentBedCard detail={detail} />
+            {detail.active_treatment_plan ? <AppCard style={styles.card}><Text style={styles.sectionTitle}>Plan de tratamiento v{detail.active_treatment_plan.version}</Text><Text style={styles.description}>{detail.active_treatment_plan.treatment || 'Sin detalle'}</Text>{detail.active_treatment_plan.monitoring ? <Text style={styles.description}>Monitoreo: {detail.active_treatment_plan.monitoring}</Text> : null}{detail.active_treatment_plan.precautions ? <Text style={styles.alertText}>Precauciones: {detail.active_treatment_plan.precautions}</Text> : null}</AppCard> : null}
+            <Text style={styles.sectionTitle}>Indicaciones médicas activas</Text>
+            {instructions.length ? instructions.map((item) => {
+              const actionable = ['active', 'acknowledged', 'in_progress'].includes(item.status);
+              const label = item.status === 'active' ? 'Confirmar recepción' : item.status === 'acknowledged' ? 'Iniciar' : 'Completar';
+              return <AppCard key={item.id} style={styles.card}><View style={styles.rowBetween}><Text style={styles.title}>{item.title}</Text><Text style={item.priority === 'urgent' || item.priority === 'stat' ? styles.alertText : styles.description}>{item.priority || 'routine'}</Text></View><Text style={styles.description}>{item.details}</Text><Text style={styles.description}>Estado: {item.status}</Text>{actionable && !isClosed ? <AppButton label={label} loading={updatingInstruction === item.id} onPress={() => void instructionAction(item)} /> : null}</AppCard>;
+            }) : <EmptyState description="El médico aún no ha registrado indicaciones activas." title="Sin indicaciones" />}
             {!isClosed ? (
               <>
                 <View style={styles.actions}>
@@ -120,6 +148,7 @@ function SectionHeader({ onPress, title }: { onPress: () => void; title: string 
 }
 
 const styles = StyleSheet.create({
+  alertText: { color: colors.danger, fontSize: 13, fontWeight: '800', lineHeight: 19 },
   actions: { flexDirection: 'row', gap: 10 },
   card: { gap: 10 },
   content: { gap: 14, padding: 18, paddingBottom: 118 },

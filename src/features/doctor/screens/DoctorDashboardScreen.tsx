@@ -46,6 +46,7 @@ export function DoctorDashboardScreen() {
     if (target === 'schedule') navigation.getParent()?.navigate('DoctorScheduleTab');
     if (target === 'waitingRoom') navigation.getParent()?.navigate('DoctorWaitingRoomTab');
     if (target === 'consultations') navigation.getParent()?.navigate('DoctorConsultationsTab');
+    if (target === 'hospitalizations') navigation.navigate('DoctorHospitalizations');
     if (target === 'notifications') navigation.navigate('DoctorNotifications');
     if (target === 'profile') navigation.getParent()?.navigate('DoctorProfileTab');
   }

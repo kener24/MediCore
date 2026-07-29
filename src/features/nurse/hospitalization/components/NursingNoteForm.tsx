@@ -21,6 +21,13 @@ const priorities: { label: string; value: NursingNotePriority }[] = [
   { label: 'Urgente', value: 'urgent' },
 ];
 
+const shifts = [
+  { label: 'Mañana', value: 'morning' },
+  { label: 'Tarde', value: 'afternoon' },
+  { label: 'Noche', value: 'night' },
+  { label: 'Otro', value: 'other' },
+];
+
 export function NursingNoteForm({
   loading,
   onSubmit,
@@ -31,6 +38,7 @@ export function NursingNoteForm({
   const [noteType, setNoteType] = useState<NursingNoteType>('observation');
   const [priority, setPriority] = useState<NursingNotePriority>('normal');
   const [content, setContent] = useState('');
+  const [shift, setShift] = useState('morning');
   const [error, setError] = useState('');
 
   function submit() {
@@ -45,7 +53,7 @@ export function NursingNoteForm({
       return;
     }
     setError('');
-    onSubmit({ content: trimmed, note_type: noteType, priority });
+    onSubmit({ content: trimmed, note_type: noteType, priority, shift });
   }
 
   return (
@@ -60,6 +68,12 @@ export function NursingNoteForm({
       <View style={styles.chips}>
         {priorities.map((item) => (
           <Chip active={priority === item.value} disabled={loading} key={item.value} label={item.label} onPress={() => setPriority(item.value)} />
+        ))}
+      </View>
+      <Text style={styles.label}>Turno</Text>
+      <View style={styles.chips}>
+        {shifts.map((item) => (
+          <Chip active={shift === item.value} disabled={loading} key={item.value} label={item.label} onPress={() => setShift(item.value)} />
         ))}
       </View>
       <AppInput icon="note-text-outline" label="Contenido" multiline onChangeText={setContent} style={styles.noteInput} value={content} />

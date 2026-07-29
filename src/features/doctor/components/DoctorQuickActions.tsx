@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors } from '@/core/theme/colors';
 
-type Target = 'schedule' | 'waitingRoom' | 'consultations' | 'notifications' | 'profile';
+type Target = 'schedule' | 'waitingRoom' | 'consultations' | 'hospitalizations' | 'notifications' | 'profile';
 
 const actions: {
   description: string;
@@ -14,6 +14,7 @@ const actions: {
   { description: 'Citas programadas de hoy', icon: 'calendar-account-outline', label: 'Agenda', target: 'schedule' },
   { description: 'Pacientes listos para médico', icon: 'account-clock-outline', label: 'Sala', target: 'waitingRoom' },
   { description: 'Atenciones en curso', icon: 'stethoscope', label: 'Consultas', target: 'consultations' },
+  { description: 'Seguimiento intrahospitalario', icon: 'hospital-building', label: 'Hospitalizados', target: 'hospitalizations' },
   { description: 'Avisos clínicos', icon: 'bell-outline', label: 'Notificaciones', target: 'notifications' },
   { description: 'Datos de cuenta', icon: 'account-circle-outline', label: 'Perfil', target: 'profile' },
 ];

@@ -50,6 +50,11 @@ export async function createMedicalInstruction(id: number, payload: Partial<Medi
   return data;
 }
 
+export async function suspendMedicalInstruction(id: number, reason: string) {
+  const { data } = await apiClient.post<MedicalInstruction>(`/hospitalization/instructions/${id}/suspend/`, { reason });
+  return data;
+}
+
 export async function getHospitalTimeline(id: number) {
   const { data } = await apiClient.get<{ results?: TimelineEntry[] }>(`/hospitalization/admissions/${id}/timeline/`);
   return data.results ?? [];

@@ -259,6 +259,8 @@ export type NursingRound = {
 
 export type NursingRoundPayload = {
   round_type: string;
+  status?: 'completed' | 'missed';
+  status_reason?: string;
   general_condition?: string;
   pain_level?: number | string;
   consciousness_status?: string;

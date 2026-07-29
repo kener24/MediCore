@@ -25,11 +25,15 @@ export function NurseNursingRoundFormScreen() {
   const route = useRoute<any>();
   const hospitalizationId = toPositiveId(route.params?.hospitalizationId);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState<NursingRoundPayload>({ round_type: 'routine', general_condition: '', pain_level: '', consciousness_status: '', mobility_status: '', feeding_status: '', elimination_status: '', notes: '' });
+  const [form, setForm] = useState<NursingRoundPayload>({ round_type: 'routine', status: 'completed', status_reason: '', general_condition: '', pain_level: '', consciousness_status: '', mobility_status: '', feeding_status: '', elimination_status: '', notes: '' });
 
   async function submit() {
     if (saving) return;
     if (!hospitalizationId) return Alert.alert('Ronda de enfermería', 'No se encontró el internamiento.');
+    if (form.status === 'missed' && !form.status_reason?.trim()) {
+      Alert.alert('Ronda omitida', 'Indica el motivo por el que no se realizó la ronda.');
+      return;
+    }
     const pain = form.pain_level === '' || form.pain_level === undefined ? undefined : Number(form.pain_level);
     if (pain !== undefined && (Number.isNaN(pain) || pain < 0 || pain > 10)) {
       Alert.alert('Ronda de enfermería', 'El nivel de dolor debe estar entre 0 y 10.');
@@ -46,6 +50,7 @@ export function NurseNursingRoundFormScreen() {
         mobility_status: form.mobility_status?.trim(),
         notes: form.notes?.trim(),
         pain_level: pain,
+        status_reason: form.status_reason?.trim(),
       });
       Alert.alert('Ronda de enfermería', 'Ronda registrada correctamente.', [{ text: 'Aceptar', onPress: () => navigation.navigate('NurseNursingRounds', { hospitalizationId }) }]);
     } catch (err) {
@@ -63,6 +68,12 @@ export function NurseNursingRoundFormScreen() {
           <AppCard style={styles.form}>
             <Text style={styles.label}>Tipo de ronda</Text>
             <View style={styles.chips}>{types.map(([value, label]) => <Chip active={form.round_type === value} key={value} label={label} onPress={() => setForm({ ...form, round_type: value })} />)}</View>
+            <Text style={styles.label}>Resultado</Text>
+            <View style={styles.chips}>
+              <Chip active={form.status === 'completed'} label="Completada" onPress={() => setForm({ ...form, status: 'completed', status_reason: '' })} />
+              <Chip active={form.status === 'missed'} label="Omitida" onPress={() => setForm({ ...form, status: 'missed' })} />
+            </View>
+            {form.status === 'missed' ? <AppInput label="Motivo obligatorio" multiline onChangeText={(value) => setForm({ ...form, status_reason: value })} value={String(form.status_reason ?? '')} /> : null}
             <AppInput label="Condición general" onChangeText={(value) => setForm({ ...form, general_condition: value })} value={String(form.general_condition ?? '')} />
             <AppInput keyboardType="number-pad" label="Dolor 0-10" onChangeText={(value) => setForm({ ...form, pain_level: value.replace(/[^0-9]/g, '') })} value={String(form.pain_level ?? '')} />
             <AppInput label="Conciencia" onChangeText={(value) => setForm({ ...form, consciousness_status: value })} value={String(form.consciousness_status ?? '')} />

@@ -225,3 +225,33 @@ La evidencia de despliegue, migraciones MySQL, servicios, pruebas A/B y HTTPS se
 ### Android fisico
 
 Pendiente de confirmacion manual en dispositivo. TypeScript y Expo Doctor estan aprobados, pero la certificacion fisica requiere que el usuario confirme login, caja, pago parcial, pago final, recibo, movimiento, cierre, timeout, doble toque y perdida de red.
+
+## Sprint 1.5: inventario, compras, lotes y alertas
+
+### Evidencia local previa al despliegue
+
+- `python manage.py check`: aprobado, 0 errores.
+- `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
+- Diagnostico local: 7 productos, 4 lotes, 7 movimientos y 1 linea de recepcion; 0 errores y 0 advertencias.
+- Suite Django completa: 329/329 pruebas ejecutadas correctamente; 2 pruebas MySQL omitidas en SQLite.
+- Regresion focalizada con base creada desde cero: 80/80 correctas; las mismas 2 pruebas de concurrencia quedan para MySQL.
+- Build web: aprobado; TypeScript y Vite completaron 1850 modulos.
+- ESLint web: 0 errores y 55 advertencias heredadas.
+- TypeScript movil: aprobado.
+- Expo Doctor: 18/18 controles aprobados.
+- ESLint movil: 0 errores y 1 advertencia heredada.
+- Metro/Android: manifest HTTP 200 y bundle Android HTTP 200 de 1,513 modulos.
+- Se agregaron pruebas de FEFO dividido, vencidos, stock negativo, idempotencia, recepcion parcial/total, varios lotes, devolucion, reversion, inmutabilidad, alertas y aislamiento por clinica.
+- La prueba de concurrencia real queda condicionada a MySQL y debe ejecutarse durante la certificacion del servidor.
+
+### Evidencia pendiente de completar tras despliegue
+
+- Resultado final de la suite Django completa.
+- TypeScript, Expo Doctor y arranque de Metro.
+- Ruta y hashes del respaldo previo.
+- Commit desplegado y migraciones MySQL.
+- Salida del diagnostico no destructivo de inventario.
+- Estado del timer de notificaciones y ejecucion controlada.
+- Pruebas sinteticas en Clinica A y Clinica B.
+- Pruebas de IDs cruzados y concurrencia MySQL.
+- Confirmacion HTTPS de web y API.

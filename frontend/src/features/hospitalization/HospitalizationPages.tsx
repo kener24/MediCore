@@ -720,6 +720,17 @@ function ClinicalCareSections({
     );
   }
 
+  async function suspendInstruction(item: MedicalInstruction) {
+    const reason =
+      window.prompt("Motivo obligatorio de suspensión")?.trim() || "";
+    if (!reason) return toast.error("El motivo de suspensión es obligatorio.");
+    await run(
+      `suspend-${item.id}`,
+      () => changeMedicalInstructionStatus(item.id, "suspend", reason),
+      "Indicación suspendida con trazabilidad.",
+    );
+  }
+
   return (
     <div className="space-y-4">
       {canWriteMedical && !isClosedAdmission(admission.status) ? (
@@ -961,6 +972,20 @@ function ClinicalCareSections({
                       }
                     >
                       {item.status === "acknowledged" ? "Iniciar" : "Completar"}
+                    </Button>
+                  ) : null}
+                  {canWriteMedical &&
+                  ["active", "acknowledged", "in_progress"].includes(
+                    item.status,
+                  ) ? (
+                    <Button
+                      className="mt-2"
+                      isLoading={savingAction === `suspend-${item.id}`}
+                      type="button"
+                      variant="danger"
+                      onClick={() => void suspendInstruction(item)}
+                    >
+                      Suspender
                     </Button>
                   ) : null}
                 </div>
@@ -1747,7 +1772,27 @@ export function HospitalRoomsBedsPage() {
     setUpdating(key);
     try {
       await updateHospitalRoom(room.id, { is_active: !room.is_active });
-      toast.success(room.is_active ? "Habitación desactivada." : "Habitación activada.");
+      toast.success(
+        room.is_active ? "Habitación desactivada." : "Habitación activada.",
+      );
+      await load();
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    } finally {
+      setUpdating("");
+    }
+  }
+  async function editRoom(room: HospitalRoom) {
+    const name = window.prompt("Nombre de la habitación", room.name)?.trim();
+    if (!name) return;
+    const floor = window.prompt("Piso", room.floor || "")?.trim();
+    if (floor === undefined) return;
+    const key = `room-${room.id}`;
+    if (updating) return;
+    setUpdating(key);
+    try {
+      await updateHospitalRoom(room.id, { name, floor });
+      toast.success("Habitación actualizada.");
       await load();
     } catch (error) {
       toast.error(getErrorMessage(error));
@@ -1852,29 +1897,61 @@ export function HospitalRoomsBedsPage() {
           <Table
             data={rooms}
             columns={[
-              { key: "number", header: "Número", render: (room) => room.room_number },
+              {
+                key: "number",
+                header: "Número",
+                render: (room) => room.room_number,
+              },
               { key: "name", header: "Nombre", render: (room) => room.name },
-              { key: "floor", header: "Piso", render: (room) => room.floor || "-" },
-              { key: "beds", header: "Camas", render: (room) => room.beds_count ?? 0 },
-              { key: "occupied", header: "Ocupadas", render: (room) => room.occupied_beds ?? 0 },
-              { key: "state", header: "Estado", render: (room) => room.is_active ? "Activa" : "Inactiva" },
+              {
+                key: "floor",
+                header: "Piso",
+                render: (room) => room.floor || "-",
+              },
+              {
+                key: "beds",
+                header: "Camas",
+                render: (room) => room.beds_count ?? 0,
+              },
+              {
+                key: "occupied",
+                header: "Ocupadas",
+                render: (room) => room.occupied_beds ?? 0,
+              },
+              {
+                key: "state",
+                header: "Estado",
+                render: (room) => (room.is_active ? "Activa" : "Inactiva"),
+              },
               {
                 key: "actions",
                 header: "Acción",
                 render: (room) => (
-                  <Button
-                    isLoading={updating === `room-${room.id}`}
-                    type="button"
-                    variant="outline"
-                    onClick={() => void toggleRoom(room)}
-                  >
-                    {room.is_active ? "Desactivar" : "Activar"}
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      disabled={Boolean(updating)}
+                      type="button"
+                      variant="outline"
+                      onClick={() => void editRoom(room)}
+                    >
+                      Editar
+                    </Button>
+                    <Button
+                      isLoading={updating === `room-${room.id}`}
+                      type="button"
+                      variant="outline"
+                      onClick={() => void toggleRoom(room)}
+                    >
+                      {room.is_active ? "Desactivar" : "Activar"}
+                    </Button>
+                  </div>
                 ),
               },
             ]}
           />
-        ) : <EmptyState title="No hay habitaciones registradas." />}
+        ) : (
+          <EmptyState title="No hay habitaciones registradas." />
+        )}
       </Card>
       <Card title="Camas">
         <Table
@@ -1905,9 +1982,13 @@ export function HospitalRoomsBedsPage() {
                   className="h-9 rounded-md border px-2 text-xs"
                   disabled={Boolean(updating) || bed.status === "occupied"}
                   value={bed.status}
-                  onChange={(event) => void changeBedStatus(bed, event.target.value)}
+                  onChange={(event) =>
+                    void changeBedStatus(bed, event.target.value)
+                  }
                 >
-                  {bed.status === "occupied" ? <option value="occupied">Ocupada</option> : null}
+                  {bed.status === "occupied" ? (
+                    <option value="occupied">Ocupada</option>
+                  ) : null}
                   <option value="available">Disponible</option>
                   <option value="cleaning">Limpieza</option>
                   <option value="maintenance">Mantenimiento</option>

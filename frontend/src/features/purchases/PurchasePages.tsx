@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { PackagePlus } from "lucide-react";
 import { toast } from "sonner";
 
-import { approvePurchaseOrder, cancelPurchaseOrder, createPurchaseOrder, createSupplier, getPurchaseOrder, getPurchaseOrders, getPurchaseReceipts, getPurchaseReceipt, getPurchaseStats, getSupplier, getSupplierHistory, getSuppliers, receivePurchaseOrder } from "../../api/purchasesApi";
+import { approvePurchaseOrder, cancelPurchaseOrder, createPurchaseOrder, createSupplier, getPurchaseOrder, getPurchaseOrders, getPurchaseReceipts, getPurchaseReceipt, getPurchaseStats, getSupplier, getSupplierHistory, getSuppliers, receivePurchaseOrder, returnPurchaseItems, reversePurchaseReceipt } from "../../api/purchasesApi";
 import { getInventoryItems } from "../../api/inventoryApi";
 import { getErrorMessage } from "../../api/axios";
 import { Button } from "../../components/ui/Button";
@@ -21,6 +21,7 @@ import { cleanDecimal, digitInputProps, onlyDigits, onlyPhoneChars, phoneInputPr
 
 const money = (value?: string | number | null) => `L ${Number(value ?? 0).toFixed(2)}`;
 const today = () => new Date().toISOString().slice(0, 10);
+const operationKey = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 export function PurchasesDashboardPage() {
   const [stats, setStats] = useState<PurchaseStats | null>(null);
@@ -81,20 +82,41 @@ export function PurchaseOrderDetailsPage() {
   async function load() { if (id) setOrder(await getPurchaseOrder(id)); }
   useEffect(() => { load().catch((e) => toast.error(getErrorMessage(e))); }, [id]);
   if (!order) return <Loader />;
-  return <div className="space-y-6"><PageHeader title={order.order_number} description={`Proveedor: ${order.supplier_nombre ?? "-"}`} actions={<div className="flex gap-2"><Link className="rounded-md border px-4 py-2 text-sm font-semibold" to={`/clinic/purchases/orders/${order.id}/receive`}>Recibir</Link><Link className="rounded-md border px-4 py-2 text-sm font-semibold" to="/clinic/purchases/orders">Volver</Link></div>} /><div className="grid gap-4 md:grid-cols-4"><StatCard label="Subtotal" value={money(order.subtotal)} icon={<PackagePlus className="h-5 w-5" />} /><StatCard label="Descuento" value={money(order.discount_amount)} icon={<PackagePlus className="h-5 w-5" />} /><StatCard label="Impuesto" value={money(order.tax_amount)} icon={<PackagePlus className="h-5 w-5" />} /><StatCard label="Total" value={money(order.total_amount)} icon={<PackagePlus className="h-5 w-5" />} /></div><Card title="Productos"><Table data={order.items ?? []} columns={[{ key: "item", header: "Producto", render: (i) => i.item_nombre }, { key: "ordered", header: "Pedido", render: (i) => i.quantity_ordered }, { key: "received", header: "Recibido", render: (i) => i.quantity_received }, { key: "pending", header: "Pendiente", render: (i) => i.pending_quantity }, { key: "cost", header: "Costo", render: (i) => money(i.unit_cost) }, { key: "total", header: "Total", render: (i) => money(i.line_total) }]} /></Card><Card title="Recepciones"><Table data={order.receipts ?? []} columns={[{ key: "num", header: "Numero", render: (i) => <Link className="font-semibold text-brand-700" to={`/clinic/purchases/receipts/${i.id}`}>{i.receipt_number}</Link> }, { key: "date", header: "Fecha", render: (i) => i.receipt_date }, { key: "user", header: "Recibido por", render: (i) => i.received_by_nombre || "-" }]} /></Card></div>;
+  const canReceive = ["aprobada", "recibida_parcial"].includes(order.status) && (order.items ?? []).some((item) => Number(item.pending_quantity) > 0);
+  return <div className="space-y-6"><PageHeader title={order.order_number} description={`Proveedor: ${order.supplier_nombre ?? "-"}`} actions={<div className="flex gap-2">{canReceive ? <Link className="rounded-md border px-4 py-2 text-sm font-semibold" to={`/clinic/purchases/orders/${order.id}/receive`}>Recibir</Link> : null}<Link className="rounded-md border px-4 py-2 text-sm font-semibold" to="/clinic/purchases/orders">Volver</Link></div>} /><div className="grid gap-4 md:grid-cols-4"><StatCard label="Subtotal" value={money(order.subtotal)} icon={<PackagePlus className="h-5 w-5" />} /><StatCard label="Descuento" value={money(order.discount_amount)} icon={<PackagePlus className="h-5 w-5" />} /><StatCard label="Impuesto" value={money(order.tax_amount)} icon={<PackagePlus className="h-5 w-5" />} /><StatCard label="Total" value={money(order.total_amount)} icon={<PackagePlus className="h-5 w-5" />} /></div><Card title="Productos"><Table data={order.items ?? []} columns={[{ key: "item", header: "Producto", render: (i) => i.item_nombre }, { key: "ordered", header: "Pedido", render: (i) => i.quantity_ordered }, { key: "received", header: "Recibido", render: (i) => i.quantity_received }, { key: "pending", header: "Pendiente", render: (i) => i.pending_quantity }, { key: "cost", header: "Costo", render: (i) => money(i.unit_cost) }, { key: "total", header: "Total", render: (i) => money(i.line_total) }]} /></Card><Card title="Recepciones">{(order.receipts ?? []).length ? <Table data={order.receipts ?? []} columns={[{ key: "num", header: "Numero", render: (i) => <Link className="font-semibold text-brand-700" to={`/clinic/purchases/receipts/${i.id}`}>{i.receipt_number}</Link> }, { key: "date", header: "Fecha", render: (i) => i.receipt_date }, { key: "user", header: "Recibido por", render: (i) => i.received_by_nombre || "-" }]} /> : <EmptyState title="No hay recepciones asociadas a esta orden." />}</Card></div>;
 }
 
 export function PurchaseReceivePage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [order, setOrder] = useState<PurchaseOrder | null>(null);
-  const [lines, setLines] = useState<Record<number, { quantity_received: string; lot_number: string; expiration_date: string; notes: string }>>({});
-  useEffect(() => { if (id) getPurchaseOrder(id).then((o) => { setOrder(o); const initial: typeof lines = {}; (o.items ?? []).forEach((item) => { if (Number(item.pending_quantity) > 0) initial[item.id] = { quantity_received: item.pending_quantity, lot_number: "", expiration_date: "", notes: "" }; }); setLines(initial); }).catch((e) => toast.error(getErrorMessage(e))); }, [id]);
+  const [lines, setLines] = useState<Array<{ key: string; purchase_order_item: number; quantity_received: string; lot_number: string; expiration_date: string; notes: string }>>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [idempotencyKey, setIdempotencyKey] = useState(operationKey);
+  useEffect(() => { if (id) getPurchaseOrder(id).then((o) => { setOrder(o); setLines((o.items ?? []).filter((item) => Number(item.pending_quantity) > 0).map((item) => ({ key: operationKey(), purchase_order_item: item.id, quantity_received: item.pending_quantity, lot_number: "", expiration_date: "", notes: "" }))); }).catch((e) => toast.error(getErrorMessage(e))); }, [id]);
   if (!order) return <Loader />;
   const currentOrder = order;
   const pending = (order.items ?? []).filter((item) => Number(item.pending_quantity) > 0);
-  async function submit(e: FormEvent) { e.preventDefault(); try { await receivePurchaseOrder(currentOrder.id, { receipt_date: today(), items: pending.map((item) => ({ purchase_order_item: item.id, quantity_received: lines[item.id]?.quantity_received, unit_cost: item.unit_cost, lot_number: lines[item.id]?.lot_number, expiration_date: lines[item.id]?.expiration_date || null, notes: lines[item.id]?.notes })) }); toast.success("Recepcion registrada correctamente. Inventario actualizado."); navigate(`/clinic/purchases/orders/${currentOrder.id}`); } catch (err) { toast.error(getErrorMessage(err)); } }
-  return <div className="space-y-6"><PageHeader title={`Recibir ${order.order_number}`} description="Registra recepcion total o parcial y actualiza inventario." /><Card><form className="space-y-4" onSubmit={submit}>{pending.length ? pending.map((item) => <div key={item.id} className="grid gap-2 lg:grid-cols-[1fr_100px_120px_140px_1fr]"><div><p className="font-semibold text-slate-900">{item.item_nombre}</p><p className="text-xs text-slate-500">Pendiente: {item.pending_quantity} | Lote: {item.requires_lot ? "requerido" : "opcional"}</p></div><input className="h-10 rounded-md border px-3 text-sm" inputMode="decimal" value={lines[item.id]?.quantity_received ?? ""} onChange={(e) => setLines({ ...lines, [item.id]: { ...lines[item.id], quantity_received: cleanDecimal(e.target.value) } })} /><input className="h-10 rounded-md border px-3 text-sm" placeholder="Lote" required={item.requires_lot} value={lines[item.id]?.lot_number ?? ""} onChange={(e) => setLines({ ...lines, [item.id]: { ...lines[item.id], lot_number: e.target.value } })} /><input className="h-10 rounded-md border px-3 text-sm" type="date" required={item.requires_expiration} value={lines[item.id]?.expiration_date ?? ""} onChange={(e) => setLines({ ...lines, [item.id]: { ...lines[item.id], expiration_date: e.target.value } })} /><input className="h-10 rounded-md border px-3 text-sm" placeholder="Notas" value={lines[item.id]?.notes ?? ""} onChange={(e) => setLines({ ...lines, [item.id]: { ...lines[item.id], notes: e.target.value } })} /></div>) : <EmptyState title="No hay productos pendientes." description="La orden ya fue recibida por completo." />}<button className="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white" disabled={!pending.length}>Registrar recepcion</button></form></Card></div>;
+  const allowed = ["aprobada", "recibida_parcial"].includes(order.status);
+  function changeLine(key: string, field: "quantity_received" | "lot_number" | "expiration_date" | "notes", value: string) { setLines((current) => current.map((line) => line.key === key ? { ...line, [field]: field === "quantity_received" ? cleanDecimal(value) : value } : line)); }
+  function addLot(item: PurchaseOrderItem) { setLines((current) => [...current, { key: operationKey(), purchase_order_item: item.id, quantity_received: "", lot_number: "", expiration_date: "", notes: "" }]); }
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    const selected = lines.filter((line) => Number(line.quantity_received) > 0);
+    if (!selected.length) { toast.error("Ingresa al menos una cantidad recibida."); return; }
+    for (const item of pending) {
+      const total = selected.filter((line) => line.purchase_order_item === item.id).reduce((sum, line) => sum + Number(line.quantity_received), 0);
+      if (total > Number(item.pending_quantity)) { toast.error(`La cantidad de ${item.item_nombre ?? "producto"} supera lo pendiente.`); return; }
+    }
+    setSubmitting(true);
+    try {
+      await receivePurchaseOrder(currentOrder.id, { receipt_date: today(), idempotency_key: idempotencyKey, items: selected.map((line) => ({ ...line, key: undefined, unit_cost: currentOrder.items?.find((item) => item.id === line.purchase_order_item)?.unit_cost, expiration_date: line.expiration_date || null })) }, idempotencyKey);
+      toast.success("Recepcion registrada correctamente. Inventario actualizado.");
+      navigate(`/clinic/purchases/orders/${currentOrder.id}`);
+    } catch (err) { toast.error(getErrorMessage(err)); setIdempotencyKey(operationKey()); }
+    finally { setSubmitting(false); }
+  }
+  return <div className="space-y-6"><PageHeader title={`Recibir ${order.order_number}`} description="Registra recepcion total o parcial y actualiza inventario." /><Card><form className="space-y-5" onSubmit={submit}>{allowed && pending.length ? pending.map((item) => <section key={item.id} className="space-y-2 border-b border-slate-200 pb-4 last:border-0"><div className="flex items-center justify-between gap-3"><div><p className="font-semibold text-slate-900">{item.item_nombre}</p><p className="text-xs text-slate-500">Pendiente: {item.pending_quantity} | Lote: {item.requires_lot ? "requerido" : "opcional"}</p></div><Button type="button" variant="outline" className="h-8 px-3 text-xs" onClick={() => addLot(item)}>Agregar lote</Button></div>{lines.filter((line) => line.purchase_order_item === item.id).map((line, index) => <div key={line.key} className="grid gap-2 lg:grid-cols-[100px_140px_150px_1fr_auto]"><input aria-label={`Cantidad lote ${index + 1}`} className="h-10 rounded-md border px-3 text-sm" inputMode="decimal" placeholder="Cantidad" value={line.quantity_received} onChange={(e) => changeLine(line.key, "quantity_received", e.target.value)} /><input aria-label={`Lote ${index + 1}`} className="h-10 rounded-md border px-3 text-sm" placeholder="Lote" required={item.requires_lot && Number(line.quantity_received) > 0} value={line.lot_number} onChange={(e) => changeLine(line.key, "lot_number", e.target.value)} /><input aria-label={`Vencimiento lote ${index + 1}`} className="h-10 rounded-md border px-3 text-sm" type="date" min={today()} required={item.requires_expiration && Number(line.quantity_received) > 0} value={line.expiration_date} onChange={(e) => changeLine(line.key, "expiration_date", e.target.value)} /><input aria-label={`Notas lote ${index + 1}`} className="h-10 rounded-md border px-3 text-sm" placeholder="Notas" value={line.notes} onChange={(e) => changeLine(line.key, "notes", e.target.value)} />{index > 0 ? <Button type="button" variant="outline" className="h-10 px-3 text-xs" onClick={() => setLines((current) => current.filter((entry) => entry.key !== line.key))}>Quitar</Button> : <span />}</div>)}</section>) : <EmptyState title="No hay productos pendientes." description={allowed ? "La orden ya fue recibida por completo." : "La orden debe estar aprobada antes de registrar una recepcion."} />}<Button type="submit" disabled={!allowed || !pending.length || submitting}>{submitting ? "Registrando..." : "Registrar recepcion"}</Button></form></Card></div>;
 }
 
 export function PurchaseReceiptsPage() {
@@ -106,7 +128,35 @@ export function PurchaseReceiptsPage() {
 export function PurchaseReceiptDetailsPage() {
   const { id } = useParams();
   const [receipt, setReceipt] = useState<PurchaseReceipt | null>(null);
-  useEffect(() => { if (id) getPurchaseReceipt(id).then(setReceipt).catch((e) => toast.error(getErrorMessage(e))); }, [id]);
+  const [actionType, setActionType] = useState<"return" | "reverse" | null>(null);
+  const [reason, setReason] = useState("");
+  const [quantities, setQuantities] = useState<Record<number, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [returnKey, setReturnKey] = useState(operationKey);
+  async function load() { if (id) setReceipt(await getPurchaseReceipt(id)); }
+  useEffect(() => { load().catch((e) => toast.error(getErrorMessage(e))); }, [id]);
   if (!receipt) return <Loader />;
-  return <div className="space-y-6"><PageHeader title={receipt.receipt_number} description={`${receipt.supplier_nombre ?? "-"} | Orden ${receipt.order_number ?? "-"}`} actions={<Link className="rounded-md border px-4 py-2 text-sm font-semibold" to="/clinic/purchases/receipts">Volver</Link>} /><Card title="Items recibidos"><Table data={receipt.items ?? []} columns={[{ key: "item", header: "Producto", render: (i) => i.item_nombre }, { key: "qty", header: "Cantidad", render: (i) => i.quantity_received }, { key: "cost", header: "Costo", render: (i) => money(i.unit_cost) }, { key: "lot", header: "Lote", render: (i) => i.lot_number || "-" }, { key: "exp", header: "Vence", render: (i) => i.expiration_date || "-" }, { key: "mov", header: "Movimiento", render: (i) => i.inventory_movement ?? "-" }]} /></Card></div>;
+  const hasReturns = (receipt.items ?? []).some((item) => Number(item.quantity_returned) > 0);
+  const hasReturnable = (receipt.items ?? []).some((item) => Number(item.returnable_quantity) > 0);
+  function openAction(type: "return" | "reverse") { setActionType(type); setReason(""); setQuantities({}); if (type === "return") setReturnKey(operationKey()); }
+  async function submitAction(e: FormEvent) {
+    e.preventDefault();
+    if (!reason.trim() || !id) return;
+    setSubmitting(true);
+    try {
+      if (actionType === "reverse") {
+        await reversePurchaseReceipt(id, reason.trim());
+        toast.success("Recepcion revertida y existencias restauradas.");
+      } else {
+        const items = Object.entries(quantities).filter(([, quantity]) => Number(quantity) > 0).map(([receipt_item, quantity]) => ({ receipt_item: Number(receipt_item), quantity }));
+        if (!items.length) { toast.error("Indica al menos una cantidad a devolver."); return; }
+        await returnPurchaseItems(id, { reason: reason.trim(), idempotency_key: returnKey, items });
+        toast.success("Devolucion a proveedor registrada correctamente.");
+      }
+      setActionType(null);
+      await load();
+    } catch (error) { toast.error(getErrorMessage(error)); if (actionType === "return") setReturnKey(operationKey()); }
+    finally { setSubmitting(false); }
+  }
+  return <div className="space-y-6"><PageHeader title={receipt.receipt_number} description={`${receipt.supplier_nombre ?? "-"} | Orden ${receipt.order_number ?? "-"}`} actions={<div className="flex flex-wrap gap-2">{receipt.active && hasReturnable ? <Button variant="outline" onClick={() => openAction("return")}>Devolver</Button> : null}{receipt.active && !hasReturns ? <Button variant="outline" onClick={() => openAction("reverse")}>Revertir</Button> : null}<Link className="rounded-md border px-4 py-2 text-sm font-semibold" to="/clinic/purchases/receipts">Volver</Link></div>} />{!receipt.active ? <Card><p className="font-semibold text-red-700">Recepcion revertida</p><p className="mt-1 text-sm text-slate-600">{receipt.reversal_reason || "Sin detalle disponible."}</p></Card> : null}<Card title="Items recibidos"><Table data={receipt.items ?? []} columns={[{ key: "item", header: "Producto", render: (i) => i.item_nombre }, { key: "qty", header: "Recibido", render: (i) => i.quantity_received }, { key: "returned", header: "Devuelto", render: (i) => i.quantity_returned }, { key: "available", header: "Disponible para devolver", render: (i) => i.returnable_quantity }, { key: "cost", header: "Costo", render: (i) => money(i.unit_cost) }, { key: "lot", header: "Lote", render: (i) => i.lot_number || "-" }, { key: "exp", header: "Vence", render: (i) => i.expiration_date || "-" }, { key: "mov", header: "Movimiento", render: (i) => i.inventory_movement ?? "-" }]} /></Card><Modal open={Boolean(actionType)} title={actionType === "reverse" ? "Revertir recepcion" : "Devolver a proveedor"} onClose={() => setActionType(null)} actions={<><ModalCloseButton onClick={() => setActionType(null)} /><Button form="receipt-action-form" type="submit" variant="danger" disabled={submitting}>{submitting ? "Procesando..." : "Confirmar"}</Button></>}><form id="receipt-action-form" className="grid gap-4" onSubmit={submitAction}><p className="text-sm text-slate-600">{actionType === "reverse" ? "Se crearan movimientos inversos. Solo es posible si toda la existencia recibida sigue disponible." : "La recepcion original se conserva y se registrara una salida trazable."}</p>{actionType === "return" ? (receipt.items ?? []).filter((item) => Number(item.returnable_quantity) > 0).map((item) => <label key={item.id} className="block space-y-1.5"><span className="text-sm font-medium text-slate-700">{item.item_nombre} (maximo {item.returnable_quantity})</span><input className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm" inputMode="decimal" value={quantities[item.id] ?? ""} onChange={(e) => setQuantities({ ...quantities, [item.id]: cleanDecimal(e.target.value) })} /></label>) : null}<label className="block space-y-1.5"><span className="text-sm font-medium text-slate-700">Motivo</span><textarea className="min-h-28 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" minLength={5} maxLength={500} required value={reason} onChange={(e) => setReason(e.target.value)} /></label></form></Modal></div>;
 }

@@ -10,6 +10,6 @@ export function StockBadge({ low }: { low: boolean }) {
 }
 
 export function MovementTypeBadge({ type }: { type: InventoryMovementType }) {
-  const negative = ["salida", "ajuste_negativo", "perdida", "vencimiento"].includes(type);
+  const negative = ["salida", "ajuste_negativo", "devolucion_proveedor", "reversion", "perdida", "vencimiento"].includes(type);
   return <Badge tone={negative ? "inactive" : "active"}>{type}</Badge>;
 }

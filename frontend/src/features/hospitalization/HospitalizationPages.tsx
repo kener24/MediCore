@@ -5,17 +5,22 @@ import { toast } from "sonner";
 
 import { getErrorMessage } from "../../api/axios";
 import {
+  acknowledgeMedicalInstruction,
   assignHospitalBed,
   administerMedication,
   cancelHospitalization,
   changeHospitalBed,
   createHospitalBed,
+  createHospitalEvent,
+  createMedicalEvolution,
+  createMedicalInstruction,
   createMedicationAdministration,
   createHospitalRoom,
   createHospitalVitalSigns,
   createHospitalization,
   createNursingNote,
   createNursingRound,
+  createTreatmentPlan,
   delayMedication,
   dischargeHospitalization,
   getAvailableHospitalBeds,
@@ -23,10 +28,18 @@ import {
   getHospitalRooms,
   getHospitalization,
   getHospitalizationDashboard,
+  getHospitalTimeline,
   getHospitalizations,
+  getMedicalEvolutions,
+  getMedicalInstructions,
   getMedicationAdministrations,
   getNursingRounds,
+  getTreatmentPlans,
   omitMedication,
+  signMedicalEvolution,
+  changeMedicalInstructionStatus,
+  updateHospitalBed,
+  updateHospitalRoom,
 } from "../../api/hospitalizationApi";
 import { getDoctors } from "../../api/doctorsApi";
 import { getPatients } from "../../api/patientsApi";
@@ -37,8 +50,9 @@ import { Loader } from "../../components/ui/Loader";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { StatCard } from "../../components/ui/StatCard";
 import { Table } from "../../components/ui/Table";
+import { useAuth } from "../../hooks/useAuth";
 import type { DoctorProfile } from "../../types/doctor";
-import type { HospitalBed, HospitalRoom, Hospitalization, MedicationAdministration, NursingRound } from "../../types/hospitalization";
+import type { HospitalBed, HospitalRoom, HospitalTimelineEntry, Hospitalization, MedicalEvolution, MedicalInstruction, MedicationAdministration, NursingRound, TreatmentPlan } from "../../types/hospitalization";
 import type { Patient } from "../../types/patient";
 import { cleanDecimal, onlyDigits } from "../../utils/inputSanitizers";
 
@@ -48,6 +62,8 @@ const statusLabel: Record<string, string> = {
   transferred: "Trasladado",
   discharged: "Alta",
   cancelled: "Cancelado",
+  pending_admission: "Pendiente de ingreso",
+  discharge_pending: "Alta pendiente",
   pending: "Pendiente",
   administered: "Administrado",
   omitted: "Omitido",
@@ -129,7 +145,9 @@ export function HospitalizationFormPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [doctors, setDoctors] = useState<DoctorProfile[]>([]);
   const [beds, setBeds] = useState<HospitalBed[]>([]);
-  const [form, setForm] = useState({ patient: "", responsible_doctor: "", bed: "", admission_source: "reception", status: "active", reason: "", diagnosis_at_admission: "" });
+  const [form, setForm] = useState({ patient: "", responsible_doctor: "", bed: "", admission_source: "reception", status: "pending_admission", reason: "", diagnosis_at_admission: "", expected_discharge_date: "" });
+  const [submitting, setSubmitting] = useState(false);
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
   useEffect(() => {
     Promise.all([getPatients({ is_active: "true" }), getDoctors({ is_active: "true" }), getAvailableHospitalBeds()])
       .then(([p, d, b]) => { setPatients(p); setDoctors(d); setBeds(b); })
@@ -137,9 +155,11 @@ export function HospitalizationFormPage() {
   }, []);
   async function submit(e: FormEvent) {
     e.preventDefault();
+    if (submitting) return;
     if (!form.patient) return toast.error("Selecciona un paciente.");
     if (!requireTrimmed(form.reason, "El motivo de internamiento es obligatorio.")) return;
     try {
+      setSubmitting(true);
       const created = await createHospitalization({
         patient: Number(form.patient),
         responsible_doctor: form.responsible_doctor ? Number(form.responsible_doctor) : null,
@@ -148,10 +168,11 @@ export function HospitalizationFormPage() {
         status: form.status,
         reason: form.reason.trim(),
         diagnosis_at_admission: form.diagnosis_at_admission.trim(),
-      });
+        expected_discharge_date: form.expected_discharge_date || null,
+      }, idempotencyKey);
       toast.success("Internamiento creado correctamente.");
       navigate(`/clinic/hospitalization/admissions/${created.id}`);
-    } catch (error) { toast.error(getErrorMessage(error)); }
+    } catch (error) { toast.error(getErrorMessage(error)); setSubmitting(false); }
   }
   return (
     <div className="space-y-6">
@@ -164,9 +185,10 @@ export function HospitalizationFormPage() {
             <select className="h-11 rounded-md border px-3 text-sm" value={form.bed} onChange={(e) => setForm({ ...form, bed: e.target.value })}><option value="">Sin cama asignada</option>{beds.map((b) => <option key={b.id} value={b.id}>{b.bed_code} · {b.room_name}</option>)}</select>
             <select className="h-11 rounded-md border px-3 text-sm" value={form.admission_source} onChange={(e) => setForm({ ...form, admission_source: e.target.value })}><option value="reception">Recepción</option><option value="consultation">Consulta</option><option value="emergency">Emergencia</option><option value="transfer">Traslado</option><option value="other">Otro</option></select>
           </div>
+          <input className="h-11 rounded-md border px-3 text-sm" min={new Date().toISOString().slice(0, 10)} type="date" value={form.expected_discharge_date} onChange={(e) => setForm({ ...form, expected_discharge_date: e.target.value })} />
           <textarea className="min-h-24 rounded-md border px-3 py-2 text-sm" required placeholder="Motivo de internamiento" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
           <textarea className="min-h-24 rounded-md border px-3 py-2 text-sm" placeholder="Diagnóstico al ingreso" value={form.diagnosis_at_admission} onChange={(e) => setForm({ ...form, diagnosis_at_admission: e.target.value })} />
-          <Button type="submit">Crear internamiento</Button>
+          <Button isLoading={submitting} type="submit">Crear internamiento</Button>
         </form>
       </Card>
     </div>
@@ -175,25 +197,42 @@ export function HospitalizationFormPage() {
 
 export function HospitalizationDetailPage() {
   const { id } = useParams();
+  const { user } = useAuth();
+  const role = (typeof user?.role === "object" ? user.role.nombre : user?.role_nombre) || "";
+  const canManageAdmission = ["admin", "recepcionista"].includes(role);
+  const canWriteNursing = role === "enfermera";
+  const canWriteMedical = role === "medico";
+  const canViewClinical = ["admin", "medico", "enfermera"].includes(role);
   const [admission, setAdmission] = useState<Hospitalization | null>(null);
   const [beds, setBeds] = useState<HospitalBed[]>([]);
   const [rounds, setRounds] = useState<NursingRound[]>([]);
   const [medications, setMedications] = useState<MedicationAdministration[]>([]);
+  const [evolutions, setEvolutions] = useState<MedicalEvolution[]>([]);
+  const [plans, setPlans] = useState<TreatmentPlan[]>([]);
+  const [instructions, setInstructions] = useState<MedicalInstruction[]>([]);
+  const [timeline, setTimeline] = useState<HospitalTimelineEntry[]>([]);
+  const [loadError, setLoadError] = useState("");
   async function load() {
     if (!id) return;
-    const [detail, availableBeds, nursingRounds, medicationRows] = await Promise.all([
-      getHospitalization(id),
-      getAvailableHospitalBeds(),
-      getNursingRounds(id),
-      getMedicationAdministrations(id),
-    ]);
+    setLoadError("");
+    const [detail, availableBeds] = await Promise.all([getHospitalization(id), canManageAdmission ? getAvailableHospitalBeds() : Promise.resolve([])]);
     setAdmission(detail);
     setBeds(availableBeds);
-    setRounds(nursingRounds);
-    setMedications(medicationRows);
+    if (canViewClinical) {
+      const [nursingRounds, medicationRows, evolutionRows, planRows, instructionRows, timelineRows] = await Promise.all([
+        getNursingRounds(id), getMedicationAdministrations(id), getMedicalEvolutions(id), getTreatmentPlans(id), getMedicalInstructions(id), getHospitalTimeline(id),
+      ]);
+      setRounds(nursingRounds);
+      setMedications(medicationRows);
+      setEvolutions(evolutionRows);
+      setPlans(planRows);
+      setInstructions(instructionRows);
+      setTimeline(timelineRows);
+    }
   }
-  useEffect(() => { load().catch((e) => toast.error(getErrorMessage(e))); }, [id]);
-  if (!admission) return <Loader />;
+  useEffect(() => { load().catch((e) => { const message = getErrorMessage(e); setLoadError(message); toast.error(message); }); }, [id, role]);
+  if (!admission && !loadError) return <Loader />;
+  if (!admission) return <Card><EmptyState title="No se pudo cargar el internamiento." description={loadError} /><div className="mt-4 flex justify-center"><Button type="button" onClick={() => void load()}>Reintentar</Button></div></Card>;
   return (
     <div className="space-y-6">
       <PageHeader title={admission.patient_name} description={`Internamiento ${statusLabel[admission.status] || admission.status}`} actions={<Link className="inline-flex h-10 items-center rounded-md border px-4 text-sm font-semibold" to="/clinic/hospitalization/admissions">Volver</Link>} />
@@ -203,20 +242,95 @@ export function HospitalizationDetailPage() {
           <p><b>Médico:</b> {admission.responsible_doctor_name || "-"}</p>
           <p><b>Ingreso:</b> {new Date(admission.admission_datetime).toLocaleString("es-HN")}</p>
           <p className="md:col-span-3"><b>Motivo:</b> {admission.reason}</p>
+          {canViewClinical ? <><p className="md:col-span-3"><b>Alergias:</b> {admission.patient_allergies || "No registradas"}</p><p className="md:col-span-3"><b>Antecedentes cronicos:</b> {admission.patient_chronic_diseases || "No registrados"}</p></> : null}
           <p className="md:col-span-3"><b>Diagnóstico:</b> {admission.diagnosis_at_admission || "-"}</p>
         </div>
       </Card>
-      {!isClosedAdmission(admission.status) ? <HospitalizationActions admission={admission} beds={beds} onSaved={load} /> : null}
-      <div className="grid gap-4 lg:grid-cols-2">
+      {!isClosedAdmission(admission.status) && canManageAdmission ? <HospitalizationActions admission={admission} beds={beds} onSaved={load} /> : null}
+      {canViewClinical ? <ClinicalCareSections admission={admission} canWriteMedical={canWriteMedical} canWriteNursing={canWriteNursing} evolutions={evolutions} instructions={instructions} onSaved={load} plans={plans} timeline={timeline} /> : null}
+      {canWriteNursing ? <div className="grid gap-4 lg:grid-cols-2">
         <VitalSignsSection admission={admission} onSaved={load} />
         <NursingNotesSection admission={admission} onSaved={load} />
-      </div>
-      <div className="grid gap-4 lg:grid-cols-2">
+      </div> : null}
+      {canWriteNursing ? <div className="grid gap-4 lg:grid-cols-2">
         <NursingRoundsSection admission={admission} rounds={rounds} onSaved={load} />
         <MedicationAdministrationsSection admission={admission} medications={medications} onSaved={load} />
-      </div>
+      </div> : null}
     </div>
   );
+}
+
+function ClinicalCareSections({ admission, canWriteMedical, canWriteNursing, evolutions, instructions, onSaved, plans, timeline }: { admission: Hospitalization; canWriteMedical: boolean; canWriteNursing: boolean; evolutions: MedicalEvolution[]; instructions: MedicalInstruction[]; onSaved: () => Promise<void>; plans: TreatmentPlan[]; timeline: HospitalTimelineEntry[] }) {
+  const [evolution, setEvolution] = useState({ subjective: "", objective: "", assessment: "", plan: "" });
+  const [treatment, setTreatment] = useState({ goals: "", treatment: "", monitoring: "", precautions: "", change_reason: "" });
+  const [instruction, setInstruction] = useState({ instruction_type: "general", priority: "routine", title: "", details: "" });
+  const [event, setEvent] = useState({ event_type: "clinical_event", severity: "info", description: "" });
+  const [savingAction, setSavingAction] = useState("");
+
+  async function run(key: string, action: () => Promise<unknown>, message: string) {
+    if (savingAction) return;
+    setSavingAction(key);
+    try {
+      await action();
+      toast.success(message);
+      await onSaved();
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    } finally {
+      setSavingAction("");
+    }
+  }
+
+  async function saveEvolution(e: FormEvent) {
+    e.preventDefault();
+    if (!evolution.assessment.trim() || !evolution.plan.trim()) return toast.error("La evaluacion y el plan son obligatorios.");
+    await run("evolution", async () => {
+      await createMedicalEvolution(admission.id, evolution);
+      setEvolution({ subjective: "", objective: "", assessment: "", plan: "" });
+    }, "Evolucion guardada como borrador.");
+  }
+
+  async function savePlan(e: FormEvent) {
+    e.preventDefault();
+    if (!treatment.treatment.trim()) return toast.error("Describe el tratamiento.");
+    if (plans.some((plan) => plan.status === "active") && !treatment.change_reason.trim()) return toast.error("Indica el motivo del cambio para crear una nueva version.");
+    await run("plan", async () => {
+      await createTreatmentPlan(admission.id, treatment);
+      setTreatment({ goals: "", treatment: "", monitoring: "", precautions: "", change_reason: "" });
+    }, "Plan de tratamiento actualizado.");
+  }
+
+  async function saveInstruction(e: FormEvent) {
+    e.preventDefault();
+    if (!instruction.title.trim() || instruction.details.trim().length < 5) return toast.error("Completa el titulo y el detalle de la indicacion.");
+    await run("instruction", async () => {
+      await createMedicalInstruction(admission.id, instruction);
+      setInstruction({ instruction_type: "general", priority: "routine", title: "", details: "" });
+    }, "Indicacion medica creada.");
+  }
+
+  async function saveEvent(e: FormEvent) {
+    e.preventDefault();
+    if (event.description.trim().length < 5) return toast.error("Describe el evento clinico.");
+    await run("event", async () => {
+      await createHospitalEvent(admission.id, event);
+      setEvent({ event_type: "clinical_event", severity: "info", description: "" });
+    }, "Evento clinico registrado.");
+  }
+
+  return <div className="space-y-4">
+    {canWriteMedical && !isClosedAdmission(admission.status) ? <div className="grid gap-4 xl:grid-cols-3">
+      <Card title="Nueva evolucion medica"><form className="grid gap-2" onSubmit={saveEvolution}><textarea className="min-h-16 rounded-md border p-2 text-sm" placeholder="Subjetivo" value={evolution.subjective} onChange={(e) => setEvolution({ ...evolution, subjective: e.target.value })} /><textarea className="min-h-16 rounded-md border p-2 text-sm" placeholder="Objetivo" value={evolution.objective} onChange={(e) => setEvolution({ ...evolution, objective: e.target.value })} /><textarea className="min-h-16 rounded-md border p-2 text-sm" required placeholder="Evaluacion" value={evolution.assessment} onChange={(e) => setEvolution({ ...evolution, assessment: e.target.value })} /><textarea className="min-h-16 rounded-md border p-2 text-sm" required placeholder="Plan" value={evolution.plan} onChange={(e) => setEvolution({ ...evolution, plan: e.target.value })} /><Button isLoading={savingAction === "evolution"} type="submit">Guardar borrador</Button></form></Card>
+      <Card title="Plan de tratamiento"><form className="grid gap-2" onSubmit={savePlan}><input className="h-10 rounded-md border px-3 text-sm" placeholder="Objetivos" value={treatment.goals} onChange={(e) => setTreatment({ ...treatment, goals: e.target.value })} /><textarea className="min-h-20 rounded-md border p-2 text-sm" required placeholder="Tratamiento" value={treatment.treatment} onChange={(e) => setTreatment({ ...treatment, treatment: e.target.value })} /><input className="h-10 rounded-md border px-3 text-sm" placeholder="Monitoreo" value={treatment.monitoring} onChange={(e) => setTreatment({ ...treatment, monitoring: e.target.value })} /><input className="h-10 rounded-md border px-3 text-sm" placeholder="Precauciones" value={treatment.precautions} onChange={(e) => setTreatment({ ...treatment, precautions: e.target.value })} /><input className="h-10 rounded-md border px-3 text-sm" placeholder="Motivo del cambio" value={treatment.change_reason} onChange={(e) => setTreatment({ ...treatment, change_reason: e.target.value })} /><Button isLoading={savingAction === "plan"} type="submit">Crear nueva version</Button></form></Card>
+      <Card title="Indicacion medica"><form className="grid gap-2" onSubmit={saveInstruction}><select className="h-10 rounded-md border px-3 text-sm" value={instruction.instruction_type} onChange={(e) => setInstruction({ ...instruction, instruction_type: e.target.value })}><option value="general">General</option><option value="vital_signs">Signos vitales</option><option value="diet">Dieta</option><option value="activity">Actividad</option><option value="procedure">Procedimiento</option></select><select className="h-10 rounded-md border px-3 text-sm" value={instruction.priority} onChange={(e) => setInstruction({ ...instruction, priority: e.target.value })}><option value="routine">Rutina</option><option value="urgent">Urgente</option><option value="stat">Inmediata</option></select><input className="h-10 rounded-md border px-3 text-sm" required placeholder="Titulo" value={instruction.title} onChange={(e) => setInstruction({ ...instruction, title: e.target.value })} /><textarea className="min-h-24 rounded-md border p-2 text-sm" required placeholder="Detalle" value={instruction.details} onChange={(e) => setInstruction({ ...instruction, details: e.target.value })} /><Button isLoading={savingAction === "instruction"} type="submit">Crear indicacion</Button></form></Card>
+    </div> : null}
+    <div className="grid gap-4 xl:grid-cols-2">
+      <Card title="Evoluciones medicas"><div className="space-y-2">{evolutions.length ? evolutions.map((item) => <div className="rounded-md border p-3 text-sm" key={item.id}><div className="flex flex-wrap justify-between gap-2"><b>{item.status === "correction" ? "Correccion firmada" : item.status === "signed" ? "Firmada" : "Borrador"}</b><span>{item.doctor_name}</span></div><p>{item.assessment || item.progress_notes || "Sin evaluacion"}</p><p className="text-slate-600">Plan: {item.plan || "-"}</p>{canWriteMedical && item.status === "draft" ? <Button className="mt-2" isLoading={savingAction === `sign-${item.id}`} type="button" onClick={() => void run(`sign-${item.id}`, () => signMedicalEvolution(item.id), "Evolucion firmada; ya no puede modificarse.")}>Firmar evolucion</Button> : null}</div>) : <EmptyState title="Sin evoluciones medicas." />}</div></Card>
+      <Card title="Indicaciones activas"><div className="space-y-2">{instructions.length ? instructions.map((item) => <div className="rounded-md border p-3 text-sm" key={item.id}><div className="flex flex-wrap justify-between gap-2"><b>{item.title}</b><StatusPill value={item.status} /></div><p>{item.details}</p><p className="text-xs text-slate-500">Prioridad: {item.priority} | Medico: {item.doctor_name || "-"}</p>{canWriteNursing && item.status === "active" ? <Button className="mt-2" type="button" onClick={() => void run(`ack-${item.id}`, () => acknowledgeMedicalInstruction(item.id), "Indicacion recibida.")}>Confirmar recepcion</Button> : null}{canWriteNursing && ["acknowledged", "in_progress"].includes(item.status) ? <Button className="mt-2" type="button" onClick={() => void run(`status-${item.id}`, () => changeMedicalInstructionStatus(item.id, item.status === "acknowledged" ? "start" : "complete"), item.status === "acknowledged" ? "Indicacion iniciada." : "Indicacion completada.")}>{item.status === "acknowledged" ? "Iniciar" : "Completar"}</Button> : null}</div>) : <EmptyState title="Sin indicaciones activas." />}</div></Card>
+    </div>
+    {(canWriteMedical || canWriteNursing) && !isClosedAdmission(admission.status) ? <Card title="Registrar evento clinico"><form className="grid gap-2 md:grid-cols-[180px_150px_1fr_auto]" onSubmit={saveEvent}><input className="h-10 rounded-md border px-3 text-sm" value={event.event_type} onChange={(e) => setEvent({ ...event, event_type: e.target.value })} /><select className="h-10 rounded-md border px-3 text-sm" value={event.severity} onChange={(e) => setEvent({ ...event, severity: e.target.value })}><option value="info">Informativo</option><option value="warning">Advertencia</option><option value="critical">Critico</option></select><input className="h-10 rounded-md border px-3 text-sm" required placeholder="Descripcion del evento" value={event.description} onChange={(e) => setEvent({ ...event, description: e.target.value })} /><Button isLoading={savingAction === "event"} type="submit">Registrar</Button></form></Card> : null}
+    <Card title="Linea de tiempo clinica"><div className="space-y-2">{timeline.length ? timeline.map((item) => <div className="border-l-2 border-brand-500 py-1 pl-3 text-sm" key={item.id}><div className="flex flex-wrap justify-between gap-2"><b>{item.title}</b><span className="text-xs text-slate-500">{new Date(item.occurred_at).toLocaleString("es-HN")}</span></div><p>{item.description}</p><p className="text-xs text-slate-500">{item.user || "Sistema"}</p></div>) : <EmptyState title="Sin actividad clinica registrada." />}</div></Card>
+  </div>;
 }
 
 function HospitalizationActions({ admission, beds, onSaved }: { admission: Hospitalization; beds: HospitalBed[]; onSaved: () => Promise<void> }) {

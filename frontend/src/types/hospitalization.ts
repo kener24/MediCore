@@ -52,6 +52,8 @@ export interface HospitalVitalSigns {
   notes?: string;
   recorded_by_name?: string;
   recorded_at: string;
+  is_abnormal?: boolean;
+  alert_summary?: string;
 }
 
 export interface NursingNote {
@@ -61,6 +63,67 @@ export interface NursingNote {
   note: string;
   created_by_name?: string;
   recorded_at: string;
+  shift?: string;
+  status?: string;
+  correction_of?: number | null;
+}
+
+export interface MedicalEvolution {
+  id: number;
+  doctor_name?: string;
+  status: "draft" | "signed" | "correction";
+  subjective?: string;
+  objective?: string;
+  assessment?: string;
+  plan?: string;
+  progress_notes?: string;
+  diagnosis_changes?: string;
+  treatment_changes?: string;
+  observations?: string;
+  signed_at?: string | null;
+  correction_of?: number | null;
+  correction_reason?: string;
+  creado_en: string;
+}
+
+export interface TreatmentPlan {
+  id: number;
+  doctor_name?: string;
+  version: number;
+  status: string;
+  goals?: string;
+  treatment?: string;
+  diet?: string;
+  activity?: string;
+  monitoring?: string;
+  precautions?: string;
+  change_reason?: string;
+  creado_en: string;
+}
+
+export interface MedicalInstruction {
+  id: number;
+  doctor_name?: string;
+  instruction_type: string;
+  priority: string;
+  title: string;
+  details: string;
+  status: string;
+  scheduled_for?: string | null;
+  acknowledged_by_name?: string;
+  acknowledged_at?: string | null;
+  completed_at?: string | null;
+  creado_en: string;
+}
+
+export interface HospitalTimelineEntry {
+  id: string;
+  type: string;
+  title: string;
+  description: string;
+  severity: string;
+  occurred_at: string;
+  user?: string;
 }
 
 export interface NursingRound {
@@ -99,6 +162,10 @@ export interface Hospitalization {
   patient: number;
   patient_name: string;
   patient_code?: string;
+  patient_identity?: string;
+  patient_birth_date?: string | null;
+  patient_allergies?: string;
+  patient_chronic_diseases?: string;
   visit?: number | null;
   consultation?: number | null;
   admission_source: string;
@@ -112,6 +179,7 @@ export interface Hospitalization {
   diagnosis_at_admission?: string;
   admission_datetime: string;
   discharge_datetime?: string | null;
+  expected_discharge_date?: string | null;
   discharge_reason?: string;
   discharge_notes?: string;
   transfer_notes?: string;
@@ -120,6 +188,9 @@ export interface Hospitalization {
   nursing_rounds?: NursingRound[];
   medication_administrations?: MedicationAdministration[];
   events?: Array<{ id: number; event_type: string; description: string; creado_en: string; created_by_name?: string }>;
+  active_treatment_plan?: TreatmentPlan | null;
+  active_instructions?: MedicalInstruction[];
+  recent_evolutions?: MedicalEvolution[];
 }
 
 export interface HospitalizationCreatePayload {
@@ -132,4 +203,5 @@ export interface HospitalizationCreatePayload {
   status?: string;
   reason: string;
   diagnosis_at_admission?: string;
+  expected_discharge_date?: string | null;
 }

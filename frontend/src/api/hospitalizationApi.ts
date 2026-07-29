@@ -6,9 +6,13 @@ import type {
   Hospitalization,
   HospitalizationCreatePayload,
   HospitalizationDashboard,
+  HospitalTimelineEntry,
+  MedicalEvolution,
+  MedicalInstruction,
   MedicationAdministration,
   NursingNote,
   NursingRound,
+  TreatmentPlan,
 } from "../types/hospitalization";
 
 type PaginatedResponse<T> = T[] | { results?: T[] };
@@ -32,8 +36,8 @@ export async function getHospitalization(id: number | string) {
   return data;
 }
 
-export async function createHospitalization(payload: HospitalizationCreatePayload) {
-  const { data } = await api.post<Hospitalization>("/hospitalization/admissions/", payload);
+export async function createHospitalization(payload: HospitalizationCreatePayload, idempotencyKey = crypto.randomUUID()) {
+  const { data } = await api.post<Hospitalization>("/hospitalization/admissions/", payload, { headers: { "Idempotency-Key": idempotencyKey } });
   return data;
 }
 
@@ -67,6 +71,11 @@ export async function createHospitalRoom(payload: Partial<HospitalRoom>) {
   return data;
 }
 
+export async function updateHospitalRoom(id: number, payload: Partial<HospitalRoom>) {
+  const { data } = await api.patch<HospitalRoom>(`/hospitalization/rooms/${id}/`, payload);
+  return data;
+}
+
 export async function getHospitalBeds(filters?: Record<string, string>) {
   const { data } = await api.get<PaginatedResponse<HospitalBed>>("/hospitalization/beds/", { params: filters });
   return normalizeList(data);
@@ -74,6 +83,11 @@ export async function getHospitalBeds(filters?: Record<string, string>) {
 
 export async function createHospitalBed(payload: Partial<HospitalBed>) {
   const { data } = await api.post<HospitalBed>("/hospitalization/beds/", payload);
+  return data;
+}
+
+export async function updateHospitalBed(id: number, payload: Partial<HospitalBed>) {
+  const { data } = await api.patch<HospitalBed>(`/hospitalization/beds/${id}/`, payload);
   return data;
 }
 
@@ -97,9 +111,69 @@ export async function getNursingRounds(id: number | string) {
   return normalizeList(data);
 }
 
-export async function createNursingRound(id: number | string, payload: Partial<NursingRound>) {
-  const { data } = await api.post<NursingRound>(`/hospitalization/admissions/${id}/nursing-rounds/`, payload);
+export async function createNursingRound(id: number | string, payload: Partial<NursingRound>, idempotencyKey = crypto.randomUUID()) {
+  const { data } = await api.post<NursingRound>(`/hospitalization/admissions/${id}/nursing-rounds/`, payload, { headers: { "Idempotency-Key": idempotencyKey } });
   return data;
+}
+
+export async function getMedicalEvolutions(id: number | string) {
+  const { data } = await api.get<PaginatedResponse<MedicalEvolution>>(`/hospitalization/admissions/${id}/evolutions/`);
+  return normalizeList(data);
+}
+
+export async function createMedicalEvolution(id: number | string, payload: Partial<MedicalEvolution>) {
+  const { data } = await api.post<MedicalEvolution>(`/hospitalization/admissions/${id}/evolutions/`, payload);
+  return data;
+}
+
+export async function signMedicalEvolution(id: number) {
+  const { data } = await api.post<MedicalEvolution>(`/hospitalization/evolutions/${id}/sign/`, {});
+  return data;
+}
+
+export async function correctMedicalEvolution(id: number, payload: Partial<MedicalEvolution> & { correction_reason: string }) {
+  const { data } = await api.post<MedicalEvolution>(`/hospitalization/evolutions/${id}/correct/`, payload);
+  return data;
+}
+
+export async function getTreatmentPlans(id: number | string) {
+  const { data } = await api.get<PaginatedResponse<TreatmentPlan>>(`/hospitalization/admissions/${id}/treatment-plans/`);
+  return normalizeList(data);
+}
+
+export async function createTreatmentPlan(id: number | string, payload: Partial<TreatmentPlan>) {
+  const { data } = await api.post<TreatmentPlan>(`/hospitalization/admissions/${id}/treatment-plans/`, payload);
+  return data;
+}
+
+export async function getMedicalInstructions(id: number | string) {
+  const { data } = await api.get<PaginatedResponse<MedicalInstruction>>(`/hospitalization/admissions/${id}/instructions/`);
+  return normalizeList(data);
+}
+
+export async function createMedicalInstruction(id: number | string, payload: Partial<MedicalInstruction>) {
+  const { data } = await api.post<MedicalInstruction>(`/hospitalization/admissions/${id}/instructions/`, payload);
+  return data;
+}
+
+export async function acknowledgeMedicalInstruction(id: number) {
+  const { data } = await api.post<MedicalInstruction>(`/hospitalization/instructions/${id}/acknowledge/`, {});
+  return data;
+}
+
+export async function changeMedicalInstructionStatus(id: number, action: "start" | "complete" | "suspend" | "cancel", reason = "") {
+  const { data } = await api.post<MedicalInstruction>(`/hospitalization/instructions/${id}/${action}/`, reason ? { reason } : {});
+  return data;
+}
+
+export async function createHospitalEvent(id: number | string, payload: { event_type: string; description: string; severity: string }) {
+  const { data } = await api.post(`/hospitalization/admissions/${id}/events/`, payload);
+  return data;
+}
+
+export async function getHospitalTimeline(id: number | string) {
+  const { data } = await api.get<{ count: number; results: HospitalTimelineEntry[] }>(`/hospitalization/admissions/${id}/timeline/`);
+  return data.results;
 }
 
 export async function getMedicationAdministrations(id: number | string) {

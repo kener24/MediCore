@@ -10,6 +10,7 @@ from rest_framework.response import Response
 
 from apps.accounts.permissions import get_role_name
 from apps.inventory.models import InventoryCategory, InventoryItem, InventoryLot, InventoryMovement
+from apps.inventory.services import register_manual_movement, request_idempotency_key
 from apps.inventory.serializers import (
     InventoryCategorySerializer,
     InventoryItemCreateSerializer,
@@ -17,7 +18,6 @@ from apps.inventory.serializers import (
     InventoryItemListSerializer,
     InventoryItemUpdateSerializer,
     InventoryLotSerializer,
-    InventoryMovementCreateSerializer,
     InventoryMovementDetailSerializer,
     InventoryMovementListSerializer,
     InventoryStatsSerializer,
@@ -60,12 +60,26 @@ class InventoryCategoryViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         if not can_manage(request.user):
             return Response({"detail": "No tienes permiso para administrar categorias."}, status=status.HTTP_403_FORBIDDEN)
-        return super().create(request, *args, **kwargs)
+        response = super().create(request, *args, **kwargs)
+        if response.status_code == status.HTTP_201_CREATED:
+            log_audit_event(request=request, action=AuditLog.Action.CREATE, module=AuditLog.Module.INVENTORY, model_name="InventoryCategory", object_id=response.data.get("id"), object_repr=response.data.get("name", ""), description="Categoria de inventario creada.", new_values=request.data)
+        return response
+
+    def update(self, request, *args, **kwargs):
+        if not can_manage(request.user):
+            return Response({"detail": "No tienes permiso para administrar categorias."}, status=status.HTTP_403_FORBIDDEN)
+        category = self.get_object()
+        response = super().update(request, *args, **kwargs)
+        log_audit_event(request=request, clinic=category.clinic, action=AuditLog.Action.UPDATE, module=AuditLog.Module.INVENTORY, model_name="InventoryCategory", object_id=category.id, object_repr=response.data.get("name", category.name), description="Categoria de inventario actualizada.", new_values=request.data)
+        return response
 
     def destroy(self, request, *args, **kwargs):
+        if not can_manage(request.user):
+            return Response({"detail": "No tienes permiso para administrar categorias."}, status=status.HTTP_403_FORBIDDEN)
         category = self.get_object()
         category.active = False
         category.save(update_fields=["active"])
+        log_audit_event(request=request, clinic=category.clinic, action=AuditLog.Action.DEACTIVATE, module=AuditLog.Module.INVENTORY, model_name="InventoryCategory", object_id=category.id, object_repr=category.name, description="Categoria de inventario desactivada.")
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -113,24 +127,43 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
         return Response(InventoryItemDetailSerializer(item).data, status=status.HTTP_201_CREATED)
 
     def destroy(self, request, *args, **kwargs):
+        if not can_manage(request.user):
+            return Response({"detail": "No tienes permiso para administrar productos."}, status=status.HTTP_403_FORBIDDEN)
         item = self.get_object()
         item.active = False
         item.save(update_fields=["active"])
         log_audit_event(request=request, clinic=item.clinic, action=AuditLog.Action.DEACTIVATE, module=AuditLog.Module.INVENTORY, model_name="InventoryItem", object_id=item.id, object_repr=item.name, description="Producto de inventario desactivado.")
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    def update(self, request, *args, **kwargs):
+        if not can_manage(request.user):
+            return Response({"detail": "No tienes permiso para administrar productos."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            item = self.get_object()
+            response = super().update(request, *args, **kwargs)
+            log_audit_event(request=request, clinic=item.clinic, action=AuditLog.Action.UPDATE, module=AuditLog.Module.INVENTORY, model_name="InventoryItem", object_id=item.id, object_repr=response.data.get("name", item.name), description="Producto de inventario actualizado.", new_values=request.data)
+            return response
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+
     @action(detail=True, methods=["patch"])
     def activate(self, request, pk=None):
+        if not can_manage(request.user):
+            return Response({"detail": "No tienes permiso para administrar productos."}, status=status.HTTP_403_FORBIDDEN)
         item = self.get_object()
         item.active = True
         item.save(update_fields=["active"])
+        log_audit_event(request=request, clinic=item.clinic, action=AuditLog.Action.ACTIVATE, module=AuditLog.Module.INVENTORY, model_name="InventoryItem", object_id=item.id, object_repr=item.name, description="Producto de inventario activado.")
         return Response(InventoryItemDetailSerializer(item).data)
 
     @action(detail=True, methods=["patch"])
     def deactivate(self, request, pk=None):
+        if not can_manage(request.user):
+            return Response({"detail": "No tienes permiso para administrar productos."}, status=status.HTTP_403_FORBIDDEN)
         item = self.get_object()
         item.active = False
         item.save(update_fields=["active"])
+        log_audit_event(request=request, clinic=item.clinic, action=AuditLog.Action.DEACTIVATE, module=AuditLog.Module.INVENTORY, model_name="InventoryItem", object_id=item.id, object_repr=item.name, description="Producto de inventario desactivado.")
         return Response(InventoryItemDetailSerializer(item).data)
 
     @action(detail=True, methods=["get", "post"])
@@ -138,42 +171,33 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
         item = self.get_object()
         if request.method == "GET":
             return Response(InventoryLotSerializer(item.lots.filter(active=True), many=True).data)
+        if not can_manage(request.user):
+            return Response({"detail": "No tienes permiso para administrar lotes."}, status=status.HTTP_403_FORBIDDEN)
         data = {**request.data, "item": item.id}
-        serializer = InventoryLotSerializer(data=data)
+        serializer = InventoryLotSerializer(data=data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         lot = serializer.save(item=item)
+        log_audit_event(request=request, clinic=item.clinic, action=AuditLog.Action.CREATE, module=AuditLog.Module.INVENTORY, model_name="InventoryLot", object_id=lot.id, object_repr=lot.lot_number, description="Lote de inventario creado.", new_values=request.data)
         return Response(InventoryLotSerializer(lot).data, status=status.HTTP_201_CREATED)
 
     def _movement_response(self, request, item, payload, movement_type):
         if not can_move(request.user):
             return Response({"detail": "No tienes permiso para registrar movimientos."}, status=status.HTTP_403_FORBIDDEN)
-        lot = None
-        if payload.get("lot"):
-            lot = InventoryLot.objects.filter(id=payload["lot"], item=item).first()
-        if payload.get("lot_number"):
-            lot, _ = InventoryLot.objects.get_or_create(
-                item=item,
-                lot_number=payload["lot_number"],
-                defaults={"clinic": item.clinic, "expiration_date": payload.get("expiration_date"), "cost_price": payload.get("unit_cost", 0)},
-            )
+        payload["idempotency_key"] = payload.get("idempotency_key") or request_idempotency_key(request)
         try:
-            movement = InventoryMovement.objects.create(
-                clinic=item.clinic,
-                item=item,
-                lot=lot,
-                movement_type=movement_type,
-                quantity=payload["quantity"],
-                unit_cost=payload.get("unit_cost", 0),
-                reason=payload["reason"],
-                reference_type="ajuste_manual" if "ajuste" in movement_type else "uso_clinico",
-                notes=payload.get("notes", ""),
-                performed_by=request.user,
-            )
+            movements = register_manual_movement(item=item, user=request.user, payload=payload, movement_type=movement_type)
         except DjangoValidationError as exc:
+            log_audit_event(request=request, clinic=item.clinic, action=AuditLog.Action.STOCK_ADJUSTMENT if "ajuste" in movement_type else AuditLog.Action.STOCK_OUT if movement_type == InventoryMovement.Type.SALIDA else AuditLog.Action.STOCK_IN, module=AuditLog.Module.INVENTORY, model_name="InventoryItem", object_id=item.id, object_repr=item.name, description=exc.messages[0], status=AuditLog.Status.FAILED, severity=AuditLog.Severity.WARNING, new_values=payload)
             return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+        movement = movements[0]
+        replay = bool(getattr(movement, "_idempotent_replay", False))
+        data = dict(InventoryMovementDetailSerializer(movement).data)
+        data["allocations"] = InventoryMovementListSerializer(movements, many=True).data
+        if replay:
+            return Response(data, status=status.HTTP_200_OK)
         audit_action = AuditLog.Action.STOCK_IN if movement_type == InventoryMovement.Type.ENTRADA else AuditLog.Action.STOCK_OUT if movement_type == InventoryMovement.Type.SALIDA else AuditLog.Action.STOCK_ADJUSTMENT
-        log_audit_event(request=request, clinic=item.clinic, action=audit_action, module=AuditLog.Module.INVENTORY, model_name="InventoryMovement", object_id=movement.id, object_repr=item.name, description="Movimiento de inventario registrado.", new_values=payload)
-        return Response(InventoryMovementDetailSerializer(movement).data, status=status.HTTP_201_CREATED)
+        log_audit_event(request=request, clinic=item.clinic, action=audit_action, module=AuditLog.Module.INVENTORY, model_name="InventoryMovement", object_id=movement.id, object_repr=item.name, description="Movimiento de inventario registrado.", new_values=payload, metadata={"movement_ids": [entry.id for entry in movements], "allocations": len(movements)})
+        return Response(data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"], url_path="stock-in")
     def stock_in(self, request, pk=None):
@@ -214,18 +238,37 @@ class InventoryLotViewSet(viewsets.ModelViewSet):
         return queryset
 
     def create(self, request, *args, **kwargs):
+        if not can_manage(request.user):
+            return Response({"detail": "No tienes permiso para administrar lotes."}, status=status.HTTP_403_FORBIDDEN)
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
             lot = serializer.save()
         except DjangoValidationError as exc:
             return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+        log_audit_event(request=request, clinic=lot.clinic, action=AuditLog.Action.CREATE, module=AuditLog.Module.INVENTORY, model_name="InventoryLot", object_id=lot.id, object_repr=lot.lot_number, description="Lote de inventario creado.", new_values=request.data)
         return Response(InventoryLotSerializer(lot).data, status=status.HTTP_201_CREATED)
 
+    def update(self, request, *args, **kwargs):
+        if not can_manage(request.user):
+            return Response({"detail": "No tienes permiso para administrar lotes."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            lot = self.get_object()
+            response = super().update(request, *args, **kwargs)
+            log_audit_event(request=request, clinic=lot.clinic, action=AuditLog.Action.UPDATE, module=AuditLog.Module.INVENTORY, model_name="InventoryLot", object_id=lot.id, object_repr=lot.lot_number, description="Lote de inventario actualizado.", new_values=request.data)
+            return response
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+
     def destroy(self, request, *args, **kwargs):
+        if not can_manage(request.user):
+            return Response({"detail": "No tienes permiso para administrar lotes."}, status=status.HTTP_403_FORBIDDEN)
         lot = self.get_object()
+        if lot.quantity_current > 0:
+            return Response({"detail": "No se puede desactivar un lote con existencia disponible."}, status=status.HTTP_409_CONFLICT)
         lot.active = False
         lot.save(update_fields=["active"])
+        log_audit_event(request=request, clinic=lot.clinic, action=AuditLog.Action.DEACTIVATE, module=AuditLog.Module.INVENTORY, model_name="InventoryLot", object_id=lot.id, object_repr=lot.lot_number, description="Lote de inventario desactivado.")
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -249,33 +292,26 @@ class InventoryMovementViewSet(viewsets.ReadOnlyModelViewSet):
         return queryset
 
     def create(self, request):
-        if not can_move(request.user):
-            return Response({"detail": "No tienes permiso para registrar movimientos."}, status=status.HTTP_403_FORBIDDEN)
-        serializer = InventoryMovementCreateSerializer(data=request.data, context={"request": request})
-        serializer.is_valid(raise_exception=True)
-        try:
-            movement = serializer.save()
-        except DjangoValidationError as exc:
-            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
-        audit_action = AuditLog.Action.STOCK_IN if movement.movement_type == InventoryMovement.Type.ENTRADA else AuditLog.Action.STOCK_OUT if movement.movement_type == InventoryMovement.Type.SALIDA else AuditLog.Action.STOCK_ADJUSTMENT
-        log_audit_event(request=request, clinic=movement.clinic, action=audit_action, module=AuditLog.Module.INVENTORY, model_name="InventoryMovement", object_id=movement.id, object_repr=movement.item.name, description="Movimiento de inventario registrado.", new_values=request.data)
-        return Response(InventoryMovementDetailSerializer(movement).data, status=status.HTTP_201_CREATED)
+        return Response(
+            {"detail": "Usa las acciones stock-in, stock-out o adjust-stock del producto para registrar movimientos controlados."},
+            status=status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
 
 
 class InventoryAlertViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
     def low_stock(self, request):
-        return Response(InventoryItemListSerializer(scope(request, InventoryItem.objects.all()).filter(stock_current__lte=F("stock_minimum")), many=True).data)
+        return Response(InventoryItemListSerializer(scope(request, InventoryItem.objects.all()).filter(active=True, stock_current__lte=F("stock_minimum")), many=True).data)
 
     def expiring_soon(self, request):
         days = int(request.query_params.get("days", 30))
         today = timezone.localdate()
-        lots = scope(request, InventoryLot.objects.all()).filter(expiration_date__gte=today, expiration_date__lte=today + timezone.timedelta(days=days))
+        lots = scope(request, InventoryLot.objects.all()).filter(active=True, quantity_current__gt=0, expiration_date__gte=today, expiration_date__lte=today + timezone.timedelta(days=days))
         return Response(InventoryLotSerializer(lots, many=True).data)
 
     def expired(self, request):
-        lots = scope(request, InventoryLot.objects.all()).filter(expiration_date__lt=timezone.localdate())
+        lots = scope(request, InventoryLot.objects.all()).filter(active=True, quantity_current__gt=0, expiration_date__lt=timezone.localdate())
         return Response(InventoryLotSerializer(lots, many=True).data)
 
 
@@ -289,9 +325,9 @@ class InventoryStatsViewSet(viewsets.ViewSet):
         data = {
             "total_items": items.count(),
             "active_items": items.filter(active=True).count(),
-            "low_stock_items": items.filter(stock_current__lte=F("stock_minimum")).count(),
-            "expired_lots": lots.filter(expiration_date__lt=today).count(),
-            "expiring_soon_lots": lots.filter(expiration_date__gte=today, expiration_date__lte=today + timezone.timedelta(days=30)).count(),
+            "low_stock_items": items.filter(active=True, stock_current__lte=F("stock_minimum")).count(),
+            "expired_lots": lots.filter(active=True, quantity_current__gt=0, expiration_date__lt=today).count(),
+            "expiring_soon_lots": lots.filter(active=True, quantity_current__gt=0, expiration_date__gte=today, expiration_date__lte=today + timezone.timedelta(days=30)).count(),
             "total_stock_value": items.aggregate(total=Sum(F("stock_current") * F("cost_price")))["total"] or Decimal("0.00"),
             "total_movements_today": scope(request, InventoryMovement.objects.all()).filter(creado_en__date=today).count(),
             "medicines_count": items.filter(item_type=InventoryItem.Type.MEDICAMENTO).count(),

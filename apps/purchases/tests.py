@@ -41,8 +41,7 @@ class PurchaseApiTests(APITestCase):
         response = self.client.post("/api/purchases/suppliers/", {"name": "FarmaSalud", "rtn": "080319900003"})
         self.assertEqual(response.status_code, 201, response.content)
         self.auth(self.patient)
-        self.assertEqual(self.client.get("/api/purchases/suppliers/").status_code, 200)
-        self.assertEqual(self.client.get("/api/purchases/suppliers/").json(), [])
+        self.assertEqual(self.client.get("/api/purchases/suppliers/").status_code, 403)
 
     def test_rtn_is_unique_per_clinic(self):
         self.auth(self.admin)
@@ -78,6 +77,8 @@ class PurchaseApiTests(APITestCase):
 
     def test_receive_products_updates_inventory_and_lot(self):
         order = self.create_order()
+        order.status = PurchaseOrder.Status.APROBADA
+        order.save(update_fields=["status", "actualizado_en"])
         order_item = order.items.first()
         self.auth(self.admin)
         response = self.client.post(
@@ -107,6 +108,8 @@ class PurchaseApiTests(APITestCase):
 
     def test_cannot_receive_more_than_pending_or_cancelled_order(self):
         order = self.create_order()
+        order.status = PurchaseOrder.Status.APROBADA
+        order.save(update_fields=["status", "actualizado_en"])
         order_item = order.items.first()
         self.auth(self.admin)
         response = self.client.post(f"/api/purchases/orders/{order.id}/receive/", {"items": [{"purchase_order_item": order_item.id, "quantity_received": "11", "unit_cost": "5", "lot_number": "L1", "expiration_date": "2027-12-31"}]}, format="json")

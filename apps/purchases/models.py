@@ -109,6 +109,8 @@ class PurchaseOrder(TimeStampedModel):
             self.status = self.Status.RECIBIDA
         elif received_any:
             self.status = self.Status.RECIBIDA_PARCIAL
+        else:
+            self.status = self.Status.APROBADA
         self.save(update_fields=["status", "actualizado_en"])
 
 
@@ -134,7 +136,22 @@ class PurchaseOrderItem(TimeStampedModel):
 
     def clean(self):
         if self.purchase_order_id and self.purchase_order.status in [PurchaseOrder.Status.CANCELADA, PurchaseOrder.Status.RECIBIDA]:
-            raise ValidationError("No puedes modificar una orden cancelada o recibida.")
+            receipt_balance_only = False
+            if self.pk and self.purchase_order.status == PurchaseOrder.Status.RECIBIDA:
+                original = type(self).objects.get(pk=self.pk)
+                protected_fields = [
+                    "purchase_order_id",
+                    "item_id",
+                    "description",
+                    "quantity_ordered",
+                    "unit_cost",
+                    "discount_amount",
+                    "tax_rate",
+                    "active",
+                ]
+                receipt_balance_only = all(getattr(original, field) == getattr(self, field) for field in protected_fields)
+            if not receipt_balance_only:
+                raise ValidationError("No puedes modificar una orden cancelada o recibida.")
         if self.item_id and self.purchase_order_id and self.item.clinic_id != self.purchase_order.clinic_id:
             raise ValidationError("El producto debe pertenecer a la misma clinica.")
         if self.quantity_ordered <= 0:
@@ -165,11 +182,18 @@ class PurchaseReceipt(TimeStampedModel):
     receipt_date = models.DateField(default=timezone.localdate)
     received_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="purchase_receipts_received")
     notes = models.TextField(blank=True)
+    idempotency_key = models.CharField(max_length=100, null=True, blank=True, default=None)
+    reversed_at = models.DateTimeField(null=True, blank=True)
+    reversed_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="purchase_receipts_reversed")
+    reversal_reason = models.TextField(blank=True)
     active = models.BooleanField(default=True)
 
     class Meta:
         ordering = ["-receipt_date", "-creado_en"]
-        constraints = [models.UniqueConstraint(fields=["clinic", "receipt_number"], name="unique_purchase_receipt_number_per_clinic")]
+        constraints = [
+            models.UniqueConstraint(fields=["clinic", "receipt_number"], name="unique_purchase_receipt_number_per_clinic"),
+            models.UniqueConstraint(fields=["clinic", "purchase_order", "received_by", "idempotency_key"], name="unique_purchase_receipt_operation"),
+        ]
 
     @classmethod
     def next_receipt_number(cls, clinic):
@@ -204,19 +228,26 @@ class PurchaseReceiptItem(TimeStampedModel):
     expiration_date = models.DateField(null=True, blank=True)
     notes = models.TextField(blank=True)
     inventory_movement = models.ForeignKey(InventoryMovement, on_delete=models.SET_NULL, null=True, blank=True, related_name="purchase_receipt_items")
+    quantity_returned = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     active = models.BooleanField(default=True)
+
+    @property
+    def returnable_quantity(self):
+        return max(self.quantity_received - self.quantity_returned, Decimal("0.00"))
 
     def clean(self):
         if self.quantity_received <= 0:
             raise ValidationError("La cantidad recibida debe ser mayor que cero.")
         if self.unit_cost < 0:
             raise ValidationError("El costo no puede ser negativo.")
+        if self.quantity_returned < 0 or self.quantity_returned > self.quantity_received:
+            raise ValidationError("La cantidad devuelta no es valida.")
         if self.purchase_order_item_id:
             if self.item_id and self.item_id != self.purchase_order_item.item_id:
                 raise ValidationError("El producto no coincide con el item de la orden.")
             if self.receipt_id and self.purchase_order_item.purchase_order_id != self.receipt.purchase_order_id:
                 raise ValidationError("El item no pertenece a la orden recibida.")
-            if self.quantity_received > self.purchase_order_item.pending_quantity:
+            if not self.pk and self.quantity_received > self.purchase_order_item.pending_quantity:
                 raise ValidationError("No puedes recibir mas de lo pendiente.")
         if self.item_id:
             if self.item.requires_lot and not self.lot_number and not self.lot_id:
@@ -229,24 +260,49 @@ class PurchaseReceiptItem(TimeStampedModel):
             self.item = self.purchase_order_item.item
         self.full_clean()
         if self.pk:
+            original = type(self).objects.get(pk=self.pk)
+            immutable_fields = [
+                "receipt_id",
+                "purchase_order_item_id",
+                "item_id",
+                "lot_id",
+                "quantity_received",
+                "unit_cost",
+                "lot_number",
+                "expiration_date",
+                "inventory_movement_id",
+            ]
+            if any(getattr(original, field) != getattr(self, field) for field in immutable_fields):
+                raise ValidationError("Las lineas de recepcion confirmadas no pueden modificarse; utiliza una devolucion o reversion.")
             return super().save(*args, **kwargs)
         with transaction.atomic():
             poi = PurchaseOrderItem.objects.select_for_update().select_related("purchase_order", "item").get(pk=self.purchase_order_item_id)
+            item = type(poi.item).objects.select_for_update().get(pk=poi.item_id)
+            self.item = item
             if self.quantity_received > poi.pending_quantity:
                 raise ValidationError("No puedes recibir mas de lo pendiente.")
             lot = self.lot
             if self.lot_number:
-                lot, _ = InventoryLot.objects.get_or_create(
-                    item=self.item,
-                    lot_number=self.lot_number,
-                    defaults={
-                        "clinic": self.receipt.clinic,
-                        "expiration_date": self.expiration_date,
-                        "cost_price": self.unit_cost,
-                        "received_date": self.receipt.receipt_date,
-                    },
-                )
+                self.lot_number = self.lot_number.strip()
+                lot = InventoryLot.objects.select_for_update().filter(item=item, lot_number=self.lot_number).first()
+                if lot:
+                    if self.expiration_date and lot.expiration_date and lot.expiration_date != self.expiration_date:
+                        raise ValidationError("El lote ya existe con una fecha de vencimiento diferente.")
+                else:
+                    lot = InventoryLot.objects.create(
+                        item=item,
+                        lot_number=self.lot_number,
+                        clinic=self.receipt.clinic,
+                        expiration_date=self.expiration_date,
+                        cost_price=self.unit_cost,
+                        received_date=self.receipt.receipt_date,
+                    )
                 self.lot = lot
+            if item.requires_lot and not lot:
+                raise ValidationError("Este producto requiere lote.")
+            effective_expiration = lot.expiration_date if lot else self.expiration_date
+            if effective_expiration and effective_expiration < self.receipt.receipt_date:
+                raise ValidationError("No se puede recibir un lote vencido.")
             movement = InventoryMovement.objects.create(
                 clinic=self.receipt.clinic,
                 item=self.item,
@@ -266,3 +322,86 @@ class PurchaseReceiptItem(TimeStampedModel):
             poi.save(update_fields=["quantity_received", "actualizado_en"])
             poi.purchase_order.refresh_receipt_status()
             return result
+
+
+class PurchaseReturn(TimeStampedModel):
+    class Status(models.TextChoices):
+        CONFIRMADA = "confirmada", "Confirmada"
+        REVERTIDA = "revertida", "Revertida"
+
+    clinic = models.ForeignKey("clinics.Clinic", on_delete=models.PROTECT, related_name="purchase_returns")
+    receipt = models.ForeignKey(PurchaseReceipt, on_delete=models.PROTECT, related_name="returns")
+    return_number = models.CharField(max_length=30, blank=True)
+    return_date = models.DateField(default=timezone.localdate)
+    reason = models.TextField()
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.CONFIRMADA)
+    created_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="purchase_returns_created")
+    idempotency_key = models.CharField(max_length=100, null=True, blank=True, default=None)
+    active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["-return_date", "-creado_en"]
+        constraints = [
+            models.UniqueConstraint(fields=["clinic", "return_number"], name="unique_purchase_return_number_per_clinic"),
+            models.UniqueConstraint(fields=["clinic", "receipt", "created_by", "idempotency_key"], name="unique_purchase_return_operation"),
+        ]
+
+    @classmethod
+    def next_return_number(cls, clinic):
+        last = cls.objects.filter(clinic=clinic, return_number__startswith="DEV-").order_by("-id").first()
+        value = int(last.return_number.replace("DEV-", "")) + 1 if last and last.return_number.replace("DEV-", "").isdigit() else 1
+        return f"DEV-{value:06d}"
+
+    def clean(self):
+        if self.receipt_id and self.clinic_id and self.receipt.clinic_id != self.clinic_id:
+            raise ValidationError("La devolucion debe pertenecer a la misma clinica de la recepcion.")
+        if not self.reason.strip():
+            raise ValidationError("El motivo de devolucion es obligatorio.")
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValidationError("Las devoluciones confirmadas son inmutables y no pueden modificarse.")
+        if self.receipt_id and not self.clinic_id:
+            self.clinic = self.receipt.clinic
+        if self.clinic_id and not self.return_number:
+            self.return_number = self.next_return_number(self.clinic)
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Las devoluciones confirmadas no pueden borrarse.")
+
+
+class PurchaseReturnItem(TimeStampedModel):
+    purchase_return = models.ForeignKey(PurchaseReturn, on_delete=models.PROTECT, related_name="items")
+    receipt_item = models.ForeignKey(PurchaseReceiptItem, on_delete=models.PROTECT, related_name="return_items")
+    item = models.ForeignKey("inventory.InventoryItem", on_delete=models.PROTECT, related_name="purchase_return_items")
+    lot = models.ForeignKey(InventoryLot, on_delete=models.PROTECT, null=True, blank=True, related_name="purchase_return_items")
+    quantity_returned = models.DecimalField(max_digits=12, decimal_places=2)
+    unit_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    inventory_movement = models.ForeignKey(InventoryMovement, on_delete=models.PROTECT, related_name="purchase_return_items")
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["id"]
+        constraints = [models.CheckConstraint(condition=models.Q(quantity_returned__gt=0), name="purchase_return_quantity_positive")]
+
+    def clean(self):
+        if self.receipt_item_id:
+            if self.purchase_return_id and self.receipt_item.receipt_id != self.purchase_return.receipt_id:
+                raise ValidationError("El producto devuelto no pertenece a la recepcion.")
+            if self.item_id and self.item_id != self.receipt_item.item_id:
+                raise ValidationError("El producto devuelto no coincide con la recepcion.")
+            if self.lot_id != self.receipt_item.lot_id:
+                raise ValidationError("El lote devuelto no coincide con la recepcion.")
+        if self.quantity_returned <= 0:
+            raise ValidationError("La cantidad devuelta debe ser mayor que cero.")
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValidationError("Las lineas de devolucion confirmadas no pueden modificarse.")
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Las lineas de devolucion confirmadas no pueden borrarse.")

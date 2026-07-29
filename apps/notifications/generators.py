@@ -1,8 +1,11 @@
 from datetime import timedelta
 
+from django.conf import settings
 from django.db.models import F
 from django.utils import timezone
 
+from apps.audit.models import AuditLog
+from apps.audit.services import create_audit_log
 from apps.appointments.models import Appointment
 from apps.billing.models import CashSession, FiscalDocumentRange, Invoice
 from apps.inventory.models import InventoryItem, InventoryLot
@@ -31,18 +34,84 @@ def notify_once(recipients, title, message, related_model, related_object_id, de
     return count
 
 
+def archive_resolved_inventory_alerts(queryset, description):
+    notifications = list(queryset.select_related("clinic"))
+    if not notifications:
+        return 0
+    Notification.objects.filter(id__in=[notification.id for notification in notifications]).update(status=Notification.Status.ARCHIVED)
+    for notification in notifications:
+        create_audit_log(
+            clinic=notification.clinic,
+            action=AuditLog.Action.COMPLETE,
+            module=AuditLog.Module.INVENTORY,
+            object_type=notification.related_model or "Notification",
+            object_id=notification.related_object_id,
+            description=description,
+            metadata={"notification_id": notification.id},
+        )
+    return len(notifications)
+
+
+def audit_inventory_alert_created(*, clinic, related_model, related_object_id, title):
+    create_audit_log(
+        clinic=clinic,
+        action=AuditLog.Action.CREATE,
+        module=AuditLog.Module.INVENTORY,
+        object_type=related_model,
+        object_id=related_object_id,
+        description=f"Alerta de inventario generada: {title}.",
+    )
+
+
 def generate_inventory_alerts():
     count = 0
     today = timezone.localdate()
-    for item in InventoryItem.objects.select_related("clinic").filter(active=True, stock_current__lte=F("stock_minimum")):
+    alert_days = max(1, int(getattr(settings, "INVENTORY_EXPIRATION_ALERT_DAYS", 30)))
+    low_items = InventoryItem.objects.select_related("clinic").filter(active=True, stock_current__lte=F("stock_minimum"))
+    low_item_ids = [str(value) for value in low_items.values_list("id", flat=True)]
+    archive_resolved_inventory_alerts(
+        Notification.objects.filter(module=Notification.Module.INVENTORY, title="Bajo stock").exclude(related_object_id__in=low_item_ids).exclude(status=Notification.Status.ARCHIVED),
+        "Alerta de stock bajo resuelta.",
+    )
+    for item in low_items:
         admins = item.clinic.usuarios.filter(role__nombre="admin", is_active=True)
-        count += notify_once(admins, "Bajo stock", f"{item.name} esta por debajo del stock minimo.", module=Notification.Module.INVENTORY, priority=Notification.Priority.HIGH, notification_type=Notification.Type.ALERT, related_model="InventoryItem", related_object_id=item.id, action_url="/clinic/inventory/alerts", metadata={"item": item.id, "stock_current": str(item.stock_current)})
-    for lot in InventoryLot.objects.select_related("clinic", "item").filter(active=True, expiration_date__gte=today, expiration_date__lte=today + timedelta(days=30)):
+        for admin in admins:
+            exists = Notification.objects.filter(recipient=admin, title="Bajo stock", related_model="InventoryItem", related_object_id=str(item.id)).exclude(status=Notification.Status.ARCHIVED).exists()
+            if not exists:
+                created = notify_once([admin], "Bajo stock", f"{item.name} esta por debajo del stock minimo.", module=Notification.Module.INVENTORY, priority=Notification.Priority.HIGH, notification_type=Notification.Type.ALERT, related_model="InventoryItem", related_object_id=item.id, action_url="/clinic/inventory/alerts", metadata={"item": item.id, "stock_current": str(item.stock_current), "stock_minimum": str(item.stock_minimum)})
+                count += created
+                if created:
+                    audit_inventory_alert_created(clinic=item.clinic, related_model="InventoryItem", related_object_id=item.id, title="Bajo stock")
+    expiring_lots = InventoryLot.objects.select_related("clinic", "item").filter(active=True, quantity_current__gt=0, expiration_date__gte=today, expiration_date__lte=today + timedelta(days=alert_days))
+    expiring_ids = [str(value) for value in expiring_lots.values_list("id", flat=True)]
+    archive_resolved_inventory_alerts(
+        Notification.objects.filter(module=Notification.Module.INVENTORY, title="Lote proximo a vencer").exclude(related_object_id__in=expiring_ids).exclude(status=Notification.Status.ARCHIVED),
+        "Alerta de lote proximo a vencer resuelta.",
+    )
+    for lot in expiring_lots:
         admins = lot.clinic.usuarios.filter(role__nombre="admin", is_active=True)
-        count += notify_once(admins, "Lote proximo a vencer", f"{lot.item.name} vence el {lot.expiration_date}.", module=Notification.Module.INVENTORY, priority=Notification.Priority.HIGH, notification_type=Notification.Type.WARNING, related_model="InventoryLot", related_object_id=lot.id, action_url="/clinic/inventory/alerts")
-    for lot in InventoryLot.objects.select_related("clinic", "item").filter(active=True, expiration_date__lt=today):
+        for admin in admins:
+            exists = Notification.objects.filter(recipient=admin, title="Lote proximo a vencer", related_model="InventoryLot", related_object_id=str(lot.id)).exclude(status=Notification.Status.ARCHIVED).exists()
+            if not exists:
+                created = notify_once([admin], "Lote proximo a vencer", f"{lot.item.name} vence el {lot.expiration_date}.", module=Notification.Module.INVENTORY, priority=Notification.Priority.HIGH, notification_type=Notification.Type.WARNING, related_model="InventoryLot", related_object_id=lot.id, action_url="/clinic/inventory/alerts", metadata={"lot": lot.id, "days_remaining": (lot.expiration_date - today).days, "quantity": str(lot.quantity_current)})
+                count += created
+                if created:
+                    audit_inventory_alert_created(clinic=lot.clinic, related_model="InventoryLot", related_object_id=lot.id, title="Lote proximo a vencer")
+    expired_lots = InventoryLot.objects.select_related("clinic", "item").filter(active=True, quantity_current__gt=0, expiration_date__lt=today)
+    expired_ids = [str(value) for value in expired_lots.values_list("id", flat=True)]
+    archive_resolved_inventory_alerts(
+        Notification.objects.filter(module=Notification.Module.INVENTORY, title="Lote vencido").exclude(related_object_id__in=expired_ids).exclude(status=Notification.Status.ARCHIVED),
+        "Alerta de lote vencido resuelta.",
+    )
+    for lot in expired_lots:
         admins = lot.clinic.usuarios.filter(role__nombre="admin", is_active=True)
-        count += notify_once(admins, "Lote vencido", f"{lot.item.name} tiene un lote vencido.", module=Notification.Module.INVENTORY, priority=Notification.Priority.URGENT, notification_type=Notification.Type.ERROR, related_model="InventoryLot", related_object_id=lot.id, action_url="/clinic/inventory/alerts")
+        for admin in admins:
+            exists = Notification.objects.filter(recipient=admin, title="Lote vencido", related_model="InventoryLot", related_object_id=str(lot.id)).exclude(status=Notification.Status.ARCHIVED).exists()
+            if not exists:
+                created = notify_once([admin], "Lote vencido", f"{lot.item.name} tiene un lote vencido.", module=Notification.Module.INVENTORY, priority=Notification.Priority.URGENT, notification_type=Notification.Type.ERROR, related_model="InventoryLot", related_object_id=lot.id, action_url="/clinic/inventory/alerts", metadata={"lot": lot.id, "quantity": str(lot.quantity_current)})
+                count += created
+                if created:
+                    audit_inventory_alert_created(clinic=lot.clinic, related_model="InventoryLot", related_object_id=lot.id, title="Lote vencido")
     return count
 
 

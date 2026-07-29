@@ -10,7 +10,8 @@ from apps.accounts.models import Role, User
 from apps.appointments.models import Appointment
 from apps.billing.models import CashSession, FiscalDocumentRange, Invoice
 from apps.doctors.models import DoctorProfile, DoctorSchedule, MedicalSpecialty
-from apps.inventory.models import InventoryCategory, InventoryItem
+from apps.audit.models import AuditLog
+from apps.inventory.models import InventoryCategory, InventoryItem, InventoryLot
 from apps.notifications.generators import generate_billing_alerts, generate_cash_alerts, generate_fiscal_range_alerts, generate_inventory_alerts
 from apps.notifications.models import Notification, NotificationPreference, PushDevice
 from apps.notifications.services import create_notification
@@ -157,6 +158,42 @@ class NotificationTests(APITestCase):
         self.assertGreaterEqual(created, 1)
         self.assertTrue(Notification.objects.filter(recipient=self.admin, module="inventory").exists())
         self.assertEqual(generate_inventory_alerts(), 0)
+
+    def test_inventory_alerts_cover_expiring_expired_resolution_and_clinic_isolation(self):
+        other_clinic = Clinic.objects.create(nombre="Otra clinica")
+        other_admin = User.objects.create_user(email="other-clinic@test.com", password="x", nombre_completo="Otro admin", role=self.role_admin, clinica=other_clinic)
+        other_category = InventoryCategory.objects.create(clinic=other_clinic, name="Otros")
+        other_item = InventoryItem.objects.create(clinic=other_clinic, category=other_category, name="Producto ajeno", stock_current=Decimal("20"), stock_minimum=Decimal("1"))
+        expiring = InventoryLot.objects.create(
+            clinic=self.clinic,
+            item=self.item,
+            lot_number="EXPIRING-15",
+            expiration_date=timezone.localdate() + timedelta(days=7),
+            quantity_current=Decimal("3"),
+        )
+        expired = InventoryLot.objects.create(
+            clinic=self.clinic,
+            item=self.item,
+            lot_number="EXPIRED-15",
+            expiration_date=timezone.localdate() - timedelta(days=1),
+            quantity_current=Decimal("2"),
+        )
+        generate_inventory_alerts()
+        self.assertTrue(Notification.objects.filter(recipient=self.admin, title="Lote proximo a vencer", related_object_id=str(expiring.id)).exists())
+        self.assertTrue(Notification.objects.filter(recipient=self.admin, title="Lote vencido", related_object_id=str(expired.id)).exists())
+        self.assertFalse(Notification.objects.filter(recipient=other_admin, related_object_id__in=[str(expiring.id), str(expired.id)]).exists())
+        self.assertFalse(Notification.objects.filter(recipient=self.admin, clinic=other_clinic, related_model="InventoryItem", related_object_id=str(other_item.id)).exists())
+        self.assertTrue(AuditLog.objects.filter(module=AuditLog.Module.INVENTORY, action=AuditLog.Action.CREATE, object_id=str(expiring.id)).exists())
+
+        self.item.stock_current = Decimal("10")
+        self.item.save(update_fields=["stock_current", "actualizado_en"])
+        expiring.quantity_current = Decimal("0")
+        expiring.save(update_fields=["quantity_current", "actualizado_en"])
+        expired.quantity_current = Decimal("0")
+        expired.save(update_fields=["quantity_current", "actualizado_en"])
+        generate_inventory_alerts()
+        self.assertFalse(Notification.objects.filter(recipient=self.admin, module="inventory").exclude(status=Notification.Status.ARCHIVED).exists())
+        self.assertTrue(AuditLog.objects.filter(module=AuditLog.Module.INVENTORY, action=AuditLog.Action.COMPLETE).exists())
 
     def test_billing_alerts_notify_patient_and_staff_without_duplicates(self):
         invoice = Invoice.objects.create(

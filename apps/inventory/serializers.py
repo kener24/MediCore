@@ -12,7 +12,7 @@ def can_manage(user):
 
 
 def can_move(user):
-    return get_role_name(user) in ["superadmin", "admin", "enfermera"]
+    return get_role_name(user) in ["superadmin", "admin"]
 
 
 class InventoryCategorySerializer(serializers.ModelSerializer):
@@ -26,8 +26,18 @@ class InventoryCategorySerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         request = self.context["request"]
-        if get_role_name(request.user) != "superadmin":
+        role = get_role_name(request.user)
+        if role != "superadmin":
+            if not request.user.clinica_id:
+                raise serializers.ValidationError("No hay clinica asignada.")
             attrs["clinic"] = request.user.clinica
+        clinic = attrs.get("clinic", getattr(self.instance, "clinic", None))
+        name = attrs.get("name", getattr(self.instance, "name", "")).strip()
+        if not name:
+            raise serializers.ValidationError({"name": "El nombre es obligatorio."})
+        if InventoryCategory.objects.filter(clinic=clinic, name__iexact=name).exclude(id=getattr(self.instance, "id", None)).exists():
+            raise serializers.ValidationError({"name": "Ya existe una categoria con este nombre en la clinica."})
+        attrs["name"] = name
         return attrs
 
 
@@ -57,15 +67,20 @@ class InventoryItemCreateSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         request = self.context["request"]
         clinic = attrs.get("clinic") if get_role_name(request.user) == "superadmin" else request.user.clinica
+        if not clinic:
+            raise serializers.ValidationError("No hay clinica asignada.")
         attrs["clinic"] = clinic
-        category = attrs["category"]
+        category = attrs.get("category", getattr(self.instance, "category", None))
+        if not category:
+            raise serializers.ValidationError({"category": "La categoria es obligatoria."})
         if category.clinic_id and category.clinic_id != clinic.id:
             raise serializers.ValidationError("La categoria debe ser global o de la misma clinica.")
         sku = attrs.get("sku")
         barcode = attrs.get("barcode")
-        if sku and InventoryItem.objects.filter(clinic=clinic, sku=sku).exists():
+        existing_id = getattr(self.instance, "id", None)
+        if sku and InventoryItem.objects.filter(clinic=clinic, sku=sku).exclude(id=existing_id).exists():
             raise serializers.ValidationError({"sku": "SKU ya existe en esta clinica."})
-        if barcode and InventoryItem.objects.filter(clinic=clinic, barcode=barcode).exists():
+        if barcode and InventoryItem.objects.filter(clinic=clinic, barcode=barcode).exclude(id=existing_id).exists():
             raise serializers.ValidationError({"barcode": "Codigo de barras ya existe en esta clinica."})
         return attrs
 
@@ -100,6 +115,26 @@ class InventoryLotSerializer(serializers.ModelSerializer):
     def get_expiring_soon(self, obj):
         return bool(obj.expiration_date and timezone.localdate() <= obj.expiration_date <= timezone.localdate() + timezone.timedelta(days=30))
 
+    def validate(self, attrs):
+        request = self.context.get("request")
+        item = attrs.get("item", getattr(self.instance, "item", None))
+        if not item:
+            raise serializers.ValidationError({"item": "El producto es obligatorio."})
+        if request and get_role_name(request.user) != "superadmin" and item.clinic_id != request.user.clinica_id:
+            raise serializers.ValidationError("No tienes permiso sobre este producto.")
+        lot_number = attrs.get("lot_number", getattr(self.instance, "lot_number", "")).strip()
+        if item.requires_lot and not lot_number:
+            raise serializers.ValidationError({"lot_number": "Este producto requiere numero de lote."})
+        expiration_date = attrs.get("expiration_date", getattr(self.instance, "expiration_date", None))
+        if item.requires_expiration and not expiration_date:
+            raise serializers.ValidationError({"expiration_date": "Este producto requiere fecha de vencimiento."})
+        if self.instance and "item" in attrs and item.id != self.instance.item_id:
+            raise serializers.ValidationError({"item": "No se puede cambiar el producto de un lote existente."})
+        attrs["item"] = item
+        attrs["clinic"] = item.clinic
+        attrs["lot_number"] = lot_number
+        return attrs
+
 
 class InventoryMovementListSerializer(serializers.ModelSerializer):
     item_nombre = serializers.CharField(source="item.name", read_only=True)
@@ -108,7 +143,7 @@ class InventoryMovementListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = InventoryMovement
-        fields = ["id", "clinic", "item", "item_nombre", "lot", "lot_number", "movement_type", "quantity", "unit_cost", "reason", "reference_type", "reference_id", "notes", "performed_by", "performed_by_nombre", "active", "creado_en"]
+        fields = ["id", "clinic", "item", "item_nombre", "lot", "lot_number", "movement_type", "quantity", "unit_cost", "reason", "reference_type", "reference_id", "notes", "performed_by", "performed_by_nombre", "balance_before", "balance_after", "lot_balance_before", "lot_balance_after", "reversed_movement", "active", "creado_en"]
 
 
 class InventoryMovementDetailSerializer(InventoryMovementListSerializer):
@@ -138,6 +173,7 @@ class StockInSerializer(serializers.Serializer):
     expiration_date = serializers.DateField(required=False, allow_null=True)
     reason = serializers.CharField()
     notes = serializers.CharField(required=False, allow_blank=True)
+    idempotency_key = serializers.CharField(required=False, allow_blank=True, max_length=100, write_only=True)
 
 
 class StockOutSerializer(serializers.Serializer):
@@ -145,6 +181,7 @@ class StockOutSerializer(serializers.Serializer):
     lot = serializers.IntegerField(required=False)
     reason = serializers.CharField()
     notes = serializers.CharField(required=False, allow_blank=True)
+    idempotency_key = serializers.CharField(required=False, allow_blank=True, max_length=100, write_only=True)
 
 
 class StockAdjustmentSerializer(StockOutSerializer):

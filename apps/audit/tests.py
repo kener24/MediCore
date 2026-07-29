@@ -87,6 +87,10 @@ class AuditTests(APITestCase):
     def test_receive_purchase_generates_log(self):
         order = PurchaseOrder.objects.create(clinic=self.clinic, supplier=self.supplier, created_by=self.admin)
         item = PurchaseOrderItem.objects.create(purchase_order=order, item=self.item, quantity_ordered=Decimal("3"), unit_cost=Decimal("5"))
+        order.status = PurchaseOrder.Status.APROBADA
+        order.approved_by = self.admin
+        order.approved_at = timezone.now()
+        order.save(update_fields=["status", "approved_by", "approved_at", "actualizado_en"])
         self.auth(self.admin)
         response = self.client.post(f"/api/purchases/orders/{order.id}/receive/", {"items": [{"purchase_order_item": item.id, "quantity_received": "1", "unit_cost": "5", "lot_number": "LP", "expiration_date": "2027-12-31"}]}, format="json")
         self.assertEqual(response.status_code, 201)

@@ -9,7 +9,8 @@ from rest_framework import serializers
 from apps.accounts.permissions import get_role_name
 from apps.core.validators import validate_digits_identifier, validate_phone as validate_phone_number
 from apps.inventory.models import InventoryItem
-from apps.purchases.models import PurchaseOrder, PurchaseOrderItem, PurchaseReceipt, PurchaseReceiptItem, Supplier
+from apps.purchases.models import PurchaseOrder, PurchaseOrderItem, PurchaseReceipt, PurchaseReceiptItem, PurchaseReturn, PurchaseReturnItem, Supplier
+from apps.purchases.services import receive_purchase_order
 
 
 def user_clinic(user):
@@ -17,7 +18,7 @@ def user_clinic(user):
 
 
 def can_view_purchases(user):
-    return get_role_name(user) in ["superadmin", "admin", "recepcionista", "enfermera"]
+    return get_role_name(user) in ["superadmin", "admin"]
 
 
 def can_manage_purchases(user):
@@ -29,7 +30,7 @@ def can_approve_purchase_orders(user):
 
 
 def can_receive_purchase_orders(user):
-    return get_role_name(user) in ["superadmin", "admin", "enfermera"]
+    return get_role_name(user) in ["superadmin", "admin"]
 
 
 def clinic_for_request(request, attrs=None, fallback=None):
@@ -141,7 +142,8 @@ class PurchaseReceiptItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PurchaseReceiptItem
-        fields = ["id", "receipt", "purchase_order_item", "order_item_description", "item", "item_nombre", "lot", "quantity_received", "unit_cost", "lot_number", "expiration_date", "notes", "inventory_movement", "active", "creado_en"]
+        fields = ["id", "receipt", "purchase_order_item", "order_item_description", "item", "item_nombre", "lot", "quantity_received", "quantity_returned", "returnable_quantity", "unit_cost", "lot_number", "expiration_date", "notes", "inventory_movement", "active", "creado_en"]
+        read_only_fields = ["quantity_returned", "returnable_quantity"]
 
 
 class PurchaseReceiptListSerializer(serializers.ModelSerializer):
@@ -151,7 +153,7 @@ class PurchaseReceiptListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PurchaseReceipt
-        fields = ["id", "clinic", "purchase_order", "order_number", "supplier_nombre", "receipt_number", "receipt_date", "received_by", "received_by_nombre", "notes", "active", "creado_en"]
+        fields = ["id", "clinic", "purchase_order", "order_number", "supplier_nombre", "receipt_number", "receipt_date", "received_by", "received_by_nombre", "notes", "reversed_at", "reversed_by", "reversal_reason", "active", "creado_en"]
 
 
 class PurchaseReceiptDetailSerializer(PurchaseReceiptListSerializer):
@@ -204,6 +206,8 @@ class PurchaseOrderCreateSerializer(serializers.ModelSerializer):
         items = validated_data.pop("items", [])
         request = self.context["request"]
         with transaction.atomic():
+            clinic = validated_data["clinic"]
+            type(clinic).objects.select_for_update().get(pk=clinic.pk)
             order = PurchaseOrder.objects.create(created_by=request.user, **validated_data)
             for item_data in items:
                 if item_data["item"].clinic_id != order.clinic_id:
@@ -217,8 +221,8 @@ class PurchaseOrderUpdateSerializer(PurchaseOrderCreateSerializer):
     items = PurchaseOrderItemCreateSerializer(many=True, required=False)
 
     def validate(self, attrs):
-        if self.instance.status in [PurchaseOrder.Status.CANCELADA, PurchaseOrder.Status.RECIBIDA]:
-            raise serializers.ValidationError("No puedes editar una orden cancelada o recibida.")
+        if self.instance.status not in [PurchaseOrder.Status.BORRADOR, PurchaseOrder.Status.PENDIENTE]:
+            raise serializers.ValidationError("Solo puedes editar una orden antes de aprobarla.")
         return super().validate(attrs)
 
     def update(self, instance, validated_data):
@@ -253,11 +257,12 @@ class PurchaseReceiveSerializer(serializers.Serializer):
     receipt_date = serializers.DateField(required=False)
     notes = serializers.CharField(required=False, allow_blank=True)
     items = PurchaseReceiveItemSerializer(many=True)
+    idempotency_key = serializers.CharField(required=False, allow_blank=True, max_length=100, write_only=True)
 
     def validate(self, attrs):
         order = self.context["purchase_order"]
-        if order.status == PurchaseOrder.Status.CANCELADA:
-            raise serializers.ValidationError("No puedes recibir una orden cancelada.")
+        if order.status not in [PurchaseOrder.Status.APROBADA, PurchaseOrder.Status.RECIBIDA_PARCIAL]:
+            raise serializers.ValidationError("La orden debe estar aprobada y tener cantidades pendientes para poder recibirla.")
         if not attrs.get("items"):
             raise serializers.ValidationError("Debes enviar al menos un producto recibido.")
         order_items = {item.id: item for item in order.items.select_related("item").filter(active=True)}
@@ -279,28 +284,47 @@ class PurchaseReceiveSerializer(serializers.Serializer):
 
     def save(self, **kwargs):
         request = self.context["request"]
-        order = self.context["purchase_order"]
-        with transaction.atomic():
-            receipt = PurchaseReceipt.objects.create(
-                purchase_order=order,
-                clinic=order.clinic,
-                receipt_date=self.validated_data.get("receipt_date") or timezone.localdate(),
-                notes=self.validated_data.get("notes", ""),
-                received_by=request.user,
-            )
-            for item_data in self.validated_data["items"]:
-                order_item = PurchaseOrderItem.objects.select_for_update().get(pk=item_data["purchase_order_item"])
-                PurchaseReceiptItem.objects.create(
-                    receipt=receipt,
-                    purchase_order_item=order_item,
-                    item=order_item.item,
-                    quantity_received=item_data["quantity_received"],
-                    unit_cost=item_data.get("unit_cost") or order_item.unit_cost,
-                    lot_number=item_data.get("lot_number", ""),
-                    expiration_date=item_data.get("expiration_date"),
-                    notes=item_data.get("notes", ""),
-                )
-            return receipt
+        key = self.validated_data.get("idempotency_key") or request.headers.get("Idempotency-Key")
+        return receive_purchase_order(
+            order=self.context["purchase_order"],
+            user=request.user,
+            data=self.validated_data,
+            idempotency_key=key,
+        )
+
+
+class PurchaseReceiptReverseSerializer(serializers.Serializer):
+    reason = serializers.CharField(min_length=5, max_length=500)
+
+
+class PurchaseReturnRequestItemSerializer(serializers.Serializer):
+    receipt_item = serializers.IntegerField()
+    quantity = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0.01"))
+
+
+class PurchaseReturnCreateSerializer(serializers.Serializer):
+    reason = serializers.CharField(min_length=5, max_length=500)
+    items = PurchaseReturnRequestItemSerializer(many=True)
+    idempotency_key = serializers.CharField(required=False, allow_blank=True, max_length=100, write_only=True)
+
+
+class PurchaseReturnItemSerializer(serializers.ModelSerializer):
+    item_nombre = serializers.CharField(source="item.name", read_only=True)
+    lot_number = serializers.CharField(source="lot.lot_number", read_only=True)
+
+    class Meta:
+        model = PurchaseReturnItem
+        fields = ["id", "receipt_item", "item", "item_nombre", "lot", "lot_number", "quantity_returned", "unit_cost", "inventory_movement", "notes", "creado_en"]
+
+
+class PurchaseReturnSerializer(serializers.ModelSerializer):
+    supplier_nombre = serializers.CharField(source="receipt.purchase_order.supplier.name", read_only=True)
+    created_by_nombre = serializers.CharField(source="created_by.nombre_completo", read_only=True)
+    items = PurchaseReturnItemSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = PurchaseReturn
+        fields = ["id", "clinic", "receipt", "return_number", "return_date", "reason", "status", "created_by", "created_by_nombre", "supplier_nombre", "active", "items", "creado_en"]
 
 
 class SupplierHistorySerializer(serializers.Serializer):

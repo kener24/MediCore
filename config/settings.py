@@ -140,6 +140,7 @@ EMAIL_USE_SSL = config("EMAIL_USE_SSL", default=False, cast=bool)
 EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=10, cast=int)
 EMAIL_REPLY_TO = config("EMAIL_REPLY_TO", default="")
 EMAIL_NOTIFICATIONS_ENABLED = config("EMAIL_NOTIFICATIONS_ENABLED", default=True, cast=bool)
+INVENTORY_EXPIRATION_ALERT_DAYS = config("INVENTORY_EXPIRATION_ALERT_DAYS", default=30, cast=int)
 EMAIL_NOTIFICATION_MODULES = config(
     "EMAIL_NOTIFICATION_MODULES",
     default="appointments,billing,payments,cash,inventory,purchases,audit,system",

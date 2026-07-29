@@ -77,8 +77,8 @@ class InventoryModuleTests(APITestCase):
         self.assertEqual(len(res.data), 1)
 
     def test_expiring_soon(self):
-        item = self.item()
-        InventoryLot.objects.create(item=item, lot_number="L1", expiration_date=timezone.localdate() + timezone.timedelta(days=10))
+        item = self.item(stock_current=1)
+        InventoryLot.objects.create(item=item, lot_number="L1", expiration_date=timezone.localdate() + timezone.timedelta(days=10), quantity_current=1)
         self.auth(self.admin)
         res = self.client.get("/api/inventory/alerts/expiring-soon/")
         self.assertEqual(len(res.data), 1)

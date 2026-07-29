@@ -26,7 +26,7 @@ from apps.hospitalization.views import HospitalBedViewSet, HospitalRoomViewSet, 
 from apps.prescriptions.views import DiagnosisViewSet, MedicalOrderViewSet, PrescriptionViewSet
 from apps.billing.views import BillableServiceViewSet, BillingStatsViewSet, CashSessionViewSet, ClinicFiscalProfileViewSet, CreditNoteViewSet, FiscalDocumentRangeViewSet, FiscalReadinessView, InvoiceViewSet, PaymentViewSet
 from apps.inventory.views import InventoryAlertViewSet, InventoryCategoryViewSet, InventoryItemViewSet, InventoryLotViewSet, InventoryMovementViewSet, InventoryStatsViewSet
-from apps.purchases.views import PurchaseItemHistoryViewSet, PurchaseOrderViewSet, PurchaseReceiptViewSet, PurchaseStatsViewSet, SupplierViewSet
+from apps.purchases.views import PurchaseItemHistoryViewSet, PurchaseOrderViewSet, PurchaseReceiptViewSet, PurchaseReturnViewSet, PurchaseStatsViewSet, SupplierViewSet
 from apps.reports.views import (
     AppointmentsReportView,
     CashReportView,
@@ -138,6 +138,7 @@ router.register("inventory/stats", InventoryStatsViewSet, basename="inventory-st
 router.register("purchases/suppliers", SupplierViewSet, basename="purchase-suppliers")
 router.register("purchases/orders", PurchaseOrderViewSet, basename="purchase-orders")
 router.register("purchases/receipts", PurchaseReceiptViewSet, basename="purchase-receipts")
+router.register("purchases/returns", PurchaseReturnViewSet, basename="purchase-returns")
 router.register("purchases/stats", PurchaseStatsViewSet, basename="purchase-stats")
 router.register("audit/logs", AuditLogViewSet, basename="audit-logs")
 router.register("audit/stats", AuditStatsViewSet, basename="audit-stats")

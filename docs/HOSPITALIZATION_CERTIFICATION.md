@@ -16,6 +16,9 @@ El flujo certificado es: ingreso pendiente, asignación de cama, internamiento a
 - Evoluciones firmadas y notas registradas son inmutables; la corrección crea una entrada trazable.
 - Solo existe un plan activo; las versiones anteriores quedan reemplazadas.
 - Leer una indicación no equivale a completarla.
+- El médico puede suspender una indicación activa con motivo obligatorio desde web y móvil.
+- Enfermería puede registrar una ronda completada u omitida; la omisión exige motivo.
+- Las habitaciones permiten edición de nombre y piso, además de activación controlada.
 - Recepción no recibe notas, evoluciones, alergias ni antecedentes profundos.
 - Paciente y superadmin no acceden al módulo clínico interno.
 

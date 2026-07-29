@@ -60,3 +60,15 @@ MySQL informa que no implementa restricciones únicas condicionales de Django. H
 ### Android físico
 
 Requiere confirmación del usuario desde un dispositivo real. Expo se dejará disponible al final; no se afirmará una prueba física sin esa confirmación.
+
+### Cierre de controles operativos
+
+- Commit web desplegado: `07db874`.
+- Commit móvil publicado: `b1d2263`.
+- El médico puede suspender indicaciones con motivo obligatorio en web y móvil.
+- Enfermería móvil puede registrar rondas completadas u omitidas con motivo obligatorio.
+- La gestión web permite editar nombre y piso de habitaciones.
+- Build web, TypeScript móvil y lint: correctos; lint mantiene una advertencia preexistente fuera del módulo.
+- Pruebas focalizadas locales: 11 correctas y 1 omitida por requerir MySQL.
+- Respaldo final validado: `backups/sprint16a_ui_20260729_165451/`.
+- Producción quedó en `07db874`; servicios y HTTPS activos.

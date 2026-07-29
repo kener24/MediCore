@@ -21,6 +21,12 @@ const NURSING_PATHS = [
   /^\/clinic\/documents(?:\/|$)/,
 ];
 
+const DOCTOR_PATHS = [
+  /^\/clinic\/patients(?:\/|$)/,
+  /^\/clinic\/hospitalization(?:\/|$)/,
+  /^\/clinic\/medical-records(?:\/|$)/,
+];
+
 const CASHIER_PATHS = [
   /^\/clinic\/billing(?:\/|$)/,
   /^\/clinic\/reports\/financial(?:\/|$)/,
@@ -35,6 +41,7 @@ export function canAccessClinicPath(role: string, pathname: string) {
     return [...RECEPTION_PATHS, ...CASHIER_PATHS].some((pattern) => pattern.test(pathname));
   }
   if (role === "cajero") return CASHIER_PATHS.some((pattern) => pattern.test(pathname));
+  if (role === "medico") return DOCTOR_PATHS.some((pattern) => pattern.test(pathname));
   if (role === "enfermera") return NURSING_PATHS.some((pattern) => pattern.test(pathname));
   return false;
 }

@@ -9,7 +9,7 @@ export function ForbiddenPage() {
       <Card className="max-w-lg text-center">
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-rose-600">403</p>
         <h1 className="mt-3 text-3xl font-bold text-slate-900">No tienes permiso para acceder</h1>
-        <p className="mt-3 text-sm leading-6 text-slate-500">Esta sección está reservada para el rol superadmin.</p>
+        <p className="mt-3 text-sm leading-6 text-slate-500">Tu rol no tiene autorización para consultar esta sección.</p>
         <div className="mt-6 flex justify-center">
           <Link to="/dashboard">
             <Button>Volver al dashboard</Button>

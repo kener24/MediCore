@@ -71,4 +71,7 @@ Requiere confirmación del usuario desde un dispositivo real. Expo se dejará di
 - Build web, TypeScript móvil y lint: correctos; lint mantiene una advertencia preexistente fuera del módulo.
 - Pruebas focalizadas locales: 11 correctas y 1 omitida por requerir MySQL.
 - Respaldo final validado: `backups/sprint16a_ui_20260729_165451/`.
-- Producción quedó en `07db874`; servicios y HTTPS activos.
+- La prueba visual detectó y corrigió el bloqueo web del rol médico en rutas clínicas.
+- Commit final desplegado: `089cd60`.
+- El médico accedió por HTTPS al dashboard y al detalle real de un internamiento.
+- Servicios y HTTPS permanecieron activos después del despliegue.

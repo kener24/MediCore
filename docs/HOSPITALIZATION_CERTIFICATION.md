@@ -25,6 +25,8 @@ El flujo certificado es: ingreso pendiente, asignación de cama, internamiento a
 - `python manage.py test apps.hospitalization`: 20 pruebas correctas; una prueba MySQL de concurrencia se omite en SQLite.
 - `python manage.py audit_hospital_bed_consistency --json`: consistente.
 - Build web, TypeScript móvil y lint Expo: correctos.
+- Producción MySQL: 20/20 pruebas correctas, incluida concurrencia.
+- Pruebas HTTPS por rol: médico, enfermería y recepción autorizados; paciente y superadmin bloqueados.
 
 ## Fuera de alcance
 

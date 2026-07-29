@@ -16,7 +16,30 @@ Este archivo se completa con resultados verificables durante el despliegue. No c
 
 ### Producción
 
-Pendiente de completar automáticamente al desplegar: commit, migración MySQL, diagnóstico de camas, estado de Gunicorn/Nginx, comprobación HTTPS y pruebas API por Clínica A/B.
+- Fecha: 2026-07-29.
+- Commit desplegado: `44c6960`.
+- Respaldo validado: `backups/sprint16a_20260729_160641/` con dump MySQL, bundle Git, lockfile y Nginx.
+- Migración `hospitalization.0003`: aplicada en MySQL.
+- Build Vite: correcto, 1,850 módulos transformados.
+- Servicios `medicore`, `nginx` y `mysql`: activos.
+- `nginx -t`: correcto.
+- HTTPS `/login`: disponible.
+- Diagnóstico productivo: una cama, una asignación activa y un internamiento; sin errores ni advertencias de consistencia.
+- Suite completa de hospitalización sobre MySQL temporal: 20/20 correcta, incluida concurrencia.
+- La base temporal y el permiso concedido para pruebas fueron eliminados al finalizar.
+
+### Pruebas HTTPS por rol
+
+- Médico: listado e indicaciones `200`.
+- Enfermería: listado e indicaciones `200`.
+- Recepción: listado `200`; campos clínicos profundos ausentes.
+- Paciente: acceso interno `403`.
+- Superadmin: acceso clínico interno `403`.
+- Las sesiones creadas por las pruebas fueron cerradas por el endpoint de logout.
+
+### Advertencias no bloqueantes
+
+MySQL informa que no implementa restricciones únicas condicionales de Django. Hospitalización mantiene exclusión mediante `transaction.atomic()`, bloqueo de paciente/internamiento/cama con `select_for_update()` y comprobaciones dentro de la transacción. La prueba concurrente MySQL confirmó que solo una asignación tiene éxito.
 
 ### Android físico
 

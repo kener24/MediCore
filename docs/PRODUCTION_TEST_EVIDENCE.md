@@ -17,7 +17,7 @@ Este archivo se completa con resultados verificables durante el despliegue. No c
 ### Producción
 
 - Fecha: 2026-07-29.
-- Commit desplegado: `44c6960`.
+- Commit funcional desplegado: `ef42c58`.
 - Respaldo validado: `backups/sprint16a_20260729_160641/` con dump MySQL, bundle Git, lockfile y Nginx.
 - Migración `hospitalization.0003`: aplicada en MySQL.
 - Build Vite: correcto, 1,850 módulos transformados.
@@ -36,6 +36,22 @@ Este archivo se completa con resultados verificables durante el despliegue. No c
 - Paciente: acceso interno `403`.
 - Superadmin: acceso clínico interno `403`.
 - Las sesiones creadas por las pruebas fueron cerradas por el endpoint de logout.
+
+### Regresión global
+
+- `python manage.py test --parallel 4 --keepdb --noinput`.
+- 340 pruebas ejecutadas correctamente en 529.451 segundos.
+- 3 pruebas omitidas por condiciones previstas.
+- Ningún fallo ni error.
+- El primer intento monohilo fue detenido por el límite de 15 minutos; no había reportado fallos. Se repitió completo en cuatro bases de prueba aisladas.
+
+### Móvil
+
+- `npx tsc --noEmit`: correcto.
+- `npx expo-doctor`: 18/18 comprobaciones correctas.
+- `npx expo lint`: 0 errores; permanece una advertencia preexistente fuera de hospitalización en `CashierRegisterPaymentScreen.tsx`.
+- Expo Tunnel: levantado contra `https://kp-software.tech/api`.
+- Prueba Android física: pendiente de confirmación del usuario.
 
 ### Advertencias no bloqueantes
 

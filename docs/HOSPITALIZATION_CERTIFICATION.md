@@ -27,6 +27,7 @@ El flujo certificado es: ingreso pendiente, asignación de cama, internamiento a
 - Build web, TypeScript móvil y lint Expo: correctos.
 - Producción MySQL: 20/20 pruebas correctas, incluida concurrencia.
 - Pruebas HTTPS por rol: médico, enfermería y recepción autorizados; paciente y superadmin bloqueados.
+- Regresión global: 340 pruebas correctas, 3 omitidas y 0 fallos.
 
 ## Fuera de alcance
 

@@ -244,14 +244,30 @@ Pendiente de confirmacion manual en dispositivo. TypeScript y Expo Doctor estan 
 - Se agregaron pruebas de FEFO dividido, vencidos, stock negativo, idempotencia, recepcion parcial/total, varios lotes, devolucion, reversion, inmutabilidad, alertas y aislamiento por clinica.
 - La prueba de concurrencia real queda condicionada a MySQL y debe ejecutarse durante la certificacion del servidor.
 
-### Evidencia pendiente de completar tras despliegue
+### Evidencia de produccion
 
-- Resultado final de la suite Django completa.
-- TypeScript, Expo Doctor y arranque de Metro.
-- Ruta y hashes del respaldo previo.
-- Commit desplegado y migraciones MySQL.
-- Salida del diagnostico no destructivo de inventario.
-- Estado del timer de notificaciones y ejecucion controlada.
-- Pruebas sinteticas en Clinica A y Clinica B.
-- Pruebas de IDs cruzados y concurrencia MySQL.
-- Confirmacion HTTPS de web y API.
+- Respaldo previo verificado en `/var/backups/medicore/sprint15-20260729-054521`: dump MySQL comprimido, bundle Git, `.env`, media, Nginx, unidades systemd y sumas de comprobacion.
+- Commits desplegados: `0996e43`, `e6d1d0f` y `338c959`; revision activa al certificar: `338c959`.
+- Migraciones `inventory.0002` y `purchases.0002` aplicadas correctamente en MySQL sin borrar datos existentes.
+- Diagnostico posterior: 6 productos, 8 lotes, 22 movimientos, 7 lineas de recepcion y 2 consumos; `consistent: true`, sin errores ni advertencias.
+- Flujo controlado en Clinica A y Clinica B: recepcion parcial de 4, reintento idempotente, recepcion de 6, devolucion de 2 y nueva recepcion de 2.
+- FEFO dividido aprobado en ambas clinicas: la salida de 4 consumio primero 2 unidades del lote mas proximo y luego 2 del siguiente; el reintento no duplico movimientos.
+- Stock final restaurado y consistente en `10.00` para los productos sinteticos de ambas clinicas.
+- Concurrencia MySQL de salida: dos operaciones simultaneas sobre stock 10 intentaron retirar 6; solo una fue efectiva y el stock se restauro de forma trazable.
+- Concurrencia MySQL de recepcion: dos recepciones simultaneas sobre 6 pendientes; solo una fue efectiva y luego se revirtio mediante movimiento inverso.
+- Aislamiento multi-clinica: un administrador de Clinica A obtuvo 404 al consultar producto y orden de Clinica B.
+- Auditoria: 16 eventos recientes de inventario y compras para creacion, recepcion, salida, devolucion y resolucion de alertas.
+- Alertas: ciclo de bajo stock creado y resuelto durante la prueba; dos ejecuciones posteriores generaron cero duplicados.
+- Temporizador `medicore-notifications.timer`: habilitado y activo; las ejecuciones horarias finalizaron correctamente.
+- Interfaz web: inventario, productos, categorias, lotes, movimientos, alertas, compras, proveedores, ordenes y recepciones cargaron con datos reales y sin errores de consola.
+- Detalle de orden: pedido 10, recibido 10 y pendiente 0; detalle de recepcion mostro cantidad recibida, devuelta, disponible, lote, vencimiento y movimiento.
+- HTTPS: login principal y `www` respondieron 200; HTTP redirigio con 301 a HTTPS; API de inventario anonima respondio 401; `nginx -t` fue valido.
+- Servicios `medicore`, `nginx` y `medicore-notifications.timer`: activos despues del despliegue.
+
+### Observaciones de cierre
+
+- La clase Django de concurrencia no pudo crear `test_medicore_db` en el servidor porque el usuario MySQL de la aplicacion no tiene permiso `CREATE DATABASE`. La concurrencia se certifico con operaciones desechables y controladas sobre la base MySQL real, dejando stock restaurado y diagnostico consistente.
+- MySQL conserva advertencias conocidas para constraints condicionales historicos; las reglas criticas nuevas tambien se aplican en servicios transaccionales y bloqueos de fila.
+- El bundle web conserva la advertencia de tamano superior a 500 kB.
+- Conteo fisico, conversion de unidades y una aplicacion movil independiente de bodega quedan fuera del alcance de este sprint.
+- La comprobacion en Android fisico permanece pendiente de confirmacion manual en Expo Go; TypeScript, Expo Doctor, manifest y bundle Android fueron aprobados.

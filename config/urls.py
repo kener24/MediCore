@@ -22,7 +22,17 @@ from apps.doctors.views import DoctorDashboardView, DoctorProfileViewSet, Specia
 from apps.patients.views import PatientViewSet
 from apps.appointments.views import AppointmentViewSet
 from apps.medical_records.views import ClinicalConsultationViewSet, ClinicalSupplyUsageViewSet, MedicalRecordViewSet
-from apps.hospitalization.views import HospitalBedViewSet, HospitalRoomViewSet, HospitalizationDashboardView, HospitalizationViewSet, MedicationAdministrationViewSet, PendingMedicationsView
+from apps.hospitalization.views import (
+    HospitalBedViewSet,
+    HospitalRoomViewSet,
+    HospitalizationDashboardView,
+    HospitalizationViewSet,
+    MedicalEvolutionViewSet,
+    MedicalInstructionViewSet,
+    MedicationAdministrationViewSet,
+    NursingNoteViewSet,
+    PendingMedicationsView,
+)
 from apps.prescriptions.views import DiagnosisViewSet, MedicalOrderViewSet, PrescriptionViewSet
 from apps.billing.views import BillableServiceViewSet, BillingStatsViewSet, CashSessionViewSet, ClinicFiscalProfileViewSet, CreditNoteViewSet, FiscalDocumentRangeViewSet, FiscalReadinessView, InvoiceViewSet, PaymentViewSet
 from apps.inventory.views import InventoryAlertViewSet, InventoryCategoryViewSet, InventoryItemViewSet, InventoryLotViewSet, InventoryMovementViewSet, InventoryStatsViewSet
@@ -117,6 +127,9 @@ router.register("hospitalization/rooms", HospitalRoomViewSet, basename="hospital
 router.register("hospitalization/beds", HospitalBedViewSet, basename="hospitalization-beds")
 router.register("hospitalization/admissions", HospitalizationViewSet, basename="hospitalization-admissions")
 router.register("hospitalization/medication-administrations", MedicationAdministrationViewSet, basename="hospitalization-medication-administrations")
+router.register("hospitalization/evolutions", MedicalEvolutionViewSet, basename="hospitalization-evolutions")
+router.register("hospitalization/instructions", MedicalInstructionViewSet, basename="hospitalization-instructions")
+router.register("hospitalization/nursing-notes", NursingNoteViewSet, basename="hospitalization-nursing-notes")
 router.register("medical-records", MedicalRecordViewSet, basename="medical-records")
 router.register("consultations", ClinicalConsultationViewSet, basename="consultations")
 router.register("clinical-consumptions", ClinicalSupplyUsageViewSet, basename="clinical-consumptions")

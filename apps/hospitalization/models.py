@@ -52,6 +52,11 @@ class HospitalRoom(TimeStampedModel):
     def __str__(self):
         return f"{self.room_number} - {self.name}"
 
+    def delete(self, *args, **kwargs):
+        if self.beds.exists():
+            raise ValidationError("No se puede eliminar una habitacion con historial de camas.")
+        return super().delete(*args, **kwargs)
+
 
 class HospitalBed(TimeStampedModel):
     class Status(models.TextChoices):
@@ -86,8 +91,11 @@ class HospitalBed(TimeStampedModel):
             raise ValidationError({"bed_number": "El numero de cama es obligatorio."})
         if self.room_id and self.clinic_id and self.room.clinic_id != self.clinic_id:
             raise ValidationError("La cama debe pertenecer a una habitacion de la misma clinica.")
-        if self.pk and self.status == self.Status.AVAILABLE and self.active_hospitalizations.exists():
+        active_assignments = self.assignments.filter(released_at__isnull=True) if self.pk else HospitalBedAssignment.objects.none()
+        if self.status == self.Status.AVAILABLE and active_assignments.exists():
             raise ValidationError("No se puede marcar disponible una cama con internamiento activo.")
+        if not self.is_active and active_assignments.exists():
+            raise ValidationError("No se puede desactivar una cama con asignacion activa.")
 
     def save(self, *args, **kwargs):
         if self.room_id and not self.clinic_id:
@@ -100,6 +108,11 @@ class HospitalBed(TimeStampedModel):
     def __str__(self):
         return self.bed_code
 
+    def delete(self, *args, **kwargs):
+        if self.assignments.exists():
+            raise ValidationError("No se puede eliminar una cama con historial de asignaciones.")
+        return super().delete(*args, **kwargs)
+
 
 class Hospitalization(TimeStampedModel):
     class AdmissionSource(models.TextChoices):
@@ -110,13 +123,16 @@ class Hospitalization(TimeStampedModel):
         OTHER = "other", "Otro"
 
     class Status(models.TextChoices):
+        PENDING_ADMISSION = "pending_admission", "Pendiente de ingreso"
         ACTIVE = "active", "Activo"
         OBSERVATION = "observation", "Observacion"
         TRANSFERRED = "transferred", "Trasladado"
+        DISCHARGE_PENDING = "discharge_pending", "Alta pendiente"
         DISCHARGED = "discharged", "Alta"
         CANCELLED = "cancelled", "Cancelado"
 
-    ACTIVE_STATUSES = [Status.ACTIVE, Status.OBSERVATION, Status.TRANSFERRED]
+    ACTIVE_STATUSES = [Status.ACTIVE, Status.OBSERVATION, Status.TRANSFERRED, Status.DISCHARGE_PENDING]
+    OPEN_STATUSES = [Status.PENDING_ADMISSION, *ACTIVE_STATUSES]
 
     clinic = models.ForeignKey("clinics.Clinic", on_delete=models.PROTECT, related_name="hospitalizations")
     patient = models.ForeignKey("patients.Patient", on_delete=models.PROTECT, related_name="hospitalizations")
@@ -131,6 +147,8 @@ class Hospitalization(TimeStampedModel):
     reason = models.TextField()
     diagnosis_at_admission = models.TextField(blank=True)
     admission_datetime = models.DateTimeField(default=timezone.now)
+    expected_discharge_date = models.DateField(null=True, blank=True)
+    idempotency_key = models.CharField(max_length=100, null=True, blank=True, default=None)
     discharge_datetime = models.DateTimeField(null=True, blank=True)
     discharge_reason = models.TextField(blank=True)
     discharge_notes = models.TextField(blank=True)
@@ -141,9 +159,10 @@ class Hospitalization(TimeStampedModel):
         constraints = [
             models.UniqueConstraint(
                 fields=["clinic", "patient"],
-                condition=Q(status__in=["active", "observation", "transferred"]),
+                condition=Q(status__in=["pending_admission", "active", "observation", "transferred", "discharge_pending"]),
                 name="unique_active_hospitalization_per_patient_clinic",
             ),
+            models.UniqueConstraint(fields=["clinic", "admitted_by", "idempotency_key"], name="unique_hospitalization_operation"),
         ]
         indexes = [
             models.Index(fields=["clinic", "status"]),
@@ -190,11 +209,16 @@ class HospitalBedAssignment(TimeStampedModel):
     assigned_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="hospital_bed_assignments")
     assigned_at = models.DateTimeField(default=timezone.now)
     released_at = models.DateTimeField(null=True, blank=True)
+    released_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="hospital_bed_releases")
     release_reason = models.CharField(max_length=120, blank=True)
     notes = models.TextField(blank=True)
 
     class Meta:
         ordering = ["-assigned_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["bed"], condition=Q(released_at__isnull=True), name="unique_active_assignment_per_bed"),
+            models.UniqueConstraint(fields=["hospitalization"], condition=Q(released_at__isnull=True), name="unique_active_assignment_per_hospitalization"),
+        ]
         indexes = [
             models.Index(fields=["hospitalization", "assigned_at"]),
             models.Index(fields=["bed", "released_at"]),
@@ -203,6 +227,13 @@ class HospitalBedAssignment(TimeStampedModel):
     def clean(self):
         if self.hospitalization_id and self.bed_id and self.hospitalization.clinic_id != self.bed.clinic_id:
             raise ValidationError("La cama y el internamiento deben pertenecer a la misma clinica.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Las asignaciones de cama forman parte del historial y no pueden eliminarse.")
 
 
 class HospitalVitalSigns(TimeStampedModel):
@@ -221,6 +252,10 @@ class HospitalVitalSigns(TimeStampedModel):
     notes = models.TextField(blank=True)
     recorded_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="hospital_vital_signs")
     recorded_at = models.DateTimeField(default=timezone.now)
+    is_abnormal = models.BooleanField(default=False)
+    alert_summary = models.CharField(max_length=250, blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="hospital_vital_alerts_reviewed")
 
     class Meta:
         ordering = ["-recorded_at"]
@@ -257,8 +292,24 @@ class HospitalVitalSigns(TimeStampedModel):
         if self.weight and self.height:
             self.bmi = (self.weight / (self.height * self.height)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
+    def calculate_alerts(self):
+        alerts = []
+        if self.temperature is not None and (self.temperature < Decimal("35.0") or self.temperature >= Decimal("38.0")):
+            alerts.append("Temperatura fuera del rango habitual")
+        if self.oxygen_saturation is not None and self.oxygen_saturation < 92:
+            alerts.append("Saturacion de oxigeno baja")
+        if self.heart_rate is not None and (self.heart_rate < 50 or self.heart_rate > 120):
+            alerts.append("Frecuencia cardiaca fuera del rango habitual")
+        if self.blood_pressure_systolic is not None and (self.blood_pressure_systolic < 90 or self.blood_pressure_systolic > 180):
+            alerts.append("Presion arterial sistolica fuera del rango habitual")
+        if self.pain_scale is not None and self.pain_scale >= 7:
+            alerts.append("Dolor intenso")
+        self.is_abnormal = bool(alerts)
+        self.alert_summary = "; ".join(alerts)
+
     def save(self, *args, **kwargs):
         self.calculate_bmi()
+        self.calculate_alerts()
         self.full_clean()
         return super().save(*args, **kwargs)
 
@@ -272,10 +323,24 @@ class NursingNote(TimeStampedModel):
         OBSERVATION = "observation", "Observacion"
         INCIDENT = "incident", "Incidente"
 
+    class Shift(models.TextChoices):
+        MORNING = "morning", "Manana"
+        AFTERNOON = "afternoon", "Tarde"
+        NIGHT = "night", "Noche"
+        OTHER = "other", "Otro"
+
+    class Status(models.TextChoices):
+        SIGNED = "signed", "Firmada"
+        CORRECTION = "correction", "Correccion"
+
     hospitalization = models.ForeignKey(Hospitalization, on_delete=models.CASCADE, related_name="nursing_notes")
     note_type = models.CharField(max_length=30, choices=NoteType.choices, default=NoteType.NORMAL)
     title = models.CharField(max_length=160, blank=True)
     note = models.TextField()
+    shift = models.CharField(max_length=20, choices=Shift.choices, default=Shift.OTHER)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.SIGNED)
+    correction_of = models.ForeignKey("self", on_delete=models.PROTECT, null=True, blank=True, related_name="corrections")
+    correction_reason = models.CharField(max_length=250, blank=True)
     created_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="nursing_notes")
     recorded_at = models.DateTimeField(default=timezone.now)
 
@@ -291,12 +356,30 @@ class NursingNote(TimeStampedModel):
             raise ValidationError("No se pueden crear notas de enfermeria sin hospitalizacion activa.")
         if not self.note:
             raise ValidationError("La nota de enfermeria es obligatoria.")
+        if self.correction_of_id and not self.correction_reason.strip():
+            raise ValidationError({"correction_reason": "El motivo de correccion es obligatorio."})
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValidationError("Las notas firmadas no pueden editarse; registra una correccion.")
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Las notas de enfermeria firmadas no pueden eliminarse.")
 
 
 class HospitalizationEvent(TimeStampedModel):
+    class Severity(models.TextChoices):
+        INFO = "info", "Informativo"
+        WARNING = "warning", "Advertencia"
+        CRITICAL = "critical", "Critico"
+
     hospitalization = models.ForeignKey(Hospitalization, on_delete=models.CASCADE, related_name="events")
     event_type = models.CharField(max_length=80)
     description = models.TextField()
+    severity = models.CharField(max_length=20, choices=Severity.choices, default=Severity.INFO)
+    event_datetime = models.DateTimeField(default=timezone.now)
     created_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="hospitalization_events")
     metadata = models.JSONField(default=dict, blank=True)
 
@@ -308,6 +391,167 @@ class HospitalizationEvent(TimeStampedModel):
         ]
 
 
+class MedicalEvolution(TimeStampedModel):
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Borrador"
+        SIGNED = "signed", "Firmada"
+        CORRECTION = "correction", "Correccion"
+
+    hospitalization = models.ForeignKey(Hospitalization, on_delete=models.PROTECT, related_name="medical_evolutions")
+    doctor = models.ForeignKey("doctors.DoctorProfile", on_delete=models.PROTECT, related_name="hospital_evolutions")
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
+    subjective = models.TextField(blank=True)
+    objective = models.TextField(blank=True)
+    assessment = models.TextField(blank=True)
+    plan = models.TextField(blank=True)
+    progress_notes = models.TextField(blank=True)
+    diagnosis_changes = models.TextField(blank=True)
+    treatment_changes = models.TextField(blank=True)
+    observations = models.TextField(blank=True)
+    signed_at = models.DateTimeField(null=True, blank=True)
+    correction_of = models.ForeignKey("self", on_delete=models.PROTECT, null=True, blank=True, related_name="corrections")
+    correction_reason = models.CharField(max_length=250, blank=True)
+
+    class Meta:
+        ordering = ["-creado_en"]
+        indexes = [models.Index(fields=["hospitalization", "status", "creado_en"]), models.Index(fields=["doctor", "creado_en"])]
+
+    def clean(self):
+        if self.hospitalization_id and self.doctor_id and self.hospitalization.clinic_id != self.doctor.clinic_id:
+            raise ValidationError("La evolucion y el medico deben pertenecer a la misma clinica.")
+        content = [self.subjective, self.objective, self.assessment, self.plan, self.progress_notes]
+        if not any((value or "").strip() for value in content):
+            raise ValidationError("La evolucion medica requiere contenido clinico.")
+        if self.status == self.Status.CORRECTION and (not self.correction_of_id or not self.correction_reason.strip()):
+            raise ValidationError("La correccion requiere evolucion original y motivo.")
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            original = type(self).objects.get(pk=self.pk)
+            if original.status in [self.Status.SIGNED, self.Status.CORRECTION]:
+                raise ValidationError("La evolucion firmada no puede editarse; registra una correccion.")
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        if self.status != self.Status.DRAFT:
+            raise ValidationError("Las evoluciones firmadas no pueden eliminarse.")
+        return super().delete(*args, **kwargs)
+
+
+class TreatmentPlan(TimeStampedModel):
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Borrador"
+        ACTIVE = "active", "Activo"
+        REPLACED = "replaced", "Reemplazado"
+        COMPLETED = "completed", "Completado"
+        CANCELLED = "cancelled", "Cancelado"
+
+    hospitalization = models.ForeignKey(Hospitalization, on_delete=models.PROTECT, related_name="treatment_plans")
+    doctor = models.ForeignKey("doctors.DoctorProfile", on_delete=models.PROTECT, related_name="hospital_treatment_plans")
+    version = models.PositiveIntegerField(default=1)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
+    goals = models.TextField(blank=True)
+    treatment = models.TextField()
+    monitoring = models.TextField(blank=True)
+    diet = models.TextField(blank=True)
+    activity = models.TextField(blank=True)
+    precautions = models.TextField(blank=True)
+    expected_duration = models.CharField(max_length=120, blank=True)
+    effective_from = models.DateTimeField(default=timezone.now)
+    effective_until = models.DateTimeField(null=True, blank=True)
+    change_reason = models.CharField(max_length=250, blank=True)
+    replaces = models.ForeignKey("self", on_delete=models.PROTECT, null=True, blank=True, related_name="replacements")
+
+    class Meta:
+        ordering = ["-version", "-creado_en"]
+        constraints = [models.UniqueConstraint(fields=["hospitalization", "version"], name="unique_treatment_plan_version")]
+        indexes = [models.Index(fields=["hospitalization", "status"])]
+
+    def clean(self):
+        if self.hospitalization_id and self.doctor_id and self.hospitalization.clinic_id != self.doctor.clinic_id:
+            raise ValidationError("El plan y el medico deben pertenecer a la misma clinica.")
+        if not (self.treatment or "").strip():
+            raise ValidationError({"treatment": "El tratamiento es obligatorio."})
+        if self.replaces_id and not self.change_reason.strip():
+            raise ValidationError({"change_reason": "El motivo del cambio es obligatorio."})
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValidationError("Los planes de tratamiento no se sobrescriben; crea una nueva version.")
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Los planes de tratamiento forman parte del historial clinico.")
+
+
+class MedicalInstruction(TimeStampedModel):
+    class InstructionType(models.TextChoices):
+        MEDICATION = "medication", "Medicamento"
+        MONITORING = "monitoring", "Monitorizacion"
+        DIET = "diet", "Dieta"
+        ACTIVITY = "activity", "Actividad"
+        PROCEDURE = "procedure", "Procedimiento"
+        WOUND_CARE = "wound_care", "Curacion"
+        VITAL_SIGNS = "vital_signs", "Control de signos"
+        LABORATORY = "laboratory", "Laboratorio"
+        IMAGING = "imaging", "Imagen"
+        OTHER = "other", "Otra"
+
+    class Priority(models.TextChoices):
+        ROUTINE = "routine", "Rutina"
+        URGENT = "urgent", "Urgente"
+        STAT = "stat", "Inmediata"
+
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Activa"
+        ACKNOWLEDGED = "acknowledged", "Leida"
+        IN_PROGRESS = "in_progress", "En proceso"
+        COMPLETED = "completed", "Completada"
+        SUSPENDED = "suspended", "Suspendida"
+        CANCELLED = "cancelled", "Cancelada"
+
+    hospitalization = models.ForeignKey(Hospitalization, on_delete=models.PROTECT, related_name="medical_instructions")
+    treatment_plan = models.ForeignKey(TreatmentPlan, on_delete=models.PROTECT, null=True, blank=True, related_name="instructions")
+    doctor = models.ForeignKey("doctors.DoctorProfile", on_delete=models.PROTECT, related_name="hospital_instructions")
+    instruction_type = models.CharField(max_length=30, choices=InstructionType.choices, default=InstructionType.OTHER)
+    priority = models.CharField(max_length=20, choices=Priority.choices, default=Priority.ROUTINE)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
+    title = models.CharField(max_length=180)
+    details = models.TextField()
+    frequency = models.CharField(max_length=120, blank=True)
+    effective_from = models.DateTimeField(default=timezone.now)
+    effective_until = models.DateTimeField(null=True, blank=True)
+    acknowledged_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="hospital_instructions_acknowledged")
+    acknowledged_at = models.DateTimeField(null=True, blank=True)
+    completed_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="hospital_instructions_completed")
+    completed_at = models.DateTimeField(null=True, blank=True)
+    status_reason = models.CharField(max_length=250, blank=True)
+    replaces = models.ForeignKey("self", on_delete=models.PROTECT, null=True, blank=True, related_name="replacements")
+
+    class Meta:
+        ordering = ["-effective_from", "-creado_en"]
+        indexes = [models.Index(fields=["hospitalization", "status", "priority"])]
+
+    def clean(self):
+        if self.hospitalization_id and self.doctor_id and self.hospitalization.clinic_id != self.doctor.clinic_id:
+            raise ValidationError("La indicacion y el medico deben pertenecer a la misma clinica.")
+        if self.treatment_plan_id and self.treatment_plan.hospitalization_id != self.hospitalization_id:
+            raise ValidationError("El plan no pertenece al internamiento.")
+        if not self.title.strip() or not self.details.strip():
+            raise ValidationError("La indicacion requiere titulo y detalle.")
+        if self.status in [self.Status.SUSPENDED, self.Status.CANCELLED] and not self.status_reason.strip():
+            raise ValidationError("La suspension o cancelacion requiere motivo.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Las indicaciones medicas forman parte del historial clinico.")
+
+
 class NursingRound(TimeStampedModel):
     class RoundType(models.TextChoices):
         ROUTINE = "routine", "Rutina"
@@ -317,7 +561,9 @@ class NursingRound(TimeStampedModel):
         OTHER = "other", "Otro"
 
     class Status(models.TextChoices):
+        PENDING = "pending", "Pendiente"
         COMPLETED = "completed", "Completada"
+        MISSED = "missed", "Omitida"
         PENDING_REVIEW = "pending_review", "Pendiente de revision"
         CANCELLED = "cancelled", "Cancelada"
 
@@ -334,9 +580,14 @@ class NursingRound(TimeStampedModel):
     mobility_status = models.CharField(max_length=120, blank=True)
     feeding_status = models.CharField(max_length=120, blank=True)
     elimination_status = models.CharField(max_length=120, blank=True)
+    scheduled_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    status_reason = models.CharField(max_length=250, blank=True)
+    idempotency_key = models.CharField(max_length=100, null=True, blank=True, default=None)
 
     class Meta:
         ordering = ["-creado_en"]
+        constraints = [models.UniqueConstraint(fields=["clinic", "nurse", "idempotency_key"], name="unique_nursing_round_operation")]
         indexes = [
             models.Index(fields=["clinic", "creado_en"]),
             models.Index(fields=["hospitalization", "creado_en"]),
@@ -354,11 +605,15 @@ class NursingRound(TimeStampedModel):
                 raise ValidationError("La ronda debe pertenecer al mismo paciente del internamiento.")
         if self.pain_level is not None and (self.pain_level < 0 or self.pain_level > 10):
             raise ValidationError({"pain_level": "El nivel de dolor debe estar entre 0 y 10."})
+        if self.status in [self.Status.MISSED, self.Status.CANCELLED] and not self.status_reason.strip():
+            raise ValidationError({"status_reason": "El motivo es obligatorio."})
 
     def save(self, *args, **kwargs):
         if self.hospitalization_id:
             self.clinic = self.hospitalization.clinic
             self.patient = self.hospitalization.patient
+        if self.status == self.Status.COMPLETED and not self.completed_at:
+            self.completed_at = timezone.now()
         self.full_clean()
         return super().save(*args, **kwargs)
 

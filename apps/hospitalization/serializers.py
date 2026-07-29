@@ -7,9 +7,12 @@ from apps.hospitalization.models import (
     HospitalVitalSigns,
     Hospitalization,
     HospitalizationEvent,
+    MedicalEvolution,
+    MedicalInstruction,
     MedicationAdministration,
     NursingNote,
     NursingRound,
+    TreatmentPlan,
 )
 
 
@@ -49,6 +52,12 @@ class HospitalRoomSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("El numero de habitacion es obligatorio.")
         return value
 
+    def validate(self, attrs):
+        if self.instance and attrs.get("is_active") is False:
+            if self.instance.beds.filter(assignments__released_at__isnull=True).exists():
+                raise serializers.ValidationError({"is_active": "No se puede desactivar una habitacion con pacientes asignados."})
+        return attrs
+
 
 class HospitalBedSerializer(serializers.ModelSerializer):
     clinic_nombre = serializers.CharField(source="clinic.nombre", read_only=True)
@@ -79,18 +88,31 @@ class HospitalBedSerializer(serializers.ModelSerializer):
         read_only_fields = ["clinic", "bed_code", "current_patient", "current_hospitalization", "creado_en", "actualizado_en"]
 
     def get_current_hospitalization(self, obj):
-        active = obj.active_hospitalizations.filter(status__in=Hospitalization.ACTIVE_STATUSES).first()
-        return active.id if active else None
+        assignment = obj.assignments.filter(released_at__isnull=True).select_related("hospitalization").first()
+        return assignment.hospitalization_id if assignment else None
 
     def get_current_patient(self, obj):
-        active = obj.active_hospitalizations.select_related("patient").filter(status__in=Hospitalization.ACTIVE_STATUSES).first()
-        return active.patient.nombre_completo if active else ""
+        assignment = obj.assignments.filter(released_at__isnull=True).select_related("hospitalization__patient").first()
+        return assignment.hospitalization.patient.nombre_completo if assignment else ""
 
     def validate_bed_number(self, value):
         value = value.strip()
         if not value:
             raise serializers.ValidationError("El numero de cama es obligatorio.")
         return value
+
+    def validate(self, attrs):
+        if self.instance:
+            has_assignment = self.instance.assignments.filter(released_at__isnull=True).exists()
+            next_status = attrs.get("status", self.instance.status)
+            next_active = attrs.get("is_active", self.instance.is_active)
+            if has_assignment and (next_status != HospitalBed.Status.OCCUPIED or not next_active):
+                raise serializers.ValidationError("Una cama con asignacion activa debe permanecer ocupada y activa.")
+            if not has_assignment and next_status == HospitalBed.Status.OCCUPIED:
+                raise serializers.ValidationError({"status": "La ocupacion solo se establece mediante una asignacion de cama."})
+        elif attrs.get("status") == HospitalBed.Status.OCCUPIED:
+            raise serializers.ValidationError({"status": "La ocupacion solo se establece mediante una asignacion de cama."})
+        return attrs
 
 
 class HospitalBedAssignmentSerializer(serializers.ModelSerializer):
@@ -99,8 +121,8 @@ class HospitalBedAssignmentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = HospitalBedAssignment
-        fields = ["id", "bed", "bed_code", "assigned_by", "assigned_by_name", "assigned_at", "released_at", "release_reason", "notes"]
-        read_only_fields = ["assigned_by", "assigned_at", "released_at"]
+        fields = ["id", "bed", "bed_code", "assigned_by", "assigned_by_name", "assigned_at", "released_at", "released_by", "release_reason", "notes"]
+        read_only_fields = ["assigned_by", "assigned_at", "released_at", "released_by"]
 
 
 class HospitalVitalSignsSerializer(serializers.ModelSerializer):
@@ -126,9 +148,13 @@ class HospitalVitalSignsSerializer(serializers.ModelSerializer):
             "recorded_by",
             "recorded_by_name",
             "recorded_at",
+            "is_abnormal",
+            "alert_summary",
+            "reviewed_at",
+            "reviewed_by",
             "creado_en",
         ]
-        read_only_fields = ["hospitalization", "bmi", "recorded_by", "recorded_at", "creado_en"]
+        read_only_fields = ["hospitalization", "bmi", "recorded_by", "recorded_at", "is_abnormal", "alert_summary", "reviewed_at", "reviewed_by", "creado_en"]
 
     def validate_temperature(self, value):
         if value is not None and (value < 30 or value > 45):
@@ -158,8 +184,8 @@ class NursingNoteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = NursingNote
-        fields = ["id", "hospitalization", "note_type", "title", "note", "created_by", "created_by_name", "recorded_at", "creado_en"]
-        read_only_fields = ["hospitalization", "created_by", "recorded_at", "creado_en"]
+        fields = ["id", "hospitalization", "note_type", "title", "note", "shift", "status", "correction_of", "correction_reason", "created_by", "created_by_name", "recorded_at", "creado_en"]
+        read_only_fields = ["hospitalization", "status", "correction_of", "correction_reason", "created_by", "recorded_at", "creado_en"]
 
     def validate_note(self, value):
         value = value.strip()
@@ -175,6 +201,10 @@ class HospitalizationListSerializer(serializers.ModelSerializer):
     current_bed_code = serializers.CharField(source="current_bed.bed_code", read_only=True)
     current_room = serializers.CharField(source="current_bed.room.name", read_only=True)
     admitted_by_name = serializers.CharField(source="admitted_by.nombre_completo", read_only=True)
+    patient_identity = serializers.CharField(source="patient.identidad", read_only=True)
+    patient_birth_date = serializers.DateField(source="patient.fecha_nacimiento", read_only=True)
+    patient_allergies = serializers.CharField(source="patient.alergias", read_only=True)
+    patient_chronic_diseases = serializers.CharField(source="patient.enfermedades_cronicas", read_only=True)
 
     class Meta:
         model = Hospitalization
@@ -184,6 +214,10 @@ class HospitalizationListSerializer(serializers.ModelSerializer):
             "patient",
             "patient_name",
             "patient_code",
+            "patient_identity",
+            "patient_birth_date",
+            "patient_allergies",
+            "patient_chronic_diseases",
             "visit",
             "consultation",
             "admission_source",
@@ -196,10 +230,20 @@ class HospitalizationListSerializer(serializers.ModelSerializer):
             "reason",
             "diagnosis_at_admission",
             "admission_datetime",
+            "expected_discharge_date",
             "discharge_datetime",
             "admitted_by_name",
         ]
         read_only_fields = ["clinic"]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get("request")
+        role = getattr(getattr(getattr(request, "user", None), "role", None), "nombre", "")
+        if role == "recepcionista":
+            data.pop("patient_allergies", None)
+            data.pop("patient_chronic_diseases", None)
+        return data
 
 
 class HospitalizationDetailSerializer(HospitalizationListSerializer):
@@ -207,6 +251,9 @@ class HospitalizationDetailSerializer(HospitalizationListSerializer):
     recent_vital_signs = serializers.SerializerMethodField()
     recent_nursing_notes = serializers.SerializerMethodField()
     events = serializers.SerializerMethodField()
+    active_treatment_plan = serializers.SerializerMethodField()
+    active_instructions = serializers.SerializerMethodField()
+    recent_evolutions = serializers.SerializerMethodField()
 
     class Meta(HospitalizationListSerializer.Meta):
         fields = HospitalizationListSerializer.Meta.fields + [
@@ -219,6 +266,9 @@ class HospitalizationDetailSerializer(HospitalizationListSerializer):
             "recent_vital_signs",
             "recent_nursing_notes",
             "events",
+            "active_treatment_plan",
+            "active_instructions",
+            "recent_evolutions",
             "creado_en",
             "actualizado_en",
         ]
@@ -233,9 +283,21 @@ class HospitalizationDetailSerializer(HospitalizationListSerializer):
     def get_events(self, obj):
         return HospitalizationEventSerializer(obj.events.all()[:10], many=True).data
 
+    def get_active_treatment_plan(self, obj):
+        plan = obj.treatment_plans.filter(status=TreatmentPlan.Status.ACTIVE).order_by("-version").first()
+        return TreatmentPlanSerializer(plan).data if plan else None
+
+    def get_active_instructions(self, obj):
+        statuses = [MedicalInstruction.Status.ACTIVE, MedicalInstruction.Status.ACKNOWLEDGED, MedicalInstruction.Status.IN_PROGRESS]
+        return MedicalInstructionSerializer(obj.medical_instructions.filter(status__in=statuses)[:20], many=True).data
+
+    def get_recent_evolutions(self, obj):
+        return MedicalEvolutionSerializer(obj.medical_evolutions.exclude(status=MedicalEvolution.Status.DRAFT)[:10], many=True).data
+
 
 class HospitalizationCreateSerializer(serializers.ModelSerializer):
     bed = serializers.PrimaryKeyRelatedField(queryset=HospitalBed.objects.all(), required=False, allow_null=True, write_only=True)
+    status = serializers.ChoiceField(choices=[Hospitalization.Status.PENDING_ADMISSION, Hospitalization.Status.ACTIVE, Hospitalization.Status.OBSERVATION], default=Hospitalization.Status.PENDING_ADMISSION)
 
     class Meta:
         model = Hospitalization
@@ -250,6 +312,7 @@ class HospitalizationCreateSerializer(serializers.ModelSerializer):
             "reason",
             "diagnosis_at_admission",
             "admission_datetime",
+            "expected_discharge_date",
         ]
 
     def validate_reason(self, value):
@@ -279,8 +342,60 @@ class HospitalizationEventSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = HospitalizationEvent
-        fields = ["id", "event_type", "description", "created_by", "created_by_name", "metadata", "creado_en"]
-        read_only_fields = fields
+        fields = ["id", "event_type", "description", "severity", "event_datetime", "created_by", "created_by_name", "metadata", "creado_en"]
+        read_only_fields = ["created_by", "created_by_name", "metadata", "creado_en"]
+
+    def validate_description(self, value):
+        value = value.strip()
+        if len(value) < 5:
+            raise serializers.ValidationError("La descripcion debe tener al menos 5 caracteres.")
+        return value
+
+
+class MedicalEvolutionSerializer(serializers.ModelSerializer):
+    doctor_name = serializers.CharField(source="doctor.user.nombre_completo", read_only=True)
+
+    class Meta:
+        model = MedicalEvolution
+        fields = ["id", "hospitalization", "doctor", "doctor_name", "status", "subjective", "objective", "assessment", "plan", "progress_notes", "diagnosis_changes", "treatment_changes", "observations", "signed_at", "correction_of", "correction_reason", "creado_en", "actualizado_en"]
+        read_only_fields = ["hospitalization", "doctor", "status", "signed_at", "correction_of", "correction_reason", "creado_en", "actualizado_en"]
+
+
+class MedicalEvolutionCorrectionSerializer(serializers.ModelSerializer):
+    correction_reason = serializers.CharField(min_length=5, max_length=250)
+
+    class Meta:
+        model = MedicalEvolution
+        fields = ["subjective", "objective", "assessment", "plan", "progress_notes", "diagnosis_changes", "treatment_changes", "observations", "correction_reason"]
+
+
+class TreatmentPlanSerializer(serializers.ModelSerializer):
+    doctor_name = serializers.CharField(source="doctor.user.nombre_completo", read_only=True)
+
+    class Meta:
+        model = TreatmentPlan
+        fields = ["id", "hospitalization", "doctor", "doctor_name", "version", "status", "goals", "treatment", "monitoring", "diet", "activity", "precautions", "expected_duration", "effective_from", "effective_until", "change_reason", "replaces", "creado_en"]
+        read_only_fields = ["hospitalization", "doctor", "version", "status", "effective_until", "replaces", "creado_en"]
+
+
+class MedicalInstructionSerializer(serializers.ModelSerializer):
+    doctor_name = serializers.CharField(source="doctor.user.nombre_completo", read_only=True)
+    acknowledged_by_name = serializers.CharField(source="acknowledged_by.nombre_completo", read_only=True)
+    completed_by_name = serializers.CharField(source="completed_by.nombre_completo", read_only=True)
+
+    class Meta:
+        model = MedicalInstruction
+        fields = ["id", "hospitalization", "treatment_plan", "doctor", "doctor_name", "instruction_type", "priority", "status", "title", "details", "frequency", "effective_from", "effective_until", "acknowledged_by", "acknowledged_by_name", "acknowledged_at", "completed_by", "completed_by_name", "completed_at", "status_reason", "replaces", "creado_en"]
+        read_only_fields = ["hospitalization", "doctor", "status", "acknowledged_by", "acknowledged_at", "completed_by", "completed_at", "status_reason", "replaces", "creado_en"]
+
+
+class InstructionStatusSerializer(serializers.Serializer):
+    reason = serializers.CharField(required=False, allow_blank=True, max_length=250)
+
+
+class NursingNoteCorrectionSerializer(serializers.Serializer):
+    reason = serializers.CharField(min_length=5, max_length=250)
+    note = serializers.CharField(min_length=5)
 
 
 class NursingRoundSerializer(serializers.ModelSerializer):
@@ -307,6 +422,9 @@ class NursingRoundSerializer(serializers.ModelSerializer):
             "mobility_status",
             "feeding_status",
             "elimination_status",
+            "scheduled_at",
+            "completed_at",
+            "status_reason",
             "created_at",
             "creado_en",
             "actualizado_en",
@@ -317,7 +435,7 @@ class NursingRoundSerializer(serializers.ModelSerializer):
 class NursingRoundCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = NursingRound
-        fields = ["round_type", "status", "notes", "general_condition", "pain_level", "consciousness_status", "mobility_status", "feeding_status", "elimination_status"]
+        fields = ["round_type", "status", "notes", "general_condition", "pain_level", "consciousness_status", "mobility_status", "feeding_status", "elimination_status", "scheduled_at", "status_reason"]
 
     def validate_pain_level(self, value):
         if value is not None and (value < 0 or value > 10):

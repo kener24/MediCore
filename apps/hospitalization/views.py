@@ -10,7 +10,17 @@ from rest_framework.views import APIView
 from apps.accounts.permissions import get_role_name
 from apps.audit.models import AuditLog
 from apps.audit.services import log_audit_event
-from apps.hospitalization.models import HospitalBed, HospitalRoom, HospitalVitalSigns, Hospitalization, MedicationAdministration, NursingNote
+from apps.hospitalization.models import (
+    HospitalBed,
+    HospitalRoom,
+    HospitalVitalSigns,
+    Hospitalization,
+    MedicalEvolution,
+    MedicalInstruction,
+    MedicationAdministration,
+    NursingNote,
+    TreatmentPlan,
+)
 from apps.hospitalization.serializers import (
     BedActionSerializer,
     CancelHospitalizationSerializer,
@@ -22,12 +32,18 @@ from apps.hospitalization.serializers import (
     HospitalizationDetailSerializer,
     HospitalizationEventSerializer,
     HospitalizationListSerializer,
+    InstructionStatusSerializer,
+    MedicalEvolutionCorrectionSerializer,
+    MedicalEvolutionSerializer,
+    MedicalInstructionSerializer,
     MedicationAdministrationActionSerializer,
     MedicationAdministrationCreateSerializer,
     MedicationAdministrationSerializer,
     NursingNoteSerializer,
+    NursingNoteCorrectionSerializer,
     NursingRoundCreateSerializer,
     NursingRoundSerializer,
+    TreatmentPlanSerializer,
 )
 from apps.hospitalization import services
 
@@ -60,8 +76,6 @@ def scoped_queryset(request, queryset):
         return queryset.none()
     if role in VIEW_ROLES and user.clinica_id:
         return queryset.filter(clinic_id=user.clinica_id)
-    if role == "paciente":
-        return queryset.filter(patient__user=user)
     return queryset.none()
 
 
@@ -70,11 +84,16 @@ def forbidden(detail="No tienes permiso para realizar esta accion."):
 
 
 def validation_response(exc):
+    response_status = status.HTTP_409_CONFLICT if isinstance(exc, (services.BedUnavailableError, services.DuplicateHospitalizationError)) else status.HTTP_400_BAD_REQUEST
     if hasattr(exc, "message_dict"):
-        return Response(exc.message_dict, status=status.HTTP_400_BAD_REQUEST)
+        return Response(exc.message_dict, status=response_status)
     if hasattr(exc, "messages") and exc.messages:
-        return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
-    return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"detail": exc.messages[0]}, status=response_status)
+    return Response({"detail": str(exc)}, status=response_status)
+
+
+def doctor_profile(user):
+    return getattr(user, "doctor_profile", None) if role_name(user) == "medico" else None
 
 
 class HospitalRoomViewSet(viewsets.ModelViewSet):
@@ -82,7 +101,7 @@ class HospitalRoomViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     queryset = HospitalRoom.objects.annotate(
         beds_count=Count("beds", distinct=True),
-        occupied_beds=Count("beds", filter=Q(beds__status=HospitalBed.Status.OCCUPIED), distinct=True),
+        occupied_beds=Count("beds", filter=Q(beds__assignments__id__isnull=False, beds__assignments__released_at__isnull=True), distinct=True),
     ).select_related("clinic")
 
     def get_queryset(self):
@@ -90,6 +109,11 @@ class HospitalRoomViewSet(viewsets.ModelViewSet):
         if self.request.query_params.get("is_active") is not None:
             queryset = queryset.filter(is_active=self.request.query_params["is_active"].lower() in ["1", "true", "yes", "si"])
         return queryset
+
+    def list(self, request, *args, **kwargs):
+        if not can_view_hospitalization(request.user):
+            return forbidden("No tienes permiso para ver habitaciones hospitalarias.")
+        return super().list(request, *args, **kwargs)
 
     def create(self, request, *args, **kwargs):
         if role_name(request.user) not in MANAGE_BEDS_ROLES:
@@ -110,11 +134,16 @@ class HospitalRoomViewSet(viewsets.ModelViewSet):
         log_audit_event(request=request, user=request.user, clinic=user_clinic(request.user), action=AuditLog.Action.UPDATE, module=AuditLog.Module.ADMISSIONS, obj=self.get_object(), description="Habitacion hospitalaria actualizada.")
         return response
 
+    def destroy(self, request, *args, **kwargs):
+        return Response({"detail": "Las habitaciones con historial no se eliminan; desactiva la habitacion."}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
 
 class HospitalBedViewSet(viewsets.ModelViewSet):
     serializer_class = HospitalBedSerializer
     permission_classes = [IsAuthenticated]
-    queryset = HospitalBed.objects.select_related("clinic", "room").prefetch_related("active_hospitalizations__patient")
+    queryset = HospitalBed.objects.select_related("clinic", "room").annotate(
+        active_assignment_count=Count("assignments", filter=Q(assignments__released_at__isnull=True)),
+    ).prefetch_related("assignments__hospitalization__patient")
 
     def get_queryset(self):
         queryset = scoped_queryset(self.request, super().get_queryset())
@@ -126,6 +155,11 @@ class HospitalBedViewSet(viewsets.ModelViewSet):
         if p.get("available", "").lower() in ["1", "true", "yes", "si"]:
             queryset = queryset.filter(status=HospitalBed.Status.AVAILABLE, is_active=True)
         return queryset
+
+    def list(self, request, *args, **kwargs):
+        if not can_view_hospitalization(request.user):
+            return forbidden("No tienes permiso para ver camas hospitalarias.")
+        return super().list(request, *args, **kwargs)
 
     def create(self, request, *args, **kwargs):
         if role_name(request.user) not in MANAGE_BEDS_ROLES:
@@ -145,13 +179,24 @@ class HospitalBedViewSet(viewsets.ModelViewSet):
     def partial_update(self, request, *args, **kwargs):
         if role_name(request.user) not in MANAGE_BEDS_ROLES:
             return forbidden("No tienes permiso para administrar camas.")
-        response = super().partial_update(request, *args, **kwargs)
+        serializer = self.get_serializer(self.get_object(), data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        try:
+            serializer.save()
+        except DjangoValidationError as exc:
+            return validation_response(exc)
+        response = Response(serializer.data)
         log_audit_event(request=request, user=request.user, clinic=user_clinic(request.user), action=AuditLog.Action.UPDATE, module=AuditLog.Module.ADMISSIONS, obj=self.get_object(), description="Cama hospitalaria actualizada.")
         return response
 
+    def destroy(self, request, *args, **kwargs):
+        return Response({"detail": "Las camas con historial no se eliminan; desactiva la cama."}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
     @action(detail=False, methods=["get"])
     def available(self, request):
-        queryset = self.get_queryset().filter(status=HospitalBed.Status.AVAILABLE, is_active=True)
+        if not can_view_hospitalization(request.user):
+            return forbidden("No tienes permiso para ver camas hospitalarias.")
+        queryset = self.get_queryset().filter(status=HospitalBed.Status.AVAILABLE, is_active=True, room__is_active=True, active_assignment_count=0)
         return Response(self.get_serializer(queryset, many=True).data)
 
 
@@ -171,9 +216,34 @@ class HospitalizationViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action == "create":
             return HospitalizationCreateSerializer
-        if self.action == "list":
+        if self.action == "list" or (self.action == "retrieve" and role_name(self.request.user) == "recepcionista"):
             return HospitalizationListSerializer
         return HospitalizationDetailSerializer
+
+    def _belongs_to_request_clinic(self, obj):
+        clinic_id = getattr(self.request.user, "clinica_id", None)
+        if obj is None:
+            return True
+        return clinic_id is not None and getattr(obj, "clinic_id", clinic_id) == clinic_id
+
+    def _validate_admission_relations(self, validated_data):
+        patient = validated_data["patient"]
+        related = [
+            patient,
+            validated_data.get("visit"),
+            validated_data.get("consultation"),
+            validated_data.get("responsible_doctor"),
+            validated_data.get("bed"),
+        ]
+        if any(not self._belongs_to_request_clinic(item) for item in related):
+            return False
+        visit = validated_data.get("visit")
+        consultation = validated_data.get("consultation")
+        if visit and getattr(visit, "patient_id", patient.id) != patient.id:
+            return False
+        if consultation and getattr(consultation, "patient_id", patient.id) != patient.id:
+            return False
+        return True
 
     def get_queryset(self):
         queryset = scoped_queryset(self.request, super().get_queryset())
@@ -199,6 +269,8 @@ class HospitalizationViewSet(viewsets.ModelViewSet):
             return forbidden("No tienes permiso para crear internamientos.")
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        if not self._validate_admission_relations(serializer.validated_data):
+            return Response({"detail": "El recurso solicitado no existe."}, status=status.HTTP_404_NOT_FOUND)
         try:
             hospitalization = services.create_hospitalization(
                 clinic=user_clinic(request.user),
@@ -213,6 +285,8 @@ class HospitalizationViewSet(viewsets.ModelViewSet):
                 diagnosis_at_admission=serializer.validated_data.get("diagnosis_at_admission", ""),
                 user=request.user,
                 request=request,
+                idempotency_key=(request.headers.get("Idempotency-Key") or "").strip() or None,
+                **({"expected_discharge_date": serializer.validated_data["expected_discharge_date"]} if serializer.validated_data.get("expected_discharge_date") else {}),
                 **({"admission_datetime": serializer.validated_data["admission_datetime"]} if serializer.validated_data.get("admission_datetime") else {}),
             )
         except DjangoValidationError as exc:
@@ -225,7 +299,13 @@ class HospitalizationViewSet(viewsets.ModelViewSet):
             return forbidden("No se puede editar un internamiento cerrado.")
         if role_name(request.user) not in MANAGE_ADMISSIONS_ROLES:
             return forbidden("No tienes permiso para editar internamientos.")
+        forbidden_fields = {"clinic", "patient", "current_bed", "status", "discharge_datetime", "discharged_by"}
+        if forbidden_fields.intersection(request.data):
+            return Response({"detail": "Utiliza las acciones controladas para cambiar estado, paciente o cama."}, status=status.HTTP_400_BAD_REQUEST)
         return super().partial_update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        return Response({"detail": "Los internamientos forman parte del historial y no pueden eliminarse."}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
     @action(detail=True, methods=["post"], url_path="assign-bed")
     def assign_bed(self, request, pk=None):
@@ -233,6 +313,8 @@ class HospitalizationViewSet(viewsets.ModelViewSet):
             return forbidden("No tienes permiso para asignar camas.")
         serializer = BedActionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        if not self._belongs_to_request_clinic(serializer.validated_data["bed"]):
+            return Response({"detail": "El recurso solicitado no existe."}, status=status.HTTP_404_NOT_FOUND)
         try:
             hospitalization = services.assign_bed(self.get_object(), serializer.validated_data["bed"], user=request.user, request=request, notes=serializer.validated_data.get("notes", ""))
         except DjangoValidationError as exc:
@@ -245,6 +327,8 @@ class HospitalizationViewSet(viewsets.ModelViewSet):
             return forbidden("No tienes permiso para cambiar camas.")
         serializer = BedActionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        if not self._belongs_to_request_clinic(serializer.validated_data["bed"]):
+            return Response({"detail": "El recurso solicitado no existe."}, status=status.HTTP_404_NOT_FOUND)
         try:
             hospitalization = services.change_bed(self.get_object(), serializer.validated_data["bed"], user=request.user, request=request, notes=serializer.validated_data.get("notes", ""))
         except DjangoValidationError as exc:
@@ -282,7 +366,7 @@ class HospitalizationViewSet(viewsets.ModelViewSet):
             if role_name(request.user) not in CLINICAL_VIEW_ROLES:
                 return forbidden("No tienes permiso para ver signos vitales hospitalarios.")
             return Response(HospitalVitalSignsSerializer(hospitalization.vital_signs.all(), many=True).data)
-        if role_name(request.user) not in NURSING_CLINICAL_ROLES:
+        if role_name(request.user) not in NURSING_WRITE_ROLES:
             return forbidden("No tienes permiso para registrar signos vitales hospitalarios.")
         serializer = HospitalVitalSignsSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -299,7 +383,7 @@ class HospitalizationViewSet(viewsets.ModelViewSet):
             if role_name(request.user) not in CLINICAL_VIEW_ROLES:
                 return forbidden("No tienes permiso para ver notas de enfermeria.")
             return Response(NursingNoteSerializer(hospitalization.nursing_notes.all(), many=True).data)
-        if role_name(request.user) not in NURSING_CLINICAL_ROLES:
+        if role_name(request.user) not in NURSING_WRITE_ROLES:
             return forbidden("No tienes permiso para crear notas de enfermeria.")
         serializer = NursingNoteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -309,11 +393,100 @@ class HospitalizationViewSet(viewsets.ModelViewSet):
             return validation_response(exc)
         return Response(NursingNoteSerializer(note).data, status=status.HTTP_201_CREATED)
 
-    @action(detail=True, methods=["get"])
+    @action(detail=True, methods=["get", "post"])
     def events(self, request, pk=None):
         if role_name(request.user) not in CLINICAL_VIEW_ROLES:
             return forbidden("No tienes permiso para ver eventos clinicos de hospitalizacion.")
-        return Response(HospitalizationEventSerializer(self.get_object().events.all(), many=True).data)
+        hospitalization = self.get_object()
+        if request.method == "GET":
+            return Response(HospitalizationEventSerializer(hospitalization.events.all(), many=True).data)
+        if role_name(request.user) not in ["medico", "enfermera"]:
+            return forbidden("No tienes permiso para registrar eventos clinicos.")
+        serializer = HospitalizationEventSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            event = services.create_hospital_event(hospitalization, request.user, request=request, **serializer.validated_data)
+        except DjangoValidationError as exc:
+            return validation_response(exc)
+        return Response(HospitalizationEventSerializer(event).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["get", "post"], url_path="evolutions")
+    def evolutions(self, request, pk=None):
+        hospitalization = self.get_object()
+        if role_name(request.user) not in ["admin", "medico", "enfermera"]:
+            return forbidden("No tienes permiso para ver evoluciones medicas.")
+        queryset = hospitalization.medical_evolutions.select_related("doctor__user")
+        profile = doctor_profile(request.user)
+        if request.method == "GET":
+            if profile:
+                queryset = queryset.filter(Q(status__in=[MedicalEvolution.Status.SIGNED, MedicalEvolution.Status.CORRECTION]) | Q(status=MedicalEvolution.Status.DRAFT, doctor=profile))
+            else:
+                queryset = queryset.exclude(status=MedicalEvolution.Status.DRAFT)
+            return Response(MedicalEvolutionSerializer(queryset, many=True).data)
+        if not profile:
+            return forbidden("Solo un medico puede registrar evoluciones.")
+        serializer = MedicalEvolutionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            evolution = services.create_medical_evolution(hospitalization, profile, request=request, **serializer.validated_data)
+        except DjangoValidationError as exc:
+            return validation_response(exc)
+        return Response(MedicalEvolutionSerializer(evolution).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["get", "post"], url_path="treatment-plans")
+    def treatment_plans(self, request, pk=None):
+        hospitalization = self.get_object()
+        if role_name(request.user) not in ["admin", "medico", "enfermera"]:
+            return forbidden("No tienes permiso para ver planes de tratamiento.")
+        if request.method == "GET":
+            return Response(TreatmentPlanSerializer(hospitalization.treatment_plans.select_related("doctor__user"), many=True).data)
+        profile = doctor_profile(request.user)
+        if not profile:
+            return forbidden("Solo un medico puede actualizar el plan de tratamiento.")
+        serializer = TreatmentPlanSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            plan = services.create_treatment_plan(hospitalization, profile, request=request, **serializer.validated_data)
+        except DjangoValidationError as exc:
+            return validation_response(exc)
+        return Response(TreatmentPlanSerializer(plan).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["get", "post"], url_path="instructions")
+    def instructions(self, request, pk=None):
+        hospitalization = self.get_object()
+        if role_name(request.user) not in ["admin", "medico", "enfermera"]:
+            return forbidden("No tienes permiso para ver indicaciones medicas.")
+        if request.method == "GET":
+            return Response(MedicalInstructionSerializer(hospitalization.medical_instructions.select_related("doctor__user", "acknowledged_by", "completed_by"), many=True).data)
+        profile = doctor_profile(request.user)
+        if not profile:
+            return forbidden("Solo un medico puede crear indicaciones medicas.")
+        serializer = MedicalInstructionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            instruction = services.create_medical_instruction(hospitalization, profile, request=request, **serializer.validated_data)
+        except DjangoValidationError as exc:
+            return validation_response(exc)
+        return Response(MedicalInstructionSerializer(instruction).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["get"], url_path="timeline")
+    def timeline(self, request, pk=None):
+        if role_name(request.user) not in CLINICAL_VIEW_ROLES:
+            return forbidden("No tienes permiso para ver la linea de tiempo clinica.")
+        hospitalization = self.get_object()
+        try:
+            limit = min(max(int(request.query_params.get("limit", 50)), 1), 100)
+        except (TypeError, ValueError):
+            return Response({"detail": "El limite debe ser un numero entero entre 1 y 100."}, status=status.HTTP_400_BAD_REQUEST)
+        entries = []
+        for event in hospitalization.events.select_related("created_by")[:limit]:
+            entries.append({"id": f"event-{event.id}", "type": event.event_type, "title": "Evento hospitalario", "description": event.description, "severity": event.severity, "occurred_at": event.event_datetime, "user": event.created_by.nombre_completo if event.created_by else ""})
+        for evolution in hospitalization.medical_evolutions.exclude(status=MedicalEvolution.Status.DRAFT).select_related("doctor__user")[:limit]:
+            entries.append({"id": f"evolution-{evolution.id}", "type": "medical_evolution", "title": "Evolucion medica", "description": evolution.progress_notes or evolution.assessment or "Evolucion firmada", "severity": "info", "occurred_at": evolution.signed_at or evolution.creado_en, "user": evolution.doctor.user.nombre_completo})
+        for signs in hospitalization.vital_signs.select_related("recorded_by")[:limit]:
+            entries.append({"id": f"vitals-{signs.id}", "type": "hospital_vital_signs", "title": "Signos vitales hospitalarios", "description": signs.alert_summary or "Control de signos registrado", "severity": "warning" if signs.is_abnormal else "info", "occurred_at": signs.recorded_at, "user": signs.recorded_by.nombre_completo if signs.recorded_by else ""})
+        entries.sort(key=lambda item: item["occurred_at"], reverse=True)
+        return Response({"count": min(len(entries), limit), "results": entries[:limit]})
 
     @action(detail=True, methods=["get", "post"], url_path="nursing-rounds")
     def nursing_rounds(self, request, pk=None):
@@ -327,7 +500,7 @@ class HospitalizationViewSet(viewsets.ModelViewSet):
         serializer = NursingRoundCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            nursing_round = services.create_nursing_round(hospitalization, nurse=request.user, request=request, **serializer.validated_data)
+            nursing_round = services.create_nursing_round(hospitalization, nurse=request.user, request=request, idempotency_key=(request.headers.get("Idempotency-Key") or "").strip() or None, **serializer.validated_data)
         except DjangoValidationError as exc:
             return validation_response(exc)
         return Response(NursingRoundSerializer(nursing_round).data, status=status.HTTP_201_CREATED)
@@ -350,6 +523,128 @@ class HospitalizationViewSet(viewsets.ModelViewSet):
         return Response(MedicationAdministrationSerializer(medication).data, status=status.HTTP_201_CREATED)
 
 
+class MedicalEvolutionViewSet(viewsets.GenericViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = MedicalEvolutionSerializer
+    queryset = MedicalEvolution.objects.select_related("hospitalization", "doctor__user")
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser or role_name(user) not in ["admin", "medico", "enfermera"] or not user.clinica_id:
+            return self.queryset.none()
+        return self.queryset.filter(hospitalization__clinic_id=user.clinica_id)
+
+    @action(detail=True, methods=["post"])
+    def sign(self, request, pk=None):
+        profile = doctor_profile(request.user)
+        if not profile:
+            return forbidden("Solo un medico puede firmar evoluciones.")
+        try:
+            evolution = services.sign_medical_evolution(self.get_object(), profile, request=request)
+        except DjangoValidationError as exc:
+            return validation_response(exc)
+        return Response(MedicalEvolutionSerializer(evolution).data)
+
+    @action(detail=True, methods=["post"])
+    def correct(self, request, pk=None):
+        profile = doctor_profile(request.user)
+        if not profile:
+            return forbidden("Solo un medico puede corregir evoluciones.")
+        serializer = MedicalEvolutionCorrectionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = dict(serializer.validated_data)
+        reason = payload.pop("correction_reason")
+        try:
+            evolution = services.correct_medical_evolution(self.get_object(), profile, reason, request=request, **payload)
+        except DjangoValidationError as exc:
+            return validation_response(exc)
+        return Response(MedicalEvolutionSerializer(evolution).data, status=status.HTTP_201_CREATED)
+
+
+class MedicalInstructionViewSet(viewsets.GenericViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = MedicalInstructionSerializer
+    queryset = MedicalInstruction.objects.select_related("hospitalization", "doctor__user", "acknowledged_by", "completed_by")
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser or role_name(user) not in ["admin", "medico", "enfermera"] or not user.clinica_id:
+            return self.queryset.none()
+        return self.queryset.filter(hospitalization__clinic_id=user.clinica_id)
+
+    @action(detail=True, methods=["post"])
+    def acknowledge(self, request, pk=None):
+        if role_name(request.user) != "enfermera":
+            return forbidden("Solo enfermeria puede confirmar la lectura.")
+        try:
+            instruction = services.acknowledge_medical_instruction(self.get_object(), request.user, request=request)
+        except DjangoValidationError as exc:
+            return validation_response(exc)
+        return Response(MedicalInstructionSerializer(instruction).data)
+
+    def _change_status(self, request, next_status, doctor_required=False):
+        serializer = InstructionStatusSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        profile = doctor_profile(request.user)
+        if doctor_required and not profile:
+            return forbidden("Solo un medico puede suspender o cancelar indicaciones.")
+        if not doctor_required and role_name(request.user) not in ["medico", "enfermera"]:
+            return forbidden("No tienes permiso para actualizar esta indicacion.")
+        instruction = self.get_object()
+        if profile and instruction.doctor_id != profile.id and doctor_required:
+            return forbidden("Solo el medico responsable puede cambiar esta indicacion.")
+        try:
+            instruction = services.change_medical_instruction_status(
+                instruction,
+                profile or instruction.doctor,
+                next_status,
+                serializer.validated_data.get("reason", ""),
+                request=request,
+                user=request.user,
+            )
+        except DjangoValidationError as exc:
+            return validation_response(exc)
+        return Response(MedicalInstructionSerializer(instruction).data)
+
+    @action(detail=True, methods=["post"])
+    def complete(self, request, pk=None):
+        return self._change_status(request, MedicalInstruction.Status.COMPLETED)
+
+    @action(detail=True, methods=["post"], url_path="start")
+    def start(self, request, pk=None):
+        return self._change_status(request, MedicalInstruction.Status.IN_PROGRESS)
+
+    @action(detail=True, methods=["post"])
+    def suspend(self, request, pk=None):
+        return self._change_status(request, MedicalInstruction.Status.SUSPENDED, doctor_required=True)
+
+    @action(detail=True, methods=["post"])
+    def cancel(self, request, pk=None):
+        return self._change_status(request, MedicalInstruction.Status.CANCELLED, doctor_required=True)
+
+
+class NursingNoteViewSet(viewsets.GenericViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = NursingNoteSerializer
+    queryset = NursingNote.objects.select_related("hospitalization", "created_by")
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser or role_name(user) not in ["admin", "enfermera"] or not user.clinica_id:
+            return self.queryset.none()
+        return self.queryset.filter(hospitalization__clinic_id=user.clinica_id)
+
+    @action(detail=True, methods=["post"])
+    def correct(self, request, pk=None):
+        serializer = NursingNoteCorrectionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            correction = services.correct_nursing_note(self.get_object(), request.user, serializer.validated_data["reason"], serializer.validated_data["note"], request=request)
+        except DjangoValidationError as exc:
+            return validation_response(exc)
+        return Response(NursingNoteSerializer(correction).data, status=status.HTTP_201_CREATED)
+
+
 class HospitalizationDashboardView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -358,12 +653,14 @@ class HospitalizationDashboardView(APIView):
             return forbidden("No tienes permiso para ver hospitalizacion.")
         clinic = user_clinic(request.user)
         hospitalizations = Hospitalization.objects.filter(clinic=clinic)
-        beds = HospitalBed.objects.filter(clinic=clinic, is_active=True)
+        beds = HospitalBed.objects.filter(clinic=clinic, is_active=True).annotate(
+            active_assignment_count=Count("assignments", filter=Q(assignments__released_at__isnull=True)),
+        )
         data = {
             "active_patients": hospitalizations.filter(status__in=Hospitalization.ACTIVE_STATUSES).count(),
             "observation_patients": hospitalizations.filter(status=Hospitalization.Status.OBSERVATION).count(),
-            "available_beds": beds.filter(status=HospitalBed.Status.AVAILABLE).count(),
-            "occupied_beds": beds.filter(status=HospitalBed.Status.OCCUPIED).count(),
+            "available_beds": beds.filter(status=HospitalBed.Status.AVAILABLE, room__is_active=True, active_assignment_count=0).count(),
+            "occupied_beds": beds.filter(active_assignment_count__gt=0).count(),
             "cleaning_beds": beds.filter(status=HospitalBed.Status.CLEANING).count(),
             "maintenance_beds": beds.filter(status=HospitalBed.Status.MAINTENANCE).count(),
             "discharges_today": hospitalizations.filter(status=Hospitalization.Status.DISCHARGED, discharge_datetime__date=timezone.localdate()).count(),

@@ -76,7 +76,7 @@ class HospitalizationNursingFollowUpTests(APITestCase):
     def test_paciente_no_accede_a_rondas(self):
         self.auth(self.patient_user)
         response = self.client.get(f"/api/hospitalization/admissions/{self.hospitalization.id}/nursing-rounds/")
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
 
     def test_no_permite_asignar_cama_ocupada_y_audita_asignacion(self):
         self.auth(self.admin)
@@ -88,7 +88,7 @@ class HospitalizationNursingFollowUpTests(APITestCase):
         other_patient = Patient.objects.create(clinic=self.clinic, codigo_paciente="PAC-F2", nombres="Ana", apellidos="Lopez")
         other_hospitalization = Hospitalization.objects.create(clinic=self.clinic, patient=other_patient, admitted_by=self.admin, reason="Control")
         response = self.client.post(f"/api/hospitalization/admissions/{other_hospitalization.id}/assign-bed/", {"bed": self.bed.id}, format="json")
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 409)
         self.assertTrue(AuditLog.objects.filter(action=AuditLog.Action.UPDATE, module=AuditLog.Module.ADMISSIONS, object_id=str(self.hospitalization.id)).exists())
 
     def test_alta_libera_cama_y_bloquea_acciones_clinicas(self):

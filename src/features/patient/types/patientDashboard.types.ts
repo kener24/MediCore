@@ -9,7 +9,12 @@ export type PatientPortalPermissions = {
   can_view_medical_record?: boolean;
   can_view_prescriptions?: boolean;
   can_view_invoices?: boolean;
+  can_view_medical_orders?: boolean;
+  can_view_documents?: boolean;
   can_request_appointments?: boolean;
+  can_request_in_person_appointments?: boolean;
+  can_request_online_appointments?: boolean;
+  can_reschedule_appointments?: boolean;
   can_cancel_appointments?: boolean;
 };
 
@@ -33,9 +38,11 @@ export type PatientDashboard = {
   recent_documents?: PatientDocument[];
   notifications?: PatientNotification[];
   unread_notifications?: number;
+  new_documents_count?: number;
   unread_notifications_count?: number;
   clinic?: PatientClinicInfo;
   permissions?: PatientPortalPermissions;
+  available_actions?: PatientPortalPermissions;
 };
 
 export type PatientDashboardResponse = PatientDashboard & {
@@ -67,6 +74,7 @@ export type NormalizedPatientDashboard = {
   patientCode?: string;
   patientName?: string;
   pendingInvoices: PatientInvoice[];
+  permissions: PatientPortalPermissions;
   recentDocuments: PatientDocument[];
   recentNotifications: PatientNotification[];
   recentPrescriptions: PatientPrescription[];

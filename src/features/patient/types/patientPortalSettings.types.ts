@@ -5,7 +5,9 @@ export type PatientPortalSettings = {
   permissions?: PatientPortalPermissions;
   portal?: {
     allow_patient_portal?: boolean;
+    allow_appointments?: boolean;
     allow_online_appointments?: boolean;
+    allow_in_person_appointments?: boolean;
     allow_patient_cancellations?: boolean;
     cancellation_hours_limit?: number;
     allow_patient_medical_record_view?: boolean;

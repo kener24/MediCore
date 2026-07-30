@@ -20,6 +20,7 @@ import {
   getPatientDoctors,
   getPatientSpecialties,
   requestPatientAppointment,
+  reschedulePatientAppointment,
 } from '@/features/patient/services/patientAppointmentsService';
 import type {
   AppointmentAvailabilitySlot,
@@ -36,6 +37,8 @@ export function RequestAppointmentScreen() {
   const routeParams = (route.params ?? {}) as {
     previousAppointmentDate?: string;
     previousAppointmentDoctor?: string;
+    previousDoctorId?: number | string;
+    previousSpecialtyId?: number | string;
     rescheduleFrom?: number | string;
   };
   const [specialties, setSpecialties] = useState<PatientSpecialty[]>([]);
@@ -53,6 +56,7 @@ export function RequestAppointmentScreen() {
   const [loading, setLoading] = useState(true);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [operationKey, setOperationKey] = useState(() => `patient-appointment-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
   const canSubmit = Boolean(specialty && doctor && date.trim() && slot && reason.trim().length >= 5 && !submitting);
   const isRescheduleFlow = Boolean(routeParams.rescheduleFrom);
 
@@ -61,7 +65,18 @@ export function RequestAppointmentScreen() {
       setLoading(true);
       setError('');
       try {
-        setSpecialties(await getPatientSpecialties());
+        const loadedSpecialties = await getPatientSpecialties();
+        setSpecialties(loadedSpecialties);
+        if (routeParams.rescheduleFrom && routeParams.previousSpecialtyId && routeParams.previousDoctorId) {
+          const selectedSpecialty = loadedSpecialties.find((item) => String(item.id) === String(routeParams.previousSpecialtyId));
+          if (selectedSpecialty) {
+            setSpecialty(selectedSpecialty);
+            const loadedDoctors = await getPatientDoctors(selectedSpecialty.id);
+            setDoctors(loadedDoctors);
+            const selectedDoctor = loadedDoctors.find((item) => String(item.id) === String(routeParams.previousDoctorId));
+            if (selectedDoctor) setDoctor(selectedDoctor);
+          }
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error al cargar datos.');
       } finally {
@@ -69,7 +84,7 @@ export function RequestAppointmentScreen() {
       }
     }
     loadSpecialties();
-  }, []);
+  }, [routeParams.previousDoctorId, routeParams.previousSpecialtyId, routeParams.rescheduleFrom]);
 
   function resetAvailability() {
     setSlot(null);
@@ -152,17 +167,29 @@ export function RequestAppointmentScreen() {
 
     setSubmitting(true);
     try {
-      await requestPatientAppointment({
-        doctor: doctor.id,
-        modality,
-        reason: reason.trim(),
-        scheduled_date: date.trim(),
-        start_time: slot.start_time,
-      });
-      Alert.alert('Solicitud enviada', 'Solicitud de cita enviada correctamente.', [
+      if (isRescheduleFlow && routeParams.rescheduleFrom) {
+        await reschedulePatientAppointment(
+          routeParams.rescheduleFrom,
+          { reason: reason.trim(), scheduled_date: date.trim(), start_time: slot.start_time },
+          operationKey,
+        );
+      } else {
+        await requestPatientAppointment(
+          {
+            doctor: doctor.id,
+            modality,
+            reason: reason.trim(),
+            scheduled_date: date.trim(),
+            start_time: slot.start_time,
+          },
+          operationKey,
+        );
+      }
+      Alert.alert(isRescheduleFlow ? 'Cita reprogramada' : 'Solicitud enviada', isRescheduleFlow ? 'La misma cita fue reprogramada correctamente.' : 'Solicitud de cita enviada correctamente.', [
         { text: 'Ver mis citas', onPress: goToAppointments },
       ]);
     } catch (err) {
+      setOperationKey(`patient-appointment-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
       Alert.alert('Solicitud', err instanceof Error ? err.message : 'El horario ya fue tomado.');
     } finally {
       setSubmitting(false);
@@ -183,16 +210,16 @@ export function RequestAppointmentScreen() {
   return (
     <KeyboardAwareScreen contentContainerStyle={styles.content}>
       <PatientHeader
-        subtitle={isRescheduleFlow ? 'Selecciona una nueva fecha y horario. La cita anterior no se cancela automáticamente.' : 'Completa los datos requeridos para enviar tu solicitud.'}
+        subtitle={isRescheduleFlow ? 'Selecciona una nueva fecha y horario. Se actualizará la misma cita y se conservará su historial.' : 'Completa los datos requeridos para enviar tu solicitud.'}
         title={isRescheduleFlow ? 'Reprogramar cita' : 'Solicitar cita'}
       />
       {error ? <ErrorState message={error} title="No se pudo cargar información" /> : null}
       {isRescheduleFlow ? (
         <AppCard style={styles.notice}>
-          <Text style={styles.noticeTitle}>Reprogramación guiada</Text>
+          <Text style={styles.noticeTitle}>Reprogramación segura</Text>
           <Text style={styles.help}>
             Cita original: {routeParams.previousAppointmentDate || 'fecha no indicada'}
-            {routeParams.previousAppointmentDoctor ? ` con ${routeParams.previousAppointmentDoctor}` : ''}. Al confirmar la nueva cita, revisa si debes cancelar la anterior.
+            {routeParams.previousAppointmentDoctor ? ` con ${routeParams.previousAppointmentDoctor}` : ''}. Al confirmar, la fecha y hora se actualizarán sin crear una cita duplicada.
           </Text>
         </AppCard>
       ) : null}
@@ -205,6 +232,7 @@ export function RequestAppointmentScreen() {
                 key={item.id}
                 label={item.nombre || item.name || `Especialidad ${item.id}`}
                 onPress={() => selectSpecialty(item)}
+                disabled={isRescheduleFlow}
                 variant={specialty?.id === item.id ? 'primary' : 'secondary'}
               />
             ))}
@@ -225,6 +253,7 @@ export function RequestAppointmentScreen() {
                   setDoctor(item);
                   resetAvailability();
                 }}
+                disabled={isRescheduleFlow}
                 variant={doctor?.id === item.id ? 'primary' : 'secondary'}
               />
             ))}
@@ -284,7 +313,7 @@ export function RequestAppointmentScreen() {
         </Text>
       </Step>
 
-      <AppButton disabled={!canSubmit} label={isRescheduleFlow ? 'Solicitar nueva cita' : 'Enviar solicitud'} loading={submitting} onPress={submit} />
+      <AppButton disabled={!canSubmit} label={isRescheduleFlow ? 'Confirmar reprogramación' : 'Enviar solicitud'} loading={submitting} onPress={submit} />
     </KeyboardAwareScreen>
   );
 }

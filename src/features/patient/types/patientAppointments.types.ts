@@ -44,6 +44,10 @@ export type PatientAppointment = {
   status_display?: string;
   cancellation_reason?: string | null;
   can_cancel?: boolean;
+  can_reschedule?: boolean;
+  duration_minutes?: number | null;
+  last_reschedule_reason?: string | null;
+  rescheduled_at?: string | null;
   instructions?: string | null;
   activo?: boolean;
   created_at?: string;
@@ -111,5 +115,11 @@ export type PatientAppointmentRequestPayload = {
 export type AppointmentRequestPayload = PatientAppointmentRequestPayload;
 
 export type CancelAppointmentPayload = {
+  reason: string;
+};
+
+export type RescheduleAppointmentPayload = {
+  scheduled_date: string;
+  start_time: string;
   reason: string;
 };

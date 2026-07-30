@@ -1,6 +1,6 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
@@ -12,7 +12,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { colors } from '@/core/theme/colors';
 import { formatDate } from '@/core/utils/dateUtils';
 import { toPositiveId } from '@/core/utils/idUtils';
-import { getPatientPrescription } from '@/features/patient/services/patientPrescriptionsService';
+import { getPatientPrescription, openPatientPrescriptionPdf } from '@/features/patient/services/patientPrescriptionsService';
 import type { PatientPrescription, PatientPrescriptionItem } from '@/features/patient/types/patientPrescriptions.types';
 
 export function PatientPrescriptionDetailScreen() {
@@ -23,6 +23,7 @@ export function PatientPrescriptionDetailScreen() {
   const [prescription, setPrescription] = useState<PatientPrescription | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [openingPdf, setOpeningPdf] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -47,6 +48,18 @@ export function PatientPrescriptionDetailScreen() {
   if (error || !prescription) return <ErrorState message={error || 'No hay información disponible.'} onRetry={load} />;
 
   const medications = normalizeMedications(prescription);
+
+  async function openPdf() {
+    if (!id || openingPdf) return;
+    setOpeningPdf(true);
+    try {
+      await openPatientPrescriptionPdf(id, prescription?.prescription_number);
+    } catch (err) {
+      Alert.alert('Receta', err instanceof Error ? err.message : 'No se pudo abrir la receta.');
+    } finally {
+      setOpeningPdf(false);
+    }
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -86,6 +99,7 @@ export function PatientPrescriptionDetailScreen() {
             {prescription.notes ? <Text style={styles.text}>{prescription.notes}</Text> : null}
           </AppCard>
         ) : null}
+        <AppButton label="Abrir PDF seguro" loading={openingPdf} onPress={openPdf} variant="secondary" />
       </ScrollView>
     </SafeAreaView>
   );

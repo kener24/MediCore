@@ -1,6 +1,6 @@
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
@@ -100,6 +100,14 @@ export function PatientProfileScreen() {
               ]}
               title="Contacto de emergencia"
             />
+            <ProfileInfoCard
+              items={[
+                { label: 'Alergias', value: profile.alergias || 'No hay alergias registradas.' },
+                { label: 'Antecedentes crónicos', value: profile.enfermedades_cronicas || 'No hay antecedentes registrados.' },
+              ]}
+              title="Información clínica autorizada"
+            />
+            <Text style={styles.clinicalNotice}>La ausencia de registros no garantiza que no existan alergias o antecedentes. Comunícalos al personal médico.</Text>
             <AppButton label="Editar perfil" onPress={() => navigation.navigate('EditPatientProfile')} />
             <AppButton
               label="Configuración"
@@ -114,6 +122,7 @@ export function PatientProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  clinicalNotice: { color: colors.warning, fontSize: 13, fontWeight: '700', lineHeight: 19 },
   content: { gap: 14, padding: 22, paddingBottom: 34 },
   safeArea: { backgroundColor: colors.background, flex: 1 },
 });

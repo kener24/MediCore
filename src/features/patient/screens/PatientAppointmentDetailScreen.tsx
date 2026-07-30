@@ -120,6 +120,8 @@ export function PatientAppointmentDetailScreen() {
                 navigation.navigate('RequestAppointment' as never, {
                   previousAppointmentDate: formatDate(appointment.scheduled_date),
                   previousAppointmentDoctor: appointment.doctor_name || appointment.doctor_nombre,
+                  previousDoctorId: appointment.doctor,
+                  previousSpecialtyId: appointment.specialty,
                   rescheduleFrom: appointment.id,
                 } as never)
               }

@@ -1,8 +1,6 @@
-import { Linking } from 'react-native';
-
 import { apiClient } from '@/core/api/apiClient';
 import { endpoints } from '@/core/api/endpoints';
-import { appConfig } from '@/core/config/appConfig';
+import { downloadAndShareAuthenticated } from '@/core/files/authenticatedFile';
 import { normalizeList, type ListResponse } from '@/features/patient/types/pagination.types';
 import type { PatientDocument } from '@/features/patient/types/patientDocuments.types';
 
@@ -21,34 +19,23 @@ export async function getPatientDocument(id: number | string) {
 
 export const getDocumentDetail = getPatientDocument;
 
-export function getPatientDocumentFileUrl(id: number | string, mode: 'download' | 'preview') {
-  const path =
-    mode === 'download'
-      ? endpoints.patientPortal.documentDownload(id)
-      : endpoints.patientPortal.documentPreview(id);
-  return `${appConfig.API_BASE_URL}${path}`;
-}
-
-function toAbsoluteUrl(url: string) {
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  if (url.startsWith('/')) return `${appConfig.API_BASE_URL.replace('/api', '')}${url}`;
-  return url;
-}
-
 export async function openPatientDocumentUrl(document: PatientDocument, mode: 'download' | 'preview') {
-  const explicitUrl = mode === 'preview' ? document.preview_url : document.download_url;
-  const url = toAbsoluteUrl(explicitUrl || document.file_url || document.file || getPatientDocumentFileUrl(document.id, mode));
-  const canOpen = await Linking.canOpenURL(url);
-  if (!canOpen) {
-    throw new Error('No se pudo abrir el documento.');
-  }
-  await Linking.openURL(url);
+  const extension = document.file_extension || 'bin';
+  const filename = document.original_filename || `documento-${document.id}.${extension}`;
+  return downloadAndShareAuthenticated({
+    dialogTitle: mode === 'preview' ? 'Abrir documento' : 'Descargar documento',
+    filename,
+    mimeType: document.mime_type || 'application/octet-stream',
+    path: mode === 'download' ? endpoints.patientPortal.documentDownload(document.id) : endpoints.patientPortal.documentPreview(document.id),
+  });
 }
 
 export async function previewDocument(id: number | string) {
-  await Linking.openURL(getPatientDocumentFileUrl(id, 'preview'));
+  const document = await getPatientDocument(id);
+  await openPatientDocumentUrl(document, 'preview');
 }
 
 export async function downloadDocument(id: number | string) {
-  await Linking.openURL(getPatientDocumentFileUrl(id, 'download'));
+  const document = await getPatientDocument(id);
+  await openPatientDocumentUrl(document, 'download');
 }

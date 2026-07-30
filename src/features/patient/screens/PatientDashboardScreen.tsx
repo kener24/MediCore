@@ -115,7 +115,7 @@ export function PatientDashboardScreen() {
 
             <PatientStatsGrid stats={dashboard.stats} />
 
-            <PatientQuickActions onNavigate={navigateQuickAction} />
+            <PatientQuickActions onNavigate={navigateQuickAction} permissions={dashboard.permissions} />
 
             <RecentPrescriptionsSection
               items={dashboard.recentPrescriptions}

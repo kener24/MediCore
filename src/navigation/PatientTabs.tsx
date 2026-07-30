@@ -1,6 +1,7 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useEffect, useState } from 'react';
 
 import { RoleGuard } from '@/components/RoleGuard';
 import { ChangePasswordScreen } from '@/features/patient/screens/ChangePasswordScreen';
@@ -24,6 +25,8 @@ import { PatientPrescriptionsScreen } from '@/features/patient/screens/PatientPr
 import { PatientProfileScreen } from '@/features/patient/screens/PatientProfileScreen';
 import { RequestAppointmentScreen } from '@/features/patient/screens/RequestAppointmentScreen';
 import { SettingsScreen } from '@/features/patient/screens/SettingsScreen';
+import { getPatientPortalSettings } from '@/features/patient/services/patientPortalSettingsService';
+import type { PatientPortalPermissions } from '@/features/patient/types/patientDashboard.types';
 import { createTabOptions, tabIcon } from '@/navigation/tabOptions';
 
 const Tab = createBottomTabNavigator();
@@ -93,6 +96,10 @@ function PatientProfileStack() {
 
 export function PatientTabs() {
   const insets = useSafeAreaInsets();
+  const [permissions, setPermissions] = useState<PatientPortalPermissions>({});
+  useEffect(() => {
+    getPatientPortalSettings().then((settings) => setPermissions(settings.permissions ?? {})).catch(() => setPermissions({}));
+  }, []);
   return (
     <RoleGuard roles={['paciente']}>
       <Tab.Navigator screenOptions={createTabOptions(insets)}>
@@ -106,11 +113,11 @@ export function PatientTabs() {
           name="PatientAppointmentsTab"
           options={{ tabBarIcon: tabIcon('calendar-check-outline'), title: 'Citas' }}
         />
-        <Tab.Screen
+        {permissions.can_view_documents !== false ? <Tab.Screen
           component={PatientDocumentsStack}
           name="PatientDocumentsTab"
           options={{ tabBarIcon: tabIcon('file-document-outline'), title: 'Documentos' }}
-        />
+        /> : null}
         <Tab.Screen
           component={PatientNotificationsStack}
           name="PatientNotificationsTab"

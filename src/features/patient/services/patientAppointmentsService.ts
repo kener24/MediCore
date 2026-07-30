@@ -9,6 +9,7 @@ import type {
   PatientAppointmentRequestPayload,
   PatientDoctor,
   PatientSpecialty,
+  RescheduleAppointmentPayload,
 } from '@/features/patient/types/patientAppointments.types';
 
 export async function getPatientAppointments(params?: Record<string, string>) {
@@ -26,10 +27,11 @@ export async function getPatientAppointment(id: number | string) {
 
 export const getPatientAppointmentDetail = getPatientAppointment;
 
-export async function requestPatientAppointment(payload: PatientAppointmentRequestPayload) {
+export async function requestPatientAppointment(payload: PatientAppointmentRequestPayload, idempotencyKey?: string) {
   const { data } = await apiClient.post<PatientAppointment>(
     endpoints.patientPortal.requestAppointment,
     payload,
+    idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : undefined,
   );
   return data;
 }
@@ -46,6 +48,19 @@ export async function cancelPatientAppointment(id: number | string, reason: stri
 
 export function cancelAppointment(id: number | string, payload: CancelAppointmentPayload) {
   return cancelPatientAppointment(id, payload.reason);
+}
+
+export async function reschedulePatientAppointment(
+  id: number | string,
+  payload: RescheduleAppointmentPayload,
+  idempotencyKey?: string,
+) {
+  const { data } = await apiClient.post<PatientAppointment>(
+    endpoints.patientPortal.rescheduleAppointment(id),
+    payload,
+    idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : undefined,
+  );
+  return data;
 }
 
 export async function getPatientSpecialties() {

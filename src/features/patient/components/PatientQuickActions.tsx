@@ -1,6 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 
 import { QuickActionCard } from '@/components/QuickActionCard';
+import type { PatientPortalPermissions } from '@/features/patient/types/patientDashboard.types';
 
 interface PatientQuickActionsProps {
   onAppointments?: () => void;
@@ -13,6 +14,7 @@ interface PatientQuickActionsProps {
   onPrescriptions?: () => void;
   onProfile?: () => void;
   onRequestAppointment?: () => void;
+  permissions?: PatientPortalPermissions;
 }
 
 export function PatientQuickActions({
@@ -26,6 +28,7 @@ export function PatientQuickActions({
   onPrescriptions,
   onProfile,
   onRequestAppointment,
+  permissions = {},
 }: PatientQuickActionsProps) {
   const navigate = (target: Parameters<NonNullable<PatientQuickActionsProps['onNavigate']>>[0], fallback?: () => void) => {
     if (onNavigate) onNavigate(target);
@@ -40,48 +43,48 @@ export function PatientQuickActions({
         onPress={() => navigate('appointments', onAppointments)}
         title="Mis citas"
       />
-      <QuickActionCard
-        description="Solicita una nueva cita en línea."
+      {permissions.can_request_appointments !== false ? <QuickActionCard
+        description="Solicita una nueva cita presencial o en línea."
         icon="calendar-plus"
         onPress={() => navigate('requestAppointment', onRequestAppointment)}
         title="Solicitar cita"
-      />
-      <QuickActionCard
+      /> : null}
+      {permissions.can_view_medical_record !== false ? <QuickActionCard
         description="Resumen de consultas y diagnósticos."
         icon="clipboard-pulse-outline"
         onPress={() => navigate('history', onHistory)}
         title="Historial"
-      />
-      <QuickActionCard
+      /> : null}
+      {permissions.can_view_prescriptions !== false ? <QuickActionCard
         description="Medicamentos e indicaciones médicas."
         icon="pill"
         onPress={() => navigate('prescriptions', onPrescriptions)}
         title="Recetas"
-      />
-      <QuickActionCard
-        description="Laboratorio, imagenes y solicitudes."
+      /> : null}
+      {permissions.can_view_medical_orders !== false ? <QuickActionCard
+        description="Laboratorio, imágenes y solicitudes."
         icon="clipboard-text-outline"
         onPress={() => navigate('medicalOrders', onMedicalOrders)}
-        title="Ordenes"
-      />
-      <QuickActionCard
+        title="Órdenes"
+      /> : null}
+      {permissions.can_view_invoices !== false ? <QuickActionCard
         description="Facturas, pagos y saldos."
         icon="receipt-text-outline"
         onPress={() => navigate('invoices', onInvoices)}
         title="Facturas"
-      />
-      <QuickActionCard
+      /> : null}
+      {permissions.can_view_invoices !== false ? <QuickActionCard
         description="Historial de pagos aplicados."
         icon="cash-check"
         onPress={() => navigate('payments', onPayments)}
         title="Pagos"
-      />
-      <QuickActionCard
+      /> : null}
+      {permissions.can_view_documents !== false ? <QuickActionCard
         description="Documentos clínicos visibles."
         icon="file-document-outline"
         onPress={() => navigate('documents', onDocuments)}
         title="Documentos"
-      />
+      /> : null}
       <QuickActionCard
         description="Datos personales y contacto de emergencia."
         icon="account-circle-outline"

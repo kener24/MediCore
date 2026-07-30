@@ -1,7 +1,9 @@
 import { BarChart3, Bed, Bell, Building2, CalendarClock, ChevronDown, FileText, Gauge, KeyRound, LogOut, Menu, Package, ScrollText, ShieldCheck, Stethoscope, UserCircle, Users, Wallet, X } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import clsx from "clsx";
+import { useEffect, useState } from "react";
 
+import { getPatientPortalSettings } from "../../api/patientPortalApi";
 import { useAuth } from "../../hooks/useAuth";
 import { canManageCatalogs } from "../../utils/constants";
 
@@ -408,7 +410,22 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const { user, logout } = useAuth();
   const { pathname } = useLocation();
   const roleName = user?.role_nombre ?? (typeof user?.role === "object" ? user.role.nombre : "");
-  const groups = navGroupsForRole(roleName);
+  const [patientPermissions, setPatientPermissions] = useState<Record<string, boolean> | null>(null);
+  useEffect(() => {
+    if (roleName !== "paciente") { setPatientPermissions(null); return; }
+    getPatientPortalSettings().then((data) => setPatientPermissions(data.permissions ?? {})).catch(() => setPatientPermissions(null));
+  }, [roleName]);
+  const groups = navGroupsForRole(roleName).map((group) => {
+    if (roleName !== "paciente" || !patientPermissions || !group.items) return group;
+    const hiddenPaths = new Set<string>();
+    if (patientPermissions.can_request_appointments === false) hiddenPaths.add("/patient/appointments/request");
+    if (patientPermissions.can_view_medical_record === false) hiddenPaths.add("/patient/medical-record");
+    if (patientPermissions.can_view_prescriptions === false) hiddenPaths.add("/patient/prescriptions");
+    if (patientPermissions.can_view_medical_orders === false) hiddenPaths.add("/patient/medical-orders");
+    if (patientPermissions.can_view_documents === false) hiddenPaths.add("/patient/documents");
+    if (patientPermissions.can_view_invoices === false) { hiddenPaths.add("/patient/invoices"); hiddenPaths.add("/patient/payments"); }
+    return { ...group, items: group.items.filter((item) => !hiddenPaths.has(item.path)) };
+  });
 
   return (
     <>

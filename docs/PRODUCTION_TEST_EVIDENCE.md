@@ -13,6 +13,7 @@ Fecha de validación: 2026-07-29 local / 2026-07-30 UTC.
 - Build web de producción: aprobado.
 - TypeScript móvil: aprobado.
 - Expo Doctor: 18 de 18 comprobaciones aprobadas.
+- Expo/Metro: iniciado con caché limpia en modo LAN y escuchando en el puerto 8081.
 - Metro/Expo: iniciado correctamente en modo LAN y escuchando en el puerto 8081.
 
 ## Casos certificados
@@ -48,3 +49,25 @@ Se verificaron alergias con justificación médica, programación sin consumo, F
 ## Android físico
 
 La validación estática y el inicio de Expo pueden certificarse desde el entorno de desarrollo. La interacción en un dispositivo Android físico requiere confirmación manual del usuario y no se declarará aprobada sin esa evidencia.
+
+---
+
+# Evidencia Sprint 1.7A - portal del paciente
+
+Fecha local: 2026-07-30.
+
+## Validación local
+
+- `python manage.py check`: aprobado.
+- Pruebas específicas del portal: 7 de 7 aprobadas.
+- Pruebas ampliadas de portal, citas, documentos y cuentas: 75 de 75 aprobadas.
+- Regresión de receta emitida y portal seguro: aprobada junto con las pruebas del sprint.
+- Suite completa: 353 pruebas aprobadas y 3 omitidas de forma prevista, sin fallos.
+- Build web de producción: aprobado.
+- TypeScript móvil: aprobado.
+- Expo Doctor: 18 de 18 comprobaciones aprobadas.
+
+## Estado pendiente de evidencia
+
+- Android físico requiere ejecución manual real; no se marca aprobado por validación estática.
+- Producción se documentará después del respaldo, despliegue, migración y smoke tests autenticados.

@@ -326,7 +326,7 @@ export function PasswordSecurityPage() {
     }
     setLoading(true);
     try {
-      await changePassword({ old_password: oldPassword, new_password: newPassword });
+      await changePassword({ old_password: oldPassword, new_password: newPassword, confirm_password: confirmPassword });
       toast.success("Contrasena actualizada.");
       setOldPassword("");
       setNewPassword("");

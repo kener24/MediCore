@@ -34,6 +34,7 @@ export interface PrescriptionItem {
   duration: string;
   quantity: string;
   route: string;
+  route_display?: string;
   instructions: string;
   allergy_warnings?: string[];
   activo: boolean;
@@ -47,6 +48,8 @@ export interface Prescription {
   patient_nombre?: string;
   doctor: number;
   doctor_nombre?: string;
+  status_display?: string;
+  prescription_type_display?: string;
   consultation: number;
   prescription_number: string;
   issue_date: string;
@@ -73,6 +76,10 @@ export interface MedicalOrder {
   patient_nombre?: string;
   doctor: number;
   doctor_nombre?: string;
+  order_type_display?: string;
+  priority_display?: string;
+  status_display?: string;
+  is_expired?: boolean;
   consultation: number;
   order_number: string;
   order_type: MedicalOrderType;

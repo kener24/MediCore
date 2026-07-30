@@ -7,7 +7,12 @@ export interface PatientPortalPermissions {
   can_view_medical_record: boolean;
   can_view_prescriptions: boolean;
   can_view_invoices: boolean;
+  can_view_medical_orders: boolean;
+  can_view_documents: boolean;
   can_request_appointments: boolean;
+  can_request_in_person_appointments: boolean;
+  can_request_online_appointments: boolean;
+  can_reschedule_appointments: boolean;
   can_cancel_appointments: boolean;
 }
 
@@ -16,6 +21,9 @@ export interface PatientPortalProfile {
   codigo_paciente: string;
   nombre_completo: string;
   identidad: string;
+  fecha_nacimiento?: string | null;
+  genero?: string;
+  tipo_sangre?: string;
   telefono: string;
   correo: string;
   direccion: string;
@@ -53,10 +61,13 @@ export interface PatientPortalDashboard {
   patient: PatientPortalProfile;
   upcoming_appointments: Appointment[];
   recent_prescriptions: Prescription[];
+  recent_orders: MedicalOrder[];
   pending_invoices: Invoice[];
+  new_documents_count: number;
   unread_notifications: number;
   clinic: PatientClinicInfo;
   permissions: PatientPortalPermissions;
+  available_actions: PatientPortalPermissions;
 }
 
 export interface PatientAppointmentRequestPayload {

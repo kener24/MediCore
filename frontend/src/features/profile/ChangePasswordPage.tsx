@@ -42,6 +42,7 @@ export function ChangePasswordPage() {
       await changePassword({
         old_password: values.old_password,
         new_password: values.new_password,
+        confirm_password: values.confirm_password,
       });
       toast.success("Contraseña actualizada correctamente.");
       reset();

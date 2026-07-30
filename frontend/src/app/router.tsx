@@ -272,6 +272,7 @@ export const router = createBrowserRouter([
               { path: "/patient/appointments/request", element: <PatientRequestAppointmentPage /> },
               { path: "/patient/appointments/new", element: <PatientRequestAppointmentPage /> },
               { path: "/patient/appointments/:id", element: <PatientPortalAppointmentDetailsPage /> },
+              { path: "/patient/appointments/:id/reschedule", element: <PatientRequestAppointmentPage /> },
               { path: "/patient/medical-record", element: <PatientMedicalRecordSummaryPage /> },
               { path: "/patient/diagnoses", element: <DiagnosesPage patientOnly /> },
               { path: "/patient/prescriptions", element: <PatientPortalPrescriptionsPage /> },

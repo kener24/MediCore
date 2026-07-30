@@ -17,7 +17,7 @@ export async function updateMe(payload: Pick<User, "nombre_completo" | "telefono
   return data;
 }
 
-export async function changePassword(payload: { old_password: string; new_password: string }) {
+export async function changePassword(payload: { old_password: string; new_password: string; confirm_password: string }) {
   const { data } = await api.post<{ detail: string }>("/auth/change-password/", payload);
   return data;
 }

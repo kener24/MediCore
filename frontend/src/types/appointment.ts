@@ -27,6 +27,11 @@ export interface Appointment {
   cancelled_at?: string | null;
   confirmed_at?: string | null;
   attended_at?: string | null;
+  rescheduled_at?: string | null;
+  last_reschedule_reason?: string;
+  duration_minutes?: number | null;
+  can_cancel?: boolean;
+  can_reschedule?: boolean;
   visit_id?: number | null;
   activo: boolean;
   creado_en?: string;

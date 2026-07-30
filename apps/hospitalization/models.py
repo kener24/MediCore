@@ -521,6 +521,19 @@ class MedicalInstruction(TimeStampedModel):
     title = models.CharField(max_length=180)
     details = models.TextField()
     frequency = models.CharField(max_length=120, blank=True)
+    inventory_item = models.ForeignKey("inventory.InventoryItem", on_delete=models.PROTECT, null=True, blank=True, related_name="hospital_medical_instructions")
+    generic_name = models.CharField(max_length=180, blank=True)
+    concentration = models.CharField(max_length=120, blank=True)
+    dose = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    dose_unit = models.CharField(max_length=40, blank=True)
+    route = models.CharField(max_length=30, blank=True)
+    interval_hours = models.PositiveSmallIntegerField(null=True, blank=True)
+    inventory_quantity = models.DecimalField(max_digits=12, decimal_places=2, default=1)
+    as_needed = models.BooleanField(default=False)
+    maximum_daily_dose = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    allergy_warning = models.TextField(blank=True)
+    allergy_override_reason = models.TextField(blank=True)
+    version = models.PositiveIntegerField(default=1)
     effective_from = models.DateTimeField(default=timezone.now)
     effective_until = models.DateTimeField(null=True, blank=True)
     acknowledged_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="hospital_instructions_acknowledged")
@@ -543,6 +556,27 @@ class MedicalInstruction(TimeStampedModel):
             raise ValidationError("La indicacion requiere titulo y detalle.")
         if self.status in [self.Status.SUSPENDED, self.Status.CANCELLED] and not self.status_reason.strip():
             raise ValidationError("La suspension o cancelacion requiere motivo.")
+        if self.instruction_type == self.InstructionType.MEDICATION:
+            if not self.inventory_item_id:
+                raise ValidationError({"inventory_item": "Selecciona el medicamento de inventario."})
+            if self.inventory_item.clinic_id != self.hospitalization.clinic_id:
+                raise ValidationError({"inventory_item": "El medicamento debe pertenecer a la misma clinica."})
+            if self.inventory_item.item_type != self.inventory_item.Type.MEDICAMENTO:
+                raise ValidationError({"inventory_item": "El producto seleccionado no esta clasificado como medicamento."})
+            if self.dose is None or self.dose <= 0:
+                raise ValidationError({"dose": "La dosis debe ser mayor que cero."})
+            if not self.dose_unit.strip():
+                raise ValidationError({"dose_unit": "La unidad de dosis es obligatoria."})
+            if not self.route.strip():
+                raise ValidationError({"route": "La via es obligatoria."})
+            if not self.as_needed and not self.interval_hours:
+                raise ValidationError({"interval_hours": "Indica el intervalo de administracion."})
+            if self.inventory_quantity <= 0:
+                raise ValidationError({"inventory_quantity": "La cantidad de inventario debe ser mayor que cero."})
+            if self.maximum_daily_dose is not None and self.maximum_daily_dose <= 0:
+                raise ValidationError({"maximum_daily_dose": "La dosis maxima debe ser mayor que cero."})
+            if self.allergy_warning.strip() and not self.allergy_override_reason.strip():
+                raise ValidationError({"allergy_override_reason": "Justifica la indicacion ante la alerta de alergia."})
 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -624,10 +658,15 @@ class NursingRound(TimeStampedModel):
 class MedicationAdministration(TimeStampedModel):
     class Status(models.TextChoices):
         PENDING = "pending", "Pendiente"
+        SCHEDULED = "scheduled", "Programada"
+        DUE = "due", "Por administrar"
         ADMINISTERED = "administered", "Administrado"
         OMITTED = "omitted", "Omitido"
+        REFUSED = "refused", "Rechazado"
+        UNAVAILABLE = "unavailable", "No disponible"
         DELAYED = "delayed", "Retrasado"
         CANCELLED = "cancelled", "Cancelado"
+        REVERSED = "reversed", "Revertido"
 
     class Route(models.TextChoices):
         ORAL = "oral", "Oral"
@@ -641,17 +680,34 @@ class MedicationAdministration(TimeStampedModel):
     clinic = models.ForeignKey("clinics.Clinic", on_delete=models.PROTECT, related_name="medication_administrations")
     hospitalization = models.ForeignKey(Hospitalization, on_delete=models.CASCADE, related_name="medication_administrations")
     patient = models.ForeignKey("patients.Patient", on_delete=models.PROTECT, related_name="medication_administrations")
+    instruction = models.ForeignKey(MedicalInstruction, on_delete=models.PROTECT, null=True, blank=True, related_name="administrations")
+    inventory_item = models.ForeignKey("inventory.InventoryItem", on_delete=models.PROTECT, null=True, blank=True, related_name="hospital_medication_administrations")
+    selected_lot = models.ForeignKey("inventory.InventoryLot", on_delete=models.PROTECT, null=True, blank=True, related_name="hospital_medication_administrations")
     prescription = models.ForeignKey("prescriptions.Prescription", on_delete=models.SET_NULL, null=True, blank=True, related_name="medication_administrations")
     prescription_item = models.ForeignKey("prescriptions.PrescriptionItem", on_delete=models.SET_NULL, null=True, blank=True, related_name="medication_administrations")
     medication_name = models.CharField(max_length=180)
     dosage = models.CharField(max_length=120)
+    ordered_dose = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    administered_dose = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    dose_unit = models.CharField(max_length=40, blank=True)
+    inventory_quantity = models.DecimalField(max_digits=12, decimal_places=2, default=1)
+    administered_quantity = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     route = models.CharField(max_length=30, choices=Route.choices, default=Route.ORAL)
     scheduled_time = models.DateTimeField(null=True, blank=True)
     administered_time = models.DateTimeField(null=True, blank=True)
+    status_recorded_at = models.DateTimeField(null=True, blank=True)
     status = models.CharField(max_length=30, choices=Status.choices, default=Status.PENDING)
     administered_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="medication_administrations_done")
     notes = models.TextField(blank=True)
     omission_reason = models.TextField(blank=True)
+    refusal_reason = models.TextField(blank=True)
+    unavailable_reason = models.TextField(blank=True)
+    delay_reason = models.TextField(blank=True)
+    administration_idempotency_key = models.CharField(max_length=100, blank=True)
+    inventory_processed_at = models.DateTimeField(null=True, blank=True)
+    reversed_at = models.DateTimeField(null=True, blank=True)
+    reversed_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="reversed_medication_administrations")
+    reversal_reason = models.TextField(blank=True)
 
     class Meta:
         ordering = ["scheduled_time", "-creado_en"]
@@ -659,6 +715,9 @@ class MedicationAdministration(TimeStampedModel):
             models.Index(fields=["clinic", "status", "scheduled_time"]),
             models.Index(fields=["hospitalization", "status"]),
             models.Index(fields=["patient", "status"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(fields=["instruction", "scheduled_time"], condition=models.Q(instruction__isnull=False, scheduled_time__isnull=False), name="unique_instruction_medication_schedule"),
         ]
 
     def clean(self):
@@ -671,14 +730,33 @@ class MedicationAdministration(TimeStampedModel):
             raise ValidationError("La receta debe pertenecer a la misma clinica.")
         if self.prescription_item_id and self.prescription_item.prescription_id != self.prescription_id:
             raise ValidationError("El item de receta no pertenece a la receta seleccionada.")
+        if self.instruction_id:
+            if self.instruction.hospitalization_id != self.hospitalization_id:
+                raise ValidationError("La indicacion no pertenece al internamiento.")
+            if self.instruction.instruction_type != MedicalInstruction.InstructionType.MEDICATION:
+                raise ValidationError("La indicacion no corresponde a un medicamento.")
+        if self.inventory_item_id and self.inventory_item.clinic_id != self.clinic_id:
+            raise ValidationError("El medicamento debe pertenecer a la misma clinica.")
+        if self.selected_lot_id and (self.selected_lot.item_id != self.inventory_item_id or self.selected_lot.clinic_id != self.clinic_id):
+            raise ValidationError("El lote no pertenece al medicamento o a la clinica.")
         if not self.medication_name:
             raise ValidationError({"medication_name": "El medicamento es obligatorio."})
         if not self.dosage:
             raise ValidationError({"dosage": "La dosis es obligatoria."})
         if self.status == self.Status.OMITTED and not self.omission_reason:
             raise ValidationError({"omission_reason": "El motivo de omision es obligatorio."})
+        if self.status == self.Status.REFUSED and not self.refusal_reason:
+            raise ValidationError({"refusal_reason": "El motivo de rechazo es obligatorio."})
+        if self.status == self.Status.UNAVAILABLE and not self.unavailable_reason:
+            raise ValidationError({"unavailable_reason": "La observacion de falta de stock es obligatoria."})
         if self.status == self.Status.ADMINISTERED and (not self.administered_time or not self.administered_by_id):
             raise ValidationError("Medicamento administrado requiere hora y enfermera responsable.")
+        if self.status == self.Status.ADMINISTERED and (self.administered_dose is None or self.administered_dose <= 0):
+            raise ValidationError({"administered_dose": "La dosis administrada debe ser mayor que cero."})
+        if self.inventory_quantity <= 0:
+            raise ValidationError({"inventory_quantity": "La cantidad de inventario debe ser mayor que cero."})
+        if self.status == self.Status.REVERSED and (not self.reversed_at or not self.reversed_by_id or not self.reversal_reason.strip()):
+            raise ValidationError("La reversion requiere usuario, fecha y motivo.")
 
     def save(self, *args, **kwargs):
         if self.hospitalization_id:
@@ -694,3 +772,67 @@ class MedicationAdministration(TimeStampedModel):
 
     def __str__(self):
         return f"{self.medication_name} - {self.get_status_display()}"
+
+
+class DischargeSummary(TimeStampedModel):
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Borrador"
+        SIGNED = "signed", "Firmado"
+        REPLACED = "replaced", "Reemplazado"
+
+    class DischargeType(models.TextChoices):
+        MEDICAL = "medical", "Alta medica"
+        VOLUNTARY = "voluntary", "Alta voluntaria"
+        TRANSFER = "transfer", "Traslado"
+        DEATH = "death", "Defuncion"
+        ABANDONMENT = "abandonment", "Abandono"
+        OTHER = "other", "Otra"
+
+    hospitalization = models.ForeignKey(Hospitalization, on_delete=models.PROTECT, related_name="discharge_summaries")
+    doctor = models.ForeignKey("doctors.DoctorProfile", on_delete=models.PROTECT, related_name="hospital_discharge_summaries")
+    version = models.PositiveIntegerField(default=1)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
+    discharge_type = models.CharField(max_length=20, choices=DischargeType.choices, default=DischargeType.MEDICAL)
+    admission_summary = models.TextField(blank=True)
+    hospital_course = models.TextField()
+    discharge_diagnoses = models.TextField()
+    procedures = models.TextField(blank=True)
+    relevant_findings = models.TextField(blank=True)
+    condition_at_discharge = models.TextField()
+    treatment_at_discharge = models.TextField(blank=True)
+    recommendations = models.TextField()
+    warning_signs = models.TextField(blank=True)
+    follow_up_plan = models.TextField()
+    pending_results = models.TextField(blank=True)
+    signed_at = models.DateTimeField(null=True, blank=True)
+    signed_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="signed_hospital_discharge_summaries")
+    replaces = models.ForeignKey("self", on_delete=models.PROTECT, null=True, blank=True, related_name="replacement_summaries")
+    correction_reason = models.CharField(max_length=250, blank=True)
+    prescription = models.ForeignKey("prescriptions.Prescription", on_delete=models.SET_NULL, null=True, blank=True, related_name="hospital_discharge_summaries")
+
+    class Meta:
+        ordering = ["-version", "-creado_en"]
+        constraints = [models.UniqueConstraint(fields=["hospitalization", "version"], name="unique_discharge_summary_version")]
+
+    def clean(self):
+        if self.hospitalization_id and self.doctor_id and self.hospitalization.clinic_id != self.doctor.clinic_id:
+            raise ValidationError("El resumen y el medico deben pertenecer a la misma clinica.")
+        if self.status == self.Status.SIGNED:
+            required = [self.hospital_course, self.discharge_diagnoses, self.condition_at_discharge, self.recommendations, self.follow_up_plan]
+            if any(not (value or "").strip() for value in required):
+                raise ValidationError("Completa evolucion, diagnosticos, condicion, recomendaciones y seguimiento antes de firmar.")
+            if not self.signed_at or not self.signed_by_id:
+                raise ValidationError("El resumen firmado requiere fecha y responsable.")
+        if self.replaces_id and not self.correction_reason.strip():
+            raise ValidationError("La correccion del resumen requiere motivo.")
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            original = type(self).objects.filter(pk=self.pk).first()
+            if original and original.status == self.Status.SIGNED:
+                raise ValidationError("El resumen firmado es inmutable; crea una correccion versionada.")
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Los resumenes de egreso forman parte del historial clinico.")

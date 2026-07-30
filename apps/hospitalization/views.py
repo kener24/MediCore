@@ -15,6 +15,7 @@ from apps.hospitalization.models import (
     HospitalRoom,
     HospitalVitalSigns,
     Hospitalization,
+    DischargeSummary,
     MedicalEvolution,
     MedicalInstruction,
     MedicationAdministration,
@@ -25,6 +26,9 @@ from apps.hospitalization.serializers import (
     BedActionSerializer,
     CancelHospitalizationSerializer,
     DischargeSerializer,
+    DischargeRequestSerializer,
+    DischargeSummarySerializer,
+    DischargeSummaryWriteSerializer,
     HospitalBedSerializer,
     HospitalRoomSerializer,
     HospitalVitalSignsSerializer,
@@ -36,6 +40,7 @@ from apps.hospitalization.serializers import (
     MedicalEvolutionCorrectionSerializer,
     MedicalEvolutionSerializer,
     MedicalInstructionSerializer,
+    MedicalInstructionReplaceSerializer,
     MedicationAdministrationActionSerializer,
     MedicationAdministrationCreateSerializer,
     MedicationAdministrationSerializer,
@@ -44,7 +49,10 @@ from apps.hospitalization.serializers import (
     NursingRoundCreateSerializer,
     NursingRoundSerializer,
     TreatmentPlanSerializer,
+    HospitalConsumptionSerializer,
+    HospitalConsumptionCreateSerializer,
 )
+from apps.billing.serializers import InvoiceDetailSerializer
 from apps.hospitalization import services
 
 
@@ -341,11 +349,97 @@ class HospitalizationViewSet(viewsets.ModelViewSet):
             return forbidden("No tienes permiso para dar alta hospitalaria.")
         serializer = DischargeSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        if serializer.validated_data.get("allow_pending_balance") and role_name(request.user) != "admin":
+            return forbidden("Solo administracion puede autorizar un saldo pendiente al alta.")
         try:
             hospitalization = services.discharge_hospitalization(self.get_object(), user=request.user, request=request, **serializer.validated_data)
         except DjangoValidationError as exc:
             return validation_response(exc)
         return Response(HospitalizationDetailSerializer(hospitalization).data)
+
+    @action(detail=True, methods=["post"], url_path="request-discharge")
+    def request_discharge(self, request, pk=None):
+        profile = doctor_profile(request.user)
+        if not profile:
+            return forbidden("Solo un medico puede solicitar el alta hospitalaria.")
+        serializer = DischargeRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            hospitalization = services.request_hospital_discharge(self.get_object(), user=request.user, request=request, **serializer.validated_data)
+        except DjangoValidationError as exc:
+            return validation_response(exc)
+        return Response(HospitalizationDetailSerializer(hospitalization).data)
+
+    @action(detail=True, methods=["get", "post"], url_path="discharge-summary")
+    def discharge_summary(self, request, pk=None):
+        hospitalization = self.get_object()
+        if role_name(request.user) not in CLINICAL_VIEW_ROLES:
+            return forbidden("No tienes permiso para ver el resumen de egreso.")
+        if request.method == "GET":
+            summaries = hospitalization.discharge_summaries.select_related("doctor__user", "signed_by", "prescription")
+            return Response(DischargeSummarySerializer(summaries, many=True).data)
+        profile = doctor_profile(request.user)
+        if not profile:
+            return forbidden("Solo un medico puede preparar el resumen de egreso.")
+        serializer = DischargeSummaryWriteSerializer(data=request.data, context={"hospitalization": hospitalization})
+        serializer.is_valid(raise_exception=True)
+        payload = dict(serializer.validated_data)
+        correction_reason = payload.pop("correction_reason", "")
+        try:
+            summary = services.save_discharge_summary(hospitalization, profile, request=request, correction_reason=correction_reason, **payload)
+        except DjangoValidationError as exc:
+            return validation_response(exc)
+        return Response(DischargeSummarySerializer(summary).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"], url_path="sign-discharge-summary")
+    def sign_discharge_summary(self, request, pk=None):
+        profile = doctor_profile(request.user)
+        if not profile:
+            return forbidden("Solo un medico puede firmar el resumen de egreso.")
+        summary_id = request.data.get("summary_id")
+        summary = self.get_object().discharge_summaries.filter(pk=summary_id).first() if summary_id else self.get_object().discharge_summaries.filter(status=DischargeSummary.Status.DRAFT, doctor=profile).order_by("-version").first()
+        if not summary:
+            return Response({"detail": "No se encontro un borrador de resumen para firmar."}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            summary = services.sign_discharge_summary(summary, profile, request=request)
+        except DjangoValidationError as exc:
+            return validation_response(exc)
+        return Response(DischargeSummarySerializer(summary).data)
+
+    @action(detail=True, methods=["get", "post"], url_path="consumptions")
+    def consumptions(self, request, pk=None):
+        hospitalization = self.get_object()
+        if role_name(request.user) not in CLINICAL_VIEW_ROLES:
+            return forbidden("No tienes permiso para ver consumos hospitalarios.")
+        if request.method == "GET":
+            return Response(HospitalConsumptionSerializer(hospitalization.clinical_supply_usages.select_related("inventory_item", "inventory_lot", "applied_by"), many=True).data)
+        if role_name(request.user) != "enfermera":
+            return forbidden("Solo enfermeria puede registrar consumos hospitalarios.")
+        serializer = HospitalConsumptionCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = dict(serializer.validated_data)
+        payload["idempotency_key"] = (request.headers.get("Idempotency-Key") or payload.get("idempotency_key") or "").strip()
+        try:
+            usage = services.register_hospital_consumption(hospitalization, request.user, request=request, **payload)
+        except DjangoValidationError as exc:
+            return validation_response(exc)
+        return Response(HospitalConsumptionSerializer(usage).data, status=status.HTTP_200_OK if getattr(usage, "_idempotent_replay", False) else status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["get", "post"], url_path="hospital-invoice")
+    def hospital_invoice(self, request, pk=None):
+        if role_name(request.user) not in ["admin", "recepcionista"]:
+            return forbidden("No tienes permiso para gestionar la factura hospitalaria.")
+        hospitalization = self.get_object()
+        if request.method == "GET":
+            invoice = getattr(hospitalization, "hospital_invoice", None)
+            if not invoice:
+                return Response({"invoice": None, "pending_consumptions": hospitalization.clinical_supply_usages.filter(active=True, billable=True, invoiced=False).count()})
+            return Response(InvoiceDetailSerializer(invoice).data)
+        try:
+            invoice, created = services.generate_hospital_invoice(hospitalization, request.user, request=request)
+        except DjangoValidationError as exc:
+            return validation_response(exc)
+        return Response(InvoiceDetailSerializer(invoice).data, status=status.HTTP_201_CREATED if created and request.method == "POST" else status.HTTP_200_OK)
 
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
@@ -622,6 +716,21 @@ class MedicalInstructionViewSet(viewsets.GenericViewSet):
     def cancel(self, request, pk=None):
         return self._change_status(request, MedicalInstruction.Status.CANCELLED, doctor_required=True)
 
+    @action(detail=True, methods=["post"])
+    def replace(self, request, pk=None):
+        profile = doctor_profile(request.user)
+        if not profile:
+            return forbidden("Solo un medico puede reemplazar indicaciones.")
+        serializer = MedicalInstructionReplaceSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = dict(serializer.validated_data)
+        reason = payload.pop("reason")
+        try:
+            instruction = services.replace_medical_instruction(self.get_object(), profile, reason, request=request, **payload)
+        except DjangoValidationError as exc:
+            return validation_response(exc)
+        return Response(MedicalInstructionSerializer(instruction).data, status=status.HTTP_201_CREATED)
+
 
 class NursingNoteViewSet(viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated]
@@ -702,7 +811,7 @@ class MedicationAdministrationViewSet(viewsets.GenericViewSet):
         serializer = MedicationAdministrationActionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            medication = services.mark_medication_administered(medication, nurse=request.user, request=request, notes=serializer.validated_data.get("notes", ""))
+            medication = services.mark_medication_administered(medication, nurse=request.user, request=request, **serializer.validated_data)
         except DjangoValidationError as exc:
             return validation_response(exc)
         return Response(MedicationAdministrationSerializer(medication).data)
@@ -728,7 +837,45 @@ class MedicationAdministrationViewSet(viewsets.GenericViewSet):
         serializer = MedicationAdministrationActionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            medication = services.mark_medication_delayed(medication, nurse=request.user, request=request, notes=serializer.validated_data.get("notes", ""))
+            medication = services.mark_medication_delayed(medication, nurse=request.user, request=request, notes=serializer.validated_data.get("reason") or serializer.validated_data.get("notes", ""))
+        except DjangoValidationError as exc:
+            return validation_response(exc)
+        return Response(MedicationAdministrationSerializer(medication).data)
+
+    @action(detail=True, methods=["post"])
+    def refuse(self, request, pk=None):
+        medication, error = self._get_medication()
+        if error:
+            return error
+        serializer = MedicationAdministrationActionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            medication = services.mark_medication_refused(medication, request.user, serializer.validated_data.get("reason", ""), request=request, notes=serializer.validated_data.get("notes", ""))
+        except DjangoValidationError as exc:
+            return validation_response(exc)
+        return Response(MedicationAdministrationSerializer(medication).data)
+
+    @action(detail=True, methods=["post"])
+    def unavailable(self, request, pk=None):
+        medication, error = self._get_medication()
+        if error:
+            return error
+        serializer = MedicationAdministrationActionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            medication = services.mark_medication_unavailable(medication, request.user, serializer.validated_data.get("reason", ""), request=request, notes=serializer.validated_data.get("notes", ""))
+        except DjangoValidationError as exc:
+            return validation_response(exc)
+        return Response(MedicationAdministrationSerializer(medication).data)
+
+    @action(detail=True, methods=["post"])
+    def reverse(self, request, pk=None):
+        if role_name(request.user) != "admin":
+            return forbidden("Solo administracion puede autorizar la reversion de una administracion.")
+        serializer = MedicationAdministrationActionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            medication = services.reverse_medication_administration(self.get_object(), request.user, serializer.validated_data.get("reason", ""), request=request)
         except DjangoValidationError as exc:
             return validation_response(exc)
         return Response(MedicationAdministrationSerializer(medication).data)

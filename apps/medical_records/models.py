@@ -230,6 +230,8 @@ class ClinicalSupplyUsage(TimeStampedModel):
     patient = models.ForeignKey("patients.Patient", on_delete=models.PROTECT, related_name="clinical_supply_usages")
     consultation = models.ForeignKey("medical_records.ClinicalConsultation", on_delete=models.SET_NULL, null=True, blank=True, related_name="supply_usages")
     appointment = models.ForeignKey("appointments.Appointment", on_delete=models.SET_NULL, null=True, blank=True, related_name="supply_usages")
+    hospitalization = models.ForeignKey("hospitalization.Hospitalization", on_delete=models.PROTECT, null=True, blank=True, related_name="clinical_supply_usages")
+    medication_administration = models.ForeignKey("hospitalization.MedicationAdministration", on_delete=models.PROTECT, null=True, blank=True, related_name="clinical_supply_usages")
     doctor = models.ForeignKey("doctors.DoctorProfile", on_delete=models.SET_NULL, null=True, blank=True, related_name="supply_usages")
     nurse = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="nursing_supply_usages")
     inventory_item = models.ForeignKey("inventory.InventoryItem", on_delete=models.PROTECT, related_name="clinical_usages")
@@ -288,6 +290,14 @@ class ClinicalSupplyUsage(TimeStampedModel):
         if self.appointment_id:
             if self.appointment.patient_id != self.patient_id or self.appointment.clinic_id != self.clinic_id:
                 raise ValidationError("La cita debe pertenecer al mismo paciente y clinica.")
+        if self.hospitalization_id:
+            if self.hospitalization.patient_id != self.patient_id or self.hospitalization.clinic_id != self.clinic_id:
+                raise ValidationError("El internamiento debe pertenecer al mismo paciente y clinica.")
+        if self.medication_administration_id:
+            if self.medication_administration.hospitalization_id != self.hospitalization_id:
+                raise ValidationError("La administracion no pertenece al internamiento indicado.")
+            if self.medication_administration.inventory_item_id != self.inventory_item_id:
+                raise ValidationError("La administracion no corresponde al producto consumido.")
 
     def save(self, *args, **kwargs):
         if self.patient_id and not self.clinic_id:
@@ -298,6 +308,9 @@ class ClinicalSupplyUsage(TimeStampedModel):
             self.doctor = self.consultation.doctor
             if self.consultation.appointment_id and not self.appointment_id:
                 self.appointment = self.consultation.appointment
+        if self.hospitalization_id:
+            self.patient = self.hospitalization.patient
+            self.clinic = self.hospitalization.clinic
         if self.inventory_item_id:
             if not self.description:
                 self.description = self.inventory_item.name

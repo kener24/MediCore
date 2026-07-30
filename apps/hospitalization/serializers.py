@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from rest_framework import serializers
 
 from apps.hospitalization.models import (
@@ -7,6 +9,7 @@ from apps.hospitalization.models import (
     HospitalVitalSigns,
     Hospitalization,
     HospitalizationEvent,
+    DischargeSummary,
     MedicalEvolution,
     MedicalInstruction,
     MedicationAdministration,
@@ -14,6 +17,8 @@ from apps.hospitalization.models import (
     NursingRound,
     TreatmentPlan,
 )
+from apps.inventory.models import InventoryItem, InventoryLot
+from apps.medical_records.models import ClinicalSupplyUsage
 
 
 class HospitalRoomSerializer(serializers.ModelSerializer):
@@ -330,7 +335,37 @@ class BedActionSerializer(serializers.Serializer):
 class DischargeSerializer(serializers.Serializer):
     discharge_reason = serializers.CharField(required=True, allow_blank=False)
     discharge_notes = serializers.CharField(required=False, allow_blank=True)
-    bed_status = serializers.ChoiceField(choices=[HospitalBed.Status.CLEANING, HospitalBed.Status.AVAILABLE], default=HospitalBed.Status.CLEANING)
+    allow_pending_balance = serializers.BooleanField(default=False)
+    bed_status = serializers.ChoiceField(choices=[HospitalBed.Status.CLEANING], default=HospitalBed.Status.CLEANING)
+
+
+class DischargeRequestSerializer(serializers.Serializer):
+    reason = serializers.CharField(required=False, allow_blank=True, max_length=250)
+
+
+class DischargeSummarySerializer(serializers.ModelSerializer):
+    doctor_name = serializers.CharField(source="doctor.user.nombre_completo", read_only=True)
+    signed_by_name = serializers.CharField(source="signed_by.nombre_completo", read_only=True)
+
+    class Meta:
+        model = DischargeSummary
+        fields = ["id", "hospitalization", "doctor", "doctor_name", "version", "status", "discharge_type", "admission_summary", "hospital_course", "discharge_diagnoses", "procedures", "relevant_findings", "condition_at_discharge", "treatment_at_discharge", "recommendations", "warning_signs", "follow_up_plan", "pending_results", "signed_at", "signed_by", "signed_by_name", "replaces", "correction_reason", "prescription", "creado_en", "actualizado_en"]
+        read_only_fields = ["hospitalization", "doctor", "version", "status", "signed_at", "signed_by", "replaces", "creado_en", "actualizado_en"]
+
+
+class DischargeSummaryWriteSerializer(serializers.ModelSerializer):
+    correction_reason = serializers.CharField(required=False, allow_blank=True, max_length=250)
+
+    class Meta:
+        model = DischargeSummary
+        fields = ["discharge_type", "admission_summary", "hospital_course", "discharge_diagnoses", "procedures", "relevant_findings", "condition_at_discharge", "treatment_at_discharge", "recommendations", "warning_signs", "follow_up_plan", "pending_results", "prescription", "correction_reason"]
+
+    def validate(self, attrs):
+        prescription = attrs.get("prescription")
+        hospitalization = self.context.get("hospitalization")
+        if prescription and hospitalization and (prescription.clinic_id != hospitalization.clinic_id or prescription.patient_id != hospitalization.patient_id):
+            raise serializers.ValidationError({"prescription": "La receta debe pertenecer al paciente y clinica del internamiento."})
+        return attrs
 
 
 class CancelHospitalizationSerializer(serializers.Serializer):
@@ -385,8 +420,22 @@ class MedicalInstructionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = MedicalInstruction
-        fields = ["id", "hospitalization", "treatment_plan", "doctor", "doctor_name", "instruction_type", "priority", "status", "title", "details", "frequency", "effective_from", "effective_until", "acknowledged_by", "acknowledged_by_name", "acknowledged_at", "completed_by", "completed_by_name", "completed_at", "status_reason", "replaces", "creado_en"]
-        read_only_fields = ["hospitalization", "doctor", "status", "acknowledged_by", "acknowledged_at", "completed_by", "completed_at", "status_reason", "replaces", "creado_en"]
+        fields = ["id", "hospitalization", "treatment_plan", "doctor", "doctor_name", "instruction_type", "priority", "status", "title", "details", "frequency", "inventory_item", "generic_name", "concentration", "dose", "dose_unit", "route", "interval_hours", "inventory_quantity", "as_needed", "maximum_daily_dose", "allergy_warning", "allergy_override_reason", "version", "effective_from", "effective_until", "acknowledged_by", "acknowledged_by_name", "acknowledged_at", "completed_by", "completed_by_name", "completed_at", "status_reason", "replaces", "creado_en"]
+        read_only_fields = ["hospitalization", "doctor", "status", "allergy_warning", "version", "acknowledged_by", "acknowledged_at", "completed_by", "completed_at", "status_reason", "replaces", "creado_en"]
+
+    def validate(self, attrs):
+        start = attrs.get("effective_from", getattr(self.instance, "effective_from", None))
+        end = attrs.get("effective_until", getattr(self.instance, "effective_until", None))
+        if start and end and end <= start:
+            raise serializers.ValidationError({"effective_until": "La fecha final debe ser posterior a la fecha inicial."})
+        return attrs
+
+
+class MedicalInstructionReplaceSerializer(MedicalInstructionSerializer):
+    reason = serializers.CharField(write_only=True, min_length=5, max_length=250)
+
+    class Meta(MedicalInstructionSerializer.Meta):
+        fields = [field for field in MedicalInstructionSerializer.Meta.fields if field not in {"id", "hospitalization", "doctor", "doctor_name", "status", "allergy_warning", "version", "acknowledged_by", "acknowledged_by_name", "acknowledged_at", "completed_by", "completed_by_name", "completed_at", "status_reason", "replaces", "creado_en"}] + ["reason"]
 
 
 class InstructionStatusSerializer(serializers.Serializer):
@@ -447,6 +496,13 @@ class MedicationAdministrationSerializer(serializers.ModelSerializer):
     administered_by_name = serializers.CharField(source="administered_by.nombre_completo", read_only=True)
     patient_name = serializers.CharField(source="patient.nombre_completo", read_only=True)
     created_at = serializers.DateTimeField(source="creado_en", read_only=True)
+    delay_minutes = serializers.SerializerMethodField()
+
+    def get_delay_minutes(self, obj):
+        actual_time = obj.administered_time or obj.status_recorded_at
+        if not obj.scheduled_time or not actual_time or actual_time <= obj.scheduled_time:
+            return 0
+        return int((actual_time - obj.scheduled_time).total_seconds() // 60)
 
     class Meta:
         model = MedicationAdministration
@@ -456,18 +512,35 @@ class MedicationAdministrationSerializer(serializers.ModelSerializer):
             "hospitalization",
             "patient",
             "patient_name",
+            "instruction",
+            "inventory_item",
+            "selected_lot",
             "prescription",
             "prescription_item",
             "medication_name",
             "dosage",
+            "ordered_dose",
+            "administered_dose",
+            "dose_unit",
+            "inventory_quantity",
+            "administered_quantity",
             "route",
             "scheduled_time",
             "administered_time",
+            "status_recorded_at",
+            "delay_minutes",
             "status",
             "administered_by",
             "administered_by_name",
             "notes",
             "omission_reason",
+            "refusal_reason",
+            "unavailable_reason",
+            "delay_reason",
+            "inventory_processed_at",
+            "reversed_at",
+            "reversed_by",
+            "reversal_reason",
             "created_at",
             "creado_en",
             "actualizado_en",
@@ -478,21 +551,42 @@ class MedicationAdministrationSerializer(serializers.ModelSerializer):
 class MedicationAdministrationCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = MedicationAdministration
-        fields = ["prescription", "prescription_item", "medication_name", "dosage", "route", "scheduled_time", "notes"]
+        fields = ["instruction", "scheduled_time", "notes"]
 
     def validate(self, attrs):
-        item = attrs.get("prescription_item")
-        if item:
-            attrs.setdefault("prescription", item.prescription)
-            attrs.setdefault("medication_name", item.medication_name)
-            attrs.setdefault("dosage", item.dosage)
-        if not attrs.get("medication_name"):
-            raise serializers.ValidationError({"medication_name": "El medicamento es obligatorio."})
-        if not attrs.get("dosage"):
-            raise serializers.ValidationError({"dosage": "La dosis es obligatoria."})
+        if not attrs.get("instruction"):
+            raise serializers.ValidationError({"instruction": "Selecciona una indicacion medica de medicamento."})
         return attrs
 
 
 class MedicationAdministrationActionSerializer(serializers.Serializer):
     notes = serializers.CharField(required=False, allow_blank=True)
     reason = serializers.CharField(required=False, allow_blank=True)
+    administered_at = serializers.DateTimeField(required=False)
+    administered_dose = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, min_value=Decimal("0.01"))
+    dose_unit = serializers.CharField(required=False, allow_blank=True, max_length=40)
+    route = serializers.ChoiceField(choices=MedicationAdministration.Route.choices, required=False)
+    inventory_quantity = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, min_value=Decimal("0.01"))
+    selected_lot = serializers.PrimaryKeyRelatedField(queryset=InventoryLot.objects.all(), required=False, allow_null=True)
+    idempotency_key = serializers.CharField(required=False, allow_blank=True, max_length=100)
+
+
+class HospitalConsumptionSerializer(serializers.ModelSerializer):
+    inventory_item_name = serializers.CharField(source="inventory_item.name", read_only=True)
+    inventory_lot_number = serializers.CharField(source="inventory_lot.lot_number", read_only=True)
+
+    class Meta:
+        model = ClinicalSupplyUsage
+        fields = ["id", "hospitalization", "inventory_item", "inventory_item_name", "inventory_lot", "inventory_lot_number", "quantity", "usage_type", "description", "notes", "billable", "unit_price", "total_price", "status", "invoiced", "applied_by", "applied_at", "creado_en"]
+        read_only_fields = fields
+
+
+class HospitalConsumptionCreateSerializer(serializers.Serializer):
+    inventory_item = serializers.PrimaryKeyRelatedField(queryset=InventoryItem.objects.filter(active=True))
+    inventory_lot = serializers.PrimaryKeyRelatedField(queryset=InventoryLot.objects.filter(active=True), required=False, allow_null=True)
+    quantity = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0.01"))
+    usage_type = serializers.ChoiceField(choices=ClinicalSupplyUsage.UsageType.choices, default=ClinicalSupplyUsage.UsageType.SUPPLY)
+    description = serializers.CharField(required=False, allow_blank=True, max_length=250)
+    notes = serializers.CharField(required=False, allow_blank=True)
+    billable = serializers.BooleanField(default=True)
+    idempotency_key = serializers.CharField(required=False, allow_blank=True, max_length=100)

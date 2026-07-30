@@ -32,6 +32,8 @@ from apps.patient_portal.serializers import (
     PatientPortalProfileUpdateSerializer,
     PatientPortalSpecialtySerializer,
 )
+from apps.hospitalization.models import DischargeSummary
+from apps.hospitalization.serializers import DischargeSummarySerializer
 from apps.prescriptions.models import Diagnosis, MedicalOrder, Prescription
 from apps.prescriptions.serializers import MedicalOrderDetailSerializer, MedicalOrderListSerializer, PrescriptionDetailSerializer, PrescriptionListSerializer
 from apps.subscriptions.services import check_feature_enabled, is_subscription_active
@@ -125,6 +127,23 @@ class PatientPortalProfileView(PatientPortalBaseView):
         serializer.save()
         return Response(PatientPortalProfileSerializer(self.patient).data)
 
+
+class PatientPortalDischargeSummariesView(PatientPortalBaseView):
+    """Expose only signed discharge documents belonging to the authenticated patient."""
+
+    def get(self, request, summary_id=None):
+        queryset = DischargeSummary.objects.filter(
+            hospitalization__patient=self.patient,
+            hospitalization__clinic=self.patient.clinic,
+            status=DischargeSummary.Status.SIGNED,
+        ).select_related("hospitalization", "doctor__user", "signed_by", "prescription")
+        if summary_id:
+            summary = queryset.filter(pk=summary_id).first()
+            if not summary:
+                return Response({"detail": "No se encontro el resumen de egreso solicitado."}, status=status.HTTP_404_NOT_FOUND)
+            log_audit_event(request=request, user=request.user, clinic=self.patient.clinic, action=AuditLog.Action.VIEW, module=AuditLog.Module.MEDICAL_RECORDS, obj=summary, description="Paciente consulto resumen de egreso autorizado.")
+            return Response(DischargeSummarySerializer(summary).data)
+        return Response(DischargeSummarySerializer(queryset, many=True).data)
 
 class PatientPortalAppointmentsView(PatientPortalBaseView):
     serializer_class = AppointmentListSerializer

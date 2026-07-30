@@ -180,6 +180,7 @@ class Invoice(TimeStampedModel):
     patient = models.ForeignKey("patients.Patient", on_delete=models.PROTECT, related_name="invoices")
     appointment = models.ForeignKey("appointments.Appointment", on_delete=models.SET_NULL, null=True, blank=True, related_name="invoices")
     consultation = models.ForeignKey("medical_records.ClinicalConsultation", on_delete=models.SET_NULL, null=True, blank=True, related_name="invoices")
+    hospitalization = models.OneToOneField("hospitalization.Hospitalization", on_delete=models.PROTECT, null=True, blank=True, related_name="hospital_invoice")
     invoice_number = models.CharField(max_length=30)
     issue_date = models.DateField(default=timezone.localdate)
     due_date = models.DateField(null=True, blank=True)
@@ -262,6 +263,9 @@ class Invoice(TimeStampedModel):
             raise ValidationError("La cita debe pertenecer a la misma clinica.")
         if self.consultation_id and self.consultation.clinic_id != self.clinic_id:
             raise ValidationError("La consulta debe pertenecer a la misma clinica.")
+        if self.hospitalization_id:
+            if self.hospitalization.clinic_id != self.clinic_id or self.hospitalization.patient_id != self.patient_id:
+                raise ValidationError("El internamiento debe pertenecer al mismo paciente y clinica.")
         if self.customer_rtn:
             self.customer_rtn = clean_rtn(self.customer_rtn)
 

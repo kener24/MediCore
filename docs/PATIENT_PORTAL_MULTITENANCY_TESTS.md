@@ -15,3 +15,9 @@ Casos cubiertos:
 - Configuracion publica sin SMTP, secretos ni datos fiscales.
 
 Los intentos bloqueados relevantes generan auditoria sin copiar contenido clinico completo.
+
+## Evidencia de produccion
+
+El 2026-07-30 se repitio la validacion mediante HTTPS con tres pacientes de tres clinicas distintas. Cada cuenta consulto contenido propio no vacio y se probaron accesos cruzados ciclicos sobre recetas, ordenes, documentos y archivos descargables. Los doce accesos ajenos devolvieron 404 y los accesos propios respondieron 200.
+
+Los usuarios usados fueron cuentas demo controladas. Todas sus sesiones tecnicas quedaron revocadas al finalizar.

@@ -84,3 +84,16 @@ Fecha local: 2026-07-30.
 - La sesión de prueba se cerró y una sesión residual del intento interrumpido fue revocada.
 - Inspección visual de dashboard, perfil y citas aprobada sin errores de consola.
 - `npm audit --omit=dev` conserva dos avisos altos de React Router relacionados con el modo RSC; MediCore es SPA Vite y no utiliza RSC/SSR. La corrección ofrecida implica cambio incompatible y queda para un sprint de dependencias.
+
+## Cierre multi-clínica Sprint 1.7A
+
+- Se validaron tres pacientes demo independientes, pertenecientes a las clínicas 3, 4 y 5.
+- Cada paciente obtuvo por HTTPS sus cinco citas, cinco recetas emitidas, cinco órdenes médicas, historial finalizado y un documento PDF visible.
+- Listado, detalle y PDF de receta propia respondieron correctamente; el PDF usó `application/pdf`.
+- Listado, detalle, descarga y vista previa de documento propio respondieron 200 con `application/pdf`.
+- Se ejecutaron doce intentos cruzados entre los tres pacientes: receta, orden, documento y descarga ajenos. Todos devolvieron 404.
+- Las respuestas públicas revisadas no expusieron `user_id`, `clinic_id`, paciente interno, clínica interna ni emisor administrativo.
+- La auditoría registró login, vistas, descargas, denegaciones de permiso y logout para los casos ejecutados.
+- Al finalizar quedaron cero sesiones activas para los tres usuarios de certificación.
+- Antes de agregar los tres PDF ficticios se respaldó el módulo de documentos en `backups/20260730_patient_cert/documents_before.json`, con suma SHA-256.
+- Los archivos agregados están identificados como datos demo sin validez clínica o legal y no modifican registros originales.

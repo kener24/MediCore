@@ -32,4 +32,4 @@ Se reviso la implementacion existente del portal web, la API Django REST y la ap
 - Expo/Metro: iniciado con cache limpia en modo LAN y puerto 8081.
 - Lint web y movil: cero errores; permanecen advertencias historicas fuera del sprint.
 
-La prueba en Android fisico y las pruebas finales de produccion se registran por separado y no se consideran aprobadas hasta ejecutarlas realmente.
+Las pruebas finales de produccion quedaron aprobadas con tres pacientes de tres clinicas, contenido clinico propio y aislamiento cruzado. La prueba en Android fisico se registra por separado y no se considera aprobada hasta ejecutar interacciones reales en el dispositivo.

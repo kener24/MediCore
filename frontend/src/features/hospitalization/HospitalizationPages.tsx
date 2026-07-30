@@ -21,7 +21,7 @@ import {
   createHospitalEvent,
   createMedicalEvolution,
   createMedicalInstruction,
-  createMedicationAdministration,
+  createHospitalConsumption,
   createHospitalRoom,
   createHospitalVitalSigns,
   createHospitalization,
@@ -30,6 +30,13 @@ import {
   createTreatmentPlan,
   delayMedication,
   dischargeHospitalization,
+  requestHospitalDischarge,
+  getDischargeSummaries,
+  saveDischargeSummary,
+  signDischargeSummary,
+  getHospitalConsumptions,
+  getHospitalInvoice,
+  generateHospitalInvoice,
   getAvailableHospitalBeds,
   getHospitalBeds,
   getHospitalRooms,
@@ -43,11 +50,15 @@ import {
   getNursingRounds,
   getTreatmentPlans,
   omitMedication,
+  refuseMedication,
+  unavailableMedication,
+  reverseMedication,
   signMedicalEvolution,
   changeMedicalInstructionStatus,
   updateHospitalBed,
   updateHospitalRoom,
 } from "../../api/hospitalizationApi";
+import { getInventoryItems } from "../../api/inventoryApi";
 import { getDoctors } from "../../api/doctorsApi";
 import { getPatients } from "../../api/patientsApi";
 import { Button } from "../../components/ui/Button";
@@ -67,9 +78,13 @@ import type {
   MedicalEvolution,
   MedicalInstruction,
   MedicationAdministration,
+  DischargeSummary,
+  HospitalConsumption,
   NursingRound,
   TreatmentPlan,
 } from "../../types/hospitalization";
+import type { InventoryItem } from "../../types/inventory";
+import type { Invoice } from "../../types/billing";
 import type { Patient } from "../../types/patient";
 import { cleanDecimal, onlyDigits } from "../../utils/inputSanitizers";
 
@@ -82,9 +97,14 @@ const statusLabel: Record<string, string> = {
   pending_admission: "Pendiente de ingreso",
   discharge_pending: "Alta pendiente",
   pending: "Pendiente",
+  scheduled: "Programada",
+  due: "Por administrar",
   administered: "Administrado",
   omitted: "Omitido",
+  refused: "Rechazado",
+  unavailable: "No disponible",
   delayed: "Retrasado",
+  reversed: "Revertido",
 };
 
 const bedStatusLabel: Record<string, string> = {
@@ -419,6 +439,8 @@ export function HospitalizationDetailPage() {
   const canWriteNursing = role === "enfermera";
   const canWriteMedical = role === "medico";
   const canViewClinical = ["admin", "medico", "enfermera"].includes(role);
+  const canManageDischarge = ["admin", "medico"].includes(role);
+  const canManageFinancial = ["admin", "recepcionista"].includes(role);
   const [admission, setAdmission] = useState<Hospitalization | null>(null);
   const [beds, setBeds] = useState<HospitalBed[]>([]);
   const [rounds, setRounds] = useState<NursingRound[]>([]);
@@ -429,6 +451,10 @@ export function HospitalizationDetailPage() {
   const [plans, setPlans] = useState<TreatmentPlan[]>([]);
   const [instructions, setInstructions] = useState<MedicalInstruction[]>([]);
   const [timeline, setTimeline] = useState<HospitalTimelineEntry[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [summaries, setSummaries] = useState<DischargeSummary[]>([]);
+  const [consumptions, setConsumptions] = useState<HospitalConsumption[]>([]);
+  const [hospitalInvoice, setHospitalInvoice] = useState<Invoice | null>(null);
   const [loadError, setLoadError] = useState("");
   async function load() {
     if (!id) return;
@@ -447,6 +473,9 @@ export function HospitalizationDetailPage() {
         planRows,
         instructionRows,
         timelineRows,
+        summaryRows,
+        consumptionRows,
+        inventoryRows,
       ] = await Promise.all([
         getNursingRounds(id),
         getMedicationAdministrations(id),
@@ -454,6 +483,9 @@ export function HospitalizationDetailPage() {
         getTreatmentPlans(id),
         getMedicalInstructions(id),
         getHospitalTimeline(id),
+        getDischargeSummaries(id),
+        getHospitalConsumptions(id),
+        getInventoryItems({ active: "true" }),
       ]);
       setRounds(nursingRounds);
       setMedications(medicationRows);
@@ -461,6 +493,13 @@ export function HospitalizationDetailPage() {
       setPlans(planRows);
       setInstructions(instructionRows);
       setTimeline(timelineRows);
+      setSummaries(summaryRows);
+      setConsumptions(consumptionRows);
+      setInventoryItems(inventoryRows);
+    }
+    if (canManageFinancial) {
+      const invoiceResult = await getHospitalInvoice(id);
+      setHospitalInvoice("invoice" in invoiceResult ? null : invoiceResult);
     }
   }
   useEffect(() => {
@@ -548,7 +587,11 @@ export function HospitalizationDetailPage() {
           onSaved={load}
           plans={plans}
           timeline={timeline}
+          inventoryItems={inventoryItems}
         />
+      ) : null}
+      {canManageDischarge || canManageFinancial ? (
+        <DischargeWorkflowSection admission={admission} role={role} summaries={summaries} invoice={hospitalInvoice} onSaved={load} />
       ) : null}
       {canWriteNursing ? (
         <div className="grid gap-4 lg:grid-cols-2">
@@ -556,7 +599,7 @@ export function HospitalizationDetailPage() {
           <NursingNotesSection admission={admission} onSaved={load} />
         </div>
       ) : null}
-      {canWriteNursing ? (
+      {["admin", "enfermera"].includes(role) ? (
         <div className="grid gap-4 lg:grid-cols-2">
           <NursingRoundsSection
             admission={admission}
@@ -566,6 +609,10 @@ export function HospitalizationDetailPage() {
           <MedicationAdministrationsSection
             admission={admission}
             medications={medications}
+            inventoryItems={inventoryItems}
+            consumptions={consumptions}
+            canWrite={canWriteNursing}
+            canReverse={role === "admin"}
             onSaved={load}
           />
         </div>
@@ -583,6 +630,7 @@ function ClinicalCareSections({
   onSaved,
   plans,
   timeline,
+  inventoryItems,
 }: {
   admission: Hospitalization;
   canWriteMedical: boolean;
@@ -592,6 +640,7 @@ function ClinicalCareSections({
   onSaved: () => Promise<void>;
   plans: TreatmentPlan[];
   timeline: HospitalTimelineEntry[];
+  inventoryItems: InventoryItem[];
 }) {
   const [evolution, setEvolution] = useState({
     subjective: "",
@@ -607,10 +656,19 @@ function ClinicalCareSections({
     change_reason: "",
   });
   const [instruction, setInstruction] = useState({
-    instruction_type: "general",
+    instruction_type: "other",
     priority: "routine",
     title: "",
     details: "",
+    inventory_item: "",
+    dose: "",
+    dose_unit: "mg",
+    route: "oral",
+    interval_hours: "8",
+    inventory_quantity: "1",
+    effective_until: "",
+    as_needed: false,
+    allergy_override_reason: "",
   });
   const [event, setEvent] = useState({
     event_type: "clinical_event",
@@ -687,15 +745,33 @@ function ClinicalCareSections({
     e.preventDefault();
     if (!instruction.title.trim() || instruction.details.trim().length < 5)
       return toast.error("Completa el titulo y el detalle de la indicacion.");
+    if (instruction.instruction_type === "medication" && (!instruction.inventory_item || !instruction.dose || !instruction.dose_unit || !instruction.route))
+      return toast.error("Selecciona medicamento y completa dosis, unidad y via.");
     await run(
       "instruction",
       async () => {
-        await createMedicalInstruction(admission.id, instruction);
+        await createMedicalInstruction(admission.id, {
+          ...instruction,
+          inventory_item: instruction.inventory_item ? Number(instruction.inventory_item) : null,
+          dose: instruction.dose || null,
+          interval_hours: instruction.as_needed ? null : Number(instruction.interval_hours),
+          inventory_quantity: instruction.inventory_quantity,
+          effective_until: instruction.effective_until || null,
+        });
         setInstruction({
-          instruction_type: "general",
+          instruction_type: "other",
           priority: "routine",
           title: "",
           details: "",
+          inventory_item: "",
+          dose: "",
+          dose_unit: "mg",
+          route: "oral",
+          interval_hours: "8",
+          inventory_quantity: "1",
+          effective_until: "",
+          as_needed: false,
+          allergy_override_reason: "",
         });
       },
       "Indicacion medica creada.",
@@ -836,12 +912,37 @@ function ClinicalCareSections({
                   })
                 }
               >
-                <option value="general">General</option>
+                <option value="other">Otra</option>
+                <option value="medication">Medicamento</option>
                 <option value="vital_signs">Signos vitales</option>
                 <option value="diet">Dieta</option>
                 <option value="activity">Actividad</option>
                 <option value="procedure">Procedimiento</option>
               </select>
+              {instruction.instruction_type === "medication" ? (
+                <>
+                  <select className="h-10 rounded-md border px-3 text-sm" required value={instruction.inventory_item} onChange={(e) => {
+                    const selected = inventoryItems.find((item) => item.id === Number(e.target.value));
+                    setInstruction({ ...instruction, inventory_item: e.target.value, title: selected?.name || instruction.title });
+                  }}>
+                    <option value="">Medicamento de inventario</option>
+                    {inventoryItems.filter((item) => item.item_type === "medicamento").map((item) => <option key={item.id} value={item.id}>{item.name} · Stock {item.stock_current}</option>)}
+                  </select>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input className="h-10 rounded-md border px-3 text-sm" inputMode="decimal" placeholder="Dosis" value={instruction.dose} onChange={(e) => setInstruction({ ...instruction, dose: cleanDecimal(e.target.value) })} />
+                    <input className="h-10 rounded-md border px-3 text-sm" placeholder="Unidad (mg, ml)" value={instruction.dose_unit} onChange={(e) => setInstruction({ ...instruction, dose_unit: e.target.value })} />
+                    <select className="h-10 rounded-md border px-3 text-sm" value={instruction.route} onChange={(e) => setInstruction({ ...instruction, route: e.target.value })}>
+                      {Object.entries(medicationRouteLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                    </select>
+                    <input className="h-10 rounded-md border px-3 text-sm" inputMode="numeric" placeholder="Cada N horas" disabled={instruction.as_needed} value={instruction.interval_hours} onChange={(e) => setInstruction({ ...instruction, interval_hours: onlyDigits(e.target.value) })} />
+                    <input className="h-10 rounded-md border px-3 text-sm" inputMode="decimal" placeholder="Unidades de inventario por dosis" value={instruction.inventory_quantity} onChange={(e) => setInstruction({ ...instruction, inventory_quantity: cleanDecimal(e.target.value) })} />
+                    <input className="h-10 rounded-md border px-3 text-sm" type="datetime-local" value={instruction.effective_until} onChange={(e) => setInstruction({ ...instruction, effective_until: e.target.value })} />
+                  </div>
+                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={instruction.as_needed} onChange={(e) => setInstruction({ ...instruction, as_needed: e.target.checked })} /> Administrar cuando sea necesario</label>
+                  {admission.patient_allergies ? <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900"><b>Alergias:</b> {admission.patient_allergies}</div> : null}
+                  <textarea className="min-h-16 rounded-md border p-2 text-sm" placeholder="Justificacion si existe alerta de alergia" value={instruction.allergy_override_reason} onChange={(e) => setInstruction({ ...instruction, allergy_override_reason: e.target.value })} />
+                </>
+              ) : null}
               <select
                 className="h-10 rounded-md border px-3 text-sm"
                 value={instruction.priority}
@@ -1088,26 +1189,6 @@ function HospitalizationActions({
       toast.error(getErrorMessage(e));
     }
   }
-  async function discharge() {
-    const reason = window.prompt("Motivo de alta hospitalaria") || "";
-    if (!reason.trim()) return toast.error("El motivo de alta es obligatorio.");
-    if (
-      !window.confirm(
-        "Después de dar alta se liberará la cama y se bloquearán acciones clínicas. ¿Deseas continuar?",
-      )
-    )
-      return;
-    try {
-      await dischargeHospitalization(admission.id, {
-        discharge_reason: reason.trim(),
-        bed_status: "cleaning",
-      });
-      toast.success("Alta hospitalaria registrada.");
-      await onSaved();
-    } catch (e) {
-      toast.error(getErrorMessage(e));
-    }
-  }
   async function cancel() {
     const reason = window.prompt("Motivo de cancelación") || "";
     if (!reason) return;
@@ -1143,12 +1224,96 @@ function HospitalizationActions({
         <Button type="button" onClick={moveBed}>
           {admission.current_bed ? "Cambiar cama" : "Asignar cama"}
         </Button>
-        <Button type="button" variant="outline" onClick={discharge}>
-          Alta
-        </Button>
         <Button type="button" variant="danger" onClick={cancel}>
           Cancelar
         </Button>
+      </div>
+    </Card>
+  );
+}
+
+function DischargeWorkflowSection({
+  admission,
+  role,
+  summaries,
+  invoice,
+  onSaved,
+}: {
+  admission: Hospitalization;
+  role: string;
+  summaries: DischargeSummary[];
+  invoice: Invoice | null;
+  onSaved: () => Promise<void>;
+}) {
+  const isDoctor = role === "medico";
+  const canFinance = ["admin", "recepcionista"].includes(role);
+  const latest = summaries[0];
+  const signed = summaries.find((entry) => entry.status === "signed");
+  const [busy, setBusy] = useState("");
+  const [form, setForm] = useState({
+    discharge_type: "medical",
+    hospital_course: latest?.status === "draft" ? latest.hospital_course : "",
+    discharge_diagnoses: latest?.status === "draft" ? latest.discharge_diagnoses : "",
+    condition_at_discharge: latest?.status === "draft" ? latest.condition_at_discharge : "",
+    treatment_at_discharge: latest?.status === "draft" ? latest.treatment_at_discharge || "" : "",
+    recommendations: latest?.status === "draft" ? latest.recommendations : "",
+    warning_signs: latest?.status === "draft" ? latest.warning_signs || "" : "",
+    follow_up_plan: latest?.status === "draft" ? latest.follow_up_plan : "",
+    pending_results: latest?.status === "draft" ? latest.pending_results || "" : "",
+  });
+  async function run(name: string, task: () => Promise<unknown>, message: string) {
+    if (busy) return;
+    try {
+      setBusy(name);
+      await task();
+      toast.success(message);
+      await onSaved();
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    } finally {
+      setBusy("");
+    }
+  }
+  async function saveSummary(e: FormEvent) {
+    e.preventDefault();
+    if ([form.hospital_course, form.discharge_diagnoses, form.condition_at_discharge, form.recommendations, form.follow_up_plan].some((value) => value.trim().length < 3)) return toast.error("Completa evolución, diagnósticos, condición, recomendaciones y seguimiento.");
+    await run("summary", () => saveDischargeSummary(admission.id, form), "Resumen de egreso guardado como borrador.");
+  }
+  async function completeDischarge() {
+    if (!signed) return toast.error("Se requiere un resumen de egreso firmado.");
+    const hasBalance = Number(invoice?.balance_due || 0) > 0;
+    const allowPending = hasBalance && role === "admin" ? window.confirm(`La factura tiene saldo pendiente de L ${invoice?.balance_due}. ¿Autorizar el alta con saldo?`) : false;
+    if (hasBalance && !allowPending) return toast.error("Registra el pago o autoriza expresamente el saldo pendiente.");
+    if (!window.confirm("El alta cerrará el internamiento, cancelará dosis futuras y enviará la cama a limpieza. ¿Continuar?")) return;
+    await run("complete", () => dischargeHospitalization(admission.id, { discharge_reason: "Alta clínica confirmada", allow_pending_balance: allowPending, bed_status: "cleaning" }), "Alta hospitalaria completada.");
+  }
+  return (
+    <Card title="Alta médica y cierre hospitalario">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="space-y-3">
+          <div className="rounded-md border p-3 text-sm">
+            <p><b>Estado clínico:</b> {statusLabel[admission.status] || admission.status}</p>
+            <p><b>Resumen:</b> {signed ? `Firmado, versión ${signed.version}` : latest ? "Borrador pendiente de firma" : "No creado"}</p>
+            <p><b>Factura:</b> {invoice ? `${invoice.invoice_number} · saldo L ${invoice.balance_due}` : "No generada"}</p>
+          </div>
+          {isDoctor && !isClosedAdmission(admission.status) && admission.status !== "discharge_pending" ? <Button type="button" isLoading={busy === "request"} onClick={() => run("request", () => requestHospitalDischarge(admission.id, "Alta indicada por médico tratante"), "Solicitud de alta registrada. La cama permanece ocupada.")}>Solicitar alta</Button> : null}
+          {canFinance && !isClosedAdmission(admission.status) ? <Button type="button" variant="outline" isLoading={busy === "invoice"} onClick={() => run("invoice", () => generateHospitalInvoice(admission.id), "Factura hospitalaria sincronizada sin duplicados.")}>Generar o actualizar factura</Button> : null}
+          {signed && invoice && !isClosedAdmission(admission.status) && ["admin", "medico"].includes(role) ? <Button type="button" variant="danger" isLoading={busy === "complete"} onClick={completeDischarge}>Confirmar alta y liberar cama</Button> : null}
+        </div>
+        {isDoctor && !isClosedAdmission(admission.status) ? (
+          <form className="grid gap-2" onSubmit={saveSummary}>
+            <select className="h-10 rounded-md border px-3 text-sm" value={form.discharge_type} onChange={(e) => setForm({ ...form, discharge_type: e.target.value })}><option value="medical">Alta médica</option><option value="voluntary">Alta voluntaria</option><option value="transfer">Traslado</option><option value="death">Defunción</option><option value="abandonment">Abandono</option><option value="other">Otra</option></select>
+            <textarea className="min-h-16 rounded-md border p-2 text-sm" placeholder="Evolución durante el internamiento" value={form.hospital_course} onChange={(e) => setForm({ ...form, hospital_course: e.target.value })} />
+            <textarea className="min-h-16 rounded-md border p-2 text-sm" placeholder="Diagnósticos de egreso" value={form.discharge_diagnoses} onChange={(e) => setForm({ ...form, discharge_diagnoses: e.target.value })} />
+            <textarea className="min-h-16 rounded-md border p-2 text-sm" placeholder="Condición al egreso" value={form.condition_at_discharge} onChange={(e) => setForm({ ...form, condition_at_discharge: e.target.value })} />
+            <textarea className="min-h-16 rounded-md border p-2 text-sm" placeholder="Tratamiento al egreso" value={form.treatment_at_discharge} onChange={(e) => setForm({ ...form, treatment_at_discharge: e.target.value })} />
+            <textarea className="min-h-16 rounded-md border p-2 text-sm" placeholder="Recomendaciones" value={form.recommendations} onChange={(e) => setForm({ ...form, recommendations: e.target.value })} />
+            <textarea className="min-h-16 rounded-md border p-2 text-sm" placeholder="Signos de alarma" value={form.warning_signs} onChange={(e) => setForm({ ...form, warning_signs: e.target.value })} />
+            <textarea className="min-h-16 rounded-md border p-2 text-sm" placeholder="Plan de seguimiento" value={form.follow_up_plan} onChange={(e) => setForm({ ...form, follow_up_plan: e.target.value })} />
+            <textarea className="min-h-16 rounded-md border p-2 text-sm" placeholder="Resultados u órdenes pendientes" value={form.pending_results} onChange={(e) => setForm({ ...form, pending_results: e.target.value })} />
+            <div className="flex gap-2"><Button type="submit" isLoading={busy === "summary"}>Guardar borrador</Button>{latest?.status === "draft" ? <Button type="button" variant="outline" isLoading={busy === "sign"} onClick={() => run("sign", () => signDischargeSummary(admission.id, latest.id), "Resumen de egreso firmado e inmutable.")}>Firmar resumen</Button> : null}</div>
+          </form>
+        ) : null}
       </div>
     </Card>
   );
@@ -1510,122 +1675,104 @@ function NursingRoundsSection({
 function MedicationAdministrationsSection({
   admission,
   medications,
+  inventoryItems,
+  consumptions,
+  canWrite,
+  canReverse,
   onSaved,
 }: {
   admission: Hospitalization;
   medications: MedicationAdministration[];
+  inventoryItems: InventoryItem[];
+  consumptions: HospitalConsumption[];
+  canWrite: boolean;
+  canReverse: boolean;
   onSaved: () => Promise<void>;
 }) {
-  const [form, setForm] = useState({
-    medication_name: "",
-    dosage: "",
-    route: "oral",
-    scheduled_time: "",
+  const [busy, setBusy] = useState("");
+  const [consumption, setConsumption] = useState({
+    inventory_item: "",
+    quantity: "1",
+    usage_type: "supply",
     notes: "",
   });
-  async function submit(e: FormEvent) {
+  async function submitConsumption(e: FormEvent) {
     e.preventDefault();
-    if (!requireTrimmed(form.medication_name, "El medicamento es obligatorio."))
-      return;
-    if (!requireTrimmed(form.dosage, "La dosis es obligatoria.")) return;
+    if (!consumption.inventory_item || Number(consumption.quantity) <= 0) return toast.error("Selecciona el insumo y una cantidad válida.");
     try {
-      await createMedicationAdministration(admission.id, {
-        ...form,
-        medication_name: form.medication_name.trim(),
-        dosage: form.dosage.trim(),
-        notes: form.notes.trim(),
-        scheduled_time: form.scheduled_time || null,
+      setBusy("consumption");
+      await createHospitalConsumption(admission.id, {
+        ...consumption,
+        inventory_item: Number(consumption.inventory_item),
+        quantity: consumption.quantity,
+        notes: consumption.notes.trim(),
+        billable: true,
       });
-      toast.success("Medicamento programado correctamente.");
-      setForm({
-        medication_name: "",
-        dosage: "",
-        route: "oral",
-        scheduled_time: "",
-        notes: "",
-      });
+      toast.success("Consumo hospitalario registrado.");
+      setConsumption({ inventory_item: "", quantity: "1", usage_type: "supply", notes: "" });
       await onSaved();
     } catch (error) {
       toast.error(getErrorMessage(error));
+    } finally {
+      setBusy("");
     }
   }
-  async function action(id: number, type: "administer" | "omit" | "delay") {
+  async function action(med: MedicationAdministration, type: "administer" | "omit" | "delay" | "refuse" | "unavailable") {
+    if (busy) return;
     try {
+      setBusy(`${type}-${med.id}`);
       if (type === "administer") {
-        if (!window.confirm("¿Confirmas que administraste este medicamento?"))
-          return;
-        await administerMedication(id, {
+        const dose = window.prompt("Dosis realmente administrada", med.ordered_dose || med.dosage.split(" ")[0] || "")?.trim() || "";
+        const quantity = window.prompt("Cantidad de inventario utilizada", med.inventory_quantity || "1")?.trim() || "";
+        if (!dose || Number(dose) <= 0 || !quantity || Number(quantity) <= 0) return toast.error("Confirma dosis y cantidad utilizada.");
+        if (!window.confirm(`Confirma paciente ${med.patient_name || admission.patient_name}, ${med.medication_name}, dosis ${dose} ${med.dose_unit || ""}, vía ${medicationRouteLabel[med.route] || med.route}.`)) return;
+        await administerMedication(med.id, {
+          administered_dose: dose,
+          dose_unit: med.dose_unit || "mg",
+          route: med.route,
+          inventory_quantity: quantity,
           notes: window.prompt("Observaciones opcionales") || "",
+          idempotency_key: crypto.randomUUID(),
         });
       } else if (type === "omit") {
         const reason = window.prompt("Motivo obligatorio de omisión") || "";
         if (!reason) return toast.error("El motivo de omisión es obligatorio.");
-        await omitMedication(id, { reason });
+        await omitMedication(med.id, { reason });
+      } else if (type === "refuse") {
+        const reason = window.prompt("Explicación y motivo del rechazo") || "";
+        if (!reason) return toast.error("El motivo de rechazo es obligatorio.");
+        await refuseMedication(med.id, { reason });
+      } else if (type === "unavailable") {
+        const reason = window.prompt("Describe la falta de existencia") || "";
+        if (!reason) return toast.error("La observación de falta de stock es obligatoria.");
+        await unavailableMedication(med.id, { reason });
       } else {
-        await delayMedication(id, {
-          notes: window.prompt("Nota de retraso") || "",
-        });
+        const reason = window.prompt("Motivo del retraso (mínimo 5 caracteres)") || "";
+        if (reason.trim().length < 5) return;
+        await delayMedication(med.id, { notes: reason });
       }
       toast.success("Estado de medicamento actualizado.");
       await onSaved();
     } catch (error) {
       toast.error(getErrorMessage(error));
+    } finally {
+      setBusy("");
     }
   }
+  async function reverse(med: MedicationAdministration) {
+    const reason = window.prompt("Motivo obligatorio de reversión")?.trim() || "";
+    if (reason.length < 5) return toast.error("El motivo debe tener al menos 5 caracteres.");
+    if (!window.confirm("Se restaurará el inventario en los mismos lotes. ¿Deseas continuar?")) return;
+    try { setBusy(`reverse-${med.id}`); await reverseMedication(med.id, reason); toast.success("Administración e inventario revertidos."); await onSaved(); } catch (error) { toast.error(getErrorMessage(error)); } finally { setBusy(""); }
+  }
   return (
+    <div className="space-y-4">
     <Card title="Administración de medicamentos">
-      <form className="grid gap-2" onSubmit={submit}>
-        <div className="grid gap-2 md:grid-cols-2">
-          <input
-            className="h-10 rounded-md border px-3 text-sm"
-            required
-            placeholder="Medicamento"
-            value={form.medication_name}
-            onChange={(e) =>
-              setForm({ ...form, medication_name: e.target.value })
-            }
-          />
-          <input
-            className="h-10 rounded-md border px-3 text-sm"
-            required
-            placeholder="Dosis"
-            value={form.dosage}
-            onChange={(e) => setForm({ ...form, dosage: e.target.value })}
-          />
-          <select
-            className="h-10 rounded-md border px-3 text-sm"
-            value={form.route}
-            onChange={(e) => setForm({ ...form, route: e.target.value })}
-          >
-            <option value="oral">Oral</option>
-            <option value="iv">IV</option>
-            <option value="im">IM</option>
-            <option value="sc">SC</option>
-            <option value="topical">Tópica</option>
-            <option value="inhaled">Inhalada</option>
-            <option value="other">Otra</option>
-          </select>
-          <input
-            className="h-10 rounded-md border px-3 text-sm"
-            type="datetime-local"
-            value={form.scheduled_time}
-            onChange={(e) =>
-              setForm({ ...form, scheduled_time: e.target.value })
-            }
-          />
-        </div>
-        <input
-          className="h-10 rounded-md border px-3 text-sm"
-          placeholder="Observaciones"
-          value={form.notes}
-          onChange={(e) => setForm({ ...form, notes: e.target.value })}
-        />
-        <Button type="submit">Programar medicamento</Button>
-      </form>
+      <p className="mb-3 text-xs text-slate-500">Las dosis aparecen desde indicaciones médicas activas. El inventario se descuenta únicamente al confirmar la administración.</p>
       <div className="mt-4 space-y-2">
         {medications.length ? (
           medications.map((med) => {
-            const locked = ["administered", "omitted", "cancelled"].includes(
+            const locked = ["administered", "omitted", "refused", "unavailable", "cancelled", "reversed"].includes(
               med.status,
             );
             return (
@@ -1651,30 +1798,38 @@ function MedicationAdministrationsSection({
                 {med.omission_reason ? (
                   <p>Motivo omisión: {med.omission_reason}</p>
                 ) : null}
-                {!locked ? (
+                {med.refusal_reason ? <p>Motivo rechazo: {med.refusal_reason}</p> : null}
+                {med.unavailable_reason ? <p>Falta de stock: {med.unavailable_reason}</p> : null}
+                {!locked && canWrite ? (
                   <div className="mt-2 flex flex-wrap gap-2">
                     <Button
                       type="button"
-                      onClick={() => action(med.id, "administer")}
+                      disabled={Boolean(busy)}
+                      onClick={() => action(med, "administer")}
                     >
                       Administrar
                     </Button>
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => action(med.id, "delay")}
+                      disabled={Boolean(busy)}
+                      onClick={() => action(med, "delay")}
                     >
                       Retrasar
                     </Button>
                     <Button
                       type="button"
                       variant="danger"
-                      onClick={() => action(med.id, "omit")}
+                      disabled={Boolean(busy)}
+                      onClick={() => action(med, "omit")}
                     >
                       Omitir
                     </Button>
+                    <Button type="button" variant="outline" disabled={Boolean(busy)} onClick={() => action(med, "refuse")}>Rechazo</Button>
+                    <Button type="button" variant="outline" disabled={Boolean(busy)} onClick={() => action(med, "unavailable")}>Sin existencia</Button>
                   </div>
                 ) : null}
+                {med.status === "administered" && canReverse ? <div className="mt-2"><Button type="button" variant="danger" disabled={Boolean(busy)} onClick={() => void reverse(med)}>Revertir con trazabilidad</Button></div> : null}
               </div>
             );
           })
@@ -1686,6 +1841,24 @@ function MedicationAdministrationsSection({
         )}
       </div>
     </Card>
+    {canWrite ? <Card title="Consumos e insumos">
+      <form className="grid gap-2" onSubmit={submitConsumption}>
+        <select className="h-10 rounded-md border px-3 text-sm" required value={consumption.inventory_item} onChange={(e) => setConsumption({ ...consumption, inventory_item: e.target.value })}>
+          <option value="">Selecciona un insumo</option>
+          {inventoryItems.filter((item) => item.item_type !== "medicamento").map((item) => <option key={item.id} value={item.id}>{item.name} · Stock {item.stock_current}</option>)}
+        </select>
+        <div className="grid grid-cols-2 gap-2">
+          <input className="h-10 rounded-md border px-3 text-sm" inputMode="decimal" value={consumption.quantity} onChange={(e) => setConsumption({ ...consumption, quantity: cleanDecimal(e.target.value) })} placeholder="Cantidad" />
+          <select className="h-10 rounded-md border px-3 text-sm" value={consumption.usage_type} onChange={(e) => setConsumption({ ...consumption, usage_type: e.target.value })}>
+            <option value="supply">Insumo</option><option value="procedure_supply">Procedimiento</option><option value="serum">Suero</option><option value="wound_care">Curación</option><option value="other">Otro</option>
+          </select>
+        </div>
+        <input className="h-10 rounded-md border px-3 text-sm" placeholder="Observaciones" value={consumption.notes} onChange={(e) => setConsumption({ ...consumption, notes: e.target.value })} />
+        <Button type="submit" isLoading={busy === "consumption"}>Registrar consumo real</Button>
+      </form>
+      <div className="mt-3 space-y-2">{consumptions.length ? consumptions.map((entry) => <div key={entry.id} className="rounded-md bg-slate-50 p-2 text-xs"><b>{entry.inventory_item_name}</b> · {entry.quantity} · {entry.invoiced ? "Facturado" : "Pendiente de facturar"}</div>) : <EmptyState title="No hay consumos hospitalarios registrados." />}</div>
+    </Card> : null}
+    </div>
   );
 }
 

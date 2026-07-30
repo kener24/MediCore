@@ -7,6 +7,8 @@ import type {
   HospitalizationCreatePayload,
   HospitalizationDashboard,
   HospitalTimelineEntry,
+  DischargeSummary,
+  HospitalConsumption,
   MedicalEvolution,
   MedicalInstruction,
   MedicationAdministration,
@@ -14,6 +16,7 @@ import type {
   NursingRound,
   TreatmentPlan,
 } from "../types/hospitalization";
+import type { Invoice } from "../types/billing";
 
 type PaginatedResponse<T> = T[] | { results?: T[] };
 
@@ -51,8 +54,48 @@ export async function changeHospitalBed(id: number | string, payload: { bed: num
   return data;
 }
 
-export async function dischargeHospitalization(id: number | string, payload: { discharge_reason?: string; discharge_notes?: string; bed_status?: string }) {
+export async function dischargeHospitalization(id: number | string, payload: { discharge_reason?: string; discharge_notes?: string; allow_pending_balance?: boolean; bed_status?: string }) {
   const { data } = await api.post<Hospitalization>(`/hospitalization/admissions/${id}/discharge/`, payload);
+  return data;
+}
+
+export async function requestHospitalDischarge(id: number | string, reason = "") {
+  const { data } = await api.post<Hospitalization>(`/hospitalization/admissions/${id}/request-discharge/`, { reason });
+  return data;
+}
+
+export async function getDischargeSummaries(id: number | string) {
+  const { data } = await api.get<DischargeSummary[]>(`/hospitalization/admissions/${id}/discharge-summary/`);
+  return data;
+}
+
+export async function saveDischargeSummary(id: number | string, payload: Partial<DischargeSummary> & { correction_reason?: string }) {
+  const { data } = await api.post<DischargeSummary>(`/hospitalization/admissions/${id}/discharge-summary/`, payload);
+  return data;
+}
+
+export async function signDischargeSummary(id: number | string, summaryId: number) {
+  const { data } = await api.post<DischargeSummary>(`/hospitalization/admissions/${id}/sign-discharge-summary/`, { summary_id: summaryId });
+  return data;
+}
+
+export async function getHospitalConsumptions(id: number | string) {
+  const { data } = await api.get<HospitalConsumption[]>(`/hospitalization/admissions/${id}/consumptions/`);
+  return data;
+}
+
+export async function createHospitalConsumption(id: number | string, payload: Record<string, unknown>, idempotencyKey = crypto.randomUUID()) {
+  const { data } = await api.post<HospitalConsumption>(`/hospitalization/admissions/${id}/consumptions/`, payload, { headers: { "Idempotency-Key": idempotencyKey } });
+  return data;
+}
+
+export async function getHospitalInvoice(id: number | string) {
+  const { data } = await api.get<Invoice | { invoice: null; pending_consumptions: number }>(`/hospitalization/admissions/${id}/hospital-invoice/`);
+  return data;
+}
+
+export async function generateHospitalInvoice(id: number | string) {
+  const { data } = await api.post<Invoice>(`/hospitalization/admissions/${id}/hospital-invoice/`, {});
   return data;
 }
 
@@ -156,6 +199,11 @@ export async function createMedicalInstruction(id: number | string, payload: Par
   return data;
 }
 
+export async function replaceMedicalInstruction(id: number, payload: Partial<MedicalInstruction> & { reason: string }) {
+  const { data } = await api.post<MedicalInstruction>(`/hospitalization/instructions/${id}/replace/`, payload);
+  return data;
+}
+
 export async function acknowledgeMedicalInstruction(id: number) {
   const { data } = await api.post<MedicalInstruction>(`/hospitalization/instructions/${id}/acknowledge/`, {});
   return data;
@@ -186,7 +234,7 @@ export async function createMedicationAdministration(id: number | string, payloa
   return data;
 }
 
-export async function administerMedication(id: number | string, payload: { notes?: string }) {
+export async function administerMedication(id: number | string, payload: { administered_at?: string; administered_dose?: string; dose_unit?: string; route?: string; inventory_quantity?: string; selected_lot?: number | null; notes?: string; idempotency_key: string }) {
   const { data } = await api.post<MedicationAdministration>(`/hospitalization/medication-administrations/${id}/administer/`, payload);
   return data;
 }
@@ -198,6 +246,21 @@ export async function omitMedication(id: number | string, payload: { reason: str
 
 export async function delayMedication(id: number | string, payload: { notes?: string }) {
   const { data } = await api.post<MedicationAdministration>(`/hospitalization/medication-administrations/${id}/delay/`, payload);
+  return data;
+}
+
+export async function refuseMedication(id: number | string, payload: { reason: string; notes?: string }) {
+  const { data } = await api.post<MedicationAdministration>(`/hospitalization/medication-administrations/${id}/refuse/`, payload);
+  return data;
+}
+
+export async function unavailableMedication(id: number | string, payload: { reason: string; notes?: string }) {
+  const { data } = await api.post<MedicationAdministration>(`/hospitalization/medication-administrations/${id}/unavailable/`, payload);
+  return data;
+}
+
+export async function reverseMedication(id: number | string, reason: string) {
+  const { data } = await api.post<MedicationAdministration>(`/hospitalization/medication-administrations/${id}/reverse/`, { reason });
   return data;
 }
 

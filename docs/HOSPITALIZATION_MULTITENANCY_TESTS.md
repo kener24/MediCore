@@ -1,15 +1,16 @@
 # Pruebas multi-clínica de hospitalización
 
-La suite usa Clínica A y Clínica B con pacientes, médicos, enfermeras, habitaciones y camas independientes.
+## Regla de aislamiento
 
-Se verificó que:
+Los ViewSets filtran por la clínica del usuario autenticado. Los servicios vuelven a validar la clínica en internamientos, médicos, pacientes, productos, lotes, consumos y facturas. El superadministrador no recibe contenido clínico detallado.
 
-- un usuario A no recupera internamientos B;
-- un ingreso A no acepta paciente, visita, consulta, médico o cama B;
-- una cama B no puede asignarse a un internamiento A;
-- médico y enfermería A no escriben sobre objetos B;
-- paciente y superadmin reciben recurso oculto;
-- recepción no recibe contenido clínico profundo;
-- los IDs manipulados producen `403` o `404`, nunca datos ajenos.
+## Cobertura automatizada
 
-La prueba `test_sprint16a_concurrency.py` ejecuta dos asignaciones simultáneas y se habilita exclusivamente con MySQL, donde existe bloqueo real de filas.
+- Enfermería de Clínica B no puede administrar una dosis de Clínica A.
+- Un producto o lote de otra clínica no puede consumirse.
+- La factura siempre conserva clínica y paciente del internamiento.
+- Un paciente solo obtiene sus propios resúmenes firmados.
+- Los identificadores manipulados se resuelven como recurso inexistente o acceso prohibido.
+- La cola de medicamentos se construye exclusivamente para la clínica de la sesión.
+
+Las pruebas usan dos clínicas y datos ficticios. No contienen información clínica real.

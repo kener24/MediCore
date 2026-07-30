@@ -109,6 +109,21 @@ export interface MedicalInstruction {
   title: string;
   details: string;
   status: string;
+  inventory_item?: number | null;
+  generic_name?: string;
+  concentration?: string;
+  dose?: string | null;
+  dose_unit?: string;
+  route?: string;
+  interval_hours?: number | null;
+  inventory_quantity?: string;
+  as_needed?: boolean;
+  maximum_daily_dose?: string | null;
+  allergy_warning?: string;
+  allergy_override_reason?: string;
+  version?: number;
+  effective_from?: string;
+  effective_until?: string | null;
   scheduled_for?: string | null;
   acknowledged_by_name?: string;
   acknowledged_at?: string | null;
@@ -149,12 +164,64 @@ export interface MedicationAdministration {
   route: string;
   scheduled_time?: string | null;
   administered_time?: string | null;
+  status_recorded_at?: string | null;
+  delay_minutes?: number;
   status: string;
   administered_by_name?: string;
   notes?: string;
   omission_reason?: string;
   patient_name?: string;
+  instruction?: number | null;
+  inventory_item?: number | null;
+  selected_lot?: number | null;
+  ordered_dose?: string | null;
+  administered_dose?: string | null;
+  dose_unit?: string;
+  inventory_quantity?: string;
+  administered_quantity?: string | null;
+  refusal_reason?: string;
+  unavailable_reason?: string;
+  delay_reason?: string;
+  reversal_reason?: string;
   created_at?: string;
+}
+
+export interface DischargeSummary {
+  id: number;
+  version: number;
+  status: "draft" | "signed" | "replaced";
+  discharge_type: string;
+  hospital_course: string;
+  discharge_diagnoses: string;
+  condition_at_discharge: string;
+  recommendations: string;
+  follow_up_plan: string;
+  admission_summary?: string;
+  procedures?: string;
+  relevant_findings?: string;
+  treatment_at_discharge?: string;
+  warning_signs?: string;
+  pending_results?: string;
+  prescription?: number | null;
+  signed_at?: string | null;
+  doctor_name?: string;
+}
+
+export interface HospitalConsumption {
+  id: number;
+  inventory_item: number;
+  inventory_item_name: string;
+  inventory_lot?: number | null;
+  inventory_lot_number?: string;
+  quantity: string;
+  usage_type: string;
+  description: string;
+  notes?: string;
+  billable: boolean;
+  total_price: string;
+  status: string;
+  invoiced: boolean;
+  applied_at: string;
 }
 
 export interface Hospitalization {

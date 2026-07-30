@@ -1,77 +1,28 @@
-# Evidencia de pruebas en producción
+# Evidencia de certificación Sprint 1.6B
 
-## Sprint 1.6A
+Fecha de validación local: 2026-07-29.
 
-Este archivo se completa con resultados verificables durante el despliegue. No contiene contraseñas ni información clínica real.
+## Resultados locales
 
-### Controles previos locales
+- Migraciones MySQL: aplicadas correctamente hasta `hospitalization.0005`.
+- `python manage.py makemigrations --check`: sin cambios pendientes.
+- `python manage.py check`: sin errores.
+- Pruebas hospitalarias iniciales: 15 de 15 aprobadas.
+- Suite completa: 346 pruebas aprobadas y 3 omitidas de forma prevista, sin fallos.
+- Lint web: cero errores; permanecen advertencias históricas fuera del alcance.
+- Build web de producción: aprobado.
+- TypeScript móvil: aprobado.
+- Expo Doctor: 18 de 18 comprobaciones aprobadas.
+- Metro/Expo: iniciado correctamente en modo LAN y escuchando en el puerto 8081.
 
-- Migración `hospitalization.0003`: aplicada correctamente.
-- `manage.py check`: correcto; aviso de remitente de correo local pendiente de configuración productiva.
-- Suite enfocada: 20 pruebas correctas, una omitida por requerir MySQL.
-- Diagnóstico de camas: consistente.
-- Build web: correcto.
-- TypeScript móvil: correcto.
-- Lint Expo: correcto.
+## Casos certificados
 
-### Producción
+Se verificaron alergias con justificación médica, programación sin consumo, FEFO dividido, reintento idempotente, excepciones sin cargo, reversión al mismo lote, factura única, resumen firmado, alta segura, cama en limpieza, portal paciente y aislamiento entre clínicas.
 
-- Fecha: 2026-07-29.
-- Commit funcional desplegado: `ef42c58`.
-- Respaldo validado: `backups/sprint16a_20260729_160641/` con dump MySQL, bundle Git, lockfile y Nginx.
-- Migración `hospitalization.0003`: aplicada en MySQL.
-- Build Vite: correcto, 1,850 módulos transformados.
-- Servicios `medicore`, `nginx` y `mysql`: activos.
-- `nginx -t`: correcto.
-- HTTPS `/login`: disponible.
-- Diagnóstico productivo: una cama, una asignación activa y un internamiento; sin errores ni advertencias de consistencia.
-- Suite completa de hospitalización sobre MySQL temporal: 20/20 correcta, incluida concurrencia.
-- La base temporal y el permiso concedido para pruebas fueron eliminados al finalizar.
+## Producción
 
-### Pruebas HTTPS por rol
+Pendiente de completar en esta misma entrega después de crear commits, subir el repositorio, respaldar la base de datos, ejecutar migraciones, compilar la web, reiniciar servicios y realizar pruebas no destructivas sobre la API real.
 
-- Médico: listado e indicaciones `200`.
-- Enfermería: listado e indicaciones `200`.
-- Recepción: listado `200`; campos clínicos profundos ausentes.
-- Paciente: acceso interno `403`.
-- Superadmin: acceso clínico interno `403`.
-- Las sesiones creadas por las pruebas fueron cerradas por el endpoint de logout.
+## Android físico
 
-### Regresión global
-
-- `python manage.py test --parallel 4 --keepdb --noinput`.
-- 340 pruebas ejecutadas correctamente en 529.451 segundos.
-- 3 pruebas omitidas por condiciones previstas.
-- Ningún fallo ni error.
-- El primer intento monohilo fue detenido por el límite de 15 minutos; no había reportado fallos. Se repitió completo en cuatro bases de prueba aisladas.
-
-### Móvil
-
-- `npx tsc --noEmit`: correcto.
-- `npx expo-doctor`: 18/18 comprobaciones correctas.
-- `npx expo lint`: 0 errores; permanece una advertencia preexistente fuera de hospitalización en `CashierRegisterPaymentScreen.tsx`.
-- Expo Tunnel: levantado contra `https://kp-software.tech/api`.
-- Prueba Android física: pendiente de confirmación del usuario.
-
-### Advertencias no bloqueantes
-
-MySQL informa que no implementa restricciones únicas condicionales de Django. Hospitalización mantiene exclusión mediante `transaction.atomic()`, bloqueo de paciente/internamiento/cama con `select_for_update()` y comprobaciones dentro de la transacción. La prueba concurrente MySQL confirmó que solo una asignación tiene éxito.
-
-### Android físico
-
-Requiere confirmación del usuario desde un dispositivo real. Expo se dejará disponible al final; no se afirmará una prueba física sin esa confirmación.
-
-### Cierre de controles operativos
-
-- Commit web desplegado: `07db874`.
-- Commit móvil publicado: `b1d2263`.
-- El médico puede suspender indicaciones con motivo obligatorio en web y móvil.
-- Enfermería móvil puede registrar rondas completadas u omitidas con motivo obligatorio.
-- La gestión web permite editar nombre y piso de habitaciones.
-- Build web, TypeScript móvil y lint: correctos; lint mantiene una advertencia preexistente fuera del módulo.
-- Pruebas focalizadas locales: 11 correctas y 1 omitida por requerir MySQL.
-- Respaldo final validado: `backups/sprint16a_ui_20260729_165451/`.
-- La prueba visual detectó y corrigió el bloqueo web del rol médico en rutas clínicas.
-- Commit final desplegado: `089cd60`.
-- El médico accedió por HTTPS al dashboard y al detalle real de un internamiento.
-- Servicios y HTTPS permanecieron activos después del despliegue.
+La validación estática y el inicio de Expo pueden certificarse desde el entorno de desarrollo. La interacción en un dispositivo Android físico requiere confirmación manual del usuario y no se declarará aprobada sin esa evidencia.

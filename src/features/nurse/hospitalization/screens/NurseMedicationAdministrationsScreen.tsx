@@ -1,4 +1,4 @@
-import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useRoute } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
 import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,19 +14,21 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { colors } from '@/core/theme/colors';
 import { formatDateTime } from '@/core/utils/dateUtils';
 import { toPositiveId } from '@/core/utils/idUtils';
-import { administerMedication, delayMedication, getMedicationAdministrations, omitMedication } from '@/features/nurse/hospitalization/services/nurseHospitalizationService';
+import { isDeviceOnline } from '@/core/network/connectivity';
+import { administerMedication, delayMedication, getMedicationAdministrations, omitMedication, refuseMedication, unavailableMedication } from '@/features/nurse/hospitalization/services/nurseHospitalizationService';
 import type { MedicationAdministration } from '@/features/nurse/hospitalization/types/nurseHospitalization.types';
 
-type MedicationAction = 'omit' | 'delay';
+type MedicationAction = 'administer' | 'omit' | 'delay' | 'refuse' | 'unavailable';
 
 export function NurseMedicationAdministrationsScreen() {
-  const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const hospitalizationId = toPositiveId(route.params?.hospitalizationId);
   const [items, setItems] = useState<MedicationAdministration[]>([]);
   const [selected, setSelected] = useState<MedicationAdministration | null>(null);
   const [action, setAction] = useState<MedicationAction | null>(null);
   const [actionText, setActionText] = useState('');
+  const [actualDose, setActualDose] = useState('');
+  const [inventoryQuantity, setInventoryQuantity] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -53,40 +55,35 @@ export function NurseMedicationAdministrationsScreen() {
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
-  async function administer(item: MedicationAdministration) {
-    if (!item.id || workingId) return;
-    Alert.alert('Administrar medicamento', 'Confirma esta acción solo si el medicamento ya fue administrado al paciente.', [
-      { style: 'cancel', text: 'Cancelar' },
-      {
-        text: 'Confirmar',
-        onPress: async () => {
-          try {
-            setWorkingId(item.id!);
-            await administerMedication(item.id!);
-            await load(true);
-          } catch (err) {
-            Alert.alert('Medicamento', err instanceof Error ? err.message : 'No se pudo administrar el medicamento.');
-          } finally {
-            setWorkingId(null);
-          }
-        },
-      },
-    ]);
-  }
-
   async function submitAction() {
     if (!selected?.id || !action || workingId) return;
-    if (action === 'omit' && actionText.trim().length < 5) {
-      Alert.alert('Medicamento', 'El motivo de omisión es obligatorio y debe tener al menos 5 caracteres.');
+    if (['omit', 'delay', 'refuse', 'unavailable'].includes(action) && actionText.trim().length < 5) {
+      Alert.alert('Medicamento', 'El motivo es obligatorio y debe tener al menos 5 caracteres.');
       return;
     }
+    if (action === 'administer' && (!actualDose || Number(actualDose) <= 0 || !inventoryQuantity || Number(inventoryQuantity) <= 0)) return Alert.alert('Medicamento', 'Confirma la dosis y la cantidad de inventario utilizada.');
     try {
       setWorkingId(selected.id);
+      if (action === 'administer') {
+        if (!(await isDeviceOnline())) throw new Error('No tienes conexión. La administración de medicamentos requiere conexión al servidor.');
+        await administerMedication(selected.id, {
+          administered_dose: actualDose,
+          dose_unit: selected.dose_unit || 'mg',
+          route: selected.route || 'other',
+          inventory_quantity: inventoryQuantity,
+          notes: actionText.trim(),
+          idempotency_key: `med-${selected.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        });
+      }
       if (action === 'omit') await omitMedication(selected.id, { reason: actionText.trim() });
-      if (action === 'delay') await delayMedication(selected.id, { notes: actionText.trim() || 'Retrasado desde app de enfermería.' });
+      if (action === 'delay') await delayMedication(selected.id, { notes: actionText.trim() });
+      if (action === 'refuse') await refuseMedication(selected.id, { reason: actionText.trim() });
+      if (action === 'unavailable') await unavailableMedication(selected.id, { reason: actionText.trim() });
       setSelected(null);
       setAction(null);
       setActionText('');
+      setActualDose('');
+      setInventoryQuantity('');
       await load(true);
     } catch (err) {
       Alert.alert('Medicamento', err instanceof Error ? err.message : 'No se pudo actualizar el medicamento.');
@@ -101,7 +98,7 @@ export function NurseMedicationAdministrationsScreen() {
     <SafeAreaView edges={['top']} style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl onRefresh={() => void load(true)} refreshing={refreshing} />}>
         <AppHeader icon="pill" subtitle="Administración hospitalaria de medicamentos." title="Medicamentos" />
-        <AppButton disabled={!hospitalizationId} label="Programar medicamento" onPress={() => navigation.navigate('NurseMedicationAdministrationForm', { hospitalizationId })} />
+        <Text style={styles.description}>Las dosis son programadas desde indicaciones médicas activas. Confirma paciente, dosis, vía y cantidad utilizada antes de administrar.</Text>
         {error ? <ErrorState message={error} onRetry={() => void load()} title="No se pudieron cargar medicamentos" /> : null}
         {!error && items.length === 0 ? <EmptyState description="No hay medicamentos programados." title="Sin medicamentos" /> : null}
         {items.map((item) => (
@@ -110,19 +107,22 @@ export function NurseMedicationAdministrationsScreen() {
             item={item}
             key={item.id ?? item.medication_name}
             loading={workingId === item.id}
-            onAdminister={() => administer(item)}
+            onAdminister={() => { setSelected(item); setAction('administer'); setActionText(''); setActualDose(item.ordered_dose || item.dosage?.split(' ')[0] || ''); setInventoryQuantity(item.inventory_quantity || '1'); }}
             onDelay={() => { setSelected(item); setAction('delay'); setActionText(''); }}
             onOmit={() => { setSelected(item); setAction('omit'); setActionText(''); }}
+            onRefuse={() => { setSelected(item); setAction('refuse'); setActionText(''); }}
+            onUnavailable={() => { setSelected(item); setAction('unavailable'); setActionText(''); }}
           />
         ))}
         {selected && action ? (
           <AppCard style={styles.card}>
-            <Text style={styles.title}>{action === 'omit' ? 'Motivo de omisión' : 'Nota de retraso'}</Text>
-            <Text style={styles.description}>{selected.medication_name}</Text>
-            <AppInput label={action === 'omit' ? 'Motivo obligatorio' : 'Nota'} onChangeText={setActionText} value={actionText} />
+            <Text style={styles.title}>{action === 'administer' ? 'Verificación previa' : action === 'omit' ? 'Motivo de omisión' : action === 'refuse' ? 'Rechazo del paciente' : action === 'unavailable' ? 'Medicamento no disponible' : 'Nota de retraso'}</Text>
+            <Text style={styles.description}>{selected.patient_name || 'Paciente'} · {selected.medication_name} · {selected.dosage} · {routeLabel(selected.route)}</Text>
+            {action === 'administer' ? <><AppInput keyboardType="decimal-pad" label={`Dosis administrada (${selected.dose_unit || 'unidad'})`} onChangeText={setActualDose} value={actualDose} /><AppInput keyboardType="decimal-pad" label="Cantidad de inventario utilizada" onChangeText={setInventoryQuantity} value={inventoryQuantity} /></> : null}
+            <AppInput label={action === 'administer' || action === 'delay' ? 'Observaciones' : 'Motivo obligatorio'} multiline onChangeText={setActionText} value={actionText} />
             <View style={styles.actions}>
-              <AppButton disabled={Boolean(workingId)} label="Cancelar" onPress={() => { setSelected(null); setAction(null); setActionText(''); }} variant="secondary" />
-              <AppButton disabled={Boolean(workingId)} label={action === 'omit' ? 'Omitir medicamento' : 'Retrasar medicamento'} loading={workingId === selected.id} onPress={submitAction} variant={action === 'omit' ? 'danger' : 'secondary'} />
+              <AppButton disabled={Boolean(workingId)} label="Cancelar" onPress={() => { setSelected(null); setAction(null); setActionText(''); setActualDose(''); setInventoryQuantity(''); }} variant="secondary" />
+              <AppButton disabled={Boolean(workingId)} label={action === 'administer' ? 'Confirmar administración' : action === 'omit' ? 'Omitir medicamento' : action === 'refuse' ? 'Registrar rechazo' : action === 'unavailable' ? 'Registrar sin existencia' : 'Retrasar medicamento'} loading={workingId === selected.id} onPress={submitAction} variant={['omit', 'refuse', 'unavailable'].includes(action) ? 'danger' : action === 'administer' ? 'primary' : 'secondary'} />
             </View>
           </AppCard>
         ) : null}
@@ -138,6 +138,9 @@ export function MedicationCard({
   onAdminister,
   onDelay,
   onOmit,
+  onRefuse,
+  onUnavailable,
+  onOpen,
 }: {
   disabled?: boolean;
   item: MedicationAdministration;
@@ -145,8 +148,11 @@ export function MedicationCard({
   onAdminister?: () => void;
   onDelay?: () => void;
   onOmit?: () => void;
+  onRefuse?: () => void;
+  onUnavailable?: () => void;
+  onOpen?: () => void;
 }) {
-  const locked = ['administered', 'omitted', 'cancelled'].includes(String(item.status));
+  const locked = ['administered', 'omitted', 'refused', 'unavailable', 'cancelled', 'reversed'].includes(String(item.status));
   return (
     <AppCard style={styles.card}>
       <View style={styles.rowBetween}>
@@ -158,13 +164,18 @@ export function MedicationCard({
       {item.administered_by_name ? <Text style={styles.description}>Enfermera: {item.administered_by_name}</Text> : null}
       {item.notes ? <Text style={styles.description}>{item.notes}</Text> : null}
       {item.omission_reason ? <Text style={styles.description}>Omisión: {item.omission_reason}</Text> : null}
+      {item.refusal_reason ? <Text style={styles.description}>Rechazo: {item.refusal_reason}</Text> : null}
+      {item.unavailable_reason ? <Text style={styles.description}>Sin existencia: {item.unavailable_reason}</Text> : null}
       {!locked && onAdminister ? (
         <View style={styles.actions}>
           <AppButton disabled={disabled} label="Administrar" loading={loading} onPress={onAdminister} />
           <AppButton disabled={disabled} label="Retrasar" onPress={onDelay} variant="secondary" />
           <AppButton disabled={disabled} label="Omitir" onPress={onOmit} variant="danger" />
+          <AppButton disabled={disabled} label="Rechazo" onPress={onRefuse} variant="secondary" />
+          <AppButton disabled={disabled} label="Sin existencia" onPress={onUnavailable} variant="secondary" />
         </View>
       ) : null}
+      {onOpen ? <AppButton label="Abrir registro" onPress={onOpen} variant="secondary" /> : null}
     </AppCard>
   );
 }

@@ -181,6 +181,13 @@ export type MedicalInstruction = {
   acknowledged_at?: string | null;
   completed_at?: string | null;
   creado_en?: string;
+  inventory_item?: number | null;
+  dose?: string | null;
+  dose_unit?: string;
+  route?: string;
+  interval_hours?: number | null;
+  inventory_quantity?: string;
+  allergy_warning?: string;
 };
 
 export type TreatmentPlan = {
@@ -285,14 +292,29 @@ export type MedicationAdministration = {
   administered_by_name?: string;
   notes?: string;
   omission_reason?: string;
+  instruction?: number | null;
+  inventory_item?: number | null;
+  ordered_dose?: string | null;
+  administered_dose?: string | null;
+  dose_unit?: string;
+  inventory_quantity?: string;
+  administered_quantity?: string | null;
+  refusal_reason?: string;
+  unavailable_reason?: string;
+  delay_reason?: string;
+  status_recorded_at?: string | null;
+  delay_minutes?: number;
+  reversal_reason?: string;
   created_at?: string;
   creado_en?: string;
 };
 
 export type MedicationAdministrationPayload = {
-  medication_name: string;
-  dosage: string;
-  route?: string;
-  scheduled_time?: string;
+  administered_at?: string;
+  administered_dose: string;
+  dose_unit: string;
+  route: string;
+  inventory_quantity: string;
+  idempotency_key: string;
   notes?: string;
 };

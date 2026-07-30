@@ -1,5 +1,5 @@
 import { apiClient } from '@/core/api/apiClient';
-import type { DoctorHospitalization, MedicalEvolution, MedicalInstruction, TimelineEntry, TreatmentPlan } from '@/features/doctor/hospitalization/doctorHospitalization.types';
+import type { DischargeSummary, DoctorHospitalization, MedicalEvolution, MedicalInstruction, MedicationAdministration, TimelineEntry, TreatmentPlan } from '@/features/doctor/hospitalization/doctorHospitalization.types';
 
 function list<T>(data: T[] | { results?: T[] }) {
   return Array.isArray(data) ? data : data.results ?? [];
@@ -52,6 +52,36 @@ export async function createMedicalInstruction(id: number, payload: Partial<Medi
 
 export async function suspendMedicalInstruction(id: number, reason: string) {
   const { data } = await apiClient.post<MedicalInstruction>(`/hospitalization/instructions/${id}/suspend/`, { reason });
+  return data;
+}
+
+export async function getMedicationAdministrations(id: number) {
+  const { data } = await apiClient.get<MedicationAdministration[] | { results?: MedicationAdministration[] }>(`/hospitalization/admissions/${id}/medication-administrations/`);
+  return list(data);
+}
+
+export async function requestDischarge(id: number, reason: string) {
+  const { data } = await apiClient.post<DoctorHospitalization>(`/hospitalization/admissions/${id}/request-discharge/`, { reason });
+  return data;
+}
+
+export async function getDischargeSummaries(id: number) {
+  const { data } = await apiClient.get<DischargeSummary[]>(`/hospitalization/admissions/${id}/discharge-summary/`);
+  return data;
+}
+
+export async function saveDischargeSummary(id: number, payload: Partial<DischargeSummary>) {
+  const { data } = await apiClient.post<DischargeSummary>(`/hospitalization/admissions/${id}/discharge-summary/`, payload);
+  return data;
+}
+
+export async function signDischargeSummary(id: number, summaryId: number) {
+  const { data } = await apiClient.post<DischargeSummary>(`/hospitalization/admissions/${id}/sign-discharge-summary/`, { summary_id: summaryId });
+  return data;
+}
+
+export async function completeDischarge(id: number) {
+  const { data } = await apiClient.post<DoctorHospitalization>(`/hospitalization/admissions/${id}/discharge/`, { discharge_reason: 'Alta clínica confirmada', bed_status: 'cleaning' });
   return data;
 }
 

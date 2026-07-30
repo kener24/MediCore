@@ -11,11 +11,12 @@ import { LoadingState } from '@/components/LoadingState';
 import { colors } from '@/core/theme/colors';
 import { formatDate } from '@/core/utils/dateUtils';
 import { PatientHeader } from '@/features/patient/components/PatientHeader';
-import { getPatientMedicalRecordSummary } from '@/features/patient/services/patientMedicalRecordService';
+import { getPatientDischargeSummaries, getPatientMedicalRecordSummary, type PatientDischargeSummary } from '@/features/patient/services/patientMedicalRecordService';
 import type { PatientMedicalRecordSummary } from '@/features/patient/types/patientMedicalRecord.types';
 
 export function PatientMedicalHistoryScreen() {
   const [summary, setSummary] = useState<PatientMedicalRecordSummary | null>(null);
+  const [dischargeSummaries, setDischargeSummaries] = useState<PatientDischargeSummary[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -25,7 +26,9 @@ export function PatientMedicalHistoryScreen() {
     else setLoading(true);
     setError('');
     try {
-      setSummary(await getPatientMedicalRecordSummary());
+      const [record, discharges] = await Promise.all([getPatientMedicalRecordSummary(), getPatientDischargeSummaries()]);
+      setSummary(record);
+      setDischargeSummaries(discharges);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar el expediente.');
     } finally {
@@ -84,6 +87,9 @@ export function PatientMedicalHistoryScreen() {
               ) : (
                 <EmptyState description="No hay diagnósticos visibles." title="Sin diagnósticos" />
               )}
+            </Section>
+            <Section title="Resúmenes de egreso">
+              {dischargeSummaries.length ? dischargeSummaries.map((item) => <AppCard key={item.id} style={styles.card}><Text style={styles.itemTitle}>Egreso firmado · versión {item.version}</Text><Detail label="Evolución" value={item.hospital_course} /><Detail label="Diagnósticos de egreso" value={item.discharge_diagnoses} /><Detail label="Condición al egreso" value={item.condition_at_discharge} /><Detail label="Tratamiento" value={item.treatment_at_discharge} /><Detail label="Recomendaciones" value={item.recommendations} /><Detail label="Signos de alarma" value={item.warning_signs} /><Detail label="Seguimiento" value={item.follow_up_plan} />{item.pending_results ? <Detail label="Resultados pendientes" value={item.pending_results} /> : null}</AppCard>) : <EmptyState description="Los documentos firmados de una hospitalización aparecerán aquí." title="Sin resúmenes de egreso" />}
             </Section>
           </>
         ) : (

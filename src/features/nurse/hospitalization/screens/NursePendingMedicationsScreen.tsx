@@ -1,4 +1,4 @@
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,6 +22,7 @@ const filters: { label: string; value: MedicationFilter }[] = [
 ];
 
 export function NursePendingMedicationsScreen() {
+  const navigation = useNavigation<any>();
   const [items, setItems] = useState<MedicationAdministration[]>([]);
   const [filter, setFilter] = useState<MedicationFilter>('all');
   const [search, setSearch] = useState('');
@@ -65,7 +66,7 @@ export function NursePendingMedicationsScreen() {
         <SearchAndFilters filters={filters} onFilterChange={setFilter} onSearchChange={setSearch} search={search} searchLabel="Buscar medicamento, paciente o dosis" selectedFilter={filter} />
         {error ? <ErrorState message={error} onRetry={() => void load()} title="No se pudieron cargar pendientes" /> : null}
         {!error && filtered.length === 0 ? <EmptyState description="No hay medicamentos pendientes con esos filtros." title="Sin pendientes" /> : null}
-        {filtered.map((item) => <MedicationCard item={item} key={item.id ?? item.medication_name} />)}
+        {filtered.map((item) => <MedicationCard item={item} key={item.id ?? item.medication_name} onOpen={() => navigation.navigate('NurseMedicationAdministrations', { hospitalizationId: item.hospitalization || item.hospitalization_id })} />)}
       </ScrollView>
     </SafeAreaView>
   );

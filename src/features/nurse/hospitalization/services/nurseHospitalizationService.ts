@@ -241,8 +241,8 @@ export async function getPendingMedications(): Promise<MedicationAdministration[
   }
 }
 
-export async function administerMedication(id: number, payload?: { notes?: string }): Promise<MedicationAdministration> {
-  return postOrUnavailable<MedicationAdministration>(`/hospitalization/medication-administrations/${id}/administer/`, payload ?? {});
+export async function administerMedication(id: number, payload: MedicationAdministrationPayload): Promise<MedicationAdministration> {
+  return postOrUnavailable<MedicationAdministration>(`/hospitalization/medication-administrations/${id}/administer/`, payload, payload.idempotency_key);
 }
 
 export async function omitMedication(id: number, payload: { reason: string; notes?: string }): Promise<MedicationAdministration> {
@@ -251,4 +251,12 @@ export async function omitMedication(id: number, payload: { reason: string; note
 
 export async function delayMedication(id: number, payload?: { notes?: string }): Promise<MedicationAdministration> {
   return postOrUnavailable<MedicationAdministration>(`/hospitalization/medication-administrations/${id}/delay/`, payload ?? {});
+}
+
+export async function refuseMedication(id: number, payload: { reason: string; notes?: string }): Promise<MedicationAdministration> {
+  return postOrUnavailable<MedicationAdministration>(`/hospitalization/medication-administrations/${id}/refuse/`, payload);
+}
+
+export async function unavailableMedication(id: number, payload: { reason: string; notes?: string }): Promise<MedicationAdministration> {
+  return postOrUnavailable<MedicationAdministration>(`/hospitalization/medication-administrations/${id}/unavailable/`, payload);
 }

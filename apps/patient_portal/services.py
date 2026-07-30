@@ -174,6 +174,14 @@ def reschedule_patient_appointment(*, appointment_id, patient, user, validated_d
         allowed = {Appointment.Status.PENDIENTE, Appointment.Status.CONFIRMADA, Appointment.Status.REPROGRAMADA}
         if appointment.status not in allowed or not appointment.activo:
             raise PatientPortalAppointmentError("Esta cita ya no puede reprogramarse desde el portal.", status_code=409)
+        current_scheduled_at = timezone.make_aware(
+            datetime.combine(appointment.scheduled_date, appointment.start_time),
+            timezone.get_current_timezone(),
+        )
+        if current_scheduled_at <= timezone.now():
+            raise PatientPortalAppointmentError(
+                "Una cita cuyo horario ya paso no puede reprogramarse desde el portal.", status_code=409
+            )
 
         doctor = DoctorProfile.objects.select_for_update().select_related("clinic", "user", "specialty").get(
             pk=appointment.doctor_id

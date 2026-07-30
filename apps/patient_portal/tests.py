@@ -151,6 +151,21 @@ class PatientPortalSprint17ACertificationTests(APITestCase):
         self.assertEqual(Appointment.objects.filter(patient=self.patient_a).count(), 1)
         self.assertEqual(AuditLog.objects.filter(action=AuditLog.Action.UPDATE, module=AuditLog.Module.APPOINTMENTS).count(), 1)
 
+    def test_past_pending_appointment_has_no_actions_and_cannot_be_rescheduled(self):
+        past_monday = self.next_monday - timedelta(days=14)
+        appointment = self.create_appointment(scheduled_date=past_monday)
+        detail = self.client.get(f"/api/patient-portal/appointments/{appointment.id}/")
+        self.assertEqual(detail.status_code, status.HTTP_200_OK)
+        self.assertFalse(detail.data["can_cancel"])
+        self.assertFalse(detail.data["can_reschedule"])
+        response = self.client.post(
+            f"/api/patient-portal/appointments/{appointment.id}/reschedule/",
+            {"scheduled_date": self.second_monday.isoformat(), "start_time": "09:00", "reason": "Intento tardio"},
+            format="json",
+            HTTP_IDEMPOTENCY_KEY="past-reschedule",
+        )
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+
     def test_cancellation_requires_reason_and_foreign_appointment_is_hidden(self):
         own = self.create_appointment()
         foreign = self.create_appointment(patient=self.patient_a2, start_time=time(9), end_time=time(9, 30))

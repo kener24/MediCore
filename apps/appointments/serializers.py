@@ -6,7 +6,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from apps.accounts.permissions import get_role_name
-from apps.clinic_settings.models import get_or_create_workflow_settings
+from apps.clinic_settings.models import get_or_create_clinic_settings, get_or_create_workflow_settings
 from apps.appointments.models import Appointment
 from apps.clinic_settings.utils import clinic_setting
 from apps.doctors.models import DoctorProfile, DoctorSchedule
@@ -46,10 +46,23 @@ class AppointmentListSerializer(serializers.ModelSerializer):
         return int((end - start).total_seconds() // 60)
 
     def get_can_cancel(self, obj):
-        return obj.activo and obj.status in [Appointment.Status.PENDIENTE, Appointment.Status.CONFIRMADA, Appointment.Status.REPROGRAMADA]
+        if not obj.activo or obj.status not in [Appointment.Status.PENDIENTE, Appointment.Status.CONFIRMADA, Appointment.Status.REPROGRAMADA]:
+            return False
+        scheduled_at = timezone.make_aware(
+            datetime.combine(obj.scheduled_date, obj.start_time),
+            timezone.get_current_timezone(),
+        )
+        cancellation_limit = get_or_create_clinic_settings(obj.clinic).cancellation_hours_limit
+        return scheduled_at >= timezone.now() + timedelta(hours=cancellation_limit)
 
     def get_can_reschedule(self, obj):
-        return self.get_can_cancel(obj)
+        if not obj.activo or obj.status not in [Appointment.Status.PENDIENTE, Appointment.Status.CONFIRMADA, Appointment.Status.REPROGRAMADA]:
+            return False
+        scheduled_at = timezone.make_aware(
+            datetime.combine(obj.scheduled_date, obj.start_time),
+            timezone.get_current_timezone(),
+        )
+        return scheduled_at > timezone.now()
 
     class Meta:
         model = Appointment

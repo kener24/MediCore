@@ -59,10 +59,10 @@ Fecha local: 2026-07-30.
 ## Validación local
 
 - `python manage.py check`: aprobado.
-- Pruebas específicas del portal: 7 de 7 aprobadas.
+- Pruebas específicas del portal: 8 de 8 aprobadas.
 - Pruebas ampliadas de portal, citas, documentos y cuentas: 75 de 75 aprobadas.
 - Regresión de receta emitida y portal seguro: aprobada junto con las pruebas del sprint.
-- Suite completa: 353 pruebas aprobadas y 3 omitidas de forma prevista, sin fallos.
+- Suite completa: 354 pruebas aprobadas y 3 omitidas de forma prevista, sin fallos.
 - Build web de producción: aprobado.
 - TypeScript móvil: aprobado.
 - Expo Doctor: 18 de 18 comprobaciones aprobadas.
@@ -70,4 +70,17 @@ Fecha local: 2026-07-30.
 ## Estado pendiente de evidencia
 
 - Android físico requiere ejecución manual real; no se marca aprobado por validación estática.
-- Producción se documentará después del respaldo, despliegue, migración y smoke tests autenticados.
+
+## Producción Sprint 1.7A
+
+- Respaldo previo: `backups/sprint17a_20260730_173253`.
+- Dump MySQL generado con `--no-tablespaces`, validado con `gzip -t` y comprobación de estructura y datos.
+- Bundle Git verificado y sumas SHA-256 registradas.
+- Migración `appointments.0003` aplicada correctamente en MySQL.
+- Django, Gunicorn, Nginx y MySQL activos; HTTPS `/login` respondió 200.
+- Login paciente, dashboard, perfil, configuración, citas, recetas, órdenes, documentos y logout respondieron correctamente por HTTPS.
+- Accesos cruzados a cita, receta, orden, documento y descarga ajenos devolvieron 404; perfil sin sesión devolvió 401.
+- Solicitud repetida con la misma clave produjo una sola cita; reprogramación conservó el mismo registro; cancelación guardó motivo.
+- La sesión de prueba se cerró y una sesión residual del intento interrumpido fue revocada.
+- Inspección visual de dashboard, perfil y citas aprobada sin errores de consola.
+- `npm audit --omit=dev` conserva dos avisos altos de React Router relacionados con el modo RSC; MediCore es SPA Vite y no utiliza RSC/SSR. La corrección ofrecida implica cambio incompatible y queda para un sprint de dependencias.

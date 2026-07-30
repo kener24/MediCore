@@ -23,9 +23,9 @@ Se reviso la implementacion existente del portal web, la API Django REST y la ap
 ## Evidencia local
 
 - `python manage.py check`: aprobado.
-- Pruebas del sprint: 7/7 aprobadas.
+- Pruebas del sprint: 8/8 aprobadas.
 - Pruebas ampliadas de portal, cuentas, citas y documentos: 75/75 aprobadas.
-- Suite completa de MediCore: 353/353 aprobadas, con 3 omisiones previstas.
+- Suite completa de MediCore: 354/354 aprobadas, con 3 omisiones previstas.
 - Build web: aprobado.
 - TypeScript movil: aprobado.
 - Expo Doctor: 18/18 aprobado.

@@ -35,6 +35,7 @@ from apps.notifications.models import Notification
 from apps.notifications.services import create_notification
 from apps.patients.models import Patient
 from apps.prescriptions.models import MedicalOrder
+from apps.subscriptions.services import check_feature_enabled, is_subscription_active
 
 
 def bool_param(value):
@@ -434,14 +435,30 @@ class PatientPortalDocumentsView(APIView):
     permission_classes = [IsAuthenticated]
     serializer_class = PatientPortalDocumentSerializer
 
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        self.patient = Patient.objects.select_related("clinic", "user").filter(
+            user=request.user,
+            activo=True,
+            clinic__activo=True,
+        ).first()
+        valid_user = getattr(request.user, "is_active", False)
+        if not valid_user or get_role_name(request.user) not in ["paciente", "patient"] or not self.patient:
+            self.permission_denied(request, message="Solo pacientes pueden usar el portal.")
+        self.portal_settings = get_or_create_clinic_settings(self.patient.clinic)
+        if not self.portal_settings.allow_patient_portal or not self.portal_settings.allow_patient_medical_record_view:
+            self.permission_denied(request, message="Tu clínica no ha habilitado los documentos del portal.")
+        if not is_subscription_active(self.patient.clinic) or not check_feature_enabled(self.patient.clinic, "patient_portal"):
+            self.permission_denied(request, message="El portal paciente no está disponible por la suscripción actual.")
+
     def get_queryset(self, request):
-        patient = Patient.objects.filter(user=request.user, activo=True).first()
-        if not patient:
-            return ClinicalDocument.objects.none()
-        settings = get_or_create_clinic_settings(patient.clinic)
-        if not settings.allow_patient_portal or not settings.allow_patient_medical_record_view:
-            return ClinicalDocument.objects.none()
-        qs = ClinicalDocument.objects.select_related("category", "patient", "clinic").filter(patient=patient, visible_to_patient=True, active=True, status=ClinicalDocument.Status.ACTIVE)
+        qs = ClinicalDocument.objects.select_related("category", "patient", "clinic", "uploaded_by").filter(
+            patient=self.patient,
+            clinic=self.patient.clinic,
+            visible_to_patient=True,
+            active=True,
+            status=ClinicalDocument.Status.ACTIVE,
+        )
         params = request.query_params
         if params.get("category"):
             qs = qs.filter(category_id=params["category"])
@@ -460,8 +477,11 @@ class PatientPortalDocumentsView(APIView):
         if document_id:
             document = qs.filter(id=document_id).first()
             if not document:
+                log_audit_event(request=request, user=request.user, clinic=self.patient.clinic, action=AuditLog.Action.PERMISSION_DENIED, module=AuditLog.Module.DOCUMENTS, description="Intento bloqueado de consultar un documento ajeno o no visible.", metadata={"patient_id": self.patient.id, "requested_id": document_id})
                 return Response({"detail": "Documento no encontrado."}, status=status.HTTP_404_NOT_FOUND)
+            log_audit_event(request=request, user=request.user, clinic=self.patient.clinic, action=AuditLog.Action.VIEW, module=AuditLog.Module.DOCUMENTS, obj=document, description="Paciente consultó un documento autorizado.", metadata={"patient_id": self.patient.id})
             return Response(PatientPortalDocumentSerializer(document).data)
+        log_audit_event(request=request, user=request.user, clinic=self.patient.clinic, action=AuditLog.Action.VIEW, module=AuditLog.Module.DOCUMENTS, description="Paciente consultó sus documentos autorizados.", metadata={"patient_id": self.patient.id})
         return Response(PatientPortalDocumentSerializer(qs, many=True).data)
 
 
@@ -469,7 +489,9 @@ class PatientPortalDocumentFileView(PatientPortalDocumentsView):
     def get(self, request, document_id, mode=None):
         document = self.get_queryset(request).filter(id=document_id).first()
         if not document:
+            log_audit_event(request=request, user=request.user, clinic=self.patient.clinic, action=AuditLog.Action.PERMISSION_DENIED, module=AuditLog.Module.DOCUMENTS, description="Intento bloqueado de descargar un documento ajeno o no visible.", metadata={"patient_id": self.patient.id, "requested_id": document_id})
             return Response({"detail": "Documento no encontrado."}, status=status.HTTP_404_NOT_FOUND)
         if mode == "preview" and document.file_extension not in ["pdf", "jpg", "jpeg", "png", "webp"]:
             return Response({"detail": "Vista previa no disponible para este tipo de archivo."})
+        log_audit_event(request=request, user=request.user, clinic=self.patient.clinic, action=AuditLog.Action.DOWNLOAD if mode == "download" else AuditLog.Action.VIEW, module=AuditLog.Module.DOCUMENTS, obj=document, description="Paciente descargó un documento autorizado." if mode == "download" else "Paciente previsualizó un documento autorizado.", metadata={"patient_id": self.patient.id})
         return ClinicalDocumentViewSet()._file_response(request, document, inline=(mode == "preview"))

@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
 from io import BytesIO
 
+from django.db import transaction
+from django.db.models import Q
 from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import status
@@ -10,37 +12,54 @@ from rest_framework.views import APIView
 
 from apps.accounts.permissions import get_role_name
 from apps.appointments.models import Appointment
-from apps.appointments.serializers import AppointmentDetailSerializer, AppointmentListSerializer, build_availability
+from apps.appointments.serializers import build_availability
 from apps.audit.models import AuditLog
 from apps.audit.services import log_audit_event
 from apps.billing.models import CreditNote, Invoice, Payment
 from apps.billing.serializers import InvoiceDetailSerializer, InvoiceListSerializer, PaymentDetailSerializer, PaymentListSerializer
 from apps.billing.views import render_credit_note_pdf, render_payment_receipt_pdf
-from apps.clinic_settings.models import get_or_create_clinic_settings
+from apps.clinic_settings.models import get_or_create_clinic_settings, get_or_create_workflow_settings
 from apps.doctors.models import DoctorProfile, MedicalSpecialty
+from apps.documents.models import ClinicalDocument
 from apps.medical_records.models import ClinicalConsultation, MedicalRecord
 from apps.notifications.models import Notification
 from apps.notifications.serializers import NotificationListSerializer
+from apps.notifications.services import create_notification
 from apps.patients.models import Patient
+from apps.patient_portal.services import (
+    PatientPortalAppointmentError,
+    create_patient_appointment,
+    request_idempotency_key,
+    reschedule_patient_appointment,
+)
 from apps.patient_portal.serializers import (
     MedicalRecordSummarySerializer,
     PatientAppointmentCancelSerializer,
     PatientAppointmentRequestSerializer,
+    PatientAppointmentRescheduleSerializer,
     PatientPortalDashboardSerializer,
     PatientPortalDoctorSerializer,
+    PatientPortalAppointmentSerializer,
+    PatientPortalMedicalOrderSerializer,
     PatientPortalProfileSerializer,
     PatientPortalProfileUpdateSerializer,
+    PatientPortalPrescriptionSerializer,
     PatientPortalSpecialtySerializer,
 )
 from apps.hospitalization.models import DischargeSummary
 from apps.hospitalization.serializers import DischargeSummarySerializer
 from apps.prescriptions.models import Diagnosis, MedicalOrder, Prescription
-from apps.prescriptions.serializers import MedicalOrderDetailSerializer, MedicalOrderListSerializer, PrescriptionDetailSerializer, PrescriptionListSerializer
 from apps.subscriptions.services import check_feature_enabled, is_subscription_active
 
 
 def patient_for_user(user):
-    return Patient.objects.select_related("clinic", "user").filter(user=user, activo=True).first()
+    if not getattr(user, "is_authenticated", False) or not getattr(user, "is_active", False):
+        return None
+    return Patient.objects.select_related("clinic", "user").filter(
+        user=user,
+        activo=True,
+        clinic__activo=True,
+    ).first()
 
 
 def portal_denied(message="Esta funcion no esta habilitada para tu clinica."):
@@ -56,6 +75,7 @@ class PatientPortalBaseView(APIView):
         if str(get_role_name(request.user) or "").lower() not in ["paciente", "patient"] or not self.patient:
             self.permission_denied(request, message="Solo pacientes pueden usar el portal.")
         self.clinic_settings = get_or_create_clinic_settings(self.patient.clinic)
+        self.workflow_settings = get_or_create_workflow_settings(self.patient.clinic)
         if not self.clinic_settings.allow_patient_portal:
             self.permission_denied(request, message="El portal paciente no esta habilitado para tu clinica.")
         if not is_subscription_active(self.patient.clinic) or not check_feature_enabled(self.patient.clinic, "patient_portal"):
@@ -66,9 +86,28 @@ class PatientPortalBaseView(APIView):
             "can_view_medical_record": self.clinic_settings.allow_patient_medical_record_view,
             "can_view_prescriptions": self.clinic_settings.allow_patient_prescription_view,
             "can_view_invoices": self.clinic_settings.allow_patient_invoice_view,
-            "can_request_appointments": True,
+            "can_view_medical_orders": self.clinic_settings.allow_patient_medical_record_view,
+            "can_view_documents": self.clinic_settings.allow_patient_medical_record_view,
+            "can_request_appointments": self.workflow_settings.allow_appointments,
+            "can_request_in_person_appointments": self.workflow_settings.allow_in_person_appointments,
+            "can_request_online_appointments": self.workflow_settings.allow_online_appointments,
+            "can_reschedule_appointments": self.workflow_settings.allow_appointments,
             "can_cancel_appointments": self.clinic_settings.allow_patient_cancellations,
         }
+
+    def audit(self, action, module, *, obj=None, description="", metadata=None, old_values=None, new_values=None):
+        return log_audit_event(
+            request=self.request,
+            user=self.request.user,
+            clinic=self.patient.clinic,
+            action=action,
+            module=module,
+            obj=obj,
+            description=description,
+            metadata={"patient_id": self.patient.id, **(metadata or {})},
+            old_values=old_values,
+            new_values=new_values,
+        )
 
     def clinic_payload(self):
         clinic = self.patient.clinic
@@ -87,7 +126,8 @@ class PatientPortalBaseView(APIView):
             "business_start_time": self.clinic_settings.business_start_time,
             "business_end_time": self.clinic_settings.business_end_time,
             "working_days": self.clinic_settings.working_days,
-            "allow_online_appointments": self.clinic_settings.allow_online_appointments,
+            "allow_online_appointments": self.workflow_settings.allow_online_appointments,
+            "allow_in_person_appointments": self.workflow_settings.allow_in_person_appointments,
             "allow_patient_cancellations": self.clinic_settings.allow_patient_cancellations,
             "terms_and_conditions": self.clinic_settings.terms_and_conditions,
             "privacy_policy": self.clinic_settings.privacy_policy,
@@ -99,19 +139,25 @@ class PatientPortalDashboardView(PatientPortalBaseView):
 
     def get(self, request):
         today = timezone.localdate()
-        upcoming = Appointment.objects.filter(patient=self.patient, scheduled_date__gte=today).exclude(status=Appointment.Status.CANCELADA).select_related("doctor__user", "doctor__specialty", "clinic")[:5]
-        prescriptions = Prescription.objects.filter(patient=self.patient, status=Prescription.Status.EMITIDA, activo=True).select_related("clinic", "doctor__user")[:5]
-        invoices = Invoice.objects.filter(patient=self.patient, status__in=[Invoice.Status.PENDIENTE, Invoice.Status.PARCIAL], active=True).select_related("clinic", "patient")[:5]
+        upcoming = Appointment.objects.filter(patient=self.patient, clinic=self.patient.clinic, scheduled_date__gte=today, activo=True).exclude(status=Appointment.Status.CANCELADA).select_related("doctor__user", "doctor__specialty", "clinic")[:5]
+        prescriptions = Prescription.objects.filter(patient=self.patient, clinic=self.patient.clinic, status=Prescription.Status.EMITIDA, activo=True).select_related("clinic", "doctor__user")[:5]
+        orders = MedicalOrder.objects.filter(patient=self.patient, clinic=self.patient.clinic, activo=True).exclude(status=MedicalOrder.Status.CANCELADA).select_related("clinic", "doctor__user")[:5]
+        invoices = Invoice.objects.filter(patient=self.patient, clinic=self.patient.clinic, status__in=[Invoice.Status.PENDIENTE, Invoice.Status.PARCIAL], active=True).select_related("clinic", "patient")[:5]
+        new_documents_count = ClinicalDocument.objects.filter(patient=self.patient, clinic=self.patient.clinic, visible_to_patient=True, active=True, status=ClinicalDocument.Status.ACTIVE).count()
         unread = Notification.objects.filter(recipient=request.user, status=Notification.Status.UNREAD).count()
         data = {
             "patient": self.patient,
             "upcoming_appointments": upcoming,
             "recent_prescriptions": prescriptions,
+            "recent_orders": orders,
             "pending_invoices": invoices,
+            "new_documents_count": new_documents_count,
             "unread_notifications": unread,
             "clinic": self.clinic_payload(),
             "permissions": self.permissions_payload(),
+            "available_actions": self.permissions_payload(),
         }
+        self.audit(AuditLog.Action.VIEW, AuditLog.Module.PATIENTS, obj=self.patient, description="Paciente consultó su dashboard.")
         return Response(PatientPortalDashboardSerializer(data).data)
 
 
@@ -119,12 +165,16 @@ class PatientPortalProfileView(PatientPortalBaseView):
     serializer_class = PatientPortalProfileSerializer
 
     def get(self, request):
+        self.audit(AuditLog.Action.VIEW, AuditLog.Module.PATIENTS, obj=self.patient, description="Paciente consultó su perfil.")
         return Response(PatientPortalProfileSerializer(self.patient).data)
 
     def patch(self, request):
+        before = PatientPortalProfileSerializer(self.patient).data
         serializer = PatientPortalProfileUpdateSerializer(self.patient, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        after = PatientPortalProfileSerializer(self.patient).data
+        self.audit(AuditLog.Action.UPDATE, AuditLog.Module.PATIENTS, obj=self.patient, description="Paciente actualizó campos permitidos de su perfil.", old_values=before, new_values=after)
         return Response(PatientPortalProfileSerializer(self.patient).data)
 
 
@@ -146,10 +196,10 @@ class PatientPortalDischargeSummariesView(PatientPortalBaseView):
         return Response(DischargeSummarySerializer(queryset, many=True).data)
 
 class PatientPortalAppointmentsView(PatientPortalBaseView):
-    serializer_class = AppointmentListSerializer
+    serializer_class = PatientPortalAppointmentSerializer
 
     def get(self, request, appointment_id=None):
-        qs = Appointment.objects.filter(patient=self.patient).select_related("clinic", "patient", "doctor__user", "doctor__specialty", "created_by")
+        qs = Appointment.objects.filter(patient=self.patient, clinic=self.patient.clinic).select_related("clinic", "patient", "doctor__user", "doctor__specialty", "created_by")
         if request.query_params.get("status"):
             qs = qs.filter(status=request.query_params["status"])
         if request.query_params.get("date_from"):
@@ -159,9 +209,12 @@ class PatientPortalAppointmentsView(PatientPortalBaseView):
         if appointment_id:
             appointment = qs.filter(id=appointment_id).first()
             if not appointment:
+                self.audit(AuditLog.Action.PERMISSION_DENIED, AuditLog.Module.APPOINTMENTS, description="Intento bloqueado de consultar una cita ajena o inexistente.", metadata={"requested_id": appointment_id})
                 return Response({"detail": "Cita no encontrada."}, status=status.HTTP_404_NOT_FOUND)
-            return Response(AppointmentDetailSerializer(appointment).data)
-        return Response(AppointmentListSerializer(qs, many=True).data)
+            self.audit(AuditLog.Action.VIEW, AuditLog.Module.APPOINTMENTS, obj=appointment, description="Paciente consultó el detalle de su cita.")
+            return Response(PatientPortalAppointmentSerializer(appointment).data)
+        self.audit(AuditLog.Action.VIEW, AuditLog.Module.APPOINTMENTS, description="Paciente consultó su listado de citas.")
+        return Response(PatientPortalAppointmentSerializer(qs, many=True).data)
 
 
 class PatientPortalAppointmentRequestView(PatientPortalBaseView):
@@ -170,35 +223,31 @@ class PatientPortalAppointmentRequestView(PatientPortalBaseView):
     def post(self, request):
         serializer = PatientAppointmentRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        modality = serializer.validated_data.get("modality", Appointment.Modality.PRESENCIAL)
-        if modality == Appointment.Modality.ONLINE and not self.clinic_settings.allow_online_appointments:
-            return Response(
-                {"modality": ["Esta clínica no tiene habilitadas las citas en línea. Puedes solicitar una cita presencial."]},
-                status=status.HTTP_400_BAD_REQUEST,
+        try:
+            appointment = create_patient_appointment(
+                patient=self.patient,
+                user=request.user,
+                validated_data=serializer.validated_data,
+                idempotency_key=request_idempotency_key(request),
             )
-        doctor = serializer.validated_data["doctor"]
-        if doctor.clinic_id != self.patient.clinic_id:
-            return Response({"detail": "El medico no pertenece a tu clinica."}, status=status.HTTP_400_BAD_REQUEST)
-        scheduled_date = serializer.validated_data["scheduled_date"]
-        start_time = serializer.validated_data["start_time"]
-        availability = build_availability(doctor, scheduled_date)
-        slot = next((item for item in availability["available_slots"] if item["start_time"] == start_time.strftime("%H:%M")), None)
-        if not slot:
-            return Response({"detail": "El horario seleccionado no esta disponible."}, status=status.HTTP_400_BAD_REQUEST)
-        appointment = Appointment.objects.create(
-            clinic=self.patient.clinic,
-            patient=self.patient,
-            doctor=doctor,
-            scheduled_date=scheduled_date,
-            start_time=start_time,
-            end_time=datetime.strptime(slot["end_time"], "%H:%M").time(),
-            modality=modality,
-            reason=serializer.validated_data["reason"],
-            notes=serializer.validated_data.get("notes", ""),
-            status=Appointment.Status.PENDIENTE,
-            created_by=request.user,
-        )
-        return Response(AppointmentDetailSerializer(appointment).data, status=status.HTTP_201_CREATED)
+        except PatientPortalAppointmentError as exc:
+            self.audit(AuditLog.Action.PERMISSION_DENIED, AuditLog.Module.APPOINTMENTS, description="Solicitud de cita bloqueada por validación del portal.", metadata={"reason": str(exc)})
+            return Response(exc.payload(), status=exc.status_code)
+        replay = bool(getattr(appointment, "_idempotent_replay", False))
+        if not replay:
+            self.audit(AuditLog.Action.CREATE, AuditLog.Module.APPOINTMENTS, obj=appointment, description="Paciente solicitó una cita desde el portal.", new_values={"scheduled_date": appointment.scheduled_date, "start_time": appointment.start_time, "doctor": appointment.doctor_id, "modality": appointment.modality})
+            create_notification(
+                appointment.doctor.user,
+                "Nueva solicitud de cita",
+                f"{self.patient.nombre_completo} solicitó una cita para {appointment.scheduled_date} a las {appointment.start_time}.",
+                clinic=appointment.clinic,
+                notification_type=Notification.Type.INFO,
+                module=Notification.Module.APPOINTMENTS,
+                related_model="Appointment",
+                related_object_id=appointment.id,
+                action_url=f"/clinic/appointments/{appointment.id}",
+            )
+        return Response(PatientPortalAppointmentSerializer(appointment).data, status=status.HTTP_200_OK if replay else status.HTTP_201_CREATED)
 
 
 class PatientPortalAppointmentCancelView(PatientPortalBaseView):
@@ -207,31 +256,64 @@ class PatientPortalAppointmentCancelView(PatientPortalBaseView):
     def patch(self, request, appointment_id):
         if not self.clinic_settings.allow_patient_cancellations:
             return portal_denied("Las cancelaciones de paciente no estan habilitadas para tu clinica.")
-        appointment = Appointment.objects.filter(id=appointment_id, patient=self.patient).first()
-        if not appointment:
-            return Response({"detail": "Cita no encontrada."}, status=status.HTTP_404_NOT_FOUND)
-        if appointment.status == Appointment.Status.ATENDIDA:
-            return Response({"detail": "No puedes cancelar una cita atendida."}, status=status.HTTP_400_BAD_REQUEST)
-        scheduled_at = timezone.make_aware(datetime.combine(appointment.scheduled_date, appointment.start_time))
-        limit = timezone.now() + timedelta(hours=self.clinic_settings.cancellation_hours_limit)
-        if scheduled_at < limit:
-            return Response({"detail": "La cita ya esta fuera del limite permitido para cancelacion."}, status=status.HTTP_400_BAD_REQUEST)
         serializer = PatientAppointmentCancelSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        appointment.status = Appointment.Status.CANCELADA
-        appointment.activo = False
-        appointment.cancellation_reason = serializer.validated_data.get("reason", "")
-        appointment.cancelled_by = request.user
-        appointment.cancelled_at = timezone.now()
-        appointment.save(update_fields=["status", "activo", "cancellation_reason", "cancelled_by", "cancelled_at"])
-        return Response(AppointmentDetailSerializer(appointment).data)
+        with transaction.atomic():
+            appointment = Appointment.objects.select_for_update().filter(id=appointment_id, patient=self.patient, clinic=self.patient.clinic).first()
+            if not appointment:
+                self.audit(AuditLog.Action.PERMISSION_DENIED, AuditLog.Module.APPOINTMENTS, description="Intento bloqueado de cancelar una cita ajena o inexistente.", metadata={"requested_id": appointment_id})
+                return Response({"detail": "Cita no encontrada."}, status=status.HTTP_404_NOT_FOUND)
+            if appointment.status not in [Appointment.Status.PENDIENTE, Appointment.Status.CONFIRMADA, Appointment.Status.REPROGRAMADA] or not appointment.activo:
+                return Response({"detail": "Esta cita ya no puede cancelarse desde el portal."}, status=status.HTTP_409_CONFLICT)
+            scheduled_at = timezone.make_aware(datetime.combine(appointment.scheduled_date, appointment.start_time))
+            limit = timezone.now() + timedelta(hours=self.clinic_settings.cancellation_hours_limit)
+            if scheduled_at < limit:
+                return Response({"detail": "Esta cita ya no puede cancelarse desde el portal. Comunícate con la clínica."}, status=status.HTTP_400_BAD_REQUEST)
+            old_values = {"status": appointment.status, "activo": appointment.activo}
+            appointment.status = Appointment.Status.CANCELADA
+            appointment.activo = False
+            appointment.cancellation_reason = serializer.validated_data["reason"]
+            appointment.cancelled_by = request.user
+            appointment.cancelled_at = timezone.now()
+            appointment.save(update_fields=["status", "activo", "cancellation_reason", "cancelled_by", "cancelled_at", "actualizado_en"])
+        self.audit(AuditLog.Action.CANCEL, AuditLog.Module.APPOINTMENTS, obj=appointment, description="Paciente canceló su cita desde el portal.", old_values=old_values, new_values={"status": appointment.status, "reason": appointment.cancellation_reason})
+        return Response(PatientPortalAppointmentSerializer(appointment).data)
+
+    def post(self, request, appointment_id):
+        return self.patch(request, appointment_id)
+
+
+class PatientPortalAppointmentRescheduleView(PatientPortalBaseView):
+    serializer_class = PatientAppointmentRescheduleSerializer
+
+    def post(self, request, appointment_id):
+        serializer = PatientAppointmentRescheduleSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            appointment, old_values = reschedule_patient_appointment(
+                appointment_id=appointment_id,
+                patient=self.patient,
+                user=request.user,
+                validated_data=serializer.validated_data,
+                idempotency_key=request_idempotency_key(request),
+            )
+        except PatientPortalAppointmentError as exc:
+            self.audit(AuditLog.Action.PERMISSION_DENIED, AuditLog.Module.APPOINTMENTS, description="Reprogramación bloqueada por validación del portal.", metadata={"requested_id": appointment_id, "reason": str(exc)})
+            return Response(exc.payload(), status=exc.status_code)
+        replay = bool(getattr(appointment, "_idempotent_replay", False))
+        if not replay:
+            self.audit(AuditLog.Action.UPDATE, AuditLog.Module.APPOINTMENTS, obj=appointment, description="Paciente reprogramó su cita desde el portal.", old_values=old_values, new_values={"scheduled_date": appointment.scheduled_date, "start_time": appointment.start_time, "status": appointment.status, "reason": appointment.last_reschedule_reason})
+            message = f"Cita reprogramada para {appointment.scheduled_date} a las {appointment.start_time}."
+            for recipient in [appointment.doctor.user, appointment.patient.user]:
+                create_notification(recipient, "Cita reprogramada", message, clinic=appointment.clinic, notification_type=Notification.Type.REMINDER, module=Notification.Module.APPOINTMENTS, priority=Notification.Priority.HIGH, related_model="Appointment", related_object_id=appointment.id, action_url=f"/clinic/appointments/{appointment.id}")
+        return Response(PatientPortalAppointmentSerializer(appointment).data)
 
 
 class PatientPortalDoctorsView(PatientPortalBaseView):
     serializer_class = PatientPortalDoctorSerializer
 
     def get(self, request):
-        qs = DoctorProfile.objects.filter(clinic=self.patient.clinic, activo=True).select_related("user", "specialty")
+        qs = DoctorProfile.objects.filter(clinic=self.patient.clinic, activo=True, user__is_active=True).select_related("user", "specialty")
         if request.query_params.get("specialty"):
             qs = qs.filter(specialty_id=request.query_params["specialty"])
         if request.query_params.get("search"):
@@ -253,7 +335,7 @@ class PatientPortalDoctorAvailabilityView(PatientPortalBaseView):
         modality = request.query_params.get("modality") or Appointment.Modality.PRESENCIAL
         if modality not in Appointment.Modality.values:
             return Response({"modality": ["Selecciona una modalidad válida."]}, status=status.HTTP_400_BAD_REQUEST)
-        if modality == Appointment.Modality.ONLINE and not self.clinic_settings.allow_online_appointments:
+        if modality == Appointment.Modality.ONLINE and (not self.workflow_settings.allow_online_appointments or not doctor.atiende_virtual):
             return Response(
                 {
                     "doctor": doctor.id,
@@ -264,12 +346,14 @@ class PatientPortalDoctorAvailabilityView(PatientPortalBaseView):
                     "message": "Esta clínica no tiene habilitadas las citas en línea. Puedes solicitar una cita presencial.",
                 }
             )
+        if modality == Appointment.Modality.PRESENCIAL and (not self.workflow_settings.allow_in_person_appointments or not doctor.atiende_presencial):
+            return Response({"modality": ["El médico no tiene habilitadas las citas presenciales."]}, status=status.HTTP_400_BAD_REQUEST)
         try:
             target_date = datetime.fromisoformat(date_value).date()
         except ValueError:
             return Response({"date": ["Ingresa una fecha valida en formato YYYY-MM-DD."]}, status=status.HTTP_400_BAD_REQUEST)
         availability = build_availability(doctor, target_date)
-        availability["allow_online_appointments"] = self.clinic_settings.allow_online_appointments
+        availability["allow_online_appointments"] = self.workflow_settings.allow_online_appointments
         availability["modality"] = modality
         if not availability.get("available_slots"):
             availability["message"] = "No hay horarios disponibles para la fecha seleccionada."
@@ -280,23 +364,26 @@ class PatientPortalSpecialtiesView(PatientPortalBaseView):
     serializer_class = PatientPortalSpecialtySerializer
 
     def get(self, request):
-        qs = MedicalSpecialty.objects.filter(activo=True, doctor_profiles__clinic=self.patient.clinic, doctor_profiles__activo=True).distinct()
+        qs = MedicalSpecialty.objects.filter(activo=True, doctor_profiles__clinic=self.patient.clinic, doctor_profiles__activo=True, doctor_profiles__user__is_active=True).distinct()
         return Response(PatientPortalSpecialtySerializer(qs, many=True).data)
 
 
 class PatientPortalPrescriptionsView(PatientPortalBaseView):
-    serializer_class = PrescriptionListSerializer
+    serializer_class = PatientPortalPrescriptionSerializer
 
     def get(self, request, prescription_id=None):
         if not self.clinic_settings.allow_patient_prescription_view:
             return portal_denied()
-        qs = Prescription.objects.filter(patient=self.patient, status=Prescription.Status.EMITIDA, activo=True).select_related("clinic", "patient", "doctor__user")
+        qs = Prescription.objects.filter(patient=self.patient, clinic=self.patient.clinic, status=Prescription.Status.EMITIDA, activo=True).select_related("clinic", "patient", "doctor__user")
         if prescription_id:
             item = qs.filter(id=prescription_id).first()
             if not item:
+                self.audit(AuditLog.Action.PERMISSION_DENIED, AuditLog.Module.PRESCRIPTIONS, description="Intento bloqueado de consultar una receta ajena o no visible.", metadata={"requested_id": prescription_id})
                 return Response({"detail": "Receta no encontrada."}, status=status.HTTP_404_NOT_FOUND)
-            return Response(PrescriptionDetailSerializer(item).data)
-        return Response(PrescriptionListSerializer(qs, many=True).data)
+            self.audit(AuditLog.Action.VIEW, AuditLog.Module.PRESCRIPTIONS, obj=item, description="Paciente consultó una receta emitida.")
+            return Response(PatientPortalPrescriptionSerializer(item).data)
+        self.audit(AuditLog.Action.VIEW, AuditLog.Module.PRESCRIPTIONS, description="Paciente consultó sus recetas emitidas.")
+        return Response(PatientPortalPrescriptionSerializer(qs, many=True).data)
 
 
 class PatientPortalPrescriptionPdfView(PatientPortalBaseView):
@@ -316,21 +403,26 @@ class PatientPortalPrescriptionPdfView(PatientPortalBaseView):
 
         response = HttpResponse(render_prescription_pdf(prescription), content_type="application/pdf")
         response["Content-Disposition"] = f'inline; filename="receta-{prescription.prescription_number}.pdf"'
-        log_audit_event(request=request, clinic=prescription.clinic, action=AuditLog.Action.VIEW, module=AuditLog.Module.PRESCRIPTIONS, model_name="Prescription", object_id=prescription.id, object_repr=prescription.prescription_number, description="Paciente consulto PDF de receta emitida.")
+        log_audit_event(request=request, clinic=prescription.clinic, action=AuditLog.Action.DOWNLOAD, module=AuditLog.Module.PRESCRIPTIONS, model_name="Prescription", object_id=prescription.id, object_repr=prescription.prescription_number, description="Paciente descargó PDF de receta emitida.", metadata={"patient_id": self.patient.id})
         return response
 
 
 class PatientPortalMedicalOrdersView(PatientPortalBaseView):
-    serializer_class = MedicalOrderListSerializer
+    serializer_class = PatientPortalMedicalOrderSerializer
 
     def get(self, request, order_id=None):
-        qs = MedicalOrder.objects.filter(patient=self.patient, activo=True).select_related("clinic", "patient", "doctor__user")
+        if not self.clinic_settings.allow_patient_medical_record_view:
+            return portal_denied("Tu clínica no ha habilitado la consulta de órdenes médicas desde el portal.")
+        qs = MedicalOrder.objects.filter(patient=self.patient, clinic=self.patient.clinic, consultation__status=ClinicalConsultation.Status.FINALIZADA).filter(Q(activo=True) | Q(status=MedicalOrder.Status.CANCELADA)).select_related("clinic", "patient", "doctor__user")
         if order_id:
             item = qs.filter(id=order_id).first()
             if not item:
+                self.audit(AuditLog.Action.PERMISSION_DENIED, AuditLog.Module.MEDICAL_ORDERS, description="Intento bloqueado de consultar una orden ajena o no visible.", metadata={"requested_id": order_id})
                 return Response({"detail": "Orden no encontrada."}, status=status.HTTP_404_NOT_FOUND)
-            return Response(MedicalOrderDetailSerializer(item).data)
-        return Response(MedicalOrderListSerializer(qs, many=True).data)
+            self.audit(AuditLog.Action.VIEW, AuditLog.Module.MEDICAL_ORDERS, obj=item, description="Paciente consultó una orden médica autorizada.")
+            return Response(PatientPortalMedicalOrderSerializer(item).data)
+        self.audit(AuditLog.Action.VIEW, AuditLog.Module.MEDICAL_ORDERS, description="Paciente consultó sus órdenes médicas autorizadas.")
+        return Response(PatientPortalMedicalOrderSerializer(qs, many=True).data)
 
 
 class PatientPortalInvoicesView(PatientPortalBaseView):
@@ -349,7 +441,7 @@ class PatientPortalInvoicesView(PatientPortalBaseView):
     def get(self, request, invoice_id=None):
         if not self.clinic_settings.allow_patient_invoice_view:
             return portal_denied()
-        qs = Invoice.objects.filter(patient=self.patient, active=True).select_related("clinic", "patient").prefetch_related("credit_notes")
+        qs = Invoice.objects.filter(patient=self.patient, clinic=self.patient.clinic, active=True).select_related("clinic", "patient").prefetch_related("credit_notes")
         if invoice_id:
             item = qs.filter(id=invoice_id).first()
             if not item:
@@ -371,7 +463,7 @@ class PatientPortalPaymentsView(PatientPortalBaseView):
     def get(self, request, payment_id=None):
         if not self.clinic_settings.allow_patient_invoice_view:
             return portal_denied()
-        qs = Payment.objects.filter(patient=self.patient, active=True).select_related("invoice", "patient", "received_by")
+        qs = Payment.objects.filter(patient=self.patient, clinic=self.patient.clinic, active=True).select_related("invoice", "patient", "received_by")
         if payment_id:
             payment = qs.filter(id=payment_id).first()
             if not payment:
@@ -408,7 +500,7 @@ class PatientPortalInvoiceFiscalPdfView(PatientPortalBaseView):
         if not self.clinic_settings.allow_patient_invoice_view:
             return portal_denied()
         invoice = (
-            Invoice.objects.filter(patient=self.patient, active=True, id=invoice_id)
+            Invoice.objects.filter(patient=self.patient, clinic=self.patient.clinic, active=True, id=invoice_id)
             .select_related("clinic", "patient")
             .prefetch_related("items")
             .first()
@@ -465,7 +557,7 @@ class PatientPortalCreditNotePdfView(PatientPortalBaseView):
         if not self.clinic_settings.allow_patient_invoice_view:
             return portal_denied()
         credit_note = (
-            CreditNote.objects.filter(id=credit_note_id, original_invoice__patient=self.patient, active=True)
+            CreditNote.objects.filter(id=credit_note_id, clinic=self.patient.clinic, original_invoice__patient=self.patient, active=True)
             .select_related("clinic", "original_invoice__patient", "issued_by")
             .prefetch_related("original_invoice__items")
             .first()
@@ -483,13 +575,13 @@ class PatientPortalMedicalRecordSummaryView(PatientPortalBaseView):
     def get(self, request):
         if not self.clinic_settings.allow_patient_medical_record_view:
             return portal_denied()
-        record = MedicalRecord.objects.filter(patient=self.patient, activo=True).first()
+        record = MedicalRecord.objects.filter(patient=self.patient, clinic=self.patient.clinic, activo=True).first()
         if not record:
             return Response({"detail": "Expediente no encontrado."}, status=status.HTTP_404_NOT_FOUND)
-        consultations = ClinicalConsultation.objects.filter(patient=self.patient, status=ClinicalConsultation.Status.FINALIZADA, activo=True).values("id", "consultation_date", "chief_complaint", "clinical_assessment", "preliminary_diagnosis", "treatment_plan", "recommendations")[:20]
-        diagnoses = Diagnosis.objects.filter(patient=self.patient, activo=True).values("id", "code", "name", "diagnosis_type", "is_primary")[:20]
-        prescriptions = Prescription.objects.filter(patient=self.patient, status=Prescription.Status.EMITIDA, activo=True).values("id", "prescription_number", "issue_date", "general_instructions")[:20]
-        orders = MedicalOrder.objects.filter(patient=self.patient, activo=True).values("id", "order_number", "order_type", "title", "status", "priority")[:20]
+        consultations = ClinicalConsultation.objects.filter(patient=self.patient, clinic=self.patient.clinic, status=ClinicalConsultation.Status.FINALIZADA, activo=True).values("id", "consultation_date", "chief_complaint", "clinical_assessment", "preliminary_diagnosis", "treatment_plan", "recommendations")[:20]
+        diagnoses = Diagnosis.objects.filter(patient=self.patient, clinic=self.patient.clinic, consultation__status=ClinicalConsultation.Status.FINALIZADA, activo=True).values("id", "code", "name", "diagnosis_type", "is_primary")[:20]
+        prescriptions = Prescription.objects.filter(patient=self.patient, clinic=self.patient.clinic, consultation__status=ClinicalConsultation.Status.FINALIZADA, status=Prescription.Status.EMITIDA, activo=True).values("id", "prescription_number", "issue_date", "general_instructions")[:20]
+        orders = MedicalOrder.objects.filter(patient=self.patient, clinic=self.patient.clinic, consultation__status=ClinicalConsultation.Status.FINALIZADA).filter(Q(activo=True) | Q(status=MedicalOrder.Status.CANCELADA)).values("id", "order_number", "order_type", "title", "status", "priority")[:20]
         data = {
             "record_number": record.record_number,
             "blood_type": record.blood_type,
@@ -503,6 +595,7 @@ class PatientPortalMedicalRecordSummaryView(PatientPortalBaseView):
             "prescriptions": list(prescriptions),
             "medical_orders": list(orders),
         }
+        self.audit(AuditLog.Action.VIEW, AuditLog.Module.MEDICAL_RECORDS, obj=record, description="Paciente consultó el resumen autorizado de su expediente.")
         return Response(MedicalRecordSummarySerializer(data).data)
 
 
@@ -560,7 +653,9 @@ class PatientPortalSettingsView(PatientPortalBaseView):
                 "permissions": self.permissions_payload(),
                 "portal": {
                     "allow_patient_portal": self.clinic_settings.allow_patient_portal,
-                    "allow_online_appointments": self.clinic_settings.allow_online_appointments,
+                    "allow_appointments": self.workflow_settings.allow_appointments,
+                    "allow_online_appointments": self.workflow_settings.allow_online_appointments,
+                    "allow_in_person_appointments": self.workflow_settings.allow_in_person_appointments,
                     "allow_patient_cancellations": self.clinic_settings.allow_patient_cancellations,
                     "cancellation_hours_limit": self.clinic_settings.cancellation_hours_limit,
                     "allow_patient_medical_record_view": self.clinic_settings.allow_patient_medical_record_view,

@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
@@ -19,18 +20,36 @@ class AppointmentListSerializer(serializers.ModelSerializer):
     patient_codigo = serializers.CharField(source="patient.codigo_paciente", read_only=True)
     doctor_nombre = serializers.CharField(source="doctor.user.nombre_completo", read_only=True)
     specialty_nombre = serializers.CharField(source="doctor.specialty.nombre", read_only=True)
+    specialty = serializers.IntegerField(source="doctor.specialty_id", read_only=True)
     patient_name = serializers.CharField(source="patient.nombre_completo", read_only=True)
     patient_code = serializers.CharField(source="patient.codigo_paciente", read_only=True)
     doctor_name = serializers.CharField(source="doctor.user.nombre_completo", read_only=True)
     doctor_specialty = serializers.CharField(source="doctor.specialty.nombre", read_only=True)
     created_by_nombre = serializers.CharField(source="created_by.nombre_completo", read_only=True)
     visit_id = serializers.SerializerMethodField()
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+    duration_minutes = serializers.SerializerMethodField()
+    can_cancel = serializers.SerializerMethodField()
+    can_reschedule = serializers.SerializerMethodField()
 
     def get_visit_id(self, obj):
         visits = list(obj.visits.all())
         active = next((visit for visit in visits if visit.status in visit.ACTIVE_STATUSES), None)
         selected = active or (visits[0] if visits else None)
         return selected.id if selected else None
+
+    def get_duration_minutes(self, obj):
+        if not obj.scheduled_date or not obj.start_time or not obj.end_time:
+            return None
+        start = datetime.combine(obj.scheduled_date, obj.start_time)
+        end = datetime.combine(obj.scheduled_date, obj.end_time)
+        return int((end - start).total_seconds() // 60)
+
+    def get_can_cancel(self, obj):
+        return obj.activo and obj.status in [Appointment.Status.PENDIENTE, Appointment.Status.CONFIRMADA, Appointment.Status.REPROGRAMADA]
+
+    def get_can_reschedule(self, obj):
+        return self.get_can_cancel(obj)
 
     class Meta:
         model = Appointment
@@ -46,6 +65,7 @@ class AppointmentListSerializer(serializers.ModelSerializer):
             "doctor",
             "doctor_nombre",
             "specialty_nombre",
+            "specialty",
             "doctor_name",
             "doctor_specialty",
             "created_by",
@@ -56,6 +76,10 @@ class AppointmentListSerializer(serializers.ModelSerializer):
             "modality",
             "reason",
             "status",
+            "status_display",
+            "duration_minutes",
+            "can_cancel",
+            "can_reschedule",
             "activo",
             "creado_en",
             "actualizado_en",
@@ -75,6 +99,8 @@ class AppointmentDetailSerializer(AppointmentListSerializer):
             "cancelled_at",
             "confirmed_at",
             "attended_at",
+            "last_reschedule_reason",
+            "rescheduled_at",
         ]
 
 
@@ -198,7 +224,14 @@ class AppointmentStatsSerializer(serializers.Serializer):
     upcoming = serializers.IntegerField()
 
 
-def build_availability(doctor: DoctorProfile, target_date):
+def build_availability(doctor: DoctorProfile, target_date, exclude_appointment_id=None):
+    timezone_name = clinic_setting(doctor.clinic, "timezone", "America/Tegucigalpa")
+    try:
+        local_now = timezone.now().astimezone(ZoneInfo(timezone_name))
+    except ZoneInfoNotFoundError:
+        local_now = timezone.localtime()
+    if target_date < local_now.date():
+        return {"doctor": doctor.id, "date": target_date.isoformat(), "available_slots": [], "booked_slots": []}
     weekday = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"][target_date.weekday()]
     schedules = DoctorSchedule.objects.filter(doctor=doctor, dia_semana=weekday, activo=True)
     booked = Appointment.objects.filter(
@@ -207,6 +240,8 @@ def build_availability(doctor: DoctorProfile, target_date):
         activo=True,
         status__in=[Appointment.Status.PENDIENTE, Appointment.Status.CONFIRMADA, Appointment.Status.REPROGRAMADA],
     )
+    if exclude_appointment_id:
+        booked = booked.exclude(pk=exclude_appointment_id)
     booked_slots = [
         {"start_time": item.start_time.strftime("%H:%M"), "end_time": item.end_time.strftime("%H:%M"), "status": item.status}
         for item in booked
@@ -219,6 +254,9 @@ def build_availability(doctor: DoctorProfile, target_date):
         while cursor + duration <= end:
             slot_start = cursor.time()
             slot_end = (cursor + duration).time()
+            if target_date == local_now.date() and cursor.replace(tzinfo=local_now.tzinfo) <= local_now:
+                cursor += duration
+                continue
             overlaps = booked.filter(start_time__lt=slot_end, end_time__gt=slot_start).exists()
             if not overlaps:
                 available_slots.append({"start_time": slot_start.strftime("%H:%M"), "end_time": slot_end.strftime("%H:%M")})

@@ -38,6 +38,17 @@ class Appointment(TimeStampedModel):
     cancelled_at = models.DateTimeField(null=True, blank=True)
     confirmed_at = models.DateTimeField(null=True, blank=True)
     attended_at = models.DateTimeField(null=True, blank=True)
+    request_idempotency_key = models.CharField(max_length=100, null=True, blank=True, default=None)
+    last_reschedule_idempotency_key = models.CharField(max_length=100, blank=True)
+    last_reschedule_reason = models.TextField(blank=True)
+    rescheduled_at = models.DateTimeField(null=True, blank=True)
+    rescheduled_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="appointments_rescheduled",
+    )
     activo = models.BooleanField(default=True)
 
     class Meta:
@@ -47,6 +58,12 @@ class Appointment(TimeStampedModel):
             models.Index(fields=["doctor", "scheduled_date"]),
             models.Index(fields=["patient", "scheduled_date"]),
             models.Index(fields=["status"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["clinic", "patient", "request_idempotency_key"],
+                name="unique_patient_appointment_request",
+            ),
         ]
 
     def clean(self):

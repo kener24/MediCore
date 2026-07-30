@@ -71,6 +71,7 @@ from apps.documents.views import (
 from apps.patient_portal.views import (
     PatientPortalAppointmentCancelView,
     PatientPortalAppointmentRequestView,
+    PatientPortalAppointmentRescheduleView,
     PatientPortalAppointmentsView,
     PatientPortalClinicInfoView,
     PatientPortalCreditNotePdfView,
@@ -257,6 +258,7 @@ urlpatterns = [
     path("api/patient-portal/appointments/<int:appointment_id>/", PatientPortalAppointmentsView.as_view(), name="patient-portal-appointment-detail"),
     path("api/patient-portal/appointments/request/", PatientPortalAppointmentRequestView.as_view(), name="patient-portal-appointment-request"),
     path("api/patient-portal/appointments/<int:appointment_id>/cancel/", PatientPortalAppointmentCancelView.as_view(), name="patient-portal-appointment-cancel"),
+    path("api/patient-portal/appointments/<int:appointment_id>/reschedule/", PatientPortalAppointmentRescheduleView.as_view(), name="patient-portal-appointment-reschedule"),
     path("api/patient-portal/doctors/", PatientPortalDoctorsView.as_view(), name="patient-portal-doctors"),
     path("api/patient-portal/doctors/<int:doctor_id>/availability/", PatientPortalDoctorAvailabilityView.as_view(), name="patient-portal-doctor-availability"),
     path("api/patient-portal/specialties/", PatientPortalSpecialtiesView.as_view(), name="patient-portal-specialties"),

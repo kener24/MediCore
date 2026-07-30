@@ -195,7 +195,7 @@ class MeUpdateSerializer(serializers.ModelSerializer):
 class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField(write_only=True, required=True)
     new_password = serializers.CharField(write_only=True, required=True)
-    confirm_password = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    confirm_password = serializers.CharField(write_only=True, required=True)
 
     def to_internal_value(self, data):
         data = data.copy()
@@ -205,7 +205,7 @@ class ChangePasswordSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         confirm_password = attrs.get("confirm_password")
-        if confirm_password and confirm_password != attrs.get("new_password"):
+        if confirm_password != attrs.get("new_password"):
             raise serializers.ValidationError({"confirm_password": "La confirmacion no coincide."})
         return attrs
 

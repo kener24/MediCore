@@ -717,7 +717,7 @@ class MedicationAdministration(TimeStampedModel):
             models.Index(fields=["patient", "status"]),
         ]
         constraints = [
-            models.UniqueConstraint(fields=["instruction", "scheduled_time"], condition=models.Q(instruction__isnull=False, scheduled_time__isnull=False), name="unique_instruction_medication_schedule"),
+            models.UniqueConstraint(fields=["instruction", "scheduled_time"], name="unique_instruction_medication_schedule"),
         ]
 
     def clean(self):

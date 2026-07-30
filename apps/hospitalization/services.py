@@ -498,8 +498,10 @@ def create_medical_instruction(hospitalization, doctor, request=None, **payload)
         return instruction
 
 
+@transaction.atomic
 def schedule_medication_administrations(instruction, user=None, request=None, horizon_days=7):
     """Create a bounded, idempotent schedule. Stock is never touched here."""
+    instruction = MedicalInstruction.objects.select_for_update().select_related("hospitalization", "inventory_item").get(pk=instruction.pk)
     if instruction.instruction_type != MedicalInstruction.InstructionType.MEDICATION or instruction.as_needed:
         return []
     if instruction.status not in [MedicalInstruction.Status.ACTIVE, MedicalInstruction.Status.ACKNOWLEDGED, MedicalInstruction.Status.IN_PROGRESS]:

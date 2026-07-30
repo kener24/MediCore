@@ -37,6 +37,7 @@ Se verificaron alergias con justificación médica, programación sin consumo, F
 - Médico: login y lista de internamientos activos respondieron 200.
 - Paciente: login y resúmenes de egreso propios respondieron 200.
 - Las sesiones utilizadas para las pruebas se cerraron al finalizar.
+- Inspección visual web: detalle de internamiento, indicación de medicamento y flujo de alta cargaron correctamente, sin errores de consola ni superposiciones visibles.
 
 ## Advertencias controladas
 

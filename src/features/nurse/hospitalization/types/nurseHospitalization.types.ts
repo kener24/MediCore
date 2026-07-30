@@ -283,6 +283,13 @@ export type MedicationAdministration = {
   hospitalization?: number;
   patient_id?: number;
   patient_name?: string;
+  patient_identity?: string;
+  patient_allergies?: string;
+  room_name?: string;
+  bed_number?: string;
+  allergy_warning?: string;
+  instruction_notes?: string;
+  stock_available?: string | null;
   medication_name?: string;
   dosage?: string;
   route?: string;

@@ -1725,7 +1725,7 @@ function MedicationAdministrationsSection({
         const dose = window.prompt("Dosis realmente administrada", med.ordered_dose || med.dosage.split(" ")[0] || "")?.trim() || "";
         const quantity = window.prompt("Cantidad de inventario utilizada", med.inventory_quantity || "1")?.trim() || "";
         if (!dose || Number(dose) <= 0 || !quantity || Number(quantity) <= 0) return toast.error("Confirma dosis y cantidad utilizada.");
-        if (!window.confirm(`Confirma paciente ${med.patient_name || admission.patient_name}, ${med.medication_name}, dosis ${dose} ${med.dose_unit || ""}, vía ${medicationRouteLabel[med.route] || med.route}.`)) return;
+        if (!window.confirm(`Confirma paciente ${med.patient_name || admission.patient_name}, identidad ${med.patient_identity || "no registrada"}, ${med.medication_name}, dosis ${dose} ${med.dose_unit || ""}, vía ${medicationRouteLabel[med.route] || med.route}. Alergias: ${med.patient_allergies || "ninguna registrada"}.`)) return;
         await administerMedication(med.id, {
           administered_dose: dose,
           dose_unit: med.dose_unit || "mg",
@@ -1794,6 +1794,10 @@ function MedicationAdministrationsSection({
                     : "No programada"}{" "}
                   · Enfermera: {med.administered_by_name || "-"}
                 </p>
+                <p>Paciente: {med.patient_name || admission.patient_name} · Identidad: {med.patient_identity || "No registrada"} · Ubicación: {[med.room_name, med.bed_number ? `cama ${med.bed_number}` : ""].filter(Boolean).join(" · ") || "Sin cama asignada"}</p>
+                <p>Stock: {med.stock_available ?? "No disponible"} · Retraso: {med.delay_minutes ? `${med.delay_minutes} min` : "Sin retraso"}</p>
+                <p className={med.patient_allergies || med.allergy_warning ? "font-semibold text-red-700" : ""}>Alergias: {med.patient_allergies || "Ninguna registrada"}{med.allergy_warning ? ` · Alerta: ${med.allergy_warning}` : ""}</p>
+                {med.instruction_notes ? <p>Indicaciones: {med.instruction_notes}</p> : null}
                 {med.notes ? <p>{med.notes}</p> : null}
                 {med.omission_reason ? (
                   <p>Motivo omisión: {med.omission_reason}</p>

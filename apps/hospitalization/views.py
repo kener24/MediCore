@@ -605,7 +605,10 @@ class HospitalizationViewSet(viewsets.ModelViewSet):
         if request.method == "GET":
             if role_name(request.user) not in NURSING_CLINICAL_ROLES:
                 return forbidden("No tienes permiso para ver medicamentos hospitalarios.")
-            return Response(MedicationAdministrationSerializer(hospitalization.medication_administrations.all(), many=True).data)
+            medications = hospitalization.medication_administrations.select_related(
+                "patient", "instruction", "inventory_item", "administered_by", "hospitalization__current_bed__room"
+            )
+            return Response(MedicationAdministrationSerializer(medications, many=True).data)
         if role_name(request.user) not in NURSING_WRITE_ROLES:
             return forbidden("No tienes permiso para programar medicamentos hospitalarios.")
         serializer = MedicationAdministrationCreateSerializer(data=request.data)
@@ -792,7 +795,9 @@ class PendingMedicationsView(APIView):
 class MedicationAdministrationViewSet(viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = MedicationAdministrationSerializer
-    queryset = MedicationAdministration.objects.select_related("clinic", "hospitalization", "patient", "administered_by", "prescription", "prescription_item")
+    queryset = MedicationAdministration.objects.select_related(
+        "clinic", "hospitalization__current_bed__room", "patient", "administered_by", "instruction", "inventory_item", "prescription", "prescription_item"
+    )
 
     def get_queryset(self):
         return scoped_queryset(self.request, super().get_queryset())

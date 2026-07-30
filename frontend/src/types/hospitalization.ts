@@ -171,6 +171,13 @@ export interface MedicationAdministration {
   notes?: string;
   omission_reason?: string;
   patient_name?: string;
+  patient_identity?: string;
+  patient_allergies?: string;
+  room_name?: string;
+  bed_number?: string;
+  allergy_warning?: string;
+  instruction_notes?: string;
+  stock_available?: string | null;
   instruction?: number | null;
   inventory_item?: number | null;
   selected_lot?: number | null;

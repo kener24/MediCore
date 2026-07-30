@@ -102,6 +102,9 @@ class Sprint16BHospitalMedicationAndDischargeTests(APITestCase):
         payload = {"administered_dose": "500.00", "dose_unit": "mg", "route": "oral", "inventory_quantity": "4.00", "idempotency_key": "dose-16b-1"}
         first = self.client.post(f"/api/hospitalization/medication-administrations/{administration.id}/administer/", payload, format="json")
         self.assertEqual(first.status_code, status.HTTP_200_OK)
+        self.assertEqual(first.data["patient_identity"], self.patient.identidad)
+        self.assertEqual(first.data["patient_allergies"], "Penicilina")
+        self.assertEqual(first.data["stock_available"], "4.00")
         self.assertEqual(ClinicalSupplyUsage.objects.filter(medication_administration=administration).count(), 2)
         self.assertEqual(InventoryMovement.objects.filter(reason="clinical_consumption").count(), 2)
         self.lot_early.refresh_from_db()

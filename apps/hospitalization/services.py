@@ -727,6 +727,7 @@ def mark_medication_administered(medication_administration, nurse, request=None,
         medication.notes = notes or medication.notes
         medication.save(update_fields=["status", "administered_time", "status_recorded_at", "administered_by", "administered_dose", "dose_unit", "route", "administered_quantity", "administration_idempotency_key", "inventory_processed_at", "notes", "actualizado_en"])
         groups = getattr(usage, "_group_usages", [usage])
+        medication.inventory_item.refresh_from_db(fields=["stock_current"])
         _log_event(medication.hospitalization, "medication_administered", "Medicamento administrado.", user=nurse, metadata={"medication_administration": medication.id, "consumptions": [entry.id for entry in groups]})
         log_audit_event(request=request, user=nurse, clinic=medication.clinic, action=AuditLog.Action.COMPLETE, module=AuditLog.Module.MEDICAL_RECORDS, obj=medication, description="Medicamento hospitalario administrado.", old_values={"status": old_status}, new_values={"status": medication.status, "consumptions": [entry.id for entry in groups]})
         medication._idempotent_replay = False

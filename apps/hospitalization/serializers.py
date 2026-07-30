@@ -495,8 +495,23 @@ class NursingRoundCreateSerializer(serializers.ModelSerializer):
 class MedicationAdministrationSerializer(serializers.ModelSerializer):
     administered_by_name = serializers.CharField(source="administered_by.nombre_completo", read_only=True)
     patient_name = serializers.CharField(source="patient.nombre_completo", read_only=True)
+    patient_identity = serializers.CharField(source="patient.identidad", read_only=True)
+    patient_allergies = serializers.CharField(source="patient.alergias", read_only=True)
+    allergy_warning = serializers.CharField(source="instruction.allergy_warning", read_only=True, default="")
+    instruction_notes = serializers.CharField(source="instruction.details", read_only=True, default="")
+    room_name = serializers.SerializerMethodField()
+    bed_number = serializers.SerializerMethodField()
+    stock_available = serializers.DecimalField(source="inventory_item.stock_current", max_digits=12, decimal_places=2, read_only=True, allow_null=True)
     created_at = serializers.DateTimeField(source="creado_en", read_only=True)
     delay_minutes = serializers.SerializerMethodField()
+
+    def get_room_name(self, obj):
+        bed = obj.hospitalization.current_bed
+        return bed.room.name if bed and bed.room_id else ""
+
+    def get_bed_number(self, obj):
+        bed = obj.hospitalization.current_bed
+        return bed.bed_number if bed else ""
 
     def get_delay_minutes(self, obj):
         actual_time = obj.administered_time or obj.status_recorded_at
@@ -512,8 +527,15 @@ class MedicationAdministrationSerializer(serializers.ModelSerializer):
             "hospitalization",
             "patient",
             "patient_name",
+            "patient_identity",
+            "patient_allergies",
+            "room_name",
+            "bed_number",
             "instruction",
+            "allergy_warning",
+            "instruction_notes",
             "inventory_item",
+            "stock_available",
             "selected_lot",
             "prescription",
             "prescription_item",

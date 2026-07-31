@@ -223,7 +223,7 @@ def create_user_session(user, request, refresh_token=None):
     user.last_login_ip = session.ip_address
     user.last_login_user_agent = session.user_agent
     user.save(update_fields=["ultimo_acceso", "last_login_ip", "last_login_user_agent"])
-    create_notification(user, "Nuevo inicio de sesion", f"Se inicio sesion desde {session.device_name}.", clinic=user.clinica, module=Notification.Module.AUTH, notification_type=Notification.Type.INFO)
+    create_notification(user, "Nuevo inicio de sesión", f"Se inició sesión desde {session.device_name}.", clinic=user.clinica, module=Notification.Module.AUTH, notification_type=Notification.Type.INFO)
     return session
 
 

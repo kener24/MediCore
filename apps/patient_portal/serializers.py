@@ -216,8 +216,8 @@ class PatientPortalCreditNoteSerializer(serializers.ModelSerializer):
 
 
 class PatientPortalNotificationSerializer(serializers.ModelSerializer):
-    notification_type_display = serializers.CharField(source="get_notification_type_display", read_only=True)
-    priority_display = serializers.CharField(source="get_priority_display", read_only=True)
+    notification_type_display = serializers.SerializerMethodField()
+    priority_display = serializers.SerializerMethodField()
     target = serializers.SerializerMethodField()
 
     class Meta:
@@ -227,6 +227,24 @@ class PatientPortalNotificationSerializer(serializers.ModelSerializer):
             "priority", "priority_display", "status", "read_at", "sent_at", "expires_at",
             "target", "creado_en", "actualizado_en",
         ]
+
+    def get_notification_type_display(self, obj):
+        return {
+            Notification.Type.INFO: "Información",
+            Notification.Type.REMINDER: "Recordatorio",
+            Notification.Type.ALERT: "Alerta",
+            Notification.Type.WARNING: "Advertencia",
+            Notification.Type.SUCCESS: "Éxito",
+            Notification.Type.ERROR: "Error",
+        }.get(obj.notification_type, "Notificación")
+
+    def get_priority_display(self, obj):
+        return {
+            Notification.Priority.LOW: "Baja",
+            Notification.Priority.NORMAL: "Normal",
+            Notification.Priority.HIGH: "Alta",
+            Notification.Priority.URGENT: "Urgente",
+        }.get(obj.priority, "Normal")
 
     def get_target(self, obj):
         resource_id = str(obj.related_object_id or "").strip()

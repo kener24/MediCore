@@ -505,7 +505,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         invoice = Invoice.objects.select_related("clinic", "patient__user", "created_by").prefetch_related("items", "payments").get(id=invoice.id)
         log_audit_event(request=request, clinic=invoice.clinic, action=AuditLog.Action.CREATE, module=AuditLog.Module.BILLING, model_name="Invoice", object_id=invoice.id, object_repr=invoice.invoice_number, description="Factura creada.", new_values={"total": str(invoice.total_amount), "patient": invoice.patient_id})
         if invoice.patient.user:
-            create_notification(invoice.patient.user, "Factura creada", f"Se genero una factura por L {invoice.total_amount}.", clinic=invoice.clinic, notification_type=Notification.Type.INFO, module=Notification.Module.BILLING, priority=Notification.Priority.NORMAL, related_model="Invoice", related_object_id=invoice.id, action_url="/patient/invoices")
+            create_notification(invoice.patient.user, "Factura creada", f"Se generó una factura por L {invoice.total_amount}.", clinic=invoice.clinic, notification_type=Notification.Type.INFO, module=Notification.Module.BILLING, priority=Notification.Priority.NORMAL, related_model="Invoice", related_object_id=invoice.id, action_url="/patient/invoices")
         return Response(InvoiceDetailSerializer(invoice).data, status=status.HTTP_201_CREATED)
 
     def destroy(self, request, *args, **kwargs):
@@ -603,7 +603,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         else:
             log_audit_event(request=request, clinic=payment.clinic, action=AuditLog.Action.VIEW, module=AuditLog.Module.PAYMENTS, model_name="Payment", object_id=payment.id, object_repr=payment.payment_number, description="Pago duplicado evitado mediante idempotencia.")
         if created and payment.patient.user:
-            create_notification(payment.patient.user, "Pago registrado", f"Se registro un pago por L {payment.amount}.", clinic=payment.clinic, notification_type=Notification.Type.SUCCESS, module=Notification.Module.PAYMENTS, priority=Notification.Priority.NORMAL, related_model="Payment", related_object_id=payment.id, action_url="/patient/payments")
+            create_notification(payment.patient.user, "Pago registrado", f"Se registró un pago por L {payment.amount}.", clinic=payment.clinic, notification_type=Notification.Type.SUCCESS, module=Notification.Module.PAYMENTS, priority=Notification.Priority.NORMAL, related_model="Payment", related_object_id=payment.id, action_url="/patient/payments")
         data = PaymentDetailSerializer(payment).data
         data.update({"created": created, "message": "Pago registrado correctamente." if created else "La operacion ya habia sido procesada."})
         return Response(data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
@@ -956,7 +956,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
         else:
             log_audit_event(request=request, clinic=payment.clinic, action=AuditLog.Action.VIEW, module=AuditLog.Module.PAYMENTS, model_name="Payment", object_id=payment.id, object_repr=payment.payment_number, description="Pago duplicado evitado mediante idempotencia.")
         if created and payment.patient.user:
-            create_notification(payment.patient.user, "Pago registrado", f"Se registro un pago por L {payment.amount}.", clinic=payment.clinic, notification_type=Notification.Type.SUCCESS, module=Notification.Module.PAYMENTS, priority=Notification.Priority.NORMAL, related_model="Payment", related_object_id=payment.id, action_url="/patient/payments")
+            create_notification(payment.patient.user, "Pago registrado", f"Se registró un pago por L {payment.amount}.", clinic=payment.clinic, notification_type=Notification.Type.SUCCESS, module=Notification.Module.PAYMENTS, priority=Notification.Priority.NORMAL, related_model="Payment", related_object_id=payment.id, action_url="/patient/payments")
         data = PaymentDetailSerializer(payment).data
         data.update({"created": created, "message": "Pago registrado correctamente." if created else "La operacion ya habia sido procesada."})
         return Response(data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)

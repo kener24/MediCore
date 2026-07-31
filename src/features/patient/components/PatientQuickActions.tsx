@@ -9,7 +9,7 @@ interface PatientQuickActionsProps {
   onHistory?: () => void;
   onInvoices?: () => void;
   onMedicalOrders?: () => void;
-  onNavigate?: (target: 'appointments' | 'documents' | 'history' | 'invoices' | 'medicalOrders' | 'payments' | 'prescriptions' | 'profile' | 'requestAppointment') => void;
+  onNavigate?: (target: 'appointments' | 'creditNotes' | 'documents' | 'history' | 'invoices' | 'medicalOrders' | 'payments' | 'prescriptions' | 'profile' | 'requestAppointment') => void;
   onPayments?: () => void;
   onPrescriptions?: () => void;
   onProfile?: () => void;
@@ -67,11 +67,17 @@ export function PatientQuickActions({
         onPress={() => navigate('medicalOrders', onMedicalOrders)}
         title="Órdenes"
       /> : null}
-      {permissions.can_view_invoices !== false ? <QuickActionCard
+      {permissions.can_view_payments !== false ? <QuickActionCard
         description="Facturas, pagos y saldos."
         icon="receipt-text-outline"
         onPress={() => navigate('invoices', onInvoices)}
         title="Facturas"
+      /> : null}
+      {permissions.can_view_credit_notes !== false ? <QuickActionCard
+        description="Consulta ajustes y anulaciones de facturas."
+        icon="file-undo-outline"
+        onPress={() => navigate('creditNotes')}
+        title="Notas de crédito"
       /> : null}
       {permissions.can_view_invoices !== false ? <QuickActionCard
         description="Historial de pagos aplicados."

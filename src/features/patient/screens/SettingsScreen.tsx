@@ -1,6 +1,6 @@
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
-import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, RefreshControl, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
@@ -75,6 +75,18 @@ export function SettingsScreen() {
     }
   }
 
+  async function togglePreference(field: 'receive_appointment_reminders' | 'receive_billing_alerts' | 'receive_system_notifications') {
+    if (!notificationPreferences) return;
+    const nextValue = !notificationPreferences[field];
+    setNotificationPreferences({ ...notificationPreferences, [field]: nextValue });
+    try {
+      setNotificationPreferences(await updateNotificationPreferences({ [field]: nextValue }));
+    } catch (err) {
+      setNotificationPreferences(notificationPreferences);
+      Alert.alert('Notificaciones', err instanceof Error ? err.message : 'No se pudo actualizar la preferencia.');
+    }
+  }
+
   if (loading) return <LoadingState label="Cargando configuración..." />;
 
   return (
@@ -101,6 +113,9 @@ export function SettingsScreen() {
 
         <AppCard style={styles.portalCard}>
           <Text style={styles.sectionTitle}>Avisos importantes</Text>
+          <PreferenceSwitch label="Recordatorios de citas" value={Boolean(notificationPreferences?.receive_appointment_reminders)} onChange={() => void togglePreference('receive_appointment_reminders')} />
+          <PreferenceSwitch label="Facturas y pagos" value={Boolean(notificationPreferences?.receive_billing_alerts)} onChange={() => void togglePreference('receive_billing_alerts')} />
+          <PreferenceSwitch label="Avisos del sistema" value={Boolean(notificationPreferences?.receive_system_notifications)} onChange={() => void togglePreference('receive_system_notifications')} />
           <View style={styles.flagRow}>
             <View style={styles.flagCopy}>
               <Text style={styles.flagLabel}>Notificaciones push</Text>
@@ -142,6 +157,18 @@ export function SettingsScreen() {
             title="Notificaciones"
           />
           <SettingsOption
+            icon="monitor-account"
+            onPress={() => navigation.navigate('PatientActiveSessions')}
+            subtitle="Revisa y cierra accesos en otros dispositivos"
+            title="Sesiones activas"
+          />
+          {settings?.permissions?.can_view_credit_notes !== false ? <SettingsOption
+            icon="file-undo-outline"
+            onPress={() => navigation.navigate('PatientCreditNotes')}
+            subtitle="Consulta ajustes y anulaciones fiscales"
+            title="Notas de crédito"
+          /> : null}
+          <SettingsOption
             danger
             icon="logout"
             onPress={() => setLogoutVisible(true)}
@@ -166,6 +193,10 @@ function PortalFlag({ enabled, label }: { enabled?: boolean; label: string }) {
       <StatusBadge label={enabled ? 'Habilitado' : 'No habilitado'} status={enabled ? 'completed' : 'cancelled'} />
     </View>
   );
+}
+
+function PreferenceSwitch({ label, onChange, value }: { label: string; onChange: () => void; value: boolean }) {
+  return <View style={styles.flagRow}><Text style={styles.flagLabel}>{label}</Text><Switch onValueChange={onChange} trackColor={{ false: colors.border, true: colors.primary }} value={value} /></View>;
 }
 
 const styles = StyleSheet.create({

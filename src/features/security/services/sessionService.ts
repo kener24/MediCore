@@ -1,4 +1,5 @@
 import { apiClient } from '@/core/api/apiClient';
+import { endpoints } from '@/core/api/endpoints';
 
 export type ManagedSession = {
   id: number;
@@ -13,6 +14,10 @@ export type ManagedSession = {
   created_at?: string;
   last_activity_at?: string;
   revoked_at?: string | null;
+  expires_at?: string;
+  expired?: boolean;
+  location_hint?: string;
+  platform?: string;
 };
 
 type ListResponse<T> = T[] | { results?: T[]; data?: T[]; items?: T[] };
@@ -32,5 +37,20 @@ export async function getManagedSessions(params?: { active?: boolean; user?: num
 
 export async function revokeManagedSession(id: number | string) {
   const { data } = await apiClient.patch<ManagedSession>(`/security/admin/sessions/${id}/revoke/`);
+  return data;
+}
+
+export async function getOwnSessions() {
+  const { data } = await apiClient.get<ListResponse<ManagedSession>>(endpoints.security.sessions);
+  return normalizeList(data);
+}
+
+export async function revokeOwnSession(id: number | string) {
+  const { data } = await apiClient.post<ManagedSession>(endpoints.security.revokeSession(id));
+  return data;
+}
+
+export async function revokeOtherOwnSessions() {
+  const { data } = await apiClient.post<{ detail: string }>(endpoints.security.revokeAllSessions, { keep_current: true });
   return data;
 }

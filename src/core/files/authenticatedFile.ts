@@ -8,6 +8,18 @@ function safeFilename(value: string) {
   return value.replace(/[^a-zA-Z0-9._-]/g, '-').slice(0, 120) || 'documento';
 }
 
+const PRIVATE_FILE_PREFIX = 'medicore-private-';
+
+export async function clearPrivateTemporaryFiles() {
+  if (!FileSystem.cacheDirectory) return;
+  const entries = await FileSystem.readDirectoryAsync(FileSystem.cacheDirectory).catch(() => []);
+  await Promise.all(
+    entries
+      .filter((entry) => entry.startsWith(PRIVATE_FILE_PREFIX))
+      .map((entry) => FileSystem.deleteAsync(`${FileSystem.cacheDirectory}${entry}`, { idempotent: true }).catch(() => undefined)),
+  );
+}
+
 export async function downloadAndShareAuthenticated({
   dialogTitle,
   filename,
@@ -24,9 +36,10 @@ export async function downloadAndShareAuthenticated({
     throw new Error('Tu sesión expiró. Inicia sesión nuevamente.');
   }
   const url = path.startsWith('http') ? path : `${appConfig.API_BASE_URL}${path}`;
+  const localUri = `${FileSystem.cacheDirectory}${PRIVATE_FILE_PREFIX}${safeFilename(filename)}`;
   const result = await FileSystem.downloadAsync(
     url,
-    `${FileSystem.cacheDirectory}${safeFilename(filename)}`,
+    localUri,
     {
       headers: {
         Authorization: `Bearer ${session.accessToken}`,
@@ -40,6 +53,9 @@ export async function downloadAndShareAuthenticated({
   if (!(await Sharing.isAvailableAsync())) {
     throw new Error('Este dispositivo no permite abrir o compartir el archivo.');
   }
-  await Sharing.shareAsync(result.uri, { dialogTitle, mimeType });
-  return result.uri;
+  try {
+    await Sharing.shareAsync(result.uri, { dialogTitle, mimeType });
+  } finally {
+    await FileSystem.deleteAsync(result.uri, { idempotent: true }).catch(() => undefined);
+  }
 }

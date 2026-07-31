@@ -16,9 +16,11 @@ export function normalizePatientDashboard(
     clinicName: payload.clinic?.nombre ?? payload.clinic?.name,
     currency: payload.clinic?.currency ?? 'HNL',
     documentsCount: payload.stats?.recent_documents ?? payload.new_documents_count ?? recentDocuments.length,
+    lastPayment: payload.last_payment ?? null,
     nextAppointment: payload.next_appointment ?? upcomingAppointments[0] ?? null,
     patientCode: payload.patient?.codigo_paciente ?? payload.patient?.code,
     patientName: payload.patient?.nombre_completo ?? payload.patient?.full_name,
+    pendingBalance: payload.pending_balance ?? pendingInvoices.reduce((total, invoice) => total + Number(invoice.balance_due ?? 0), 0),
     pendingInvoices,
     permissions: payload.permissions ?? payload.available_actions ?? {},
     recentDocuments,
@@ -26,7 +28,7 @@ export function normalizePatientDashboard(
     recentPrescriptions,
     stats: {
       activePrescriptions: payload.stats?.active_prescriptions ?? recentPrescriptions.length,
-      pendingInvoices: payload.stats?.pending_invoices ?? pendingInvoices.length,
+      pendingInvoices: payload.stats?.pending_invoices ?? payload.pending_invoices_count ?? pendingInvoices.length,
       recentDocuments: payload.stats?.recent_documents ?? payload.new_documents_count ?? recentDocuments.length,
       unreadNotifications:
         payload.stats?.unread_notifications ??

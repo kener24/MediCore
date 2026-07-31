@@ -7,7 +7,6 @@ import { AppCard } from '@/components/AppCard';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen';
-import { colors } from '@/core/theme/colors';
 import { CashierHeader } from '@/features/cashier/components/CashierHeader';
 import { InvoiceTotalsCard } from '@/features/cashier/components/InvoiceTotalsCard';
 import { PaymentForm } from '@/features/cashier/components/PaymentForm';

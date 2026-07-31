@@ -1,4 +1,4 @@
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,6 +22,7 @@ import type { PatientNotification } from '@/features/patient/types/patientNotifi
 type Filter = 'all' | 'unread';
 
 export function PatientNotificationsScreen() {
+  const navigation = useNavigation<any>();
   const [notifications, setNotifications] = useState<PatientNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [filter, setFilter] = useState<Filter>('all');
@@ -69,6 +70,21 @@ export function PatientNotificationsScreen() {
     } catch (err) {
       Alert.alert('Notificaciones', err instanceof Error ? err.message : 'No se pudo marcar como leída.');
     }
+  }
+
+  async function openNotification(notification: PatientNotification) {
+    await markRead(notification);
+    const target = notification.target;
+    if (!target) return;
+    const id = Number(target.id);
+    if (!Number.isFinite(id) || id <= 0) return;
+    const tabs = navigation.getParent();
+    if (target.type === 'appointment') tabs?.navigate('PatientAppointmentsTab', { screen: 'PatientAppointmentDetail', params: { id } });
+    if (target.type === 'document') tabs?.navigate('PatientDocumentsTab', { screen: 'PatientDocumentDetail', params: { id } });
+    if (target.type === 'invoice') tabs?.navigate('PatientHomeTab', { screen: 'PatientInvoiceDetail', params: { id } });
+    if (target.type === 'payment') tabs?.navigate('PatientHomeTab', { screen: 'PatientPaymentDetail', params: { id } });
+    if (target.type === 'prescription') tabs?.navigate('PatientHomeTab', { screen: 'PatientPrescriptionDetail', params: { id } });
+    if (target.type === 'medical_order') tabs?.navigate('PatientHomeTab', { screen: 'PatientMedicalOrderDetail', params: { id } });
   }
 
   async function markAllRead() {
@@ -123,7 +139,7 @@ export function PatientNotificationsScreen() {
               key={notification.id}
               notification={notification}
               onMarkAsRead={() => markRead(notification)}
-              onPress={() => markRead(notification)}
+              onPress={() => void openNotification(notification)}
             />
           ))
         ) : (

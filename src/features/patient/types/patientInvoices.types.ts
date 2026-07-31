@@ -38,8 +38,10 @@ export type PatientInvoicePayment = {
   amount?: string | number;
   method?: string;
   payment_method?: string;
-  reference?: string | null;
+  reference_visible?: string | null;
   status?: string;
+  status_display?: string;
+  receipt_available?: boolean;
 };
 
 export type InvoicePayment = PatientInvoicePayment;
@@ -69,11 +71,32 @@ export type PatientInvoice = {
   is_fiscal?: boolean;
   fiscal_status?: string | null;
   fiscal_number?: string | null;
-  cai?: string | null;
   pdf_url?: string | null;
+  pdf_available?: boolean;
+  status_display?: string;
+  fiscal_status_display?: string;
+  related_credit_note?: PatientCreditNote | null;
   file_url?: string | null;
   items?: PatientInvoiceItem[];
   payments?: PatientInvoicePayment[];
+};
+
+export type PatientCreditNote = {
+  id: number;
+  clinic_nombre?: string;
+  original_invoice?: number;
+  original_invoice_number?: string;
+  credit_note_number?: string;
+  fiscal_number?: string;
+  issue_date?: string;
+  reason?: string;
+  subtotal?: string | number;
+  discount_amount?: string | number;
+  tax_amount?: string | number;
+  total_amount?: string | number;
+  status?: string;
+  status_display?: string;
+  pdf_url?: string;
 };
 
 export type PatientInvoiceDetail = PatientInvoice;

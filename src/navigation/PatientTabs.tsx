@@ -8,8 +8,10 @@ import { ChangePasswordScreen } from '@/features/patient/screens/ChangePasswordS
 import { ClinicInfoScreen } from '@/features/patient/screens/ClinicInfoScreen';
 import { EditPatientProfileScreen } from '@/features/patient/screens/EditPatientProfileScreen';
 import { PatientAppointmentDetailScreen } from '@/features/patient/screens/PatientAppointmentDetailScreen';
+import { PatientActiveSessionsScreen } from '@/features/patient/screens/PatientActiveSessionsScreen';
 import { PatientAppointmentsScreen } from '@/features/patient/screens/PatientAppointmentsScreen';
 import { PatientDashboardScreen } from '@/features/patient/screens/PatientDashboardScreen';
+import { PatientCreditNotesScreen } from '@/features/patient/screens/PatientCreditNotesScreen';
 import { PatientDocumentDetailScreen } from '@/features/patient/screens/PatientDocumentDetailScreen';
 import { PatientDocumentsScreen } from '@/features/patient/screens/PatientDocumentsScreen';
 import { PatientInvoiceDetailScreen } from '@/features/patient/screens/PatientInvoiceDetailScreen';
@@ -49,6 +51,7 @@ function PatientHomeStack() {
       <Stack.Screen component={PatientInvoiceDetailScreen} name="PatientInvoiceDetail" />
       <Stack.Screen component={PatientPaymentsScreen} name="PatientPayments" />
       <Stack.Screen component={PatientPaymentDetailScreen} name="PatientPaymentDetail" />
+      <Stack.Screen component={PatientCreditNotesScreen} name="PatientCreditNotes" />
       <Stack.Screen component={PatientDocumentDetailScreen} name="PatientDocumentDetail" />
     </Stack.Navigator>
   );
@@ -90,6 +93,8 @@ function PatientProfileStack() {
       <Stack.Screen component={ChangePasswordScreen} name="ChangePassword" />
       <Stack.Screen component={ClinicInfoScreen} name="ClinicInfo" />
       <Stack.Screen component={PatientNotificationsScreen} name="PatientNotifications" />
+      <Stack.Screen component={PatientActiveSessionsScreen} name="PatientActiveSessions" />
+      <Stack.Screen component={PatientCreditNotesScreen} name="PatientCreditNotes" />
     </Stack.Navigator>
   );
 }

@@ -2,6 +2,7 @@ import type { PatientAppointment } from '@/features/patient/types/patientAppoint
 import type { PatientDocument } from '@/features/patient/types/patientDocuments.types';
 import type { PatientInvoice } from '@/features/patient/types/patientInvoices.types';
 import type { PatientNotification } from '@/features/patient/types/patientNotifications.types';
+import type { PatientPayment } from '@/features/patient/types/patientPayments.types';
 import type { PatientPrescription } from '@/features/patient/types/patientPrescriptions.types';
 import type { PatientProfile } from '@/features/patient/types/patientProfile.types';
 
@@ -9,6 +10,10 @@ export type PatientPortalPermissions = {
   can_view_medical_record?: boolean;
   can_view_prescriptions?: boolean;
   can_view_invoices?: boolean;
+  can_view_payments?: boolean;
+  can_view_credit_notes?: boolean;
+  can_download_invoice_pdf?: boolean;
+  can_download_receipts?: boolean;
   can_view_medical_orders?: boolean;
   can_view_documents?: boolean;
   can_request_appointments?: boolean;
@@ -35,6 +40,9 @@ export type PatientDashboard = {
   next_appointment?: PatientAppointment | null;
   recent_prescriptions?: PatientPrescription[];
   pending_invoices?: PatientInvoice[];
+  pending_invoices_count?: number;
+  pending_balance?: string | number;
+  last_payment?: PatientPayment | null;
   recent_documents?: PatientDocument[];
   notifications?: PatientNotification[];
   unread_notifications?: number;
@@ -71,8 +79,10 @@ export type NormalizedPatientDashboard = {
   currency: string;
   documentsCount: number;
   nextAppointment: PatientAppointment | null;
+  lastPayment: PatientPayment | null;
   patientCode?: string;
   patientName?: string;
+  pendingBalance: string | number;
   pendingInvoices: PatientInvoice[];
   permissions: PatientPortalPermissions;
   recentDocuments: PatientDocument[];

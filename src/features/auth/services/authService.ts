@@ -1,5 +1,6 @@
 import { apiClient } from '@/core/api/apiClient';
 import { endpoints } from '@/core/api/endpoints';
+import { getPushInstallationId } from '@/core/notifications/pushNotificationService';
 import type {
   AuthResponse,
   ChangePasswordPayload,
@@ -28,7 +29,8 @@ export async function changePasswordService(payload: ChangePasswordPayload) {
 
 export async function logoutService() {
   try {
-    await apiClient.post(endpoints.auth.logout);
+    const installationId = await getPushInstallationId();
+    await apiClient.post(endpoints.auth.logout, undefined, { headers: { 'X-Installation-Id': installationId } });
   } catch {
     // Logout local must continue even when the optional backend endpoint is unavailable.
   }

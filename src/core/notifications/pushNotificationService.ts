@@ -1,5 +1,6 @@
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
+import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 import { apiClient } from '@/core/api/apiClient';
@@ -7,6 +8,13 @@ import { endpoints } from '@/core/api/endpoints';
 import { appConfig } from '@/core/config/appConfig';
 
 type NotificationsModule = typeof import('expo-notifications');
+const INSTALLATION_ID_KEY = 'medicore.pushInstallationId';
+
+export type PushNavigationData = {
+  notificationId?: number | string;
+  relatedModel?: string;
+  relatedObjectId?: number | string;
+};
 
 export type NotificationPreferences = {
   push_enabled?: boolean;
@@ -48,8 +56,18 @@ export async function updateNotificationPreferences(payload: Partial<Notificatio
   return data;
 }
 
-export async function disablePushDevice(expoPushToken?: string) {
-  await apiClient.delete(endpoints.notifications.pushDevices, { data: expoPushToken ? { expo_push_token: expoPushToken } : {} });
+export async function getPushInstallationId() {
+  const stored = await SecureStore.getItemAsync(INSTALLATION_ID_KEY);
+  if (stored) return stored;
+  const random = Math.random().toString(36).slice(2, 12);
+  const installationId = `mobile-${Date.now().toString(36)}-${random}`;
+  await SecureStore.setItemAsync(INSTALLATION_ID_KEY, installationId);
+  return installationId;
+}
+
+export async function disablePushDevice() {
+  const installationId = await getPushInstallationId();
+  await apiClient.delete(endpoints.patientPortal.devices, { data: { installation_id: installationId } });
 }
 
 export async function registerDeviceForPushNotifications() {
@@ -92,11 +110,28 @@ export async function registerDeviceForPushNotifications() {
   }
 
   const token = await Notifications.getExpoPushTokenAsync({ projectId: resolvedProjectId });
-  const { data } = await apiClient.post(endpoints.notifications.pushDevices, {
+  const installationId = await getPushInstallationId();
+  const { data } = await apiClient.post(endpoints.patientPortal.devices, {
     app_version: appConfig.APP_VERSION,
     device_name: Device.deviceName ?? `${Platform.OS} device`,
     expo_push_token: token.data,
+    installation_id: installationId,
     platform: Platform.OS,
   });
-  return { registered: true, token: token.data, device: data };
+  return { registered: true, device: data };
+}
+
+export async function subscribeToPushNotificationResponses(listener: (data: PushNavigationData) => void) {
+  const Notifications = await loadNotificationsModule();
+  if (!Notifications) return () => undefined;
+  const handle = (response: { notification: { request: { content: { data: Record<string, unknown> } } } }) => {
+    listener(response.notification.request.content.data as PushNavigationData);
+  };
+  const subscription = Notifications.addNotificationResponseReceivedListener(handle);
+  const lastResponse = await Notifications.getLastNotificationResponseAsync();
+  if (lastResponse) {
+    handle(lastResponse);
+    await Notifications.clearLastNotificationResponseAsync();
+  }
+  return () => subscription.remove();
 }

@@ -10,8 +10,13 @@ export type PatientNotification = {
   notification_type?: string;
   module?: string;
   modulo?: string;
-  action_url?: string | null;
-  related_object_id?: number | null;
+  target?: {
+    type: string;
+    id: string;
+    path: string;
+  } | null;
+  priority?: string;
+  priority_display?: string;
   is_read?: boolean;
   read?: boolean;
   status?: string;

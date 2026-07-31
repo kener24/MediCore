@@ -29,7 +29,7 @@ export async function markPatientNotificationRead(id: number | string) {
 }
 
 export async function markAllPatientNotificationsRead() {
-  const { data } = await apiClient.post<{ updated: number }>(
+  const { data } = await apiClient.patch<{ updated: number }>(
     endpoints.patientPortal.markAllNotificationsRead,
   );
   return data.updated ?? 0;

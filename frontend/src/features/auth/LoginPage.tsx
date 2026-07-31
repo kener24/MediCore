@@ -106,7 +106,7 @@ export function LoginPage() {
               </div>
               <div className="flex justify-end">
                 <Link className="text-sm font-semibold text-brand-700 hover:underline" to="/forgot-password">
-                  Olvide mi contrasena
+                  Olvidé mi contraseña
                 </Link>
               </div>
               <Button className="w-full" type="submit" isLoading={isSubmitting}>

@@ -319,7 +319,7 @@ const patientGroups: NavGroup[] = [
       { label: "Mis Facturas", path: "/patient/invoices" },
       { label: "Mis Pagos", path: "/patient/payments" },
       { label: "Notas de crédito", path: "/patient/credit-notes" },
-      { label: "Clinica", path: "/patient/clinic-info" },
+      { label: "Clínica", path: "/patient/clinic-info" },
     ],
   },
   patientAccountGroup,
@@ -459,7 +459,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
       >
         <div className="shrink-0 border-b border-white/10 px-6 py-5">
           <p className="text-xl font-bold tracking-wide">MediCore</p>
-          <p className="mt-1 text-sm text-brand-100">Administracion medica</p>
+          <p className="mt-1 text-sm text-brand-100">Administración médica</p>
         </div>
         <nav className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-4">
           {groups.map((group) => (
@@ -473,7 +473,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             type="button"
           >
             <LogOut className="h-5 w-5" />
-            Cerrar sesion
+            Cerrar sesión
           </button>
         </div>
       </aside>

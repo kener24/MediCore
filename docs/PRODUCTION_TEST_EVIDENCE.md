@@ -121,8 +121,8 @@ Fecha: 2026-07-31.
 - Respaldo previo: `backups/sprint17b_20260731T171543Z`.
 - Dump válido: `mysql-no-tablespaces.sql.gz`, con `gzip -t`, cierre del dump y SHA-256 verificados.
 - Bundle Git, `.env` protegido y parche del árbol remoto incluidos con sumas SHA-256.
-- Backend/web desplegado en `main`, commit `efe143b`.
-- Aplicación móvil subida a `master`, commit `aab8f3b`.
+- Backend/web ejecutable desplegado en `main`, commit `fc7ece1`.
+- Aplicación móvil subida a `master`, commit `6a0db76`.
 - Migración `notifications.0003` aplicada correctamente.
 - Dependencias, build, estáticos, Nginx y servicios completados sin error.
 - `medicore.service`, `medicore-notifications.timer` y Nginx quedaron activos.
@@ -143,6 +143,9 @@ Fecha: 2026-07-31.
 - Los accesos cruzados disponibles a factura, PDF, pago, recibo, nota, notificación y sesión devolvieron 404.
 - Los casos cruzados sin pago o nota de crédito en los datos demo se registraron como no ejecutables, no como aprobados.
 - No aparecieron errores, excepciones ni trazas nuevas en el journal de Gunicorn.
+- La inspección visual de facturas, pagos y notificaciones en producción cargó datos reales sin errores de consola.
+- Estados financieros, tipos y prioridades de notificación quedaron localizados en español; un nuevo inicio de sesión generó y mostró correctamente su notificación.
+- La validación Android se repitió sobre el commit final: Expo Doctor aprobó 18 de 18 comprobaciones y la exportación compiló 1529 módulos sin errores.
 
 ## Correo y tareas
 

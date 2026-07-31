@@ -2,6 +2,7 @@ import { Navigate, createBrowserRouter } from "react-router-dom";
 
 import { DashboardLayout } from "../components/layout/DashboardLayout";
 import { LoginPage } from "../features/auth/LoginPage";
+import { SessionExpiredPage } from "../features/auth/SessionExpiredPage";
 import { ProtectedRoute } from "../features/auth/ProtectedRoute";
 import { RoleProtectedRoute } from "../features/auth/RoleProtectedRoute";
 import { RoleDashboardRedirect } from "../features/dashboard/RoleDashboardRedirect";
@@ -55,7 +56,7 @@ import { AuditDashboardPage, AuditLogDetailsPage, AuditLogsPage } from "../featu
 import { NotificationDetailsPage, NotificationPreferencesPage, NotificationsAdminPage, NotificationsPage } from "../features/notifications/NotificationPages";
 import { ClinicSettingsPage, ClinicSettingsSummaryPage, ClinicWorkflowSettingsPage, SuperAdminClinicSettingsPage } from "../features/clinicSettings/ClinicSettingsPages";
 import { ClinicSubscriptionDetailsPage, ClinicSubscriptionsPage, MySubscriptionPage, SubscriptionPlansPage } from "../features/subscriptions/SubscriptionPages";
-import { PatientClinicInfoPage, PatientMedicalRecordSummaryPage, PatientPortalAppointmentDetailsPage, PatientPortalAppointmentsPage, PatientPortalDashboardPage, PatientPortalInvoiceDetailsPage, PatientPortalInvoicesPage, PatientPortalMedicalOrderDetailsPage, PatientPortalMedicalOrdersPage, PatientPortalPaymentsPage, PatientPortalPrescriptionDetailsPage, PatientPortalPrescriptionsPage, PatientPortalProfilePage, PatientRequestAppointmentPage } from "../features/patientPortal/PatientPortalPages";
+import { PatientClinicInfoPage, PatientMedicalRecordSummaryPage, PatientPortalAppointmentDetailsPage, PatientPortalAppointmentsPage, PatientPortalCreditNotesPage, PatientPortalDashboardPage, PatientPortalInvoiceDetailsPage, PatientPortalInvoicesPage, PatientPortalMedicalOrderDetailsPage, PatientPortalMedicalOrdersPage, PatientPortalNotificationDetailsPage, PatientPortalNotificationsPage, PatientPortalPaymentDetailsPage, PatientPortalPaymentsPage, PatientPortalPrescriptionDetailsPage, PatientPortalPrescriptionsPage, PatientPortalProfilePage, PatientRequestAppointmentPage } from "../features/patientPortal/PatientPortalPages";
 import { ClinicalDocumentsPage, DocumentCategoriesPage, DocumentDetailsPage, DocumentUploadPage, PatientDocumentsPage, PatientPortalDocumentDetailsPage, PatientPortalDocumentsPage } from "../features/documents/DocumentsPages";
 import { AccountLocksAdminPage, ActiveSessionsPage, AdminSessionsPage, EmailVerificationPage, ForgotPasswordPage, PasswordSecurityPage, ResetPasswordPage, SecurityActivityPage, SecurityCenterPage, SecuritySettingsPage, VerifyEmailPage } from "../features/security/SecurityPages";
 import { AdmissionVisitDetailsPage, AdmissionsDashboardPage, DoctorWaitingRoomPage, NewWalkInVisitPage, PendingBillingVisitsPage, TriageQueuePage } from "../features/admissions/AdmissionsPages";
@@ -65,6 +66,10 @@ export const router = createBrowserRouter([
   {
     path: "/login",
     element: <LoginPage />,
+  },
+  {
+    path: "/session-expired",
+    element: <SessionExpiredPage />,
   },
   {
     path: "/forgot-password",
@@ -286,6 +291,10 @@ export const router = createBrowserRouter([
               { path: "/patient/invoices/:id", element: <PatientPortalInvoiceDetailsPage /> },
               { path: "/patient/invoices/:id/print", element: <InvoicePrintPage patientPortal /> },
               { path: "/patient/payments", element: <PatientPortalPaymentsPage /> },
+              { path: "/patient/payments/:id", element: <PatientPortalPaymentDetailsPage /> },
+              { path: "/patient/credit-notes", element: <PatientPortalCreditNotesPage /> },
+              { path: "/patient/notifications", element: <PatientPortalNotificationsPage /> },
+              { path: "/patient/notifications/:id", element: <PatientPortalNotificationDetailsPage /> },
               { path: "/patient/clinic-info", element: <PatientClinicInfoPage /> },
             ],
           },

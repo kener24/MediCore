@@ -5,20 +5,32 @@ import { toast } from "sonner";
 
 import { getErrorMessage } from "../../api/axios";
 import { getNotificationSummary, markAllNotificationsRead, markNotificationRead } from "../../api/notificationsApi";
-import type { NotificationSummary } from "../../types/notification";
+import { getPatientPortalNotifications, getPatientPortalUnreadCount, markAllPatientPortalNotificationsRead, markPatientPortalNotificationRead } from "../../api/patientPortalApi";
+import { useAuth } from "../../hooks/useAuth";
+
+type BellItem = { id: number; title: string; message: string; status: string; creado_en: string };
+type BellSummary = { unread_count: number; latest: BellItem[] };
 
 function shortDate(value: string) {
   return new Date(value).toLocaleString();
 }
 
 export function NotificationBell() {
+  const { user } = useAuth();
+  const role = user?.role_nombre ?? (typeof user?.role === "object" ? user.role.nombre : "");
+  const isPatient = role === "paciente";
   const [open, setOpen] = useState(false);
-  const [summary, setSummary] = useState<NotificationSummary | null>(null);
+  const [summary, setSummary] = useState<BellSummary | null>(null);
   const unread = summary?.unread_count ?? 0;
 
   async function load() {
     try {
-      setSummary(await getNotificationSummary());
+      if (isPatient) {
+        const [items, count] = await Promise.all([getPatientPortalNotifications(), getPatientPortalUnreadCount()]);
+        setSummary({ latest: items.slice(0, 5), unread_count: count.unread_count });
+      } else {
+        setSummary(await getNotificationSummary());
+      }
     } catch {
       setSummary(null);
     }
@@ -28,11 +40,12 @@ export function NotificationBell() {
     load();
     const id = window.setInterval(load, 60000);
     return () => window.clearInterval(id);
-  }, []);
+  }, [isPatient]);
 
   async function markAllRead() {
     try {
-      await markAllNotificationsRead();
+      if (isPatient) await markAllPatientPortalNotificationsRead();
+      else await markAllNotificationsRead();
       await load();
       toast.success("Notificaciones marcadas como leidas.");
     } catch (error) {
@@ -42,7 +55,8 @@ export function NotificationBell() {
 
   async function markRead(id: number) {
     try {
-      await markNotificationRead(id);
+      if (isPatient) await markPatientPortalNotificationRead(id);
+      else await markNotificationRead(id);
       await load();
     } catch (error) {
       toast.error(getErrorMessage(error));
@@ -84,7 +98,7 @@ export function NotificationBell() {
             {summary?.latest.length ? (
               summary.latest.map((item) => (
                 <div key={item.id} className="border-b border-slate-100 px-4 py-3 last:border-b-0">
-                  <Link className="block" to={`/notifications/${item.id}`} onClick={() => setOpen(false)}>
+                  <Link className="block" to={isPatient ? `/patient/notifications/${item.id}` : `/notifications/${item.id}`} onClick={() => setOpen(false)}>
                     <p className="line-clamp-1 text-sm font-semibold text-slate-900">{item.title}</p>
                     <p className="mt-1 line-clamp-2 text-xs text-slate-500">{item.message}</p>
                     <p className="mt-2 text-xs text-slate-400">{shortDate(item.creado_en)}</p>
@@ -103,7 +117,7 @@ export function NotificationBell() {
               </div>
             )}
           </div>
-          <Link className="block border-t border-slate-200 px-4 py-3 text-center text-sm font-semibold text-brand-700 hover:bg-brand-50" to="/notifications" onClick={() => setOpen(false)}>
+          <Link className="block border-t border-slate-200 px-4 py-3 text-center text-sm font-semibold text-brand-700 hover:bg-brand-50" to={isPatient ? "/patient/notifications" : "/notifications"} onClick={() => setOpen(false)}>
             Ver centro de notificaciones
           </Link>
         </div>

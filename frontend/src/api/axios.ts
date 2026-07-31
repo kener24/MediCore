@@ -18,10 +18,15 @@ function resolveQueue(token: string | null) {
   queuedRequests = [];
 }
 
-function clearSession() {
+function clearSession(expired = false) {
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem(SESSION_KEY);
+  for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+    const key = localStorage.key(index);
+    if (key?.startsWith("medicore.patient.")) localStorage.removeItem(key);
+  }
+  if (expired) sessionStorage.setItem("medicore.session-expired", "1");
   window.dispatchEvent(new Event("medicore:logout"));
 }
 
@@ -53,7 +58,8 @@ api.interceptors.response.use(
 
     const refresh = localStorage.getItem(REFRESH_TOKEN_KEY);
     if (!refresh) {
-      clearSession();
+      clearSession(true);
+      window.location.assign("/session-expired");
       return Promise.reject(error);
     }
 
@@ -64,6 +70,7 @@ api.interceptors.response.use(
             reject(error);
             return;
           }
+          originalRequest._retry = true;
           originalRequest.headers.Authorization = `Bearer ${token}`;
           resolve(api(originalRequest));
         });
@@ -75,18 +82,20 @@ api.interceptors.response.use(
 
     try {
       const sessionKey = localStorage.getItem(SESSION_KEY);
-      const response = await axios.post<{ access: string }>(
+      const response = await axios.post<{ access: string; refresh?: string }>(
         `${api.defaults.baseURL}/auth/refresh/`,
         { refresh },
         { headers: sessionKey ? { "X-Session-Key": sessionKey } : undefined }
       );
       localStorage.setItem(ACCESS_TOKEN_KEY, response.data.access);
+      if (response.data.refresh) localStorage.setItem(REFRESH_TOKEN_KEY, response.data.refresh);
       resolveQueue(response.data.access);
       originalRequest.headers.Authorization = `Bearer ${response.data.access}`;
       return api(originalRequest);
     } catch (refreshError) {
       resolveQueue(null);
-      clearSession();
+      clearSession(true);
+      window.location.assign("/session-expired");
       toast.error("Tu sesión expiró. Inicia sesión nuevamente.");
       return Promise.reject(refreshError);
     } finally {

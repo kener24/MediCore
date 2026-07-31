@@ -1,24 +1,24 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
-import { Bell, CalendarClock, FileText, Receipt } from "lucide-react";
+import { Bell, CalendarClock, CheckCheck, Download, FileText, Receipt } from "lucide-react";
 
-import { cancelPatientAppointment, getPatientDoctorAvailability, getPatientMedicalRecordSummary, getPatientPortalAppointment, getPatientPortalAppointments, getPatientPortalClinicInfo, getPatientPortalDashboard, getPatientPortalDoctors, getPatientPortalInvoice, getPatientPortalInvoices, getPatientPortalMedicalOrder, getPatientPortalMedicalOrders, getPatientPortalPayments, getPatientPortalPrescription, getPatientPortalPrescriptionPdf, getPatientPortalPrescriptions, getPatientPortalProfile, getPatientPortalSpecialties, requestPatientAppointment, reschedulePatientAppointment, updatePatientPortalProfile } from "../../api/patientPortalApi";
+import { cancelPatientAppointment, getPatientDoctorAvailability, getPatientMedicalRecordSummary, getPatientPortalAppointment, getPatientPortalAppointments, getPatientPortalClinicInfo, getPatientPortalCreditNotePdf, getPatientPortalCreditNotes, getPatientPortalDashboard, getPatientPortalDoctors, getPatientPortalInvoice, getPatientPortalInvoicePdf, getPatientPortalInvoices, getPatientPortalMedicalOrder, getPatientPortalMedicalOrders, getPatientPortalNotification, getPatientPortalNotifications, getPatientPortalPayment, getPatientPortalPaymentReceipt, getPatientPortalPayments, getPatientPortalPrescription, getPatientPortalPrescriptionPdf, getPatientPortalPrescriptions, getPatientPortalProfile, getPatientPortalSpecialties, markAllPatientPortalNotificationsRead, markPatientPortalNotificationRead, requestPatientAppointment, reschedulePatientAppointment, updatePatientPortalProfile } from "../../api/patientPortalApi";
 import { getErrorMessage } from "../../api/axios";
+import { downloadBlob } from "../../api/billingApi";
 import { AppointmentStatusBadge } from "../../components/ui/AppointmentStatusBadge";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { EmptyState } from "../../components/ui/EmptyState";
-import { InvoiceStatusBadge, PaymentMethodBadge } from "../../components/ui/BillingBadges";
+import { InvoiceStatusBadge } from "../../components/ui/BillingBadges";
 import { Loader } from "../../components/ui/Loader";
 import { Modal, ModalCloseButton } from "../../components/ui/Modal";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { StatCard } from "../../components/ui/StatCard";
 import { Table } from "../../components/ui/Table";
 import type { Appointment, AppointmentAvailability } from "../../types/appointment";
-import type { Invoice, Payment } from "../../types/billing";
 import type { MedicalOrder, Prescription } from "../../types/prescription";
-import type { PatientClinicInfo, PatientMedicalRecordSummary, PatientPortalDashboard, PatientPortalProfile } from "../../types/patientPortal";
+import type { PatientClinicInfo, PatientMedicalRecordSummary, PatientPortalCreditNote, PatientPortalDashboard, PatientPortalInvoice, PatientPortalNotification, PatientPortalPayment, PatientPortalProfile } from "../../types/patientPortal";
 
 const money = (v?: string | number | null) => `L ${Number(v ?? 0).toFixed(2)}`;
 const appointmentDoctor = (item: Appointment) => item.doctor_name ?? (item as any).doctor_nombre ?? "-";
@@ -112,13 +112,29 @@ export function PatientRequestAppointmentPage() {
 
 export function PatientPortalPrescriptionsPage() { return <SimpleList title="Mis recetas" loader={getPatientPortalPrescriptions} columns={[["Numero", "prescription_number"], ["Fecha", "issue_date"], ["Estado", "status"]]} detailBase="/patient/prescriptions" />; }
 export function PatientPortalMedicalOrdersPage() { return <SimpleList title="Mis ordenes medicas" loader={getPatientPortalMedicalOrders} columns={[["Orden", "order_number"], ["Tipo", "order_type"], ["Estado", "status"]]} detailBase="/patient/medical-orders" />; }
-export function PatientPortalInvoicesPage() { return <SimpleList title="Mis facturas" loader={getPatientPortalInvoices} columns={[["Factura", "invoice_number"], ["Total", "total_amount"], ["Saldo", "balance_due"]]} detailBase="/patient/invoices" moneyFields={["total_amount", "balance_due"]} />; }
-export function PatientPortalPaymentsPage() {
-  const [items, setItems] = useState<Payment[]>([]);
+export function PatientPortalInvoicesPage() {
+  const [items, setItems] = useState<PatientPortalInvoice[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  useEffect(() => { getPatientPortalPayments().then(setItems).catch((e) => { const message = getErrorMessage(e); setError(message); toast.error(message); }); }, []);
+  useEffect(() => { getPatientPortalInvoices().then(setItems).catch((e) => setError(getErrorMessage(e))).finally(() => setLoading(false)); }, []);
   if (error) return <LoadError message={error} />;
-  return <div className="space-y-6"><PageHeader title="Mis pagos" description="Pagos aplicados a tus facturas." /><Card><Table data={items} columns={[{ key: "num", header: "Pago", render: (i) => i.payment_number }, { key: "method", header: "Metodo", render: (i) => <PaymentMethodBadge method={i.method} /> }, { key: "amount", header: "Monto", render: (i) => money(i.amount) }, { key: "date", header: "Fecha", render: (i) => i.payment_date }]} /></Card></div>;
+  return <div className="space-y-6"><PageHeader title="Mis facturas" description="Consulta conceptos, pagos, saldos y documentos fiscales." /><Card>{loading ? <Loader /> : items.length ? <Table data={items} columns={[
+    { key: "number", header: "Factura", render: (item) => <div><Link className="font-semibold text-brand-700" to={`/patient/invoices/${item.id}`}>{item.invoice_number}</Link>{item.fiscal_number ? <p className="text-xs text-slate-500">{item.fiscal_number}</p> : null}</div> },
+    { key: "date", header: "Fecha", render: (item) => item.issue_date },
+    { key: "total", header: "Total", render: (item) => money(item.total_amount) },
+    { key: "balance", header: "Saldo", render: (item) => money(item.balance_due) },
+    { key: "status", header: "Estado", render: (item) => <InvoiceStatusBadge status={item.status} /> },
+    { key: "credit", header: "Nota de crédito", render: (item) => item.related_credit_note?.credit_note_number || "-" },
+  ]} /> : <EmptyState title="No tienes facturas." description="Las facturas emitidas por tu clínica aparecerán aquí." />}</Card></div>;
+}
+
+export function PatientPortalPaymentsPage() {
+  const [items, setItems] = useState<PatientPortalPayment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  useEffect(() => { getPatientPortalPayments().then(setItems).catch((e) => { const message = getErrorMessage(e); setError(message); toast.error(message); }).finally(() => setLoading(false)); }, []);
+  if (error) return <LoadError message={error} />;
+  return <div className="space-y-6"><PageHeader title="Mis pagos" description="Historial de pagos y recibos emitidos por la clínica." /><Card>{loading ? <Loader /> : items.length ? <Table data={items} columns={[{ key: "num", header: "Pago", render: (i) => <Link className="font-semibold text-brand-700" to={`/patient/payments/${i.id}`}>{i.payment_number}</Link> }, { key: "invoice", header: "Factura", render: (i) => i.invoice_number }, { key: "method", header: "Método", render: (i) => i.method_display }, { key: "amount", header: "Monto", render: (i) => money(i.amount) }, { key: "date", header: "Fecha", render: (i) => i.payment_date }, { key: "status", header: "Estado", render: (i) => i.status_display }]} /> : <EmptyState title="No tienes pagos registrados." description="Cuando la clínica aplique un pago aparecerá aquí." />}</Card></div>;
 }
 
 function SimpleList({ title, loader, columns, detailBase, moneyFields = [] }: { title: string; loader: () => Promise<any[]>; columns: [string, string][]; detailBase: string; moneyFields?: string[] }) {
@@ -171,12 +187,54 @@ export function PatientPortalInvoiceDetailsPage() { return <InvoiceDetails />; }
 
 function InvoiceDetails() {
   const { id } = useParams();
-  const [item, setItem] = useState<Invoice | null>(null);
+  const [item, setItem] = useState<PatientPortalInvoice | null>(null);
   const [error, setError] = useState("");
+  const [downloading, setDownloading] = useState(false);
   useEffect(() => { if (id) getPatientPortalInvoice(id).then(setItem).catch((e) => { const message = getErrorMessage(e); setError(message); toast.error(message); }); }, [id]);
   if (error) return <LoadError message={error} />;
   if (!item) return <Loader />;
-  return <div className="space-y-6"><PageHeader title={item.invoice_number} description="Detalle de factura." actions={<Link className="rounded-md border px-4 py-2 text-sm font-semibold text-slate-700" to={`/patient/invoices/${item.id}/print`}>Imprimir</Link>} /><Card><div className="grid gap-4 md:grid-cols-4"><Info label="Total" value={money(item.total_amount)} /><Info label="Pagado" value={money(item.paid_amount)} /><Info label="Saldo" value={money(item.balance_due)} /><div><p className="text-xs font-semibold uppercase text-slate-500">Estado</p><div className="mt-1"><InvoiceStatusBadge status={item.status} /></div></div></div></Card></div>;
+  async function downloadPdf() { if (!id || downloading) return; setDownloading(true); try { downloadBlob(await getPatientPortalInvoicePdf(id), `factura-${item?.invoice_number || id}.pdf`); } catch (e) { toast.error(getErrorMessage(e)); } finally { setDownloading(false); } }
+  return <div className="space-y-6"><PageHeader title={item.invoice_number} description={item.is_fiscal ? `Factura fiscal ${item.fiscal_number || ""}` : "Factura no fiscal"} actions={item.pdf_available ? <Button type="button" variant="outline" icon={<Download className="h-4 w-4" />} isLoading={downloading} onClick={downloadPdf}>Descargar PDF</Button> : null} /><Card><div className="grid gap-4 md:grid-cols-4"><Info label="Total" value={money(item.total_amount)} /><Info label="Pagado" value={money(item.paid_amount)} /><Info label="Saldo" value={money(item.balance_due)} /><div><p className="text-xs font-semibold uppercase text-slate-500">Estado</p><div className="mt-1"><InvoiceStatusBadge status={item.status} /></div></div><Info label="Fecha" value={item.issue_date} /><Info label="Vencimiento" value={item.due_date || "Sin vencimiento"} /><Info label="Cliente" value={item.customer_name || item.patient_name} /><Info label="RTN cliente" value={item.customer_rtn || "No registrado"} /></div></Card><Card title="Conceptos">{item.items?.length ? <Table data={item.items} columns={[{ key: "description", header: "Descripción", render: (i) => i.description }, { key: "quantity", header: "Cantidad", render: (i) => i.quantity }, { key: "unit", header: "Precio", render: (i) => money(i.unit_price) }, { key: "tax", header: "Impuesto", render: (i) => i.tax_type_display }, { key: "total", header: "Total", render: (i) => money(i.line_total) }]} /> : <EmptyState title="Factura sin conceptos visibles." />}</Card><Card title="Pagos aplicados">{item.payments?.length ? <Table data={item.payments} columns={[{ key: "number", header: "Pago", render: (p) => <Link className="font-semibold text-brand-700" to={`/patient/payments/${p.id}`}>{p.payment_number}</Link> }, { key: "date", header: "Fecha", render: (p) => p.payment_date }, { key: "amount", header: "Monto", render: (p) => money(p.amount) }, { key: "status", header: "Estado", render: (p) => p.status_display }]} /> : <EmptyState title="Aún no hay pagos aplicados." />}</Card>{item.related_credit_note ? <Card title="Nota de crédito"><div className="grid gap-4 md:grid-cols-3"><Info label="Número" value={item.related_credit_note.credit_note_number} /><Info label="Motivo" value={item.related_credit_note.reason} /><Info label="Total" value={money(item.related_credit_note.total_amount)} /></div></Card> : null}</div>;
+}
+
+export function PatientPortalPaymentDetailsPage() {
+  const { id } = useParams();
+  const [item, setItem] = useState<PatientPortalPayment | null>(null);
+  const [error, setError] = useState("");
+  const [downloading, setDownloading] = useState(false);
+  useEffect(() => { if (id) getPatientPortalPayment(id).then(setItem).catch((e) => setError(getErrorMessage(e))); }, [id]);
+  if (error) return <LoadError message={error} />;
+  if (!item) return <Loader />;
+  async function receipt() { if (!id || !item) return; const filename = `recibo-${item.payment_number}.pdf`; setDownloading(true); try { downloadBlob(await getPatientPortalPaymentReceipt(id), filename); } catch (e) { toast.error(getErrorMessage(e)); } finally { setDownloading(false); } }
+  return <div className="space-y-6"><PageHeader title={item.payment_number} description={`Pago asociado a ${item.invoice_number}`} actions={item.receipt_available ? <Button type="button" variant="outline" icon={<Download className="h-4 w-4" />} isLoading={downloading} onClick={receipt}>Descargar recibo</Button> : null} /><Card><div className="grid gap-4 md:grid-cols-3"><Info label="Monto" value={money(item.amount)} /><Info label="Método" value={item.method_display} /><Info label="Fecha" value={item.payment_date} /><Info label="Estado" value={item.status_display} /><Info label="Referencia" value={item.reference_visible || "Sin referencia"} /><Info label="Saldo posterior" value={money(item.balance_after)} /></div></Card>{item.status === "anulado" ? <Card title="Pago anulado"><p className="text-sm text-rose-700">Este registro se conserva únicamente como historial y no permite descargar recibo.</p></Card> : null}</div>;
+}
+
+export function PatientPortalCreditNotesPage() {
+  const [items, setItems] = useState<PatientPortalCreditNote[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { getPatientPortalCreditNotes().then(setItems).catch((e) => toast.error(getErrorMessage(e))).finally(() => setLoading(false)); }, []);
+  async function pdf(note: PatientPortalCreditNote) { try { downloadBlob(await getPatientPortalCreditNotePdf(note.id), `nota-credito-${note.credit_note_number}.pdf`); } catch (e) { toast.error(getErrorMessage(e)); } }
+  return <div className="space-y-6"><PageHeader title="Mis notas de crédito" description="Documentos de anulación o ajuste vinculados a tus facturas." /><Card>{loading ? <Loader /> : items.length ? <Table data={items} columns={[{ key: "number", header: "Nota", render: (n) => n.credit_note_number }, { key: "invoice", header: "Factura", render: (n) => n.original_invoice_number }, { key: "date", header: "Fecha", render: (n) => n.issue_date }, { key: "reason", header: "Motivo", render: (n) => n.reason }, { key: "total", header: "Total", render: (n) => money(n.total_amount) }, { key: "pdf", header: "", render: (n) => <Button type="button" variant="outline" icon={<Download className="h-4 w-4" />} onClick={() => pdf(n)}>PDF</Button> }]} /> : <EmptyState title="No tienes notas de crédito." />}</Card></div>;
+}
+
+export function PatientPortalNotificationsPage() {
+  const [items, setItems] = useState<PatientPortalNotification[]>([]);
+  const [loading, setLoading] = useState(true);
+  async function load() { setLoading(true); try { setItems(await getPatientPortalNotifications()); } catch (e) { toast.error(getErrorMessage(e)); } finally { setLoading(false); } }
+  useEffect(() => { load(); }, []);
+  async function readAll() { try { const result = await markAllPatientPortalNotificationsRead(); toast.success(`${result.updated} notificaciones marcadas como leídas.`); await load(); } catch (e) { toast.error(getErrorMessage(e)); } }
+  return <div className="space-y-6"><PageHeader title="Notificaciones" description="Avisos de citas, documentos, facturas y pagos." actions={<Button type="button" icon={<CheckCheck className="h-4 w-4" />} onClick={readAll}>Marcar todas como leídas</Button>} /><Card>{loading ? <Loader /> : items.length ? <Table data={items} columns={[{ key: "title", header: "Notificación", render: (n) => <div><Link className="font-semibold text-brand-700" to={`/patient/notifications/${n.id}`}>{n.title}</Link><p className="mt-1 text-xs text-slate-500">{n.message}</p></div> }, { key: "type", header: "Tipo", render: (n) => n.notification_type_display }, { key: "date", header: "Fecha", render: (n) => new Date(n.creado_en).toLocaleString() }, { key: "status", header: "Estado", render: (n) => n.status === "unread" ? "No leída" : "Leída" }]} /> : <EmptyState title="No tienes notificaciones." description="Los avisos importantes aparecerán aquí." />}</Card></div>;
+}
+
+export function PatientPortalNotificationDetailsPage() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [item, setItem] = useState<PatientPortalNotification | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => { if (!id) return; getPatientPortalNotification(id).then(async (notification) => { const current = notification.status === "unread" ? await markPatientPortalNotificationRead(id) : notification; setItem(current); }).catch((e) => setError(getErrorMessage(e))); }, [id]);
+  if (error) return <LoadError message={error} />;
+  if (!item) return <Loader />;
+  return <div className="space-y-6"><PageHeader title={item.title} description={new Date(item.creado_en).toLocaleString()} actions={item.target ? <Button type="button" onClick={() => navigate(item.target!.path)}>Abrir</Button> : null} /><Card><p className="whitespace-pre-wrap text-sm leading-6 text-slate-700">{item.message}</p></Card></div>;
 }
 
 export function PatientMedicalRecordSummaryPage() {

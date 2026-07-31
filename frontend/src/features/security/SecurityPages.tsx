@@ -224,7 +224,7 @@ function SessionsTable({ sessions, onRevoke, admin = false }: { sessions: UserSe
           <tr>
             {admin ? <th className="px-4 py-3">Usuario</th> : null}
             <th className="px-4 py-3">Dispositivo</th>
-            <th className="px-4 py-3">IP</th>
+            <th className="px-4 py-3">Ubicacion</th>
             <th className="px-4 py-3">Ultima actividad</th>
             <th className="px-4 py-3">Estado</th>
             <th className="px-4 py-3"></th>
@@ -235,13 +235,13 @@ function SessionsTable({ sessions, onRevoke, admin = false }: { sessions: UserSe
             <tr key={session.id}>
               {admin ? <td className="px-4 py-3 font-medium text-slate-800">{session.user_nombre || session.user_email}</td> : null}
               <td className="px-4 py-3">{session.device_name || "Dispositivo"}</td>
-              <td className="px-4 py-3">{session.ip_address ?? "-"}</td>
+              <td className="px-4 py-3">{admin ? session.ip_address ?? "-" : session.location_hint || "No disponible"}</td>
               <td className="px-4 py-3">{formatDate(session.last_activity_at)}</td>
               <td className="px-4 py-3">
                 <Badge tone={session.active ? "active" : "inactive"}>{session.current ? "Actual" : session.active ? "Activa" : "Cerrada"}</Badge>
               </td>
               <td className="px-4 py-3 text-right">
-                <Button variant="outline" icon={<Lock className="h-4 w-4" />} disabled={!session.active || session.current} onClick={() => onRevoke(session.id)}>Cerrar</Button>
+                <Button variant="outline" icon={<Lock className="h-4 w-4" />} disabled={!session.active} onClick={() => onRevoke(session.id)}>{session.current ? "Cerrar esta sesion" : "Cerrar"}</Button>
               </td>
             </tr>
           ))}
@@ -252,6 +252,7 @@ function SessionsTable({ sessions, onRevoke, admin = false }: { sessions: UserSe
 }
 
 export function ActiveSessionsPage() {
+  const { logout } = useAuth();
   const [sessions, setSessions] = useState<UserSession[]>([]);
   const [loading, setLoading] = useState(true);
   const load = () => getMySessions().then(setSessions).finally(() => setLoading(false));
@@ -260,9 +261,19 @@ export function ActiveSessionsPage() {
     load();
   }, []);
   async function closeSession(id: number) {
-    await revokeSession(id);
-    toast.success("Sesion cerrada.");
-    load();
+    const session = sessions.find((item) => item.id === id);
+    if (!window.confirm(session?.current ? "Cerraras la sesion que estas usando. Deseas continuar?" : "Deseas cerrar esta sesion?")) return;
+    try {
+      await revokeSession(id);
+      if (session?.current) {
+        await logout();
+        return;
+      }
+      toast.success("Sesion cerrada.");
+      load();
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
   }
   async function closeAll() {
     await revokeAllSessions(true);

@@ -28,6 +28,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const key = sessionStorage.key(index);
       if (key?.startsWith("medicore.consultationDraft.")) sessionStorage.removeItem(key);
     }
+    for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+      const key = localStorage.key(index);
+      if (key?.startsWith("medicore.patient.")) localStorage.removeItem(key);
+    }
     setUser(null);
   }, []);
 
@@ -53,6 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(REFRESH_TOKEN_KEY, response.refresh);
       if (response.session_key) localStorage.setItem(SESSION_KEY, response.session_key);
       const authenticatedUser = response.user ?? (await getMe());
+      sessionStorage.removeItem("medicore.session-expired");
       setUser(authenticatedUser);
       return authenticatedUser;
     },
@@ -80,6 +85,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.addEventListener("medicore:logout", handleForcedLogout);
     return () => window.removeEventListener("medicore:logout", handleForcedLogout);
   }, [clearLocalSession, refreshMe]);
+
+  useEffect(() => {
+    if (!user) return;
+    const timeoutMinutes = Number(import.meta.env.VITE_SESSION_INACTIVITY_MINUTES ?? 30);
+    const timeoutMs = Math.max(5, timeoutMinutes) * 60_000;
+    let lastActivity = Date.now();
+    const recordActivity = () => { lastActivity = Date.now(); };
+    const events: Array<keyof WindowEventMap> = ["pointerdown", "keydown", "scroll", "touchstart"];
+    events.forEach((event) => window.addEventListener(event, recordActivity, { passive: true }));
+    const interval = window.setInterval(() => {
+      if (Date.now() - lastActivity < timeoutMs) return;
+      clearLocalSession();
+      sessionStorage.setItem("medicore.session-expired", "1");
+      window.location.assign("/session-expired");
+    }, 30_000);
+    return () => {
+      window.clearInterval(interval);
+      events.forEach((event) => window.removeEventListener(event, recordActivity));
+    };
+  }, [clearLocalSession, user]);
 
   const value = useMemo(
     () => ({

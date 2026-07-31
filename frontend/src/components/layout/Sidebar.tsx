@@ -38,6 +38,19 @@ const accountGroup: NavGroup = {
   ],
 };
 
+const patientAccountGroup: NavGroup = {
+  label: "Cuenta",
+  icon: UserCircle,
+  items: [
+    { label: "Perfil", path: "/patient/profile", icon: UserCircle },
+    { label: "Seguridad", path: "/security", icon: ShieldCheck },
+    { label: "Sesiones", path: "/security/sessions", icon: ShieldCheck },
+    { label: "Notificaciones", path: "/patient/notifications", icon: Bell },
+    { label: "Preferencias", path: "/notifications/preferences", icon: KeyRound },
+    { label: "Cambiar contraseña", path: "/change-password", icon: KeyRound },
+  ],
+};
+
 const adminGroups: NavGroup[] = [
   { label: "Dashboard", path: "/clinic/dashboard", icon: Gauge },
   {
@@ -305,10 +318,11 @@ const patientGroups: NavGroup[] = [
     items: [
       { label: "Mis Facturas", path: "/patient/invoices" },
       { label: "Mis Pagos", path: "/patient/payments" },
+      { label: "Notas de crédito", path: "/patient/credit-notes" },
       { label: "Clinica", path: "/patient/clinic-info" },
     ],
   },
-  accountGroup,
+  patientAccountGroup,
 ];
 
 const superAdminGroups: NavGroup[] = [

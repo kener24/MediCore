@@ -19,19 +19,21 @@ export interface EmailVerificationStatus {
 
 export interface UserSession {
   id: number;
-  user: number;
-  user_email: string;
-  user_nombre: string;
-  session_key: string;
-  ip_address: string | null;
-  user_agent: string;
+  user?: number;
+  user_email?: string;
+  user_nombre?: string;
+  ip_address?: string | null;
+  user_agent?: string;
   device_name: string;
+  platform?: string;
+  location_hint?: string;
   last_activity_at: string;
   expires_at: string;
   revoked_at: string | null;
   active: boolean;
   created_at: string;
   current: boolean;
+  expired?: boolean;
 }
 
 export interface AccountLock {

@@ -157,6 +157,12 @@ class SecurityApiTests(APITestCase):
         self.assertEqual(len(sessions.data), 1)
         self.assertTrue(sessions.data[0]["current"])
         self.assertNotIn("session_key", sessions.data[0])
+        self.assertNotIn("user", sessions.data[0])
+        self.assertNotIn("user_email", sessions.data[0])
+        self.assertNotIn("ip_address", sessions.data[0])
+        self.assertNotIn("user_agent", sessions.data[0])
+        self.assertIn("platform", sessions.data[0])
+        self.assertIn("location_hint", sessions.data[0])
 
     def test_refresh_y_logout_exigen_sesion_activa(self):
         login = self.client.post(
@@ -231,6 +237,22 @@ class SecurityApiTests(APITestCase):
         self.assertEqual(revoke.status_code, status.HTTP_200_OK)
         current.refresh_from_db()
         self.assertFalse(current.active)
+
+    def test_usuario_no_puede_revocar_sesion_ajena(self):
+        foreign = UserSession.objects.create(
+            user=self.other_admin,
+            session_key="sesion-ajena",
+            ip_address="10.20.30.40",
+            user_agent="foreign-agent",
+            device_name="foreign-device",
+            last_activity_at=timezone.now(),
+            expires_at=timezone.now() + timezone.timedelta(days=1),
+        )
+        self.authenticate(self.user)
+        response = self.client.post(f"/api/security/sessions/{foreign.id}/revoke/")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        foreign.refresh_from_db()
+        self.assertTrue(foreign.active)
 
     def test_endpoints_protegidos_requieren_jwt(self):
         response = self.client.get("/api/security/sessions/")

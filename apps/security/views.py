@@ -20,6 +20,7 @@ from apps.security.serializers import (
     PasswordPolicyValidateSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
+    OwnUserSessionSerializer,
     RevokeAllSessionsSerializer,
     SecuritySettingSerializer,
     UserSessionSerializer,
@@ -172,24 +173,29 @@ class AccountLockUnlockView(APIView):
 
 class UserSessionsView(APIView):
     permission_classes = [IsAuthenticated]
-    serializer_class = UserSessionSerializer
+    serializer_class = OwnUserSessionSerializer
 
     def get(self, request):
-        qs = UserSession.objects.filter(user=request.user).select_related("user")
+        qs = UserSession.objects.filter(user=request.user, active=True, expires_at__gt=timezone.now()).select_related("user")
         current = request.headers.get("X-Session-Key", "")
-        return Response(UserSessionSerializer(qs, many=True, context={"current_session_key": current}).data)
+        log_audit_event(request=request, action=AuditLog.Action.VIEW, module=AuditLog.Module.SECURITY, model_name="UserSession", description="Usuario consultó sus sesiones activas.")
+        return Response(OwnUserSessionSerializer(qs, many=True, context={"current_session_key": current}).data)
 
 
 class UserSessionRevokeView(APIView):
     permission_classes = [IsAuthenticated]
-    serializer_class = UserSessionSerializer
+    serializer_class = OwnUserSessionSerializer
 
     def patch(self, request, session_id):
         session = UserSession.objects.filter(id=session_id, user=request.user).first()
         if not session:
+            log_audit_event(request=request, action=AuditLog.Action.PERMISSION_DENIED, module=AuditLog.Module.SECURITY, model_name="UserSession", object_id=session_id, description="Intento bloqueado de revocar una sesión ajena.")
             return Response({"detail": "Sesion no encontrada."}, status=status.HTTP_404_NOT_FOUND)
         revoke_user_session(session, revoked_by=request.user)
-        return Response(UserSessionSerializer(session).data)
+        log_audit_event(request=request, action=AuditLog.Action.UPDATE, module=AuditLog.Module.SECURITY, model_name="UserSession", object_id=session.id, description="Usuario revocó una sesión propia.", metadata={"current": request.headers.get("X-Session-Key", "") == session.session_key})
+        return Response(OwnUserSessionSerializer(session, context={"current_session_key": request.headers.get("X-Session-Key", "")}).data)
+
+    post = patch
 
 
 class UserSessionsRevokeAllView(APIView):
@@ -202,6 +208,7 @@ class UserSessionsRevokeAllView(APIView):
         keep_current = serializer.validated_data.get("keep_current", True)
         current = request.headers.get("X-Session-Key") if keep_current else None
         revoke_all_user_sessions(request.user, keep_current=current, revoked_by=request.user)
+        log_audit_event(request=request, action=AuditLog.Action.UPDATE, module=AuditLog.Module.SECURITY, model_name="UserSession", description="Usuario revocó sus demás sesiones.", metadata={"keep_current": keep_current})
         return Response({"detail": "Sesiones revocadas correctamente."})
 
 

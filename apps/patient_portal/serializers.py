@@ -1,11 +1,13 @@
+from django.db.models import Q
 from rest_framework import serializers
 
 from apps.appointments.serializers import AppointmentDetailSerializer
 from apps.appointments.models import Appointment
-from apps.billing.serializers import InvoiceDetailSerializer, InvoiceListSerializer, PaymentListSerializer
+from apps.billing.models import CreditNote, Invoice, InvoiceItem, Payment
 from apps.core.validators import validate_phone
 from apps.doctors.models import DoctorProfile, MedicalSpecialty
 from apps.medical_records.models import ClinicalConsultation, MedicalRecord
+from apps.notifications.models import Notification
 from apps.patients.models import Patient
 from apps.prescriptions.models import MedicalOrder, Prescription, PrescriptionItem
 
@@ -147,6 +149,155 @@ class PatientPortalMedicalOrderSerializer(serializers.ModelSerializer):
         return ""
 
 
+class PatientPortalInvoiceItemSerializer(serializers.ModelSerializer):
+    tax_type_display = serializers.CharField(source="get_tax_type_display", read_only=True)
+
+    class Meta:
+        model = InvoiceItem
+        fields = [
+            "id", "description", "quantity", "unit_price", "discount_amount", "tax_type",
+            "tax_type_display", "tax_rate", "subtotal", "tax_amount", "line_total",
+        ]
+
+
+class PatientPortalPaymentSerializer(serializers.ModelSerializer):
+    clinic_nombre = serializers.CharField(source="clinic.nombre", read_only=True)
+    invoice_number = serializers.CharField(source="invoice.invoice_number", read_only=True)
+    method_display = serializers.CharField(source="get_method_display", read_only=True)
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+    reference_visible = serializers.SerializerMethodField()
+    receipt_available = serializers.SerializerMethodField()
+    receipt_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Payment
+        fields = [
+            "id", "clinic_nombre", "invoice", "invoice_number", "payment_number", "payment_date",
+            "amount", "method", "method_display", "reference_visible", "notes", "status",
+            "status_display", "balance_before", "balance_after", "receipt_available", "receipt_url",
+            "creado_en", "actualizado_en",
+        ]
+
+    def get_reference_visible(self, obj):
+        value = str(obj.reference or "").strip()
+        if not value:
+            return ""
+        if len(value) <= 4:
+            return value
+        return f"****{value[-4:]}"
+
+    def get_receipt_available(self, obj):
+        return bool(obj.active and obj.status == Payment.Status.APLICADO)
+
+    def get_receipt_url(self, obj):
+        if not self.get_receipt_available(obj):
+            return ""
+        return f"/api/patient-portal/payments/{obj.id}/receipt/"
+
+
+class PatientPortalCreditNoteSerializer(serializers.ModelSerializer):
+    clinic_nombre = serializers.CharField(source="clinic.nombre", read_only=True)
+    original_invoice_number = serializers.CharField(source="original_invoice.invoice_number", read_only=True)
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+    pdf_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CreditNote
+        fields = [
+            "id", "clinic_nombre", "original_invoice", "original_invoice_number", "credit_note_number",
+            "fiscal_number", "issue_date", "reason", "subtotal", "discount_amount", "tax_amount",
+            "total_amount", "subtotal_exempt", "subtotal_exonerated", "subtotal_taxed_15",
+            "subtotal_taxed_18", "isv_15", "isv_18", "amount_in_words", "status",
+            "status_display", "pdf_url", "creado_en", "actualizado_en",
+        ]
+
+    def get_pdf_url(self, obj):
+        return f"/api/patient-portal/credit-notes/{obj.id}/pdf/" if obj.active else ""
+
+
+class PatientPortalNotificationSerializer(serializers.ModelSerializer):
+    notification_type_display = serializers.CharField(source="get_notification_type_display", read_only=True)
+    priority_display = serializers.CharField(source="get_priority_display", read_only=True)
+    target = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Notification
+        fields = [
+            "id", "title", "message", "notification_type", "notification_type_display", "module",
+            "priority", "priority_display", "status", "read_at", "sent_at", "expires_at",
+            "target", "creado_en", "actualizado_en",
+        ]
+
+    def get_target(self, obj):
+        resource_id = str(obj.related_object_id or "").strip()
+        model = str(obj.related_model or "").lower()
+        routes = {
+            "appointment": ("appointment", f"/patient/appointments/{resource_id}"),
+            "prescription": ("prescription", f"/patient/prescriptions/{resource_id}"),
+            "medicalorder": ("medical_order", f"/patient/medical-orders/{resource_id}"),
+            "clinicaldocument": ("document", f"/patient/documents/{resource_id}"),
+            "invoice": ("invoice", f"/patient/invoices/{resource_id}"),
+            "payment": ("payment", f"/patient/payments/{resource_id}"),
+            "dischargesummary": ("discharge_summary", f"/patient/discharge-summaries/{resource_id}"),
+        }
+        if not resource_id or model not in routes:
+            return None
+        target_type, path = routes[model]
+        return {"type": target_type, "id": resource_id, "path": path}
+
+
+class PatientPortalInvoiceListSerializer(serializers.ModelSerializer):
+    clinic_nombre = serializers.CharField(source="clinic.nombre", read_only=True)
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+    fiscal_status_display = serializers.CharField(source="get_fiscal_status_display", read_only=True)
+    related_credit_note = serializers.SerializerMethodField()
+    pdf_available = serializers.SerializerMethodField()
+    pdf_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Invoice
+        fields = [
+            "id", "clinic_nombre", "invoice_number", "issue_date", "due_date", "status",
+            "status_display", "is_fiscal", "fiscal_status", "fiscal_status_display", "fiscal_number",
+            "subtotal", "discount_amount", "tax_amount", "total_amount", "subtotal_exempt",
+            "subtotal_exonerated", "subtotal_taxed_15", "subtotal_taxed_18", "isv_15", "isv_18",
+            "paid_amount", "balance_due", "related_credit_note", "pdf_available", "pdf_url",
+            "creado_en", "actualizado_en",
+        ]
+
+    def get_related_credit_note(self, obj):
+        note = obj.credit_notes.filter(active=True).order_by("-issue_datetime").first()
+        return PatientPortalCreditNoteSerializer(note).data if note else None
+
+    def get_pdf_available(self, obj):
+        if not obj.active:
+            return False
+        if not obj.is_fiscal:
+            return True
+        return obj.fiscal_status in [Invoice.FiscalStatus.ISSUED, Invoice.FiscalStatus.CANCELLED]
+
+    def get_pdf_url(self, obj):
+        return f"/api/patient-portal/invoices/{obj.id}/pdf/" if self.get_pdf_available(obj) else ""
+
+
+class PatientPortalInvoiceDetailSerializer(PatientPortalInvoiceListSerializer):
+    patient_name = serializers.CharField(source="patient.nombre_completo", read_only=True)
+    items = PatientPortalInvoiceItemSerializer(many=True, read_only=True)
+    payments = serializers.SerializerMethodField()
+
+    class Meta(PatientPortalInvoiceListSerializer.Meta):
+        fields = PatientPortalInvoiceListSerializer.Meta.fields + [
+            "patient_name", "customer_name", "customer_rtn", "customer_address", "notes",
+            "amount_in_words", "cancellation_reason", "items", "payments",
+        ]
+
+    def get_payments(self, obj):
+        payments = obj.payments.filter(patient=obj.patient, clinic=obj.clinic).filter(
+            Q(active=True) | Q(status=Payment.Status.ANULADO)
+        )
+        return PatientPortalPaymentSerializer(payments, many=True).data
+
+
 class PatientPortalProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Patient
@@ -245,7 +396,10 @@ class PatientPortalDashboardSerializer(serializers.Serializer):
     upcoming_appointments = PatientPortalAppointmentSerializer(many=True)
     recent_prescriptions = PatientPortalPrescriptionSerializer(many=True)
     recent_orders = PatientPortalMedicalOrderSerializer(many=True)
-    pending_invoices = InvoiceListSerializer(many=True)
+    pending_invoices = PatientPortalInvoiceListSerializer(many=True)
+    pending_invoices_count = serializers.IntegerField()
+    pending_balance = serializers.DecimalField(max_digits=14, decimal_places=2)
+    last_payment = PatientPortalPaymentSerializer(allow_null=True)
     new_documents_count = serializers.IntegerField()
     unread_notifications = serializers.IntegerField()
     clinic = serializers.DictField()

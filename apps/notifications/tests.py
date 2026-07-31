@@ -117,18 +117,46 @@ class NotificationTests(APITestCase):
         self.auth(self.admin)
         payload = {
             "expo_push_token": "ExponentPushToken[demo123]",
+            "installation_id": "installation-admin-001",
             "platform": "android",
             "device_name": "Pixel demo",
             "app_version": "1.0.0",
         }
         response = self.client.post("/api/notifications/push-devices/", payload, format="json")
         self.assertEqual(response.status_code, 201)
+        self.assertNotIn("expo_push_token", response.data)
         self.assertTrue(PushDevice.objects.filter(user=self.admin, expo_push_token=payload["expo_push_token"], is_active=True).exists())
         self.assertTrue(NotificationPreference.objects.get(user=self.admin).push_enabled)
-        self.assertEqual(self.client.get("/api/notifications/push-devices/").status_code, 200)
-        response = self.client.delete("/api/notifications/push-devices/", {"expo_push_token": payload["expo_push_token"]}, format="json")
+        listing = self.client.get("/api/notifications/push-devices/")
+        self.assertEqual(listing.status_code, 200)
+        self.assertNotIn("expo_push_token", listing.data[0])
+        response = self.client.delete("/api/notifications/push-devices/", {"installation_id": payload["installation_id"]}, format="json")
         self.assertEqual(response.status_code, 200)
         self.assertFalse(PushDevice.objects.get(expo_push_token=payload["expo_push_token"]).is_active)
+
+    def test_patient_device_is_scoped_and_token_cannot_be_stolen(self):
+        payload = {
+            "expo_push_token": "ExponentPushToken[patient-device]",
+            "installation_id": "installation-patient-001",
+            "platform": "android",
+        }
+        self.auth(self.patient_user)
+        created = self.client.post("/api/patient-portal/devices/", payload, format="json")
+        self.assertEqual(created.status_code, 201)
+        device = PushDevice.objects.get(expo_push_token=payload["expo_push_token"])
+        self.assertEqual(device.patient_id, self.patient.id)
+        self.assertEqual(device.clinic_id, self.clinic.id)
+
+        self.auth(self.other_user)
+        stolen = self.client.post(
+            "/api/notifications/push-devices/",
+            {**payload, "installation_id": "installation-other-001"},
+            format="json",
+        )
+        self.assertEqual(stolen.status_code, 409)
+        self.assertEqual(self.client.delete(f"/api/notifications/push-devices/{device.id}/").data["disabled"], 0)
+        device.refresh_from_db()
+        self.assertTrue(device.is_active)
 
     def test_reject_invalid_push_token(self):
         self.auth(self.admin)

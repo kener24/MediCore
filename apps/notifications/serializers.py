@@ -1,3 +1,5 @@
+import re
+
 from rest_framework import serializers
 
 from apps.accounts.permissions import get_role_name
@@ -35,8 +37,9 @@ class NotificationPreferenceSerializer(serializers.ModelSerializer):
 class PushDeviceSerializer(serializers.ModelSerializer):
     class Meta:
         model = PushDevice
-        fields = ["id", "expo_push_token", "platform", "device_name", "app_version", "is_active", "last_seen_at", "creado_en", "actualizado_en"]
-        read_only_fields = ["id", "is_active", "last_seen_at", "creado_en", "actualizado_en"]
+        fields = ["id", "expo_push_token", "installation_id", "platform", "device_name", "app_version", "is_active", "last_seen_at", "revoked_at", "creado_en", "actualizado_en"]
+        read_only_fields = ["id", "is_active", "last_seen_at", "revoked_at", "creado_en", "actualizado_en"]
+        extra_kwargs = {"expo_push_token": {"write_only": True, "validators": []}}
 
     def validate_expo_push_token(self, value):
         token = str(value or "").strip()
@@ -45,6 +48,12 @@ class PushDeviceSerializer(serializers.ModelSerializer):
         if len(token) > 255:
             raise serializers.ValidationError("Token push demasiado largo.")
         return token
+
+    def validate_installation_id(self, value):
+        installation_id = str(value or "").strip()
+        if installation_id and not re.fullmatch(r"[A-Za-z0-9._:-]{8,100}", installation_id):
+            raise serializers.ValidationError("Identificador de instalación inválido.")
+        return installation_id
 
 
 class NotificationStatsSerializer(serializers.Serializer):

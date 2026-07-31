@@ -1,4 +1,5 @@
 from datetime import date, time, timedelta
+from decimal import Decimal
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import status
@@ -7,11 +8,13 @@ from rest_framework.test import APITestCase
 from apps.accounts.models import Role, User
 from apps.appointments.models import Appointment
 from apps.audit.models import AuditLog
+from apps.billing.models import CreditNote, Invoice, InvoiceItem, Payment
 from apps.clinic_settings.models import get_or_create_clinic_settings, get_or_create_workflow_settings
 from apps.clinics.models import Clinic
 from apps.doctors.models import DoctorProfile, DoctorSchedule, MedicalSpecialty
 from apps.documents.models import ClinicalDocument, DocumentCategory
 from apps.medical_records.models import ClinicalConsultation, MedicalRecord
+from apps.notifications.models import Notification
 from apps.patients.models import Patient
 from apps.prescriptions.models import MedicalOrder, Prescription
 
@@ -228,3 +231,111 @@ class PatientPortalSprint17ACertificationTests(APITestCase):
         self.assertNotIn("smtp", serialized)
         self.assertNotIn("secret", serialized)
         self.assertNotIn("cai", serialized)
+
+    def create_invoice(self, patient=None, clinic=None, number="FAC-PORTAL-1", **overrides):
+        patient = patient or self.patient_a
+        clinic = clinic or patient.clinic
+        values = {
+            "clinic": clinic,
+            "patient": patient,
+            "invoice_number": number,
+            "subtotal": Decimal("100.00"),
+            "total_amount": Decimal("100.00"),
+            "total": Decimal("100.00"),
+            "balance_due": Decimal("100.00"),
+            "status": Invoice.Status.PENDIENTE,
+        }
+        values.update(overrides)
+        invoice = Invoice.objects.create(**values)
+        InvoiceItem.objects.create(invoice=invoice, description="Consulta", quantity=1, unit_price=100, subtotal=100, line_total=100, total=100)
+        return invoice
+
+    def test_financial_portal_hides_internal_fields_and_blocks_foreign_resources(self):
+        own = self.create_invoice()
+        foreign = self.create_invoice(patient=self.patient_a2, number="FAC-PORTAL-2")
+        payment = Payment.objects.create(invoice=own, clinic=self.clinic_a, patient=self.patient_a, amount=Decimal("40.00"), reference="TRANSFER-123456", balance_before=Decimal("100.00"), balance_after=Decimal("60.00"))
+        foreign_payment = Payment.objects.create(invoice=foreign, clinic=self.clinic_a, patient=self.patient_a2, amount=Decimal("20.00"), balance_before=Decimal("100.00"), balance_after=Decimal("80.00"))
+
+        invoices = self.client.get("/api/patient-portal/invoices/")
+        detail = self.client.get(f"/api/patient-portal/invoices/{own.id}/")
+        pdf = self.client.get(f"/api/patient-portal/invoices/{own.id}/pdf/")
+        payments = self.client.get("/api/patient-portal/payments/")
+        payment_detail = self.client.get(f"/api/patient-portal/payments/{payment.id}/")
+        receipt = self.client.get(f"/api/patient-portal/payments/{payment.id}/receipt/")
+
+        self.assertEqual(invoices.status_code, status.HTTP_200_OK)
+        self.assertEqual([item["id"] for item in invoices.data], [own.id])
+        for field in ["clinic", "patient", "patient_identidad", "appointment", "consultation", "cai"]:
+            self.assertNotIn(field, invoices.data[0])
+        self.assertEqual(detail.status_code, status.HTTP_200_OK)
+        self.assertNotIn("created_by", detail.data)
+        self.assertNotIn("received_by", detail.data["payments"][0])
+        self.assertNotIn("cash_session", detail.data["payments"][0])
+        self.assertEqual(pdf.status_code, status.HTTP_200_OK)
+        self.assertEqual(pdf["Content-Type"], "application/pdf")
+        self.assertEqual([item["id"] for item in payments.data], [payment.id])
+        self.assertEqual(payment_detail.data["reference_visible"], "****3456")
+        self.assertNotIn("received_by", payment_detail.data)
+        self.assertNotIn("cash_session", payment_detail.data)
+        self.assertEqual(receipt.status_code, status.HTTP_200_OK)
+        self.assertEqual(self.client.get(f"/api/patient-portal/invoices/{foreign.id}/").status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(self.client.get(f"/api/patient-portal/invoices/{foreign.id}/pdf/").status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(self.client.get(f"/api/patient-portal/payments/{foreign_payment.id}/").status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(self.client.get(f"/api/patient-portal/payments/{foreign_payment.id}/receipt/").status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_voided_payment_and_credit_note_remain_visible_read_only(self):
+        invoice = self.create_invoice(
+            number="FAC-FISCAL-1",
+        )
+        Invoice.objects.filter(id=invoice.id).update(
+            is_fiscal=True,
+            fiscal_status=Invoice.FiscalStatus.ISSUED,
+            fiscal_number="000-001-01-00000001",
+            cai="CAI-DEMO",
+            fiscal_range_start="000-001-01-00000001",
+            fiscal_range_end="000-001-01-00000100",
+            fiscal_expiration_date=date.today() + timedelta(days=30),
+        )
+        invoice.refresh_from_db()
+        voided = Payment.objects.create(invoice=invoice, clinic=self.clinic_a, patient=self.patient_a, amount=Decimal("10.00"), status=Payment.Status.ANULADO, active=False, balance_before=100, balance_after=100)
+        note = CreditNote.objects.create(
+            clinic=self.clinic_a,
+            original_invoice=invoice,
+            credit_note_number="NC-0001",
+            fiscal_number="000-001-02-00000001",
+            cai="CAI-DEMO",
+            fiscal_range_start="000-001-02-00000001",
+            fiscal_range_end="000-001-02-00000100",
+            fiscal_expiration_date=date.today() + timedelta(days=30),
+            reason="Anulación de prueba",
+            total_amount=Decimal("100.00"),
+        )
+        Invoice.objects.filter(id=invoice.id).update(fiscal_status=Invoice.FiscalStatus.CANCELLED, status=Invoice.Status.ANULADA)
+
+        invoice_detail = self.client.get(f"/api/patient-portal/invoices/{invoice.id}/")
+        payment_list = self.client.get("/api/patient-portal/payments/")
+        notes = self.client.get("/api/patient-portal/credit-notes/")
+        note_pdf = self.client.get(f"/api/patient-portal/credit-notes/{note.id}/pdf/")
+        self.assertEqual(invoice_detail.status_code, status.HTTP_200_OK)
+        self.assertEqual(invoice_detail.data["related_credit_note"]["id"], note.id)
+        self.assertIn(voided.id, [item["id"] for item in payment_list.data])
+        self.assertFalse(next(item for item in payment_list.data if item["id"] == voided.id)["receipt_available"])
+        self.assertEqual([item["id"] for item in notes.data], [note.id])
+        self.assertEqual(note_pdf.status_code, status.HTTP_200_OK)
+
+    def test_patient_notifications_are_clinic_scoped_and_read_actions_are_idempotent(self):
+        own = Notification.objects.create(clinic=self.clinic_a, recipient=self.patient_user_a, title="Factura", message="Disponible", related_model="Invoice", related_object_id="123")
+        foreign_user = Notification.objects.create(clinic=self.clinic_a, recipient=self.patient_user_a2, title="Ajena", message="No visible")
+        wrong_clinic = Notification.objects.create(clinic=self.clinic_b, recipient=self.patient_user_a, title="Otra clínica", message="No visible")
+        listing = self.client.get("/api/patient-portal/notifications/")
+        self.assertEqual([item["id"] for item in listing.data], [own.id])
+        self.assertEqual(listing.data[0]["target"]["type"], "invoice")
+        first = self.client.patch(f"/api/patient-portal/notifications/{own.id}/mark-read/")
+        second = self.client.patch(f"/api/patient-portal/notifications/{own.id}/mark-read/")
+        blocked = self.client.patch(f"/api/patient-portal/notifications/{foreign_user.id}/mark-read/")
+        self.assertEqual(first.status_code, status.HTTP_200_OK)
+        self.assertEqual(second.status_code, status.HTTP_200_OK)
+        self.assertEqual(blocked.status_code, status.HTTP_404_NOT_FOUND)
+        self.client.patch("/api/patient-portal/notifications/mark-all-read/")
+        wrong_clinic.refresh_from_db()
+        self.assertEqual(wrong_clinic.status, Notification.Status.UNREAD)

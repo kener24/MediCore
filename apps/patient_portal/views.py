@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from io import BytesIO
 
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import status
@@ -16,14 +16,12 @@ from apps.appointments.serializers import build_availability
 from apps.audit.models import AuditLog
 from apps.audit.services import log_audit_event
 from apps.billing.models import CreditNote, Invoice, Payment
-from apps.billing.serializers import InvoiceDetailSerializer, InvoiceListSerializer, PaymentDetailSerializer, PaymentListSerializer
-from apps.billing.views import render_credit_note_pdf, render_payment_receipt_pdf
+from apps.billing.views import render_credit_note_pdf, render_invoice_pdf, render_payment_receipt_pdf
 from apps.clinic_settings.models import get_or_create_clinic_settings, get_or_create_workflow_settings
 from apps.doctors.models import DoctorProfile, MedicalSpecialty
 from apps.documents.models import ClinicalDocument
 from apps.medical_records.models import ClinicalConsultation, MedicalRecord
 from apps.notifications.models import Notification
-from apps.notifications.serializers import NotificationListSerializer
 from apps.notifications.services import create_notification
 from apps.patients.models import Patient
 from apps.patient_portal.services import (
@@ -40,7 +38,12 @@ from apps.patient_portal.serializers import (
     PatientPortalDashboardSerializer,
     PatientPortalDoctorSerializer,
     PatientPortalAppointmentSerializer,
+    PatientPortalCreditNoteSerializer,
+    PatientPortalInvoiceDetailSerializer,
+    PatientPortalInvoiceListSerializer,
     PatientPortalMedicalOrderSerializer,
+    PatientPortalNotificationSerializer,
+    PatientPortalPaymentSerializer,
     PatientPortalProfileSerializer,
     PatientPortalProfileUpdateSerializer,
     PatientPortalPrescriptionSerializer,
@@ -86,6 +89,10 @@ class PatientPortalBaseView(APIView):
             "can_view_medical_record": self.clinic_settings.allow_patient_medical_record_view,
             "can_view_prescriptions": self.clinic_settings.allow_patient_prescription_view,
             "can_view_invoices": self.clinic_settings.allow_patient_invoice_view,
+            "can_view_payments": self.clinic_settings.allow_patient_invoice_view,
+            "can_view_credit_notes": self.clinic_settings.allow_patient_invoice_view,
+            "can_download_invoice_pdf": self.clinic_settings.allow_patient_invoice_view,
+            "can_download_receipts": self.clinic_settings.allow_patient_invoice_view,
             "can_view_medical_orders": self.clinic_settings.allow_patient_medical_record_view,
             "can_view_documents": self.clinic_settings.allow_patient_medical_record_view,
             "can_request_appointments": self.workflow_settings.allow_appointments,
@@ -142,15 +149,23 @@ class PatientPortalDashboardView(PatientPortalBaseView):
         upcoming = Appointment.objects.filter(patient=self.patient, clinic=self.patient.clinic, scheduled_date__gte=today, activo=True).exclude(status=Appointment.Status.CANCELADA).select_related("doctor__user", "doctor__specialty", "clinic")[:5]
         prescriptions = Prescription.objects.filter(patient=self.patient, clinic=self.patient.clinic, status=Prescription.Status.EMITIDA, activo=True).select_related("clinic", "doctor__user")[:5]
         orders = MedicalOrder.objects.filter(patient=self.patient, clinic=self.patient.clinic, activo=True).exclude(status=MedicalOrder.Status.CANCELADA).select_related("clinic", "doctor__user")[:5]
-        invoices = Invoice.objects.filter(patient=self.patient, clinic=self.patient.clinic, status__in=[Invoice.Status.PENDIENTE, Invoice.Status.PARCIAL], active=True).select_related("clinic", "patient")[:5]
+        pending_invoices = Invoice.objects.filter(patient=self.patient, clinic=self.patient.clinic, status__in=[Invoice.Status.PENDIENTE, Invoice.Status.PARCIAL], active=True).select_related("clinic", "patient").prefetch_related("credit_notes")
+        invoices = pending_invoices[:5] if self.clinic_settings.allow_patient_invoice_view else []
+        pending_summary = pending_invoices.aggregate(balance=Sum("balance_due")) if self.clinic_settings.allow_patient_invoice_view else {}
+        pending_count = pending_invoices.count() if self.clinic_settings.allow_patient_invoice_view else 0
+        pending_balance = pending_summary.get("balance") or 0
+        last_payment = Payment.objects.filter(patient=self.patient, clinic=self.patient.clinic, active=True, status=Payment.Status.APLICADO).select_related("clinic", "invoice").first() if self.clinic_settings.allow_patient_invoice_view else None
         new_documents_count = ClinicalDocument.objects.filter(patient=self.patient, clinic=self.patient.clinic, visible_to_patient=True, active=True, status=ClinicalDocument.Status.ACTIVE).count()
-        unread = Notification.objects.filter(recipient=request.user, status=Notification.Status.UNREAD).count()
+        unread = Notification.objects.filter(recipient=request.user, clinic=self.patient.clinic, status=Notification.Status.UNREAD).count()
         data = {
             "patient": self.patient,
             "upcoming_appointments": upcoming,
             "recent_prescriptions": prescriptions,
             "recent_orders": orders,
             "pending_invoices": invoices,
+            "pending_invoices_count": pending_count,
+            "pending_balance": pending_balance,
+            "last_payment": last_payment,
             "new_documents_count": new_documents_count,
             "unread_notifications": unread,
             "clinic": self.clinic_payload(),
@@ -426,56 +441,49 @@ class PatientPortalMedicalOrdersView(PatientPortalBaseView):
 
 
 class PatientPortalInvoicesView(PatientPortalBaseView):
-    serializer_class = InvoiceListSerializer
-
-    def add_credit_note_status(self, item):
-        note = item.credit_notes.filter(active=True).order_by("-issue_datetime").first()
-        return {
-            "is_voided": item.fiscal_status == Invoice.FiscalStatus.CANCELLED,
-            "related_credit_note_id": note.id if note else None,
-            "related_credit_note_number": note.fiscal_number if note else None,
-            "void_reason": item.cancellation_reason if item.fiscal_status == Invoice.FiscalStatus.CANCELLED else "",
-            "credit_note_pdf_url": f"/api/patient-portal/credit-notes/{note.id}/pdf/" if note else "",
-        }
+    serializer_class = PatientPortalInvoiceListSerializer
 
     def get(self, request, invoice_id=None):
         if not self.clinic_settings.allow_patient_invoice_view:
-            return portal_denied()
-        qs = Invoice.objects.filter(patient=self.patient, clinic=self.patient.clinic, active=True).select_related("clinic", "patient").prefetch_related("credit_notes")
+            return portal_denied("Tu clínica no ha habilitado esta información en el portal.")
+        qs = Invoice.objects.filter(patient=self.patient, clinic=self.patient.clinic).filter(
+            Q(active=True) | Q(status=Invoice.Status.ANULADA) | Q(fiscal_status=Invoice.FiscalStatus.CANCELLED)
+        ).select_related("clinic", "patient").prefetch_related("credit_notes", "items", "payments")
         if invoice_id:
             item = qs.filter(id=invoice_id).first()
             if not item:
+                self.audit(AuditLog.Action.PERMISSION_DENIED, AuditLog.Module.BILLING, description="Intento bloqueado de consultar una factura ajena.", metadata={"requested_id": invoice_id})
                 return Response({"detail": "Factura no encontrada."}, status=status.HTTP_404_NOT_FOUND)
-            data = InvoiceDetailSerializer(item).data
-            data.update(self.add_credit_note_status(item))
-            return Response(data)
-        data = []
-        for item in qs:
-            serialized = InvoiceListSerializer(item).data
-            serialized.update(self.add_credit_note_status(item))
-            data.append(serialized)
-        return Response(data)
+            self.audit(AuditLog.Action.VIEW, AuditLog.Module.BILLING, obj=item, description="Paciente consultó una factura propia.")
+            return Response(PatientPortalInvoiceDetailSerializer(item).data)
+        self.audit(AuditLog.Action.VIEW, AuditLog.Module.BILLING, description="Paciente consultó sus facturas.")
+        return Response(PatientPortalInvoiceListSerializer(qs, many=True).data)
 
 
 class PatientPortalPaymentsView(PatientPortalBaseView):
-    serializer_class = PaymentListSerializer
+    serializer_class = PatientPortalPaymentSerializer
 
     def get(self, request, payment_id=None):
         if not self.clinic_settings.allow_patient_invoice_view:
-            return portal_denied()
-        qs = Payment.objects.filter(patient=self.patient, clinic=self.patient.clinic, active=True).select_related("invoice", "patient", "received_by")
+            return portal_denied("Tu clínica no ha habilitado esta información en el portal.")
+        qs = Payment.objects.filter(patient=self.patient, clinic=self.patient.clinic).filter(
+            Q(active=True) | Q(status=Payment.Status.ANULADO)
+        ).select_related("clinic", "invoice", "patient")
         if payment_id:
             payment = qs.filter(id=payment_id).first()
             if not payment:
+                self.audit(AuditLog.Action.PERMISSION_DENIED, AuditLog.Module.PAYMENTS, description="Intento bloqueado de consultar un pago ajeno.", metadata={"requested_id": payment_id})
                 return Response({"detail": "Pago no encontrado."}, status=status.HTTP_404_NOT_FOUND)
-            return Response(PaymentDetailSerializer(payment).data)
-        return Response(PaymentListSerializer(qs, many=True).data)
+            self.audit(AuditLog.Action.VIEW, AuditLog.Module.PAYMENTS, obj=payment, description="Paciente consultó un pago propio.")
+            return Response(PatientPortalPaymentSerializer(payment).data)
+        self.audit(AuditLog.Action.VIEW, AuditLog.Module.PAYMENTS, description="Paciente consultó sus pagos.")
+        return Response(PatientPortalPaymentSerializer(qs, many=True).data)
 
 
 class PatientPortalPaymentReceiptView(PatientPortalBaseView):
     def get(self, request, payment_id):
         if not self.clinic_settings.allow_patient_invoice_view:
-            return portal_denied()
+            return portal_denied("Tu clínica no ha habilitado esta información en el portal.")
         payment = (
             Payment.objects.filter(
                 id=payment_id,
@@ -492,13 +500,34 @@ class PatientPortalPaymentReceiptView(PatientPortalBaseView):
         log_audit_event(request=request, clinic=payment.clinic, action=AuditLog.Action.DOWNLOAD, module=AuditLog.Module.PAYMENTS, model_name="Payment", object_id=payment.id, object_repr=payment.payment_number, description="Paciente descargo recibo de pago.")
         response = HttpResponse(render_payment_receipt_pdf(payment), content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="recibo-{payment.payment_number}.pdf"'
+        response["Cache-Control"] = "private, no-store"
+        return response
+
+
+class PatientPortalInvoicePdfView(PatientPortalBaseView):
+    def get(self, request, invoice_id):
+        if not self.clinic_settings.allow_patient_invoice_view:
+            return portal_denied("Tu clínica no ha habilitado esta información en el portal.")
+        invoice = Invoice.objects.filter(
+            id=invoice_id, patient=self.patient, clinic=self.patient.clinic, active=True
+        ).select_related("clinic", "patient").prefetch_related("items").first()
+        if not invoice:
+            self.audit(AuditLog.Action.PERMISSION_DENIED, AuditLog.Module.BILLING, description="Intento bloqueado de descargar una factura ajena.", metadata={"requested_id": invoice_id})
+            return Response({"detail": "Factura no encontrada."}, status=status.HTTP_404_NOT_FOUND)
+        if invoice.is_fiscal and invoice.fiscal_status not in [Invoice.FiscalStatus.ISSUED, Invoice.FiscalStatus.CANCELLED]:
+            return Response({"detail": "La factura fiscal aún no está emitida."}, status=status.HTTP_400_BAD_REQUEST)
+        self.audit(AuditLog.Action.DOWNLOAD, AuditLog.Module.BILLING, obj=invoice, description="Paciente descargó el PDF de una factura propia.")
+        response = HttpResponse(render_invoice_pdf(invoice), content_type="application/pdf")
+        number = invoice.fiscal_number or invoice.invoice_number
+        response["Content-Disposition"] = f'attachment; filename="factura-{number}.pdf"'
+        response["Cache-Control"] = "private, no-store"
         return response
 
 
 class PatientPortalInvoiceFiscalPdfView(PatientPortalBaseView):
     def get(self, request, invoice_id):
         if not self.clinic_settings.allow_patient_invoice_view:
-            return portal_denied()
+            return portal_denied("Tu clínica no ha habilitado esta información en el portal.")
         invoice = (
             Invoice.objects.filter(patient=self.patient, clinic=self.patient.clinic, active=True, id=invoice_id)
             .select_related("clinic", "patient")
@@ -506,6 +535,7 @@ class PatientPortalInvoiceFiscalPdfView(PatientPortalBaseView):
             .first()
         )
         if not invoice:
+            self.audit(AuditLog.Action.PERMISSION_DENIED, AuditLog.Module.BILLING, description="Intento bloqueado de descargar una factura fiscal ajena.", metadata={"requested_id": invoice_id})
             return Response({"detail": "Factura no encontrada."}, status=status.HTTP_404_NOT_FOUND)
         if invoice.fiscal_status not in [Invoice.FiscalStatus.ISSUED, Invoice.FiscalStatus.CANCELLED]:
             return Response({"detail": "La factura fiscal aun no esta emitida."}, status=status.HTTP_400_BAD_REQUEST)
@@ -547,15 +577,38 @@ class PatientPortalInvoiceFiscalPdfView(PatientPortalBaseView):
         story.append(Spacer(1, 8))
         story.append(Paragraph(invoice.amount_in_words or "", styles["Normal"]))
         doc.build(story)
+        self.audit(AuditLog.Action.DOWNLOAD, AuditLog.Module.BILLING, obj=invoice, description="Paciente descargó el PDF fiscal de una factura propia.")
         response = HttpResponse(stream.getvalue(), content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="factura-fiscal-{invoice.fiscal_number}.pdf"'
+        response["Cache-Control"] = "private, no-store"
         return response
+
+
+class PatientPortalCreditNotesView(PatientPortalBaseView):
+    serializer_class = PatientPortalCreditNoteSerializer
+
+    def get(self, request, credit_note_id=None):
+        if not self.clinic_settings.allow_patient_invoice_view:
+            return portal_denied("Tu clínica no ha habilitado esta información en el portal.")
+        qs = CreditNote.objects.filter(
+            clinic=self.patient.clinic,
+            original_invoice__patient=self.patient,
+        ).select_related("clinic", "original_invoice")
+        if credit_note_id:
+            note = qs.filter(id=credit_note_id).first()
+            if not note:
+                self.audit(AuditLog.Action.PERMISSION_DENIED, AuditLog.Module.BILLING, description="Intento bloqueado de consultar una nota de crédito ajena.", metadata={"requested_id": credit_note_id})
+                return Response({"detail": "Nota de crédito no encontrada."}, status=status.HTTP_404_NOT_FOUND)
+            self.audit(AuditLog.Action.VIEW, AuditLog.Module.BILLING, obj=note, description="Paciente consultó una nota de crédito propia.")
+            return Response(PatientPortalCreditNoteSerializer(note).data)
+        self.audit(AuditLog.Action.VIEW, AuditLog.Module.BILLING, description="Paciente consultó sus notas de crédito.")
+        return Response(PatientPortalCreditNoteSerializer(qs, many=True).data)
 
 
 class PatientPortalCreditNotePdfView(PatientPortalBaseView):
     def get(self, request, credit_note_id):
         if not self.clinic_settings.allow_patient_invoice_view:
-            return portal_denied()
+            return portal_denied("Tu clínica no ha habilitado esta información en el portal.")
         credit_note = (
             CreditNote.objects.filter(id=credit_note_id, clinic=self.patient.clinic, original_invoice__patient=self.patient, active=True)
             .select_related("clinic", "original_invoice__patient", "issued_by")
@@ -563,9 +616,12 @@ class PatientPortalCreditNotePdfView(PatientPortalBaseView):
             .first()
         )
         if not credit_note:
+            self.audit(AuditLog.Action.PERMISSION_DENIED, AuditLog.Module.BILLING, description="Intento bloqueado de descargar una nota de crédito ajena.", metadata={"requested_id": credit_note_id})
             return Response({"detail": "Nota de credito no encontrada."}, status=status.HTTP_404_NOT_FOUND)
+        self.audit(AuditLog.Action.DOWNLOAD, AuditLog.Module.BILLING, obj=credit_note, description="Paciente descargó una nota de crédito propia.")
         response = HttpResponse(render_credit_note_pdf(credit_note, request), content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="nota-credito-{credit_note.fiscal_number}.pdf"'
+        response["Cache-Control"] = "private, no-store"
         return response
 
 
@@ -600,40 +656,53 @@ class PatientPortalMedicalRecordSummaryView(PatientPortalBaseView):
 
 
 class PatientPortalNotificationsView(PatientPortalBaseView):
-    serializer_class = NotificationListSerializer
+    serializer_class = PatientPortalNotificationSerializer
 
     def get(self, request):
-        qs = Notification.objects.filter(recipient=request.user)
-        return Response(NotificationListSerializer(qs[:50], many=True).data)
+        qs = Notification.objects.filter(recipient=request.user, clinic=self.patient.clinic).filter(
+            Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now())
+        )
+        notification_status = request.query_params.get("status")
+        if notification_status in Notification.Status.values:
+            qs = qs.filter(status=notification_status)
+        self.audit(AuditLog.Action.VIEW, AuditLog.Module.SYSTEM, description="Paciente consultó su bandeja de notificaciones.")
+        return Response(PatientPortalNotificationSerializer(qs[:50], many=True).data)
 
 
 class PatientPortalNotificationMarkReadView(PatientPortalBaseView):
-    serializer_class = NotificationListSerializer
+    serializer_class = PatientPortalNotificationSerializer
 
     def patch(self, request, notification_id):
-        notification = Notification.objects.filter(id=notification_id, recipient=request.user).first()
+        notification = Notification.objects.filter(id=notification_id, recipient=request.user, clinic=self.patient.clinic).first()
         if not notification:
+            self.audit(AuditLog.Action.PERMISSION_DENIED, AuditLog.Module.SYSTEM, description="Intento bloqueado de abrir una notificación ajena.", metadata={"requested_id": notification_id})
             return Response({"detail": "Notificacion no encontrada."}, status=status.HTTP_404_NOT_FOUND)
-        notification.status = Notification.Status.READ
-        notification.read_at = timezone.now()
-        notification.save(update_fields=["status", "read_at", "actualizado_en"])
-        return Response(NotificationListSerializer(notification).data)
+        if notification.status != Notification.Status.READ:
+            notification.status = Notification.Status.READ
+            notification.read_at = timezone.now()
+            notification.save(update_fields=["status", "read_at", "actualizado_en"])
+            self.audit(AuditLog.Action.VIEW, AuditLog.Module.SYSTEM, obj=notification, description="Paciente abrió una notificación propia.")
+        return Response(PatientPortalNotificationSerializer(notification).data)
 
 
 class PatientPortalNotificationsMarkAllReadView(PatientPortalBaseView):
-    serializer_class = NotificationListSerializer
+    serializer_class = PatientPortalNotificationSerializer
 
     def post(self, request):
-        qs = Notification.objects.filter(recipient=request.user, status=Notification.Status.UNREAD)
+        qs = Notification.objects.filter(recipient=request.user, clinic=self.patient.clinic, status=Notification.Status.UNREAD)
         updated = qs.update(status=Notification.Status.READ, read_at=timezone.now())
+        if updated:
+            self.audit(AuditLog.Action.UPDATE, AuditLog.Module.SYSTEM, description="Paciente marcó todas sus notificaciones como leídas.", metadata={"updated": updated})
         return Response({"updated": updated})
+
+    patch = post
 
 
 class PatientPortalUnreadNotificationsView(PatientPortalBaseView):
-    serializer_class = NotificationListSerializer
+    serializer_class = PatientPortalNotificationSerializer
 
     def get(self, request):
-        return Response({"unread_count": Notification.objects.filter(recipient=request.user, status=Notification.Status.UNREAD).count()})
+        return Response({"unread_count": Notification.objects.filter(recipient=request.user, clinic=self.patient.clinic, status=Notification.Status.UNREAD).filter(Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now())).count()})
 
 
 class PatientPortalClinicInfoView(PatientPortalBaseView):

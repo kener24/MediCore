@@ -27,7 +27,7 @@ from apps.accounts.serializers import (
 )
 from apps.clinics.models import Clinic
 from apps.audit.models import AuditLog
-from apps.notifications.models import Notification
+from apps.notifications.models import Notification, PushDevice
 from apps.notifications.services import create_notification
 from apps.doctors.serializers import DoctorProfileCreateSerializer, DoctorProfileDetailSerializer
 from apps.audit.services import get_object_audit_data, log_audit_event
@@ -117,6 +117,13 @@ class LogoutView(APIView):
             session = UserSession.objects.filter(user=request.user, session_key=session_key, active=True).first()
         if session:
             revoke_user_session(session, revoked_by=request.user)
+        installation_id = request.headers.get("X-Installation-Id", "").strip()
+        if installation_id:
+            PushDevice.objects.filter(user=request.user, installation_id=installation_id, is_active=True).update(
+                is_active=False,
+                revoked_at=timezone.now(),
+                actualizado_en=timezone.now(),
+            )
         log_audit_event(
             request=request,
             action=AuditLog.Action.LOGOUT,

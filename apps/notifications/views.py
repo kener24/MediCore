@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -8,9 +9,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.permissions import get_role_name
+from apps.audit.models import AuditLog
+from apps.audit.services import log_audit_event
 from apps.notifications.generators import generate_appointment_reminders, generate_billing_alerts, generate_inventory_alerts
 from apps.notifications.models import Notification, NotificationPreference, PushDevice
 from apps.notifications.serializers import NotificationDetailSerializer, NotificationFilterSerializer, NotificationListSerializer, NotificationPreferenceSerializer, NotificationStatsSerializer, PushDeviceSerializer
+from apps.patients.models import Patient
 
 
 class NotificationPagination(PageNumberPagination):
@@ -33,6 +37,9 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         qs = self.queryset.filter(recipient=self.request.user)
+        if get_role_name(self.request.user) == "paciente" and self.request.user.clinica_id:
+            qs = qs.filter(clinic_id=self.request.user.clinica_id)
+        qs = qs.filter(Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now()))
         p = self.request.query_params
         filters = NotificationFilterSerializer(data=p)
         filters.is_valid(raise_exception=True)
@@ -120,30 +127,57 @@ class PushDeviceView(APIView):
         serializer = PushDeviceSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         token = serializer.validated_data["expo_push_token"]
-        device, _ = PushDevice.objects.update_or_create(
-            expo_push_token=token,
-            defaults={
-                "user": request.user,
-                "clinic": request.user.clinica,
-                "platform": serializer.validated_data.get("platform") or PushDevice.Platform.UNKNOWN,
-                "device_name": serializer.validated_data.get("device_name", ""),
-                "app_version": serializer.validated_data.get("app_version", ""),
-                "is_active": True,
-                "last_seen_at": timezone.now(),
-            },
-        )
+        installation_id = serializer.validated_data.get("installation_id", "")
+        patient = None
+        if get_role_name(request.user) == "paciente":
+            patient = Patient.objects.filter(user=request.user, clinic=request.user.clinica, activo=True).first()
+            if not patient:
+                return Response({"detail": "No se encontró un perfil de paciente activo."}, status=status.HTTP_403_FORBIDDEN)
+        with transaction.atomic():
+            token_device = PushDevice.objects.select_for_update().filter(expo_push_token=token).first()
+            if token_device and token_device.user_id != request.user.id:
+                return Response({"detail": "El dispositivo ya está asociado a otra sesión."}, status=status.HTTP_409_CONFLICT)
+            device = None
+            if installation_id:
+                device = PushDevice.objects.select_for_update().filter(user=request.user, installation_id=installation_id).first()
+            device = device or token_device or PushDevice(user=request.user, expo_push_token=token)
+            device.expo_push_token = token
+            device.user = request.user
+            device.clinic = request.user.clinica
+            device.patient = patient
+            device.installation_id = installation_id
+            device.platform = serializer.validated_data.get("platform") or PushDevice.Platform.UNKNOWN
+            device.device_name = serializer.validated_data.get("device_name", "")
+            device.app_version = serializer.validated_data.get("app_version", "")
+            device.is_active = True
+            device.last_seen_at = timezone.now()
+            device.revoked_at = None
+            device.failure_count = 0
+            device.last_error_code = ""
+            device.save()
         preferences, _ = NotificationPreference.objects.get_or_create(user=request.user)
         if not preferences.push_enabled:
             preferences.push_enabled = True
             preferences.save(update_fields=["push_enabled", "actualizado_en"])
+        log_audit_event(request=request, action=AuditLog.Action.CREATE, module=AuditLog.Module.SYSTEM, model_name="PushDevice", object_id=device.id, description="Dispositivo push registrado.", metadata={"platform": device.platform, "installation_registered": bool(device.installation_id)})
         return Response(PushDeviceSerializer(device).data, status=status.HTTP_201_CREATED)
 
-    def delete(self, request):
+    def delete(self, request, device_id=None):
         token = str(request.data.get("expo_push_token") or "").strip()
+        installation_id = str(request.data.get("installation_id") or "").strip()
         queryset = PushDevice.objects.filter(user=request.user, is_active=True)
-        if token:
+        if device_id:
+            queryset = queryset.filter(id=device_id)
+        elif installation_id:
+            queryset = queryset.filter(installation_id=installation_id)
+        elif token:
             queryset = queryset.filter(expo_push_token=token)
-        updated = queryset.update(is_active=False, actualizado_en=timezone.now())
+        else:
+            return Response({"detail": "Indica el dispositivo que deseas revocar."}, status=status.HTTP_400_BAD_REQUEST)
+        device_ids = list(queryset.values_list("id", flat=True))
+        updated = queryset.update(is_active=False, revoked_at=timezone.now(), actualizado_en=timezone.now())
+        if updated:
+            log_audit_event(request=request, action=AuditLog.Action.UPDATE, module=AuditLog.Module.SYSTEM, model_name="PushDevice", description="Dispositivo push revocado.", metadata={"device_ids": device_ids})
         return Response({"disabled": updated})
 
 

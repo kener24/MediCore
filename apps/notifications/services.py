@@ -110,6 +110,17 @@ def push_priority(priority):
     return "high" if priority in [Notification.Priority.HIGH, Notification.Priority.URGENT] else "default"
 
 
+def safe_push_body(notification):
+    messages = {
+        Notification.Module.APPOINTMENTS: "Tienes una actualización sobre una cita.",
+        Notification.Module.PRESCRIPTIONS: "Tienes nueva información médica disponible.",
+        Notification.Module.MEDICAL_RECORDS: "Tienes un nuevo documento disponible.",
+        Notification.Module.BILLING: "Tienes una actualización de facturación.",
+        Notification.Module.PAYMENTS: "Tienes una actualización de pago.",
+    }
+    return messages.get(notification.module, "Tienes una nueva notificación en MediCore.")
+
+
 def send_push_for_notification(notification):
     if not push_enabled():
         return 0
@@ -117,12 +128,14 @@ def send_push_for_notification(notification):
     if not preferences.push_enabled:
         return 0
     devices = PushDevice.objects.filter(user=notification.recipient, is_active=True)
+    if notification.clinic_id:
+        devices = devices.filter(clinic_id=notification.clinic_id)
     sent = 0
     for device in devices:
         payload = {
             "to": device.expo_push_token,
             "title": notification.title,
-            "body": notification.message,
+            "body": safe_push_body(notification),
             "sound": "default",
             "priority": push_priority(notification.priority),
             "data": {
@@ -141,8 +154,22 @@ def send_push_for_notification(notification):
                 method="POST",
             )
             with urlrequest.urlopen(request, timeout=4) as response:
-                if 200 <= response.status < 300:
+                body = json.loads(response.read().decode("utf-8") or "{}")
+                result = body.get("data", {}) if isinstance(body, dict) else {}
+                if 200 <= response.status < 300 and result.get("status") != "error":
                     sent += 1
+                    if device.failure_count or device.last_error_code:
+                        device.failure_count = 0
+                        device.last_error_code = ""
+                        device.save(update_fields=["failure_count", "last_error_code", "actualizado_en"])
+                else:
+                    error_code = str((result.get("details") or {}).get("error") or "provider_error")[:80]
+                    device.failure_count += 1
+                    device.last_error_code = error_code
+                    if error_code == "DeviceNotRegistered":
+                        device.is_active = False
+                        device.revoked_at = timezone.now()
+                    device.save(update_fields=["failure_count", "last_error_code", "is_active", "revoked_at", "actualizado_en"])
         except URLError as exc:
             logger.info("Expo push not delivered for device %s: %s", device.id, exc)
         except Exception as exc:

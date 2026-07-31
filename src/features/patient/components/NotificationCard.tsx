@@ -30,13 +30,22 @@ export function NotificationCard({
   const markRead = onMarkAsRead ?? onMarkRead;
   const title = notification.title || notification.titulo || 'Notificación';
   const message = notification.message || notification.mensaje || notification.body || 'Sin mensaje';
-  const meta =
+  const rawMeta =
+    notification.notification_type_display ||
     notification.type ||
     notification.tipo ||
     notification.notification_type ||
     notification.module ||
     notification.modulo ||
     'MediCore';
+  const meta = {
+    alert: 'Alerta',
+    error: 'Error',
+    info: 'Información',
+    reminder: 'Recordatorio',
+    success: 'Éxito',
+    warning: 'Advertencia',
+  }[rawMeta] ?? rawMeta;
 
   return (
     <Pressable onPress={onPress}>

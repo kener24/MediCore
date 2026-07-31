@@ -8,6 +8,7 @@ export type PatientNotification = {
   type?: string;
   tipo?: string;
   notification_type?: string;
+  notification_type_display?: string;
   module?: string;
   modulo?: string;
   target?: {

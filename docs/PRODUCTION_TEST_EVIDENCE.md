@@ -97,3 +97,61 @@ Fecha local: 2026-07-30.
 - Al finalizar quedaron cero sesiones activas para los tres usuarios de certificación.
 - Antes de agregar los tres PDF ficticios se respaldó el módulo de documentos en `backups/20260730_patient_cert/documents_before.json`, con suma SHA-256.
 - Los archivos agregados están identificados como datos demo sin validez clínica o legal y no modifican registros originales.
+
+---
+
+# Evidencia Sprint 1.7B - finanzas, notificaciones y sesión del paciente
+
+Fecha: 2026-07-31.
+
+## Validación local
+
+- `python manage.py check`: aprobado.
+- Pruebas dirigidas de portal, notificaciones y seguridad: 44 de 44 aprobadas.
+- Suite completa: 359 pruebas aprobadas; 3 casos de concurrencia se omitieron localmente por usar SQLite.
+- Los 3 casos omitidos aprobaron posteriormente contra una base temporal MySQL en producción.
+- Build web Vite: aprobado; conserva advertencia no bloqueante por bundle mayor a 500 kB.
+- TypeScript móvil: aprobado.
+- Lint móvil: aprobado sin advertencias.
+- Expo Doctor: 18 de 18 comprobaciones aprobadas.
+- Exportación Android: aprobada, 1529 módulos y bundle Hermes generado.
+
+## Respaldo y despliegue
+
+- Respaldo previo: `backups/sprint17b_20260731T171543Z`.
+- Dump válido: `mysql-no-tablespaces.sql.gz`, con `gzip -t`, cierre del dump y SHA-256 verificados.
+- Bundle Git, `.env` protegido y parche del árbol remoto incluidos con sumas SHA-256.
+- Backend/web desplegado en `main`, commit `efe143b`.
+- Aplicación móvil subida a `master`, commit `aab8f3b`.
+- Migración `notifications.0003` aplicada correctamente.
+- Dependencias, build, estáticos, Nginx y servicios completados sin error.
+- `medicore.service`, `medicore-notifications.timer` y Nginx quedaron activos.
+- La tarea de notificaciones se ejecutó manualmente con resultado exitoso y continúa programada cada hora.
+
+## Certificación HTTPS
+
+- `/login` respondió 200 con certificado válido.
+- Dashboard protegido sin sesión respondió 401.
+- Tres pacientes demo iniciaron sesión, renovaron token y cerraron sesión correctamente.
+- A1 obtuvo 6 facturas, 2 pagos, 1 nota de crédito y 31 notificaciones.
+- A2 obtuvo 5 facturas, 5 pagos y 2 notificaciones.
+- B1 obtuvo 5 facturas y 20 notificaciones; no tenía pagos ni notas de crédito demo.
+- Detalles propios, PDF de factura, recibo y PDF de nota disponibles respondieron 200 con `application/pdf`.
+- Marcar leída y marcar todas respondieron 200; el contador de A2 quedó en cero.
+- Preferencias se consultaron y actualizaron con 200.
+- Dispositivo push de prueba se registró con 201 sin exponer el token, el intento de otro paciente devolvió 409 y la revocación eliminó el dispositivo de activos.
+- Los accesos cruzados disponibles a factura, PDF, pago, recibo, nota, notificación y sesión devolvieron 404.
+- Los casos cruzados sin pago o nota de crédito en los datos demo se registraron como no ejecutables, no como aprobados.
+- No aparecieron errores, excepciones ni trazas nuevas en el journal de Gunicorn.
+
+## Correo y tareas
+
+- Producción usa SMTP de AWS SES en `us-east-2`, puerto 587 y TLS.
+- El remitente configurado pertenece a `kp-software.tech`.
+- No se realizó un envío a una dirección ficticia para evitar rebotes y proteger la reputación de SES.
+
+## Evidencia pendiente
+
+- La exportación Android y Expo Doctor no sustituyen una prueba en teléfono físico.
+- Recepción push real, apertura desde push y comportamiento del proveedor requieren una compilación/dispositivo Android real.
+- Estos puntos no se declaran certificados hasta recibir evidencia manual del dispositivo.

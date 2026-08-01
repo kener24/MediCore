@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Pencil, Plus, Power, PowerOff } from "lucide-react";
 import { toast } from "sonner";
 
-import { activateClinicUser, deactivateClinicUser, getClinicUsers } from "../../api/clinicAdminApi";
+import { activateClinicUser, deactivateClinicUser, getClinicUsersPage } from "../../api/clinicAdminApi";
 import { getErrorMessage } from "../../api/axios";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -36,17 +36,29 @@ export function ClinicUsersPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [reason, setReason] = useState("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [hasNext, setHasNext] = useState(false);
 
-  async function load() {
+  async function load(targetPage = page) {
+    if (search.trim().length === 1) {
+      toast.error("Escribe al menos dos caracteres para buscar.");
+      return;
+    }
     setLoading(true);
     try {
-      setUsers(
-        await getClinicUsers({
+      const result = await getClinicUsersPage({
           search: search || undefined,
           role: roleFilter || undefined,
           is_active: statusFilter || undefined,
-        })
-      );
+          page: targetPage,
+          page_size: 25,
+        });
+      setUsers(result.results);
+      setPage(targetPage);
+      setTotal(result.count);
+      setHasNext(Boolean(result.next));
     } catch (error) {
       toast.error(getErrorMessage(error));
     } finally {
@@ -61,16 +73,21 @@ export function ClinicUsersPage() {
 
   async function toggleUser() {
     if (!confirmUser) return;
+    if (reason.trim().length < 5) {
+      toast.error("Escribe un motivo de al menos 5 caracteres.");
+      return;
+    }
     setSaving(true);
     try {
       if (confirmUser.is_active) {
-        await deactivateClinicUser(confirmUser.id);
+        await deactivateClinicUser(confirmUser.id, reason.trim());
         toast.success("Usuario desactivado correctamente.");
       } else {
-        await activateClinicUser(confirmUser.id);
+        await activateClinicUser(confirmUser.id, reason.trim());
         toast.success("Usuario activado correctamente.");
       }
       setConfirmUser(null);
+      setReason("");
       await load();
     } catch (error) {
       toast.error(getErrorMessage(error));
@@ -107,7 +124,7 @@ export function ClinicUsersPage() {
               { label: "Inactivos", value: "false" },
             ]}
           />
-          <Button type="button" variant="secondary" onClick={load}>
+          <Button type="button" variant="secondary" onClick={() => void load(1)}>
             Filtrar
           </Button>
         </div>
@@ -147,6 +164,15 @@ export function ClinicUsersPage() {
         ) : (
           <EmptyState title="No hay usuarios para mostrar." description="Crea usuarios internos o ajusta los filtros." />
         )}
+        {!loading && total > 25 ? (
+          <div className="mt-4 flex items-center justify-between border-t border-slate-200 pt-4">
+            <span className="text-sm text-slate-600">Página {page} · {total} usuarios</span>
+            <div className="flex gap-2">
+              <Button disabled={page <= 1} type="button" variant="secondary" onClick={() => void load(page - 1)}>Anterior</Button>
+              <Button disabled={!hasNext} type="button" variant="secondary" onClick={() => void load(page + 1)}>Siguiente</Button>
+            </div>
+          </div>
+        ) : null}
       </Card>
       <ConfirmModal
         open={Boolean(confirmUser)}
@@ -155,9 +181,14 @@ export function ClinicUsersPage() {
         confirmLabel={confirmUser?.is_active ? "Desactivar" : "Activar"}
         tone={confirmUser?.is_active ? "danger" : "primary"}
         isLoading={saving}
-        onClose={() => setConfirmUser(null)}
+        onClose={() => { setConfirmUser(null); setReason(""); }}
         onConfirm={toggleUser}
-      />
+      >
+        <label className="mt-4 block space-y-1.5">
+          <span className="text-sm font-medium text-slate-700">Motivo</span>
+          <textarea className="min-h-24 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" maxLength={300} onChange={(event) => setReason(event.target.value)} value={reason} />
+        </label>
+      </ConfirmModal>
     </div>
   );
 }

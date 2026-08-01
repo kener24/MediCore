@@ -22,8 +22,7 @@ export interface UserSession {
   user?: number;
   user_email?: string;
   user_nombre?: string;
-  ip_address?: string | null;
-  user_agent?: string;
+  user_role?: string;
   device_name: string;
   platform?: string;
   location_hint?: string;
@@ -33,7 +32,7 @@ export interface UserSession {
   active: boolean;
   created_at: string;
   current: boolean;
-  expired?: boolean;
+  is_expired?: boolean;
 }
 
 export interface AccountLock {

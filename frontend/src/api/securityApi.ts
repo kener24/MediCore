@@ -65,8 +65,8 @@ export async function getAdminSessions(filters?: Filters) {
   return data;
 }
 
-export async function revokeAdminSession(id: number) {
-  const { data } = await api.patch<UserSession>(`/security/admin/sessions/${id}/revoke/`);
+export async function revokeAdminSession(id: number, reason: string) {
+  const { data } = await api.patch<UserSession>(`/security/admin/sessions/${id}/revoke/`, { reason });
   return data;
 }
 

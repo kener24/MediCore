@@ -68,9 +68,8 @@ export function ClinicUserForm({ user, isSubmitting, onSubmit }: ClinicUserFormP
       email: values.email,
       telefono: values.telefono ?? "",
       role: values.role,
-      is_active: values.is_active,
     };
-    onSubmit(isEditing ? payload : { ...payload, password: values.password ?? "" });
+    onSubmit(isEditing ? payload : { ...payload, password: values.password ?? "", is_active: values.is_active });
   }
 
   return (
@@ -93,10 +92,10 @@ export function ClinicUserForm({ user, isSubmitting, onSubmit }: ClinicUserFormP
           </select>
           {errors.role?.message ? <p className="text-xs font-medium text-rose-600">{errors.role.message}</p> : null}
         </label>
-        <label className="flex items-center gap-2 pt-8 text-sm font-medium text-slate-700">
+        {!isEditing ? <label className="flex items-center gap-2 pt-8 text-sm font-medium text-slate-700">
           <input className="h-4 w-4 rounded border-slate-300 text-brand-600" type="checkbox" {...register("is_active")} />
           Usuario activo
-        </label>
+        </label> : null}
       </div>
       <Button type="submit" isLoading={isSubmitting}>
         {isEditing ? "Guardar cambios" : "Crear usuario"}

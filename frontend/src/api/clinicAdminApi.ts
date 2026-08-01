@@ -12,6 +12,8 @@ export interface ClinicUserFilters {
   role?: string;
   is_active?: string;
   search?: string;
+  page?: number;
+  page_size?: number;
 }
 
 export async function getClinicDashboard() {
@@ -29,9 +31,15 @@ export async function updateMyClinic(payload: MyClinicUpdatePayload) {
   return data;
 }
 
+export async function getClinicUsersPage(filters?: ClinicUserFilters) {
+  const { data } = await api.get<ClinicAdminUser[] | { count?: number; next?: string | null; previous?: string | null; results?: ClinicAdminUser[] }>("/clinic-admin/users/", { params: filters });
+  if (Array.isArray(data)) return { count: data.length, next: null, previous: null, results: data };
+  const results = data.results ?? [];
+  return { count: data.count ?? results.length, next: data.next ?? null, previous: data.previous ?? null, results };
+}
+
 export async function getClinicUsers(filters?: ClinicUserFilters) {
-  const { data } = await api.get<ClinicAdminUser[]>("/clinic-admin/users/", { params: filters });
-  return data;
+  return (await getClinicUsersPage(filters)).results;
 }
 
 export async function getClinicUser(id: string | number) {
@@ -49,12 +57,12 @@ export async function updateClinicUser(id: string | number, payload: ClinicUserU
   return data;
 }
 
-export async function activateClinicUser(id: string | number) {
-  const { data } = await api.patch<ClinicAdminUser>(`/clinic-admin/users/${id}/activate/`);
+export async function activateClinicUser(id: string | number, reason: string) {
+  const { data } = await api.patch<ClinicAdminUser>(`/clinic-admin/users/${id}/activate/`, { reason });
   return data;
 }
 
-export async function deactivateClinicUser(id: string | number) {
-  const { data } = await api.patch<ClinicAdminUser>(`/clinic-admin/users/${id}/deactivate/`);
+export async function deactivateClinicUser(id: string | number, reason: string) {
+  const { data } = await api.patch<ClinicAdminUser>(`/clinic-admin/users/${id}/deactivate/`, { reason });
   return data;
 }

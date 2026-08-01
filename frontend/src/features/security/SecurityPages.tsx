@@ -235,7 +235,7 @@ function SessionsTable({ sessions, onRevoke, admin = false }: { sessions: UserSe
             <tr key={session.id}>
               {admin ? <td className="px-4 py-3 font-medium text-slate-800">{session.user_nombre || session.user_email}</td> : null}
               <td className="px-4 py-3">{session.device_name || "Dispositivo"}</td>
-              <td className="px-4 py-3">{admin ? session.ip_address ?? "-" : session.location_hint || "No disponible"}</td>
+              <td className="px-4 py-3">{session.location_hint || "No disponible"}</td>
               <td className="px-4 py-3">{formatDate(session.last_activity_at)}</td>
               <td className="px-4 py-3">
                 <Badge tone={session.active ? "active" : "inactive"}>{session.current ? "Actual" : session.active ? "Activa" : "Cerrada"}</Badge>
@@ -413,9 +413,15 @@ export function AdminSessionsPage() {
     load();
   }, []);
   async function closeSession(id: number) {
-    await revokeAdminSession(id);
-    toast.success("Sesion revocada.");
-    load();
+    const reason = window.prompt("Indica el motivo para cerrar esta sesión:", "Cierre administrativo");
+    if (!reason || reason.trim().length < 5) return;
+    try {
+      await revokeAdminSession(id, reason.trim());
+      toast.success("Sesión revocada.");
+      load();
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
   }
   if (loading) return <Loader label="Cargando sesiones..." />;
   return (

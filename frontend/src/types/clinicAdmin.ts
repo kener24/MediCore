@@ -28,7 +28,6 @@ export interface ClinicUserUpdatePayload {
   email?: string;
   telefono?: string;
   role?: string;
-  is_active?: boolean;
 }
 
 export interface MyClinicUpdatePayload {

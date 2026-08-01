@@ -1,4 +1,4 @@
-+# Evidencia de certificación Sprint 1.6B
+# Evidencia de certificación Sprint 1.6B
 
 Fecha de validación: 2026-07-29 local / 2026-07-30 UTC.
 

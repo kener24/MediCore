@@ -86,7 +86,8 @@ export function SuperAdminControlScreen() {
           {sessions.slice(0, 8).map((session) => (
             <AppCard key={session.id} style={styles.card}>
               <Text style={styles.title}>{session.user_nombre || session.user_email || 'Usuario'}</Text>
-              <Text style={styles.meta}>{session.device_name || 'Dispositivo'} · {session.ip_address || 'sin IP'}</Text>
+              <Text style={styles.meta}>{session.device_name || 'Dispositivo'} · {session.platform || 'Plataforma no identificada'}</Text>
+              <Text style={styles.meta}>{session.location_hint || 'Ubicación protegida'}</Text>
               <Text style={styles.meta}>Última actividad: {formatDateTime(session.last_activity_at)}</Text>
               <AppButton disabled={!session.active || session.current} label={session.current ? 'Sesión actual' : 'Cerrar sesión'} onPress={() => confirmRevoke(session)} variant="danger" />
             </AppCard>

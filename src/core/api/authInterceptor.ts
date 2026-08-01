@@ -39,8 +39,8 @@ export class ApiClientError extends Error {
 
 function extractErrorMessage(error: AxiosError) {
   if (!error.response) {
-    if (error.code === 'ECONNABORTED') return 'La conexión tardó demasiado. Revisa internet e intenta nuevamente.';
-    return 'No se pudo conectar con MediCore. Revisa internet o intenta de nuevo en unos minutos.';
+    if (error.code === 'ECONNABORTED') return 'La solicitud tardó demasiado. Verifica el resultado antes de reintentar.';
+    return 'No tienes conexión a internet.';
   }
 
   const status = error.response.status;
@@ -50,6 +50,7 @@ function extractErrorMessage(error: AxiosError) {
   if (status === 401) return 'Tu sesión expiró. Inicia sesión nuevamente.';
   if (status === 403) return 'Tu usuario no tiene permiso para realizar esta acción.';
   if (status === 404) return 'No se encontró la información solicitada. Actualiza la pantalla e intenta nuevamente.';
+  if (status === 409) return extractPayloadMessage(payload) || 'La información cambió o la operación ya fue procesada.';
   if (status >= 500) return 'El servidor no pudo procesar la solicitud en este momento. Intenta nuevamente y, si continúa, avisa a soporte.';
 
   return extractPayloadMessage(payload) || 'No se pudo completar la solicitud.';

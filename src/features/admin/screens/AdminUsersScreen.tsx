@@ -1,5 +1,5 @@
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -12,7 +12,7 @@ import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { RoleGuard } from '@/components/RoleGuard';
 import { colors } from '@/core/theme/colors';
-import { adminUserName, adminUserRole, getAdminUsers } from '@/features/admin/services/adminService';
+import { adminUserName, adminUserRole, getAdminUsersPage } from '@/features/admin/services/adminService';
 import type { AdminUser } from '@/features/admin/types/admin.types';
 
 const roleFilters = [
@@ -35,25 +35,50 @@ export function AdminUsersScreen() {
   const navigation = useNavigation<any>();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [hasNext, setHasNext] = useState(false);
 
   const load = useCallback(async (refresh = false) => {
     if (refresh) setRefreshing(true);
     else setLoading(true);
     setError('');
     try {
-      setUsers(await getAdminUsers());
+      const term = debouncedSearch.trim();
+      if (term.length === 1) {
+        setUsers([]);
+        return;
+      }
+      const result = await getAdminUsersPage({
+        is_active: statusFilter === 'all' ? undefined : statusFilter === 'active',
+        page,
+        page_size: 25,
+        role: roleFilter === 'all' ? undefined : roleFilter,
+        search: term.length >= 2 ? term : undefined,
+      });
+      setUsers(result.results);
+      setTotal(result.count);
+      setHasNext(Boolean(result.next));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar el equipo de la clínica.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [debouncedSearch, page, roleFilter, statusFilter]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 350);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => { setPage(1); }, [debouncedSearch, roleFilter, statusFilter]);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
@@ -89,6 +114,7 @@ export function AdminUsersScreen() {
           {error ? <ErrorState message={error} onRetry={() => void load()} title="Usuarios no disponibles" /> : null}
           <AppButton label="Crear enfermero, recepción o doctor" onPress={() => navigation.navigate('AdminCreateStaff')} />
           <AppInput icon="magnify" label="Buscar usuario" onChangeText={setSearch} placeholder="Nombre, correo o rol" value={search} />
+          {search.trim().length === 1 ? <Text style={styles.searchHint}>Escribe al menos dos caracteres para buscar.</Text> : null}
 
           <View style={styles.summary}>
             <Text style={styles.summaryText}>Activos: {stats.active}</Text>
@@ -120,7 +146,7 @@ export function AdminUsersScreen() {
             </View>
           </View>
 
-          <Text style={styles.counter}>{filtered.length} de {users.length} usuarios</Text>
+          <Text style={styles.counter}>{filtered.length} de {total} usuarios · Página {page}</Text>
           {!error && filtered.length === 0 ? (
             <EmptyState
               actionLabel={users.length === 0 ? 'Crear usuario' : undefined}
@@ -151,6 +177,7 @@ export function AdminUsersScreen() {
               <AppButton label="Ver detalle y seguridad" onPress={() => navigation.navigate('AdminUserDetail', { userId: user.id })} variant="secondary" />
             </AppCard>
           ))}
+          {total > 25 ? <View style={styles.pagination}><AppButton disabled={page <= 1} label="Anterior" onPress={() => setPage((value) => Math.max(1, value - 1))} variant="secondary" /><AppButton disabled={!hasNext} label="Siguiente" onPress={() => setPage((value) => value + 1)} variant="secondary" /></View> : null}
         </ScrollView>
       </SafeAreaView>
     </RoleGuard>
@@ -227,9 +254,18 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '900',
   },
+  pagination: {
+    flexDirection: 'row',
+    gap: 10,
+  },
   safe: {
     backgroundColor: colors.background,
     flex: 1,
+  },
+  searchHint: {
+    color: colors.warning,
+    fontSize: 12,
+    fontWeight: '800',
   },
   status: {
     backgroundColor: colors.palePrimary,

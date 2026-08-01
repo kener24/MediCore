@@ -15,7 +15,7 @@ export function OfflineBanner() {
   return (
     <View style={styles.container}>
       <MaterialCommunityIcons color={colors.white} name="wifi-off" size={17} />
-      <Text style={styles.text}>Sin conexión. Puedes ver información guardada y reintentar cuando vuelva internet.</Text>
+      <Text style={styles.text}>Sin conexión. Estás viendo la última información disponible. Las acciones requieren internet.</Text>
     </View>
   );
 }

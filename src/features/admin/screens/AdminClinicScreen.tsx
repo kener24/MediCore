@@ -21,9 +21,10 @@ import {
   getAdminClinic,
   getAdminFiscalRanges,
   getAdminFiscalReadiness,
+  getAdminOperationStatus,
   updateAdminClinic,
 } from '@/features/admin/services/adminService';
-import type { AdminClinic, AdminFiscalRange, AdminFiscalReadiness } from '@/features/admin/types/admin.types';
+import type { AdminClinic, AdminFiscalRange, AdminFiscalReadiness, AdminOperationStatus } from '@/features/admin/types/admin.types';
 import { formatDate } from '@/features/patient/utils/formatters';
 
 type RangeHealth = 'ok' | 'warning' | 'danger' | 'inactive';
@@ -33,6 +34,7 @@ export function AdminClinicScreen() {
   const [clinic, setClinic] = useState<AdminClinic | null>(null);
   const [readiness, setReadiness] = useState<AdminFiscalReadiness | null>(null);
   const [ranges, setRanges] = useState<AdminFiscalRange[]>([]);
+  const [operationStatus, setOperationStatus] = useState<AdminOperationStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -45,14 +47,16 @@ export function AdminClinicScreen() {
     else setLoading(true);
     setError('');
     try {
-      const [nextClinic, nextReadiness, nextRanges] = await Promise.all([
+      const [nextClinic, nextReadiness, nextRanges, nextOperationStatus] = await Promise.all([
         getAdminClinic(),
         getAdminFiscalReadiness().catch(() => null),
         getAdminFiscalRanges().catch(() => []),
+        getAdminOperationStatus().catch(() => null),
       ]);
       setClinic(nextClinic);
       setReadiness(nextReadiness);
       setRanges(nextRanges);
+      setOperationStatus(nextOperationStatus);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar la información de la clínica.');
     } finally {
@@ -159,6 +163,16 @@ export function AdminClinicScreen() {
             title={fiscalReady ? 'Facturación fiscal habilitada' : 'Facturación fiscal pendiente'}
             tone={fiscalReady ? 'primary' : 'warning'}
           />
+
+          <AppCard style={styles.card}>
+            <Text style={styles.title}>Estado operativo</Text>
+            <AdminInfoRow label="Portal de pacientes" value={operationStatus?.patient_portal_active ? 'Activo' : 'Inactivo'} />
+            <AdminInfoRow label="Citas en línea" value={operationStatus?.online_appointments_active ? 'Activas' : 'Inactivas'} />
+            <AdminInfoRow label="Atención presencial" value={operationStatus?.in_person_appointments_active ? 'Activa' : 'Inactiva'} />
+            <AdminInfoRow label="Caja" value={operationStatus?.cash_open ? 'Hay caja abierta' : 'Sin caja abierta'} />
+            <AdminInfoRow label="Rango fiscal" value={operationStatus?.valid_fiscal_range ? 'Vigente' : 'Requiere revisión'} />
+            <Text style={styles.helper}>Los ajustes avanzados de flujo y fiscal se administran en la web para reducir cambios accidentales desde el móvil.</Text>
+          </AppCard>
 
           <AppCard style={styles.card}>
             <Text style={styles.title}>Checklist administrativo</Text>

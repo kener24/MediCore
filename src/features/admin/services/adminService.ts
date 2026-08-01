@@ -1,4 +1,6 @@
 import { endpoints } from '@/core/api/endpoints';
+import { apiClient } from '@/core/api/apiClient';
+import { isDeviceOnline } from '@/core/network/connectivity';
 import { getFirstAvailable, normalizeAdminList, patchFirstAvailable, postFirstAvailable, type AdminQueryParams } from '@/features/admin/services/adminApiHelpers';
 import type {
   AdminAuditLog,
@@ -6,6 +8,8 @@ import type {
   AdminClinic,
   AdminDashboard,
   AdminDoctorProfile,
+  AdminDoctorSchedule,
+  AdminDoctorSchedulePayload,
   AdminFiscalRange,
   AdminFiscalReadiness,
   AdminReportSummary,
@@ -13,6 +17,8 @@ import type {
   AdminSpecialty,
   AdminSubscription,
   AdminUsage,
+  AdminOperationalAlert,
+  AdminOperationStatus,
   AdminUser,
   CreateClinicUserPayload,
   CreateDoctorProfilePayload,
@@ -21,8 +27,24 @@ import type {
   UpdateAdminUserPayload,
 } from '@/features/admin/types/admin.types';
 
-export async function getAdminDashboard(): Promise<AdminDashboard> {
-  return getFirstAvailable<AdminDashboard>([endpoints.clinicAdmin.dashboard, endpoints.clinicAdmin.clinicReport]);
+const ADMIN_ONLINE_REQUIRED = 'Esta operación requiere conexión al servidor.';
+
+async function ensureAdminMutationOnline() {
+  if (!(await isDeviceOnline())) throw new Error(ADMIN_ONLINE_REQUIRED);
+}
+
+export async function getAdminDashboard(params?: AdminQueryParams): Promise<AdminDashboard> {
+  return getFirstAvailable<AdminDashboard>([endpoints.clinicAdmin.dashboard, endpoints.clinicAdmin.clinicReport], params);
+}
+
+export async function getAdminAlerts(): Promise<AdminOperationalAlert[]> {
+  const data = await getFirstAvailable<unknown>([endpoints.clinicAdmin.alerts]);
+  return normalizeAdminList<AdminOperationalAlert>(data);
+}
+
+export async function getAdminOperationStatus(): Promise<AdminOperationStatus> {
+  const data = await getFirstAvailable<{ operation_status: AdminOperationStatus }>([endpoints.clinicAdmin.operationStatus]);
+  return data.operation_status;
 }
 
 export async function getAdminClinic(): Promise<AdminClinic> {
@@ -30,6 +52,7 @@ export async function getAdminClinic(): Promise<AdminClinic> {
 }
 
 export async function updateAdminClinic(payload: UpdateAdminClinicPayload): Promise<AdminClinic> {
+  await ensureAdminMutationOnline();
   return patchFirstAvailable<AdminClinic>([endpoints.clinicAdmin.myClinic], payload);
 }
 
@@ -38,11 +61,20 @@ export async function getAdminUsers(params?: AdminQueryParams): Promise<AdminUse
   return normalizeAdminList<AdminUser>(data);
 }
 
+export async function getAdminUsersPage(params?: AdminQueryParams): Promise<{ count: number; next: string | null; previous: string | null; results: AdminUser[] }> {
+  const { data } = await apiClient.get<unknown>(endpoints.clinicAdmin.users, { params });
+  if (Array.isArray(data)) return { count: data.length, next: null, previous: null, results: data as AdminUser[] };
+  const page = data as { count?: number; next?: string | null; previous?: string | null; results?: AdminUser[] };
+  const results = Array.isArray(page.results) ? page.results : normalizeAdminList<AdminUser>(data);
+  return { count: page.count ?? results.length, next: page.next ?? null, previous: page.previous ?? null, results };
+}
+
 export async function getAdminUser(id: number | string): Promise<AdminUser> {
   return getFirstAvailable<AdminUser>([endpoints.clinicAdmin.user(id)]);
 }
 
 export async function updateAdminUser(id: number | string, payload: UpdateAdminUserPayload): Promise<AdminUser> {
+  await ensureAdminMutationOnline();
   return patchFirstAvailable<AdminUser>([endpoints.clinicAdmin.user(id)], payload);
 }
 
@@ -56,10 +88,12 @@ export async function getAdminSpecialties(): Promise<AdminSpecialty[]> {
 }
 
 export async function createClinicUser(payload: CreateClinicUserPayload): Promise<AdminUser> {
+  await ensureAdminMutationOnline();
   return postFirstAvailable<AdminUser>([endpoints.clinicAdmin.users], payload);
 }
 
 export async function createDoctorProfile(payload: CreateDoctorProfilePayload) {
+  await ensureAdminMutationOnline();
   return postFirstAvailable([endpoints.clinicAdmin.doctors], payload);
 }
 
@@ -77,18 +111,53 @@ export async function findAdminDoctorProfileForUser(user: AdminUser): Promise<Ad
 }
 
 export async function updateAdminDoctorProfile(id: number | string, payload: UpdateAdminDoctorProfilePayload): Promise<AdminDoctorProfile> {
+  await ensureAdminMutationOnline();
   return patchFirstAvailable<AdminDoctorProfile>([`${endpoints.clinicAdmin.doctors}${id}/`], payload);
 }
 
 export async function createClinicStaff(payload: CreateClinicUserPayload, doctorProfile?: Omit<CreateDoctorProfilePayload, 'user'>): Promise<AdminUser> {
-  return postFirstAvailable<AdminUser>([endpoints.clinicAdmin.createStaff], {
+  await ensureAdminMutationOnline();
+  const requestKey = `staff-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const { data } = await apiClient.post<AdminUser>(endpoints.clinicAdmin.createStaff, {
     ...payload,
     doctor_profile: doctorProfile,
-  });
+  }, { headers: { 'Idempotency-Key': requestKey } });
+  return data;
 }
 
 export async function setAdminUserActive(id: number | string, active: boolean, reason?: string): Promise<AdminUser> {
+  await ensureAdminMutationOnline();
   return patchFirstAvailable<AdminUser>([active ? endpoints.clinicAdmin.activateUser(id) : endpoints.clinicAdmin.deactivateUser(id)], reason ? { reason } : undefined);
+}
+
+export async function requestAdminPasswordReset(userId: number | string): Promise<void> {
+  await ensureAdminMutationOnline();
+  await postFirstAvailable([endpoints.clinicAdmin.resetUserPassword(userId)]);
+}
+
+export async function revokeAdminUserSessions(userId: number | string, reason: string): Promise<{ detail: string; sessions_revoked: number }> {
+  await ensureAdminMutationOnline();
+  return postFirstAvailable([endpoints.clinicAdmin.revokeUserSessions(userId)], { reason });
+}
+
+export async function getAdminDoctorSchedules(doctorId: number | string): Promise<AdminDoctorSchedule[]> {
+  const data = await getFirstAvailable<unknown>([endpoints.clinicAdmin.doctorSchedules(doctorId)]);
+  return normalizeAdminList<AdminDoctorSchedule>(data);
+}
+
+export async function createAdminDoctorSchedule(doctorId: number | string, payload: AdminDoctorSchedulePayload): Promise<AdminDoctorSchedule> {
+  await ensureAdminMutationOnline();
+  return postFirstAvailable<AdminDoctorSchedule>([endpoints.clinicAdmin.doctorSchedules(doctorId)], payload);
+}
+
+export async function updateAdminDoctorSchedule(doctorId: number | string, scheduleId: number | string, payload: Partial<AdminDoctorSchedulePayload>): Promise<AdminDoctorSchedule> {
+  await ensureAdminMutationOnline();
+  return patchFirstAvailable<AdminDoctorSchedule>([endpoints.clinicAdmin.doctorSchedule(doctorId, scheduleId)], payload);
+}
+
+export async function deactivateAdminDoctorSchedule(doctorId: number | string, scheduleId: number | string): Promise<void> {
+  await ensureAdminMutationOnline();
+  await apiClient.delete(endpoints.clinicAdmin.doctorSchedule(doctorId, scheduleId));
 }
 
 export async function getAdminClinicReport(params?: AdminQueryParams): Promise<AdminReportSummary> {
@@ -128,11 +197,8 @@ export async function getAdminAccountLocks(params?: AdminQueryParams): Promise<A
 }
 
 export async function unlockAdminAccountLock(id: number | string): Promise<AdminAccountLock> {
+  await ensureAdminMutationOnline();
   return patchFirstAvailable<AdminAccountLock>([`/security/account-locks/${id}/unlock/`]);
-}
-
-export async function requestAdminPasswordReset(email: string): Promise<void> {
-  await postFirstAvailable(['/security/password-reset/request/'], { email });
 }
 
 export async function getAdminSubscription(): Promise<AdminSubscription | null> {

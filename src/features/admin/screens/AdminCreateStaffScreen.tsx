@@ -17,6 +17,7 @@ import type { AdminSpecialty, AdminUsage, CreateClinicUserPayload } from '@/feat
 const roles = [
   { description: 'Acceso a triaje, signos vitales y hospitalización.', label: 'Enfermería', value: 'enfermera' },
   { description: 'Acceso a citas, admisiones y atención inicial.', label: 'Recepción', value: 'recepcionista' },
+  { description: 'Acceso integrado a recepción, cobros y facturación.', label: 'Recepción y caja', value: 'recepcionista_caja' },
   { description: 'Acceso a pacientes, consulta médica y expediente.', label: 'Doctor', value: 'medico' },
 ] as const;
 

@@ -27,6 +27,7 @@ const roles = [
   { label: 'Doctor', value: 'medico' },
   { label: 'Enfermería', value: 'enfermera' },
   { label: 'Recepción', value: 'recepcionista' },
+  { label: 'Recepción y caja', value: 'recepcionista_caja' },
   { label: 'Paciente', value: 'paciente' },
 ] as const;
 
@@ -193,6 +194,7 @@ function roleValue(role: string): StaffRole {
   if (normalized.includes('admin')) return 'admin';
   if (normalized.includes('medico')) return 'medico';
   if (normalized.includes('enfermera')) return 'enfermera';
+  if (normalized.includes('recepcionista_caja')) return 'recepcionista_caja';
   if (normalized.includes('recepcionista')) return 'recepcionista';
   if (normalized.includes('paciente')) return 'paciente';
   return 'recepcionista';

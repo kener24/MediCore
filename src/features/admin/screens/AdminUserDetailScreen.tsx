@@ -19,6 +19,7 @@ import {
   getAdminAccountLocks,
   getAdminUser,
   requestAdminPasswordReset,
+  revokeAdminUserSessions,
   setAdminUserActive,
   unlockAdminAccountLock,
 } from '@/features/admin/services/adminService';
@@ -28,6 +29,7 @@ import { getManagedSessions, revokeManagedSession, type ManagedSession } from '@
 
 type RouteParams = { userId?: number | string };
 type StatusModal = { active: boolean; user: AdminUser } | null;
+type SessionModal = { session?: ManagedSession; all?: boolean } | null;
 
 export function AdminUserDetailScreen() {
   const navigation = useNavigation<any>();
@@ -43,6 +45,8 @@ export function AdminUserDetailScreen() {
   const [error, setError] = useState('');
   const [statusModal, setStatusModal] = useState<StatusModal>(null);
   const [statusReason, setStatusReason] = useState('');
+  const [sessionModal, setSessionModal] = useState<SessionModal>(null);
+  const [sessionReason, setSessionReason] = useState('');
 
   const load = useCallback(async (refresh = false) => {
     if (!userId) {
@@ -99,17 +103,27 @@ export function AdminUserDetailScreen() {
     }
   };
 
-  const confirmRevoke = (session: ManagedSession) => {
-    Alert.alert('Cerrar sesión', `Se cerrará la sesión de ${session.user_email ?? user?.email ?? 'este usuario'}.`, [
-      { style: 'cancel', text: 'Cancelar' },
-      {
-        onPress: () => void revokeManagedSession(session.id)
-          .then(() => load(true))
-          .catch((err) => Alert.alert('Sesiones', err instanceof Error ? err.message : 'No se pudo cerrar la sesión.')),
-        style: 'destructive',
-        text: 'Cerrar',
-      },
-    ]);
+  const openSessionModal = (session?: ManagedSession, all = false) => {
+    setSessionReason('');
+    setSessionModal({ session, all });
+  };
+
+  const confirmRevoke = async () => {
+    if (!sessionModal || !user || saving) return;
+    const reason = sessionReason.trim();
+    if (reason.length < 5) {
+      Alert.alert('Motivo requerido', 'Escribe un motivo de al menos 5 caracteres.');
+      return;
+    }
+    setSaving(true);
+    try {
+      if (sessionModal.all) await revokeAdminUserSessions(user.id, reason);
+      else if (sessionModal.session) await revokeManagedSession(sessionModal.session.id, reason);
+      setSessionModal(null);
+      await load(true);
+    } catch (err) {
+      Alert.alert('Sesiones', err instanceof Error ? err.message : 'No se pudo cerrar la sesión.');
+    } finally { setSaving(false); }
   };
 
   const confirmUnlock = (lock: AdminAccountLock) => {
@@ -129,7 +143,7 @@ export function AdminUserDetailScreen() {
     Alert.alert('Recuperar contraseña', `Se enviará el flujo de recuperación a ${user.email}.`, [
       { style: 'cancel', text: 'Cancelar' },
       {
-        onPress: () => void requestAdminPasswordReset(user.email)
+        onPress: () => void requestAdminPasswordReset(user.id)
           .then(() => Alert.alert('Recuperación', 'Solicitud enviada correctamente.'))
           .catch((err) => Alert.alert('Recuperación', err instanceof Error ? err.message : 'No se pudo iniciar la recuperación.')),
         text: 'Enviar',
@@ -164,7 +178,6 @@ export function AdminUserDetailScreen() {
                 <Info label="Teléfono" value={user.telefono ?? user.phone ?? 'Sin teléfono'} />
                 <Info label="Correo verificado" value={user.email_verified ? 'Sí' : 'No'} />
                 <Info label="Último acceso" value={formatDateTime(user.ultimo_acceso ?? user.last_login)} />
-                <Info label="Última IP" value={user.last_login_ip ?? 'Sin IP'} />
                 <Info label="Cambio de contraseña" value={formatDateTime(user.password_changed_at)} />
                 <AppButton label="Editar usuario" onPress={() => navigation.navigate('AdminEditUser', { userId: user.id })} />
                 <AppButton label="Enviar recuperación de contraseña" onPress={confirmPasswordRecovery} variant="secondary" />
@@ -184,17 +197,20 @@ export function AdminUserDetailScreen() {
                   <Info label="Duración consulta" value={`${doctorProfile.duracion_consulta_minutos ?? 0} minutos`} />
                   <Info label="Tarifa" value={formatCurrency(doctorProfile.tarifa_consulta ?? 0)} />
                   <Info label="Virtual" value={doctorProfile.atiende_virtual ? 'Sí' : 'No'} />
+                  <AppButton label="Gestionar horarios" onPress={() => navigation.navigate('AdminDoctorSchedules', { doctorId: doctorProfile.id, doctorName: adminUserName(user) })} variant="secondary" />
                 </AppCard>
               ) : null}
 
               <AppCard style={styles.card}>
                 <Text style={styles.title}>Sesiones activas</Text>
+                {sessions.length > 1 ? <AppButton label="Cerrar todas las sesiones" onPress={() => openSessionModal(undefined, true)} variant="danger" /> : null}
                 {sessions.length === 0 ? <EmptyState description="Este usuario no tiene sesiones activas." title="Sin sesiones" /> : null}
                 {sessions.map((session) => (
                   <View key={session.id} style={styles.itemBox}>
                     <Text style={styles.itemTitle}>{session.device_name || 'Dispositivo'}</Text>
-                    <Text style={styles.meta}>{session.ip_address || 'sin IP'} · {formatDateTime(session.last_activity_at)}</Text>
-                    <AppButton disabled={session.current} label={session.current ? 'Sesión actual' : 'Cerrar sesión'} onPress={() => confirmRevoke(session)} variant="danger" />
+                    <Text style={styles.meta}>{session.platform || 'Plataforma no identificada'} · {session.location_hint || 'Ubicación protegida'}</Text>
+                    <Text style={styles.meta}>Actividad: {formatDateTime(session.last_activity_at)}</Text>
+                    <AppButton disabled={session.current} label={session.current ? 'Sesión actual' : 'Cerrar sesión'} onPress={() => openSessionModal(session)} variant="danger" />
                   </View>
                 ))}
               </AppCard>
@@ -229,6 +245,19 @@ export function AdminUserDetailScreen() {
               <View style={styles.modalActions}>
                 <AppButton disabled={saving} label="Cancelar" onPress={() => setStatusModal(null)} variant="secondary" />
                 <AppButton loading={saving} label="Confirmar" onPress={confirmStatusChange} variant={statusModal?.active ? 'primary' : 'danger'} />
+              </View>
+            </AppCard>
+          </View>
+        </Modal>
+        <Modal animationType="fade" transparent visible={Boolean(sessionModal)}>
+          <View style={styles.modalBackdrop}>
+            <AppCard style={styles.modalCard}>
+              <Text style={styles.title}>{sessionModal?.all ? 'Cerrar todas las sesiones' : 'Cerrar sesión'}</Text>
+              <Text style={styles.meta}>El usuario deberá iniciar sesión nuevamente. El motivo quedará auditado.</Text>
+              <AppInput label="Motivo" multiline onChangeText={setSessionReason} placeholder="Ej. Equipo extraviado o cambio de funciones" value={sessionReason} />
+              <View style={styles.modalActions}>
+                <AppButton disabled={saving} label="Cancelar" onPress={() => setSessionModal(null)} variant="secondary" />
+                <AppButton loading={saving} label="Cerrar sesión" onPress={confirmRevoke} variant="danger" />
               </View>
             </AppCard>
           </View>

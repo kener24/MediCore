@@ -1,21 +1,21 @@
 import { apiClient } from '@/core/api/apiClient';
 import { endpoints } from '@/core/api/endpoints';
+import { isDeviceOnline } from '@/core/network/connectivity';
 
 export type ManagedSession = {
   id: number;
   user?: number;
   user_email?: string;
   user_nombre?: string;
+  user_role?: string;
   device_name?: string;
-  ip_address?: string | null;
-  user_agent?: string;
   active?: boolean;
   current?: boolean;
   created_at?: string;
   last_activity_at?: string;
   revoked_at?: string | null;
   expires_at?: string;
-  expired?: boolean;
+  is_expired?: boolean;
   location_hint?: string;
   platform?: string;
 };
@@ -35,8 +35,9 @@ export async function getManagedSessions(params?: { active?: boolean; user?: num
   return normalizeList(data);
 }
 
-export async function revokeManagedSession(id: number | string) {
-  const { data } = await apiClient.patch<ManagedSession>(`/security/admin/sessions/${id}/revoke/`);
+export async function revokeManagedSession(id: number | string, reason = 'Cierre remoto autorizado por administración.') {
+  if (!(await isDeviceOnline())) throw new Error('Esta operación requiere conexión al servidor.');
+  const { data } = await apiClient.patch<ManagedSession>(`/security/admin/sessions/${id}/revoke/`, { reason });
   return data;
 }
 

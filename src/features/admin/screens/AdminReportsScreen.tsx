@@ -24,7 +24,7 @@ import {
 } from '@/features/admin/services/adminService';
 import type { AdminAccountLock, AdminAuditLog, AdminReportSummary, AdminSubscription, AdminUsage } from '@/features/admin/types/admin.types';
 import { formatCurrency, formatDateTime } from '@/features/cashier/types/commonCashier.types';
-import { getManagedSessions, revokeManagedSession, type ManagedSession } from '@/features/security/services/sessionService';
+import { getManagedSessions, type ManagedSession } from '@/features/security/services/sessionService';
 
 const severityFilters = ['Todas', 'info', 'warning', 'error'] as const;
 type SeverityFilter = (typeof severityFilters)[number];
@@ -83,19 +83,6 @@ export function AdminReportsScreen() {
     });
   }, [auditLogs, auditSearch, severity]);
 
-  const confirmRevoke = useCallback((session: ManagedSession) => {
-    Alert.alert('Cerrar sesión remota', `¿Deseas cerrar la sesión de ${session.user_email ?? session.user_nombre ?? 'este usuario'}?`, [
-      { style: 'cancel', text: 'Cancelar' },
-      {
-        style: 'destructive',
-        text: 'Cerrar sesión',
-        onPress: () => void revokeManagedSession(session.id)
-          .then(() => load(true))
-          .catch((err) => Alert.alert('No se pudo cerrar', err instanceof Error ? err.message : 'Intenta nuevamente.')),
-      },
-    ]);
-  }, [load]);
-
   const confirmUnlock = useCallback((lock: AdminAccountLock) => {
     Alert.alert('Desbloquear cuenta', `¿Deseas desbloquear a ${lock.user_email ?? lock.user_nombre ?? 'este usuario'}?`, [
       { style: 'cancel', text: 'Cancelar' },
@@ -148,12 +135,13 @@ export function AdminReportsScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Sesiones activas</Text>
             {sessions.length === 0 ? <EmptyState description="No hay sesiones activas en la clínica." title="Sin sesiones activas" /> : null}
-            {sessions.slice(0, 12).map((session) => (
+            {sessions.map((session) => (
               <AppCard key={session.id} style={styles.auditCard}>
                 <Text style={styles.auditTitle}>{session.user_nombre || session.user_email || 'Usuario'}</Text>
-                <Text style={styles.meta}>{session.device_name || 'Dispositivo'} · {session.ip_address || 'sin IP'}</Text>
+                <Text style={styles.meta}>{session.device_name || 'Dispositivo'} · {session.platform || 'Plataforma no identificada'}</Text>
+                <Text style={styles.meta}>{session.location_hint || 'Ubicación protegida'}</Text>
                 <Text style={styles.meta}>Última actividad: {formatDateTime(session.last_activity_at)}</Text>
-                <AppButton disabled={!session.active || session.current} label={session.current ? 'Sesión actual' : 'Cerrar sesión'} onPress={() => confirmRevoke(session)} variant="danger" />
+                <Text style={styles.meta}>La revocación con motivo se realiza desde el detalle del usuario.</Text>
               </AppCard>
             ))}
           </View>

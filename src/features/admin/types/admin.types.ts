@@ -32,6 +32,45 @@ export type AdminDashboard = {
   total_enfermeras?: number;
   total_recepcionistas?: number;
   total_pacientes?: number;
+  period?: { key: 'today' | '7d' | 'month' | 'custom'; date_from: string; date_to: string; timezone: string };
+  operation?: {
+    appointments_scheduled: number;
+    appointments_attended: number;
+    appointments_cancelled: number;
+    appointments_no_show: number;
+    patients_waiting: number;
+    patients_in_consultation: number;
+    patients_hospitalized: number;
+  };
+  finance?: { invoiced: string | number; paid: string | number; balance_due: string | number; open_cash_sessions: number; cash_differences: number };
+  inventory?: { out_of_stock: number; low_stock: number; expiring_lots: number; expired_lots: number };
+  users?: { total: number; active: number; inactive: number; active_doctors: number; active_sessions: number; active_locks: number };
+  operation_status?: AdminOperationStatus;
+  alerts?: AdminOperationalAlert[];
+};
+
+export type AdminOperationalAlert = {
+  key: string;
+  title: string;
+  category: 'inventory' | 'security' | 'cash' | 'appointments' | 'fiscal' | string;
+  severity: 'critical' | 'error' | 'warning' | 'info' | string;
+  count: number;
+  status: string;
+  resource_type: string;
+  detail: string;
+  created_at?: string;
+  acknowledge_supported?: boolean;
+};
+
+export type AdminOperationStatus = {
+  clinic_active: boolean;
+  patient_portal_active: boolean;
+  online_appointments_active: boolean;
+  in_person_appointments_active: boolean;
+  cash_open: boolean;
+  valid_fiscal_range: boolean;
+  fiscal_billing_enabled: boolean;
+  last_updated?: string;
 };
 
 export type AdminUser = {
@@ -52,13 +91,14 @@ export type AdminUser = {
   date_joined?: string | null;
   creado_en?: string | null;
   actualizado_en?: string | null;
+  has_active_session?: boolean;
+  doctor_profile_id?: number | null;
 };
 
 export type UpdateAdminUserPayload = {
   email?: string;
-  is_active?: boolean;
   nombre_completo?: string;
-  role?: 'admin' | 'medico' | 'enfermera' | 'recepcionista' | 'paciente';
+  role?: 'admin' | 'medico' | 'enfermera' | 'recepcionista' | 'cajero' | 'recepcionista_caja' | 'paciente';
   telefono?: string;
 };
 
@@ -77,7 +117,21 @@ export type AdminDoctorProfile = {
   atiende_virtual?: boolean;
   atiende_presencial?: boolean;
   activo?: boolean;
+  schedules?: AdminDoctorSchedule[];
 };
+
+export type AdminDoctorSchedule = {
+  id: number;
+  doctor?: number;
+  dia_semana: 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo';
+  hora_inicio: string;
+  hora_fin: string;
+  activo: boolean;
+  creado_en?: string;
+  actualizado_en?: string;
+};
+
+export type AdminDoctorSchedulePayload = Pick<AdminDoctorSchedule, 'dia_semana' | 'hora_inicio' | 'hora_fin'> & { activo?: boolean };
 
 export type UpdateAdminDoctorProfilePayload = {
   atiende_presencial?: boolean;
@@ -180,7 +234,7 @@ export type CreateClinicUserPayload = {
   is_active?: boolean;
   nombre_completo: string;
   password: string;
-  role: 'medico' | 'enfermera' | 'recepcionista';
+  role: 'medico' | 'enfermera' | 'recepcionista' | 'recepcionista_caja';
   telefono?: string;
 };
 

@@ -329,13 +329,13 @@ class AuthAndUsersTests(APITestCase):
         self.authenticate(self.clinic_admin)
         response = self.client.get("/api/clinic-admin/users/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual({item["clinica"] for item in response.data}, {self.clinic.id})
+        self.assertEqual({item["clinica"] for item in response.data["results"]}, {self.clinic.id})
 
     def test_admin_no_puede_listar_usuarios_de_otra_clinica(self):
         self.authenticate(self.clinic_admin)
         response = self.client.get(f"/api/clinic-admin/users/?clinic_id={self.other_clinic.id}")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual({item["clinica"] for item in response.data}, {self.clinic.id})
+        self.assertEqual({item["clinica"] for item in response.data["results"]}, {self.clinic.id})
 
     def test_admin_puede_crear_medico_en_su_clinica(self):
         self.authenticate(self.clinic_admin)

@@ -214,6 +214,7 @@ class ClinicAdminCertificationTests(APITestCase):
         self.assertEqual(operation.status_code, status.HTTP_200_OK)
         self.assertEqual(operation.data["clinic"]["id"], self.clinic_a.id)
         self.assertTrue(all("cai" not in item for item in alerts.data["results"]))
+        self.assertTrue(AuditLog.objects.filter(clinic=self.clinic_a, model_name="ClinicOperationStatus", action=AuditLog.Action.VIEW).exists())
 
     def test_doctor_schedule_is_scoped_validated_and_audited(self):
         specialty = MedicalSpecialty.objects.create(nombre="Medicina familiar")

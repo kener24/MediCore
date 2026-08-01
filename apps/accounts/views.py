@@ -392,6 +392,7 @@ class ClinicAdminOperationStatusView(APIView):
         if not clinic:
             return Response({"detail": "No se encontró una clínica asociada a tu cuenta."}, status=status.HTTP_404_NOT_FOUND)
         dashboard = build_clinic_admin_dashboard(request, clinic)
+        log_audit_event(request=request, clinic=clinic, action=AuditLog.Action.VIEW, module=AuditLog.Module.SYSTEM, model_name="ClinicOperationStatus", object_id=clinic.id, description="Estado operativo de la clínica consultado.")
         return Response({
             "clinic": dashboard["clinic"],
             "operation_status": dashboard["operation_status"],

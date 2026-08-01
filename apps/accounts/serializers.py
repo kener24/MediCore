@@ -10,6 +10,17 @@ from apps.security.services import validate_password_policy
 from apps.subscriptions.services import ensure_can_create_user
 
 
+CLINIC_ADMIN_MANAGED_ROLES = {
+    "admin",
+    "medico",
+    "enfermera",
+    "recepcionista",
+    "cajero",
+    "recepcionista_caja",
+    "paciente",
+}
+
+
 class RoleSerializer(serializers.ModelSerializer):
     permissions = serializers.SerializerMethodField()
     permission_groups = serializers.SerializerMethodField()
@@ -252,6 +263,37 @@ class MyClinicSerializer(serializers.ModelSerializer):
         return validate_phone(value)
 
 
+class ClinicAdminUserReadSerializer(serializers.ModelSerializer):
+    role_nombre = serializers.CharField(source="role.nombre", read_only=True)
+    clinica_nombre = serializers.CharField(source="clinica.nombre", read_only=True)
+    has_active_session = serializers.BooleanField(source="_has_active_session", read_only=True, default=False)
+    doctor_profile_id = serializers.IntegerField(source="doctor_profile.id", read_only=True, default=None)
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "nombre_completo",
+            "email",
+            "telefono",
+            "avatar_url",
+            "role",
+            "role_nombre",
+            "clinica",
+            "clinica_nombre",
+            "is_active",
+            "ultimo_acceso",
+            "email_verified",
+            "password_changed_at",
+            "date_joined",
+            "creado_en",
+            "actualizado_en",
+            "has_active_session",
+            "doctor_profile_id",
+        ]
+        read_only_fields = fields
+
+
 class ClinicAdminUserCreateSerializer(serializers.ModelSerializer):
     role = serializers.CharField()
     password = serializers.CharField(write_only=True, required=True, min_length=8)
@@ -271,9 +313,10 @@ class ClinicAdminUserCreateSerializer(serializers.ModelSerializer):
         return validate_phone(value)
 
     def validate_role(self, value):
-        allowed = ["admin", "medico", "enfermera", "recepcionista", "paciente"]
-        if value not in allowed:
+        if value not in CLINIC_ADMIN_MANAGED_ROLES:
             raise serializers.ValidationError("No puedes crear usuarios con este rol.")
+        if not Role.objects.filter(nombre=value, activo=True).exists():
+            raise serializers.ValidationError("El rol seleccionado no está disponible.")
         return value
 
     def validate(self, attrs):
@@ -291,7 +334,7 @@ class ClinicAdminUserCreateSerializer(serializers.ModelSerializer):
         request = self.context["request"]
         role_name = validated_data.pop("role")
         password = validated_data.pop("password")
-        role = Role.objects.get(nombre=role_name)
+        role = Role.objects.get(nombre=role_name, activo=True)
         clinic = request.user.clinica
         if getattr(request.user.role, "nombre", None) == "superadmin":
             clinic_id = self.context.get("clinic_id")
@@ -305,7 +348,7 @@ class ClinicAdminUserUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["nombre_completo", "email", "telefono", "role", "is_active"]
+        fields = ["nombre_completo", "email", "telefono", "role"]
 
     def validate_email(self, value):
         email = User.objects.normalize_email(value)
@@ -320,13 +363,24 @@ class ClinicAdminUserUpdateSerializer(serializers.ModelSerializer):
         return validate_phone(value)
 
     def validate_role(self, value):
-        allowed = ["admin", "medico", "enfermera", "recepcionista", "paciente"]
-        if value not in allowed:
+        if value not in CLINIC_ADMIN_MANAGED_ROLES:
             raise serializers.ValidationError("No puedes asignar este rol.")
+        if not Role.objects.filter(nombre=value, activo=True).exists():
+            raise serializers.ValidationError("El rol seleccionado no está disponible.")
         return value
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        role_name = attrs.get("role")
+        current_role = getattr(getattr(self.instance, "role", None), "nombre", None)
+        if request and self.instance == request.user and role_name and role_name != current_role:
+            raise serializers.ValidationError({"role": "No puedes cambiar tu propio rol administrativo."})
+        if role_name == "medico" and current_role != "medico" and not hasattr(self.instance, "doctor_profile"):
+            raise serializers.ValidationError({"role": "Crea el perfil médico antes de asignar el rol médico."})
+        return attrs
 
     def update(self, instance, validated_data):
         role_name = validated_data.pop("role", None)
         if role_name:
-            validated_data["role"] = Role.objects.get(nombre=role_name)
+            validated_data["role"] = Role.objects.get(nombre=role_name, activo=True)
         return super().update(instance, validated_data)

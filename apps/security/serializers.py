@@ -45,15 +45,30 @@ class AccountLockSerializer(serializers.ModelSerializer):
 class UserSessionSerializer(serializers.ModelSerializer):
     user_email = serializers.CharField(source="user.email", read_only=True)
     user_nombre = serializers.CharField(source="user.nombre_completo", read_only=True)
+    user_role = serializers.CharField(source="user.role.nombre", read_only=True)
     current = serializers.SerializerMethodField()
+    platform = serializers.SerializerMethodField()
+    location_hint = serializers.SerializerMethodField()
+    is_expired = serializers.SerializerMethodField()
 
     class Meta:
         model = UserSession
-        fields = ["id", "user", "user_email", "user_nombre", "ip_address", "user_agent", "device_name", "last_activity_at", "expires_at", "revoked_at", "active", "created_at", "current"]
+        fields = ["id", "user", "user_email", "user_nombre", "user_role", "device_name", "platform", "location_hint", "last_activity_at", "expires_at", "revoked_at", "active", "is_expired", "created_at", "current"]
         read_only_fields = fields
 
     def get_current(self, obj) -> bool:
         return self.context.get("current_session_key") == obj.session_key
+
+    def get_platform(self, obj):
+        return session_platform(obj.user_agent)
+
+    def get_location_hint(self, obj):
+        return mask_ip(obj.ip_address)
+
+    def get_is_expired(self, obj):
+        from django.utils import timezone
+
+        return obj.expires_at <= timezone.now()
 
 
 class OwnUserSessionSerializer(serializers.ModelSerializer):
@@ -74,30 +89,38 @@ class OwnUserSessionSerializer(serializers.ModelSerializer):
         return self.context.get("current_session_key") == obj.session_key
 
     def get_platform(self, obj):
-        agent = str(obj.user_agent or "").lower()
-        if "android" in agent:
-            return "Android"
-        if "iphone" in agent or "ipad" in agent or "ios" in agent:
-            return "iOS"
-        if "windows" in agent:
-            return "Windows"
-        if "macintosh" in agent or "mac os" in agent:
-            return "macOS"
-        return "Dispositivo"
+        return session_platform(obj.user_agent)
 
     def get_location_hint(self, obj):
-        value = str(obj.ip_address or "")
-        if "." in value:
-            parts = value.split(".")
-            return ".".join(parts[:2] + ["x", "x"])
-        if ":" in value:
-            return f"{value.split(':')[0]}:****"
-        return ""
+        return mask_ip(obj.ip_address)
 
     def get_is_expired(self, obj):
         from django.utils import timezone
 
         return obj.expires_at <= timezone.now()
+
+
+def session_platform(user_agent):
+    agent = str(user_agent or "").lower()
+    if "android" in agent:
+        return "Android"
+    if "iphone" in agent or "ipad" in agent or "ios" in agent:
+        return "iOS"
+    if "windows" in agent:
+        return "Windows"
+    if "macintosh" in agent or "mac os" in agent:
+        return "macOS"
+    return "Dispositivo"
+
+
+def mask_ip(ip_address):
+    value = str(ip_address or "")
+    if "." in value:
+        parts = value.split(".")
+        return ".".join(parts[:2] + ["x", "x"])
+    if ":" in value:
+        return f"{value.split(':')[0]}:****"
+    return ""
 
 
 class PasswordPolicySerializer(serializers.Serializer):

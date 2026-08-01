@@ -36,7 +36,12 @@ def is_superadmin(user):
 def can_manage_user(request_user, target_user):
     if is_superadmin(request_user):
         return True
-    return get_role_name(request_user) == "admin" and request_user.clinica_id and target_user.clinica_id == request_user.clinica_id
+    return bool(
+        get_role_name(request_user) == "admin"
+        and request_user.clinica_id
+        and target_user.clinica_id == request_user.clinica_id
+        and get_role_name(target_user) != "superadmin"
+    )
 
 
 class PasswordResetRequestView(APIView):
@@ -222,19 +227,25 @@ class AdminSessionsView(APIView):
             if request.query_params.get("clinic"):
                 qs = qs.filter(user__clinica_id=request.query_params["clinic"])
         elif get_role_name(request.user) == "admin" and request.user.clinica_id:
-            qs = qs.filter(user__clinica_id=request.user.clinica_id)
+            qs = qs.filter(user__clinica_id=request.user.clinica_id).exclude(user__role__nombre="superadmin")
         else:
             return qs.none()
         if request.query_params.get("user"):
             qs = qs.filter(user_id=request.query_params["user"])
         if request.query_params.get("active") is not None:
             qs = qs.filter(active=str(request.query_params["active"]).lower() in ["1", "true", "yes", "si"])
+        if request.query_params.get("role"):
+            qs = qs.filter(user__role__nombre=request.query_params["role"])
+        if request.query_params.get("device"):
+            qs = qs.filter(device_name__icontains=request.query_params["device"])
         return qs
 
     def get(self, request):
         if get_role_name(request.user) not in ["superadmin", "admin"]:
             return Response({"detail": "No tienes permiso para ver sesiones."}, status=status.HTTP_403_FORBIDDEN)
-        return Response(UserSessionSerializer(self.get_queryset(request), many=True).data)
+        queryset = self.get_queryset(request)
+        log_audit_event(request=request, clinic=getattr(request.user, "clinica", None), action=AuditLog.Action.VIEW, module=AuditLog.Module.SECURITY, model_name="UserSession", description="Sesiones activas de la clínica consultadas.", metadata={"count": queryset.count()})
+        return Response(UserSessionSerializer(queryset, many=True, context={"current_session_key": request.headers.get("X-Session-Key", "")}).data)
 
 
 class AdminSessionRevokeView(APIView):
@@ -242,13 +253,23 @@ class AdminSessionRevokeView(APIView):
     serializer_class = UserSessionSerializer
 
     def patch(self, request, session_id):
-        session = UserSession.objects.select_related("user", "user__clinica").filter(id=session_id).first()
+        allowed = AdminSessionsView().get_queryset(request)
+        session = allowed.filter(id=session_id).first()
         if not session:
+            log_audit_event(request=request, clinic=getattr(request.user, "clinica", None), action=AuditLog.Action.PERMISSION_DENIED, module=AuditLog.Module.SECURITY, model_name="UserSession", object_id=session_id, description="Intento bloqueado de revocar una sesión administrativa ajena.", status=AuditLog.Status.FAILED, severity=AuditLog.Severity.WARNING)
             return Response({"detail": "Sesion no encontrada."}, status=status.HTTP_404_NOT_FOUND)
         if not can_manage_user(request.user, session.user):
             return Response({"detail": "No tienes permiso para revocar esta sesion."}, status=status.HTTP_403_FORBIDDEN)
+        reason = str(request.data.get("reason") or request.data.get("motivo") or "").strip()
+        if len(reason) < 5:
+            return Response({"reason": "El motivo es obligatorio y debe tener al menos 5 caracteres."}, status=status.HTTP_400_BAD_REQUEST)
+        if not session.active:
+            return Response({"detail": "La sesión ya se encuentra cerrada."}, status=status.HTTP_409_CONFLICT)
         revoke_user_session(session, revoked_by=request.user)
-        return Response(UserSessionSerializer(session).data)
+        log_audit_event(request=request, clinic=session.user.clinica, action=AuditLog.Action.UPDATE, module=AuditLog.Module.SECURITY, model_name="UserSession", object_id=session.id, object_repr=session.user.email, description="Sesión de usuario revocada por un administrador de clínica.", new_values={"active": False, "reason": reason})
+        return Response(UserSessionSerializer(session, context={"current_session_key": request.headers.get("X-Session-Key", "")}).data)
+
+    post = patch
 
 
 class PasswordPolicyView(APIView):

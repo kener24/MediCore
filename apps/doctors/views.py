@@ -1,4 +1,5 @@
 from django.db.models import Q
+from django.http import Http404
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -6,6 +7,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.permissions import IsSuperAdmin, get_role_name
+from apps.audit.models import AuditLog
+from apps.audit.services import get_object_audit_data, log_audit_event
 from apps.doctors.models import DoctorProfile, DoctorSchedule, MedicalSpecialty
 from apps.doctors.serializers import (
     DoctorProfileCreateSerializer,
@@ -85,6 +88,14 @@ class DoctorProfileViewSet(viewsets.ModelViewSet):
             )
         return queryset
 
+    def get_object(self):
+        try:
+            return super().get_object()
+        except Http404:
+            if get_role_name(self.request.user) == "admin":
+                log_audit_event(request=self.request, clinic=getattr(self.request.user, "clinica", None), action=AuditLog.Action.PERMISSION_DENIED, module=AuditLog.Module.DOCTORS, model_name="DoctorProfile", object_id=self.kwargs.get(self.lookup_field or "pk"), description="Intento bloqueado de acceder a un médico fuera del alcance de la clínica.", status=AuditLog.Status.FAILED, severity=AuditLog.Severity.WARNING)
+            raise
+
     def get_permissions(self):
         if self.action in ["create", "update", "partial_update", "destroy", "activate", "deactivate"]:
             return [IsAuthenticated()]
@@ -93,7 +104,11 @@ class DoctorProfileViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         if get_role_name(request.user) != "admin":
             return Response({"detail": "No tienes permiso para administrar medicos."}, status=status.HTTP_403_FORBIDDEN)
-        return super().create(request, *args, **kwargs)
+        response = super().create(request, *args, **kwargs)
+        if response.status_code == status.HTTP_201_CREATED:
+            doctor = DoctorProfile.objects.filter(id=response.data.get("id")).select_related("clinic", "user").first()
+            log_audit_event(request=request, clinic=getattr(doctor, "clinic", None), action=AuditLog.Action.CREATE, module=AuditLog.Module.DOCTORS, model_name="DoctorProfile", object_id=getattr(doctor, "id", None), object_repr=str(doctor or ""), description="Perfil médico creado por administrador de clínica.", new_values={"user": getattr(doctor, "user_id", None), "specialty": getattr(doctor, "specialty_id", None), "activo": getattr(doctor, "activo", None)})
+        return response
 
     def update(self, request, *args, **kwargs):
         doctor = self.get_object()
@@ -101,7 +116,12 @@ class DoctorProfileViewSet(viewsets.ModelViewSet):
             return Response({"detail": "No tienes permiso para modificar este medico."}, status=status.HTTP_403_FORBIDDEN)
         if get_role_name(request.user) != "admin":
             return Response({"detail": "No tienes permiso para administrar medicos."}, status=status.HTTP_403_FORBIDDEN)
-        return super().update(request, *args, **kwargs)
+        old_values = get_object_audit_data(doctor)
+        response = super().update(request, *args, **kwargs)
+        if response.status_code == status.HTTP_200_OK:
+            doctor.refresh_from_db()
+            log_audit_event(request=request, clinic=doctor.clinic, action=AuditLog.Action.UPDATE, module=AuditLog.Module.DOCTORS, model_name="DoctorProfile", object_id=doctor.id, object_repr=str(doctor), description="Perfil médico actualizado por administrador de clínica.", old_values=old_values, new_values=get_object_audit_data(doctor))
+        return response
 
     def destroy(self, request, *args, **kwargs):
         doctor = self.get_object()
@@ -109,6 +129,7 @@ class DoctorProfileViewSet(viewsets.ModelViewSet):
             return Response({"detail": "No tienes permiso para desactivar este medico."}, status=status.HTTP_403_FORBIDDEN)
         doctor.activo = False
         doctor.save(update_fields=["activo"])
+        log_audit_event(request=request, clinic=doctor.clinic, action=AuditLog.Action.DEACTIVATE, module=AuditLog.Module.DOCTORS, model_name="DoctorProfile", object_id=doctor.id, object_repr=str(doctor), description="Perfil médico desactivado por administrador de clínica.", new_values={"activo": False})
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=False, methods=["get"], url_path="me")
@@ -133,7 +154,8 @@ class DoctorProfileViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
         serializer = DoctorScheduleSerializer(data=request.data, context={"doctor": doctor})
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        schedule = serializer.save()
+        log_audit_event(request=request, clinic=doctor.clinic, action=AuditLog.Action.CREATE, module=AuditLog.Module.DOCTORS, model_name="DoctorSchedule", object_id=schedule.id, object_repr=str(schedule), description="Horario médico creado por administrador de clínica.", new_values=serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["get", "patch", "delete"], url_path=r"schedules/(?P<schedule_id>[^/.]+)")
@@ -152,10 +174,13 @@ class DoctorProfileViewSet(viewsets.ModelViewSet):
         if request.method == "DELETE":
             schedule.activo = False
             schedule.save(update_fields=["activo"])
+            log_audit_event(request=request, clinic=doctor.clinic, action=AuditLog.Action.DEACTIVATE, module=AuditLog.Module.DOCTORS, model_name="DoctorSchedule", object_id=schedule.id, object_repr=str(schedule), description="Horario médico desactivado; las citas existentes no fueron canceladas.", new_values={"activo": False})
             return Response(status=status.HTTP_204_NO_CONTENT)
+        old_values = get_object_audit_data(schedule)
         serializer = DoctorScheduleSerializer(schedule, data=request.data, partial=True, context={"doctor": doctor})
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        log_audit_event(request=request, clinic=doctor.clinic, action=AuditLog.Action.UPDATE, module=AuditLog.Module.DOCTORS, model_name="DoctorSchedule", object_id=schedule.id, object_repr=str(schedule), description="Horario médico actualizado; las citas existentes no fueron canceladas.", old_values=old_values, new_values=serializer.data)
         return Response(serializer.data)
 
 

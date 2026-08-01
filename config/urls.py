@@ -5,7 +5,9 @@ from rest_framework.routers import DefaultRouter
 
 from apps.accounts.views import (
     ChangePasswordView,
+    ClinicAdminAlertsView,
     ClinicAdminDashboardView,
+    ClinicAdminOperationStatusView,
     ClinicAdminUserViewSet,
     LoginView,
     LogoutView,
@@ -189,6 +191,8 @@ urlpatterns = [
     path("api/security/settings/", SecuritySettingsView.as_view(), name="security-settings"),
     path("api/admin/dashboard/", SuperAdminDashboardView.as_view(), name="superadmin_dashboard"),
     path("api/clinic-admin/dashboard/", ClinicAdminDashboardView.as_view(), name="clinic_admin_dashboard"),
+    path("api/clinic-admin/alerts/", ClinicAdminAlertsView.as_view(), name="clinic_admin_alerts"),
+    path("api/clinic-admin/operation-status/", ClinicAdminOperationStatusView.as_view(), name="clinic_admin_operation_status"),
     path("api/clinic-admin/my-clinic/", MyClinicView.as_view(), name="clinic_admin_my_clinic"),
     path("api/doctor/dashboard/", DoctorDashboardView.as_view(), name="doctor_dashboard"),
     path("api/hospitalization/dashboard/", HospitalizationDashboardView.as_view(), name="hospitalization-dashboard"),

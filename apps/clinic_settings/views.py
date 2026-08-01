@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 from apps.accounts.permissions import get_role_name
 from apps.audit.models import AuditLog
 from apps.audit.services import log_audit_event
+from apps.audit.services import get_object_audit_data
 from apps.clinic_settings.models import ClinicSettings, get_or_create_clinic_settings, get_or_create_workflow_settings
 from apps.clinic_settings.serializers import ClinicSettingsSerializer, ClinicSettingsSummarySerializer, ClinicSettingsUpdateSerializer, ClinicWorkflowSettingsSerializer, PublicClinicSettingsSerializer
 from apps.clinics.models import Clinic
@@ -50,9 +51,11 @@ class MyClinicSettingsView(APIView):
         settings = self.get_object(request)
         if not settings:
             return Response({"detail": "Tu usuario no tiene clinica asignada."}, status=status.HTTP_400_BAD_REQUEST)
+        old_values = get_object_audit_data(settings)
         serializer = ClinicSettingsUpdateSerializer(settings, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        log_audit_event(request=request, clinic=settings.clinic, action=AuditLog.Action.SETTINGS_CHANGE, module=AuditLog.Module.SETTINGS, model_name="ClinicSettings", object_id=settings.id, object_repr=str(settings), description="Configuración administrativa de clínica actualizada.", old_values=old_values, new_values=serializer.data)
         return Response(ClinicSettingsSerializer(settings).data)
 
 

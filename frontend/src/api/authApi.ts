@@ -1,6 +1,7 @@
 import api from "./axios";
 import type { AuthResponse, LoginPayload, MeResponse } from "../types/auth";
 import type { User } from "../types/user";
+import { REFRESH_TOKEN_KEY } from "../utils/constants";
 
 export async function login(payload: LoginPayload) {
   const { data } = await api.post<AuthResponse>("/auth/login/", payload);
@@ -23,5 +24,6 @@ export async function changePassword(payload: { old_password: string; new_passwo
 }
 
 export async function logout() {
-  await api.post("/auth/logout/");
+  const refresh = localStorage.getItem(REFRESH_TOKEN_KEY);
+  await api.post("/auth/logout/", refresh ? { refresh } : {});
 }

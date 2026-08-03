@@ -49,6 +49,7 @@ Fecha de revisión: 2026-07-21
 
 ## Consideraciones
 
-- SimpleJWT no necesita blacklist independiente para este flujo porque el refresh está ligado al hash y estado de `UserSession`.
+- SimpleJWT rota cada refresh y agrega el token anterior a blacklist. Además, el refresh está ligado al hash y estado de `UserSession`.
+- Access y refresh incluyen el claim `sid`; debe coincidir con `X-Session-Key`.
 - Swagger o clientes externos deben enviar `X-Session-Key` además de `Authorization`.
 - Los tokens y contraseñas no deben incluirse en logs, capturas ni documentos de evidencia.

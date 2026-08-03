@@ -26,11 +26,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(SESSION_KEY);
     for (let index = sessionStorage.length - 1; index >= 0; index -= 1) {
       const key = sessionStorage.key(index);
-      if (key?.startsWith("medicore.consultationDraft.")) sessionStorage.removeItem(key);
+      if (key?.startsWith("medicore.")) sessionStorage.removeItem(key);
     }
     for (let index = localStorage.length - 1; index >= 0; index -= 1) {
       const key = localStorage.key(index);
-      if (key?.startsWith("medicore.patient.")) localStorage.removeItem(key);
+      if (key?.startsWith("medicore.")) localStorage.removeItem(key);
     }
     setUser(null);
   }, []);

@@ -1,6 +1,6 @@
 # Matriz de roles y permisos
 
-Fecha de revisión: 2026-07-21
+Fecha de revisión: 2026-08-03 (Sprint 1.9A)
 
 Esta matriz describe el acceso esperado y certificado en el Sprint 1.0. Ocultar una opción en la interfaz no reemplaza el control del backend.
 
@@ -15,8 +15,8 @@ Esta matriz describe el acceso esperado y certificado en el Sprint 1.0. Ocultar 
 | Citas | Sin detalle clínico | Su clínica | Gestiona | No | Consulta operativa | Agenda propia | Solo propias |
 | Check-in y admisiones | No | Su clínica | Gestiona | No | Flujo permitido | Sala de espera | No |
 | Triaje y signos vitales | No | Consulta operativa | No clínico | No | Gestiona | Consulta | No |
-| Expediente completo | Bloqueado | Su clínica | Bloqueado | Bloqueado | Permitido | Permitido | Resumen propio |
-| Consultas clínicas | Bloqueado | Lectura operativa | Bloqueado | Bloqueado | Lectura permitida | Crea y edita propias | Finalizadas propias |
+| Expediente completo | Bloqueado | Solo índice/inicialización, sin contenido | Bloqueado | Bloqueado | Permitido | Permitido | Resumen propio autorizado |
+| Consultas clínicas | Bloqueado | Bloqueado | Bloqueado | Bloqueado | Lectura sin notas privadas | Crea y edita propias | Finalizadas propias sin notas privadas |
 | Diagnósticos | Bloqueado | Lectura de su clínica | Bloqueado | Bloqueado | Lectura permitida | Gestiona propios | Lectura propia permitida |
 | Recetas y órdenes | Bloqueado | Lectura de su clínica | Bloqueado | Bloqueado | Lectura permitida | Gestiona propias | Lectura propia emitida |
 | Hospitalización | Bloqueado | Su clínica | Flujo administrativo | No | Seguimiento permitido | Seguimiento permitido | No |

@@ -2,6 +2,20 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 
+class AppendOnlyAuditLogQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise ValidationError("Los registros de auditoria son append-only y no pueden modificarse.")
+
+    def bulk_update(self, objs, fields, batch_size=None):
+        raise ValidationError("Los registros de auditoria son append-only y no pueden modificarse.")
+
+    def delete(self):
+        raise ValidationError("Los registros de auditoria son append-only y no pueden borrarse.")
+
+    def _raw_delete(self, using):
+        raise ValidationError("Los registros de auditoria son append-only y no pueden borrarse.")
+
+
 class AuditLog(models.Model):
     class Action(models.TextChoices):
         LOGIN = "login", "Login"
@@ -97,7 +111,10 @@ class AuditLog(models.Model):
     old_values = models.JSONField(default=dict, blank=True)
     new_values = models.JSONField(default=dict, blank=True)
     metadata = models.JSONField(default=dict, blank=True)
+    request_id = models.UUIDField(null=True, blank=True, db_index=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = AppendOnlyAuditLogQuerySet.as_manager()
 
     class Meta:
         ordering = ["-created_at"]

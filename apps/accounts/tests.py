@@ -194,7 +194,8 @@ class AuthAndUsersTests(APITestCase):
         session.refresh_from_db()
         self.assertFalse(session.active)
         login = self.client.post("/api/auth/login/", {"email": self.normal_user.email, "password": "Medico12345*"}, format="json")
-        self.assertEqual(login.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(login.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(login.data["detail"], "Credenciales incorrectas.")
 
     def test_superadmin_debe_indicar_motivo_para_activar_clinica(self):
         self.clinic.activo = False

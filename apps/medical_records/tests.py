@@ -125,8 +125,7 @@ class MedicalRecordsModuleTests(APITestCase):
         self.assertEqual(self.client.get("/api/medical-records/").status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(self.client.get(f"/api/medical-records/{record.id}/").status_code, status.HTTP_404_NOT_FOUND)
         consultations = self.client.get("/api/consultations/")
-        self.assertEqual(consultations.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(consultations.data), 0)
+        self.assertEqual(consultations.status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(self.client.get(f"/api/consultations/{consultation.id}/").status_code, status.HTTP_404_NOT_FOUND)
 
     def test_paciente_y_enfermera_no_modifican_consulta_medica(self):

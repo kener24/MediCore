@@ -32,6 +32,7 @@ class AuditLogListSerializer(serializers.ModelSerializer):
             "ip_address",
             "request_method",
             "request_path",
+            "request_id",
             "created_at",
         ]
 

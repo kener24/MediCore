@@ -33,9 +33,8 @@ class AppointmentsModuleTests(APITestCase):
         self.other_doctor = DoctorProfile.objects.create(clinic=self.other_clinic, user=self.other_doctor_user, specialty=self.specialty, numero_colegiacion="CMH-2", duracion_consulta_minutos=30)
         self.patient = Patient.objects.create(clinic=self.clinic, user=self.patient_user, nombres="Juan", apellidos="Perez")
         self.other_patient = Patient.objects.create(clinic=self.other_clinic, user=self.other_patient_user, nombres="Ana", apellidos="Lopez")
-        self.next_monday = date.today() + timedelta(days=(0 - date.today().weekday()) % 7)
-        if self.next_monday < date.today():
-            self.next_monday += timedelta(days=7)
+        days_until_monday = (7 - date.today().weekday()) % 7 or 7
+        self.next_monday = date.today() + timedelta(days=days_until_monday)
         DoctorSchedule.objects.create(doctor=self.doctor, dia_semana="lunes", hora_inicio=time(8, 0), hora_fin=time(12, 0))
         DoctorSchedule.objects.create(doctor=self.second_doctor, dia_semana="lunes", hora_inicio=time(8, 0), hora_fin=time(12, 0))
         DoctorSchedule.objects.create(doctor=self.other_doctor, dia_semana="lunes", hora_inicio=time(8, 0), hora_fin=time(12, 0))

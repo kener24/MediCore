@@ -203,6 +203,13 @@ class ClinicalConsultationDetailSerializer(ClinicalConsultationListSerializer):
         ]
 
 
+class ClinicalConsultationRestrictedDetailSerializer(ClinicalConsultationDetailSerializer):
+    """Clinical detail for care roles without the physician's private notes."""
+
+    class Meta(ClinicalConsultationDetailSerializer.Meta):
+        fields = [field for field in ClinicalConsultationDetailSerializer.Meta.fields if field != "private_notes"]
+
+
 class ClinicalConsultationCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ClinicalConsultation

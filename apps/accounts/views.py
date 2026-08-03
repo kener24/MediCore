@@ -4,11 +4,13 @@ from django.http import Http404
 from django.utils import timezone
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import AuthenticationFailed, Throttled
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from apps.accounts.models import Role, User
@@ -39,19 +41,24 @@ from apps.doctors.serializers import DoctorProfileCreateSerializer, DoctorProfil
 from apps.audit.services import get_object_audit_data, log_audit_event
 from apps.security.models import UserSession
 from apps.security.services import active_lock, create_password_reset_token, create_user_session, hash_token, record_login_attempt, register_failed_login, revoke_all_user_sessions, revoke_user_session
+from apps.security.throttles import LoginIdentifierRateThrottle, LoginIPRateThrottle
 
 
 class LoginSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
-        email = attrs.get("email", "")
+        email = str(attrs.get("email", "")).strip().lower()
+        attrs["email"] = email
         candidate = User.objects.filter(email__iexact=email).select_related("clinica").first()
         if candidate:
             lock = active_lock(candidate)
             if lock:
-                raise serializers.ValidationError({"detail": f"Cuenta bloqueada temporalmente hasta {lock.locked_until}."})
+                raise AuthenticationFailed("Credenciales incorrectas.")
             if candidate.clinica_id and not candidate.clinica.activo:
-                raise serializers.ValidationError({"detail": "La clínica asociada está inactiva. Contacta al administrador del sistema."})
-        data = super().validate(attrs)
+                raise AuthenticationFailed("Credenciales incorrectas.")
+        try:
+            data = super().validate(attrs)
+        except AuthenticationFailed as exc:
+            raise AuthenticationFailed("Credenciales incorrectas.") from exc
         data["user"] = MeSerializer(self.user).data
         return data
 
@@ -59,25 +66,35 @@ class LoginSerializer(TokenObtainPairSerializer):
 class LoginView(TokenObtainPairView):
     serializer_class = LoginSerializer
     permission_classes = [AllowAny]
+    throttle_classes = [LoginIPRateThrottle, LoginIdentifierRateThrottle]
 
     def post(self, request, *args, **kwargs):
         response = super().post(request, *args, **kwargs)
-        email = request.data.get("email", "")
+        email = str(request.data.get("email", "")).strip().lower()
         if response.status_code == status.HTTP_200_OK:
-            user = User.objects.filter(email=email).select_related("clinica").first()
+            user = User.objects.filter(email__iexact=email).select_related("clinica").first()
             record_login_attempt(email, request, True, user=user)
-            session = create_user_session(user, request, refresh_token=response.data.get("refresh")) if user else None
+            session = create_user_session(user, request) if user else None
             if session:
+                refresh = RefreshToken(str(response.data["refresh"]))
+                refresh["sid"] = session.session_key
+                refresh_text = str(refresh)
+                session.refresh_token_hash = hash_token(refresh_text)
+                session.save(update_fields=["refresh_token_hash"])
+                response.data["refresh"] = refresh_text
+                response.data["access"] = str(refresh.access_token)
                 response.data["session_key"] = session.session_key
             log_audit_event(request=request, user=user, clinic=getattr(user, "clinica", None), action=AuditLog.Action.LOGIN_SUCCESS, module=AuditLog.Module.AUTH, model_name="User", object_id=getattr(user, "id", None), object_repr=email, description="Inicio de sesion exitoso.", new_values={"email": email})
         return response
 
     def handle_exception(self, exc):
         request = self.request
-        email = request.data.get("email", "") if request else ""
+        email = str(request.data.get("email", "")).strip().lower() if request else ""
         user = User.objects.filter(email__iexact=email).select_related("clinica").first()
-        record_login_attempt(email, request, False, user=user, failure_reason=str(exc)[:180])
-        register_failed_login(user, request)
+        should_count_failure = not isinstance(exc, Throttled) and not (user and active_lock(user))
+        if should_count_failure:
+            record_login_attempt(email, request, False, user=user, failure_reason=str(exc)[:180])
+            register_failed_login(user, request)
         log_audit_event(request=request, user=user, clinic=getattr(user, "clinica", None), action=AuditLog.Action.LOGIN_FAILED, module=AuditLog.Module.AUTH, object_repr=email, description="Intento fallido de login.", status=AuditLog.Status.FAILED, severity=AuditLog.Severity.WARNING, metadata={"email": email})
         return super().handle_exception(exc)
 
@@ -91,25 +108,38 @@ class SessionTokenRefreshView(TokenRefreshView):
         if not refresh_token or not session_key:
             return Response({"detail": "La sesión no es válida. Inicia sesión nuevamente."}, status=status.HTTP_401_UNAUTHORIZED)
 
-        session = UserSession.objects.select_related("user", "user__clinica").filter(
-            session_key=session_key,
-            refresh_token_hash=hash_token(refresh_token),
-            active=True,
-            expires_at__gt=timezone.now(),
-        ).first()
-        if not session:
+        try:
+            parsed_refresh = RefreshToken(refresh_token)
+        except TokenError:
             return Response({"detail": "Tu sesión expiró o fue revocada. Inicia sesión nuevamente."}, status=status.HTTP_401_UNAUTHORIZED)
-        if not session.user.is_active:
-            revoke_user_session(session)
-            return Response({"detail": "Tu usuario se encuentra inactivo."}, status=status.HTTP_401_UNAUTHORIZED)
-        if session.user.clinica_id and not session.user.clinica.activo:
-            revoke_user_session(session)
-            return Response({"detail": "Tu clínica se encuentra inactiva."}, status=status.HTTP_401_UNAUTHORIZED)
+        if parsed_refresh.get("sid") != session_key:
+            return Response({"detail": "Tu sesión expiró o fue revocada. Inicia sesión nuevamente."}, status=status.HTTP_401_UNAUTHORIZED)
 
-        response = super().post(request, *args, **kwargs)
-        if response.status_code == status.HTTP_200_OK:
-            session.last_activity_at = timezone.now()
-            session.save(update_fields=["last_activity_at"])
+        with transaction.atomic():
+            session = UserSession.objects.select_for_update().select_related("user", "user__clinica").filter(
+                session_key=session_key,
+                refresh_token_hash=hash_token(refresh_token),
+                active=True,
+                expires_at__gt=timezone.now(),
+            ).first()
+            if not session:
+                return Response({"detail": "Tu sesión expiró o fue revocada. Inicia sesión nuevamente."}, status=status.HTTP_401_UNAUTHORIZED)
+            if not session.user.is_active:
+                revoke_user_session(session)
+                return Response({"detail": "Tu usuario se encuentra inactivo."}, status=status.HTTP_401_UNAUTHORIZED)
+            if session.user.clinica_id and not session.user.clinica.activo:
+                revoke_user_session(session)
+                return Response({"detail": "Tu clínica se encuentra inactiva."}, status=status.HTTP_401_UNAUTHORIZED)
+
+            response = super().post(request, *args, **kwargs)
+            if response.status_code == status.HTTP_200_OK:
+                session.last_activity_at = timezone.now()
+                update_fields = ["last_activity_at"]
+                rotated_refresh = str(response.data.get("refresh") or "")
+                if rotated_refresh:
+                    session.refresh_token_hash = hash_token(rotated_refresh)
+                    update_fields.append("refresh_token_hash")
+                session.save(update_fields=update_fields)
         return response
 
 
@@ -122,6 +152,14 @@ class LogoutView(APIView):
             session_key = request.headers.get("X-Session-Key", "").strip()
             session = UserSession.objects.filter(user=request.user, session_key=session_key, active=True).first()
         if session:
+            refresh_token = str(request.data.get("refresh") or "")
+            if refresh_token and session.refresh_token_hash == hash_token(refresh_token):
+                try:
+                    token = RefreshToken(refresh_token)
+                    if token.get("sid") == session.session_key:
+                        token.blacklist()
+                except TokenError:
+                    pass
             revoke_user_session(session, revoked_by=request.user)
         installation_id = request.headers.get("X-Installation-Id", "").strip()
         if installation_id:

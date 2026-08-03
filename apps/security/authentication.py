@@ -17,6 +17,8 @@ class SessionBoundJWTAuthentication(JWTAuthentication):
         session_key = request.headers.get("X-Session-Key", "").strip()
         if not session_key:
             raise AuthenticationFailed("La sesión no es válida. Inicia sesión nuevamente.")
+        if validated_token.get("sid") != session_key:
+            raise AuthenticationFailed("La sesión no corresponde al token presentado.")
 
         session = UserSession.objects.filter(
             user=user,

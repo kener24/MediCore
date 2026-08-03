@@ -1,4 +1,5 @@
 import logging
+import ipaddress
 from collections.abc import Mapping
 from datetime import date, datetime
 from decimal import Decimal
@@ -104,6 +105,17 @@ def get_client_ip(request):
     return request.META.get("REMOTE_ADDR")
 
 
+def protect_ip(value):
+    if not value:
+        return None
+    try:
+        address = ipaddress.ip_address(value)
+        prefix = 24 if address.version == 4 else 64
+        return str(ipaddress.ip_network(f"{address}/{prefix}", strict=False).network_address)
+    except ValueError:
+        return None
+
+
 def get_user_role(user):
     return str(getattr(getattr(user, "role", None), "nombre", "") or "")
 
@@ -186,13 +198,14 @@ def create_audit_log(
             changes=computed_changes,
             status=status or AuditLog.Status.SUCCESS,
             severity=severity or AuditLog.Severity.INFO,
-            ip_address=get_client_ip(request),
+            ip_address=protect_ip(get_client_ip(request)),
             user_agent=(request.META.get("HTTP_USER_AGENT", "") if request else "")[:1000],
             request_method=(request.method if request else "")[:12],
             request_path=(request.get_full_path() if request else "")[:300],
             old_values=mask_sensitive(before_raw or {}),
             new_values=mask_sensitive(after_raw or {}),
             metadata=mask_sensitive(metadata or {}),
+            request_id=getattr(request, "request_id", None) if request else None,
         )
         notify_critical_audit(log)
         return log

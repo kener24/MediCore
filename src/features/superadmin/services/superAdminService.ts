@@ -1,14 +1,20 @@
 import { apiClient } from '@/core/api/apiClient';
 import { endpoints } from '@/core/api/endpoints';
 import { ApiClientError } from '@/core/api/authInterceptor';
+import { isDeviceOnline } from '@/core/network/connectivity';
 import type {
   CreateClinicAdminPayload,
   CreateClinicPayload,
   ListResponse,
   SuperAdminAuditLog,
+  SuperAdminAlert,
   SuperAdminClinic,
   SuperAdminDashboard,
+  SuperAdminPlan,
   SuperAdminRole,
+  SuperAdminSubscription,
+  SuperAdminSystemStatus,
+  SuperAdminUsage,
   SuperAdminUser,
   UpdateClinicAdminPayload,
   UpdateClinicPayload,
@@ -31,8 +37,13 @@ async function get<T>(url: string, params?: QueryParams): Promise<T> {
 }
 
 async function patch<T>(url: string, payload?: unknown): Promise<T> {
+  await requireOnline();
   const { data } = await apiClient.patch<T>(url, payload ?? {});
   return data;
+}
+
+async function requireOnline() {
+  if (!(await isDeviceOnline())) throw new Error('Esta operación requiere conexión al servidor.');
 }
 
 export async function getSuperAdminDashboard() {
@@ -47,8 +58,9 @@ export async function getSuperAdminClinic(id: number | string) {
   return get<SuperAdminClinic>(endpoints.superAdmin.clinic(id));
 }
 
-export async function createSuperAdminClinic(payload: CreateClinicPayload) {
-  const { data } = await apiClient.post<SuperAdminClinic>(endpoints.superAdmin.clinics, payload);
+export async function createSuperAdminClinic(payload: CreateClinicPayload, idempotencyKey = crypto.randomUUID()) {
+  await requireOnline();
+  const { data } = await apiClient.post<SuperAdminClinic>(endpoints.superAdmin.clinics, payload, { headers: { 'Idempotency-Key': idempotencyKey } });
   return data;
 }
 
@@ -73,6 +85,7 @@ export async function getSuperAdminUser(id: number | string) {
 }
 
 export async function createSuperAdminClinicAdmin(payload: CreateClinicAdminPayload) {
+  await requireOnline();
   const { data } = await apiClient.post<SuperAdminUser>(endpoints.superAdmin.users, payload);
   return data;
 }
@@ -81,8 +94,8 @@ export async function updateSuperAdminClinicAdmin(id: number | string, payload: 
   return patch<SuperAdminUser>(endpoints.superAdmin.user(id), payload);
 }
 
-export async function setUserActive(id: number | string, active: boolean, reason?: string) {
-  return patch<SuperAdminUser>(active ? endpoints.superAdmin.activateUser(id) : endpoints.superAdmin.deactivateUser(id), reason ? { reason } : undefined);
+export async function setUserActive(id: number | string, active: boolean, reason: string) {
+  return patch<SuperAdminUser>(active ? endpoints.superAdmin.activateUser(id) : endpoints.superAdmin.deactivateUser(id), { reason });
 }
 
 export async function getSuperAdminRoles() {
@@ -102,11 +115,63 @@ export async function getSuperAdminAuditLogs() {
 
 export async function getSuperAdminSubscriptions() {
   try {
-    return normalizeList<Record<string, unknown>>(await get<unknown>(endpoints.superAdmin.subscriptions));
+    return normalizeList<SuperAdminSubscription>(await get<unknown>(endpoints.superAdmin.subscriptions));
   } catch (error) {
     if (error instanceof ApiClientError && [403, 404, 405].includes(error.status ?? 0)) return [];
     throw error;
   }
+}
+
+export async function getSuperAdminSubscription(clinicId: number | string) {
+  return get<SuperAdminSubscription>(endpoints.superAdmin.subscription(clinicId));
+}
+
+export async function getSuperAdminPlans() {
+  return normalizeList<SuperAdminPlan>(await get<unknown>(endpoints.superAdmin.plans));
+}
+
+export async function createSuperAdminPlan(payload: Partial<SuperAdminPlan>) {
+  await requireOnline();
+  const { data } = await apiClient.post<SuperAdminPlan>(endpoints.superAdmin.plans, payload);
+  return data;
+}
+
+export async function updateSuperAdminPlan(id: number | string, payload: Partial<SuperAdminPlan>) {
+  return patch<SuperAdminPlan>(endpoints.superAdmin.plan(id), payload);
+}
+
+export async function getSuperAdminUsage() {
+  const response = await get<{ results?: SuperAdminUsage[] }>(endpoints.superAdmin.usage);
+  return response.results ?? [];
+}
+
+export async function getSuperAdminAlerts() {
+  const response = await get<{ results?: SuperAdminAlert[] }>(endpoints.superAdmin.alerts);
+  return response.results ?? [];
+}
+
+export async function getSuperAdminSystemStatus() {
+  return get<SuperAdminSystemStatus>(endpoints.superAdmin.systemStatus);
+}
+
+export async function changeSuperAdminSubscription(clinicId: number | string, plan: number, billingCycle: string, reason: string) {
+  return patch<SuperAdminSubscription>(endpoints.superAdmin.subscriptionAction(clinicId, 'change-plan'), { plan, billing_cycle: billingCycle, reason });
+}
+
+export async function setSuperAdminSubscriptionActive(clinicId: number | string, active: boolean, reason: string) {
+  return patch<SuperAdminSubscription>(endpoints.superAdmin.subscriptionAction(clinicId, active ? 'reactivate' : 'suspend'), { reason });
+}
+
+export async function extendSuperAdminTrial(clinicId: number | string, days: number, reason: string) {
+  return patch<SuperAdminSubscription>(endpoints.superAdmin.subscriptionAction(clinicId, 'extend-trial'), { days, reason });
+}
+
+export async function renewSuperAdminSubscription(clinicId: number | string, endDate: string, reason: string) {
+  return patch<SuperAdminSubscription>(endpoints.superAdmin.subscriptionAction(clinicId, 'renew'), { end_date: endDate, reason });
+}
+
+export async function cancelSuperAdminSubscription(clinicId: number | string, reason: string) {
+  return patch<SuperAdminSubscription>(endpoints.superAdmin.subscriptionAction(clinicId, 'cancel'), { reason });
 }
 
 export function clinicName(clinic: SuperAdminClinic) {

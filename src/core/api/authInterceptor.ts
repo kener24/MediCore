@@ -121,8 +121,9 @@ export function setupAuthInterceptors(apiClient: AxiosInstance) {
 
     const cacheableConfig = config as RetriableRequestConfig;
     const clinicId = typeof user?.clinica === 'object' ? user.clinica?.id : user?.clinica;
+    const roleName = typeof user?.role === 'object' ? user.role.nombre : user?.role_nombre ?? user?.role;
     cacheableConfig._cacheUserKey = accessToken
-      ? `${user?.id ?? 'user'}:${clinicId ?? 'clinic'}:${sessionKey ?? 'session'}`
+      ? `${user?.id ?? 'user'}:${roleName ?? 'role'}:${clinicId ?? 'clinic'}:${sessionKey ?? 'session'}`
       : 'anonymous';
     if (isReadRequest(cacheableConfig)) {
       cacheableConfig._cacheKey = buildApiCacheKey({

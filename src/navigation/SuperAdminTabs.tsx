@@ -7,10 +7,13 @@ import { SuperAdminClinicDetailScreen } from '@/features/superadmin/screens/Supe
 import { SuperAdminClinicsScreen } from '@/features/superadmin/screens/SuperAdminClinicsScreen';
 import { SuperAdminCreateAdminScreen } from '@/features/superadmin/screens/SuperAdminCreateAdminScreen';
 import { SuperAdminCreateClinicScreen } from '@/features/superadmin/screens/SuperAdminCreateClinicScreen';
+import { SuperAdminControlScreen } from '@/features/superadmin/screens/SuperAdminControlScreen';
 import { SuperAdminEditAdminScreen } from '@/features/superadmin/screens/SuperAdminEditAdminScreen';
 import { SuperAdminEditClinicScreen } from '@/features/superadmin/screens/SuperAdminEditClinicScreen';
 import { SuperAdminHomeScreen } from '@/features/superadmin/screens/SuperAdminHomeScreen';
 import { SuperAdminProfileScreen } from '@/features/superadmin/screens/SuperAdminProfileScreen';
+import { SuperAdminPlansScreen } from '@/features/superadmin/screens/SuperAdminPlansScreen';
+import { SuperAdminSubscriptionDetailScreen } from '@/features/superadmin/screens/SuperAdminSubscriptionDetailScreen';
 import { SuperAdminUsersScreen } from '@/features/superadmin/screens/SuperAdminUsersScreen';
 import { createTabOptions, tabIcon } from '@/navigation/tabOptions';
 
@@ -41,6 +44,16 @@ function SuperAdminAdminsStack() {
   );
 }
 
+function SuperAdminControlStack() {
+  return (
+    <Stack.Navigator screenOptions={stackOptions}>
+      <Stack.Screen component={SuperAdminControlScreen} name="SuperAdminControl" />
+      <Stack.Screen component={SuperAdminPlansScreen} name="SuperAdminPlans" />
+      <Stack.Screen component={SuperAdminSubscriptionDetailScreen} name="SuperAdminSubscriptionDetail" />
+    </Stack.Navigator>
+  );
+}
+
 export function SuperAdminTabs() {
   const insets = useSafeAreaInsets();
   return (
@@ -49,6 +62,7 @@ export function SuperAdminTabs() {
         <Tab.Screen component={SuperAdminHomeScreen} name="SuperAdminHomeTab" options={{ tabBarIcon: tabIcon('shield-crown-outline'), title: 'Inicio' }} />
         <Tab.Screen component={SuperAdminClinicsStack} name="SuperAdminClinicsTab" options={{ tabBarIcon: tabIcon('hospital-building'), title: 'Clínicas' }} />
         <Tab.Screen component={SuperAdminAdminsStack} name="SuperAdminUsersTab" options={{ tabBarIcon: tabIcon('account-supervisor-outline'), title: 'Admins' }} />
+        <Tab.Screen component={SuperAdminControlStack} name="SuperAdminControlTab" options={{ tabBarIcon: tabIcon('chart-timeline-variant'), title: 'Control' }} />
         <Tab.Screen component={SuperAdminProfileScreen} name="SuperAdminProfileTab" options={{ tabBarIcon: tabIcon('shield-key-outline'), title: 'Perfil' }} />
       </Tab.Navigator>
     </RoleGuard>

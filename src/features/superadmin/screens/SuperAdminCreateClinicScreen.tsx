@@ -1,5 +1,5 @@
 import { useNavigation } from '@react-navigation/native';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -16,6 +16,7 @@ import type { CreateClinicPayload } from '@/features/superadmin/types/superAdmin
 export function SuperAdminCreateClinicScreen() {
   const navigation = useNavigation<any>();
   const [saving, setSaving] = useState(false);
+  const createKey = useRef(crypto.randomUUID());
   const [form, setForm] = useState<CreateClinicPayload>({ correo: '', direccion: '', nombre: '', rtn: '', telefono: '' });
 
   const update = (patch: Partial<CreateClinicPayload>) => setForm((current) => ({ ...current, ...patch }));
@@ -34,7 +35,7 @@ export function SuperAdminCreateClinicScreen() {
 
     setSaving(true);
     try {
-      await createSuperAdminClinic({ ...form, correo: email || undefined, nombre: name, rtn: rtn || undefined, telefono: form.telefono?.trim() || undefined });
+      await createSuperAdminClinic({ ...form, correo: email || undefined, nombre: name, rtn: rtn || undefined, telefono: form.telefono?.trim() || undefined }, createKey.current);
       Alert.alert('Clínica', 'Clínica creada correctamente.', [{ text: 'Ver clínicas', onPress: () => navigation.goBack() }]);
     } catch (err) {
       Alert.alert('No se pudo crear', err instanceof Error ? err.message : 'Revisa los datos e intenta nuevamente.');

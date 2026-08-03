@@ -253,3 +253,45 @@ Desplegado en `https://kp-software.tech` con commit `5ca9c4b`.
 ### Android fisico
 
 No certificado aun. TypeScript, Expo Doctor y exportacion Android no sustituyen la prueba tactil en un telefono real. Deben verificarse login, navegacion, doble toque, alta de clinica, planes, ciclo de suscripcion, sesiones, offline, restauracion, expiracion y logout antes de declarar certificacion fisica.
+
+---
+
+## Sprint 1.9A - Hardening transversal de seguridad
+
+Fecha local: 2026-08-03.
+
+### Automatizacion local
+
+- Suite de seguridad: 20/20 pruebas aprobadas.
+- Suite completa: 401/401 aprobadas; 3 omitidas de forma controlada.
+- `manage.py check`: 0 problemas; migraciones consistentes.
+- Web: lint sin errores y build de 1,852 modulos aprobado.
+- Movil: TypeScript, lint y Expo Doctor 18/18 aprobados.
+- Exportacion Android: 1,534 modulos empaquetados correctamente.
+
+### Produccion
+
+Desplegado en `https://kp-software.tech` con commit funcional `664131a`.
+
+- Respaldo: `/var/www/medicore/backups/sprint19a_20260803_181516`.
+- Dump MySQL, bundle Git, `.env`, Nginx, systemd y SHA-256 verificados.
+- Migraciones de `audit.request_id` y blacklist SimpleJWT aplicadas.
+- Login, rotacion, rechazo de replay, logout y revocacion: aprobados.
+- Aislamiento Clinica A/B: 200 para recurso propio y 404 para el ajeno.
+- Superadmin: dashboard 200 y pacientes, expedientes y consultas 403.
+- Auditoria: request ID presente y sin material de contrasena.
+- HTTPS raiz y `www`: 200; redireccion HTTP: 301; API anonima: 401 JSON.
+- `/media/`: 404; CORS limitado; cabeceras de seguridad presentes.
+- Renovacion simulada de Certbot: aprobada.
+- Nginx, Gunicorn y notificaciones: activos.
+
+La primera verificacion detecto un 502 debido al grupo incorrecto de `.env`
+despues del restore. Se corrigio de `ubuntu:ubuntu 640` a
+`ubuntu:www-data 640`, se reinicio Gunicorn y se repitieron las comprobaciones
+con resultados correctos y cero reinicios automaticos posteriores.
+
+### Pendientes manuales
+
+- Smoke tactil completo en Chrome y Edge.
+- Android fisico por rol. No se declara certificado al 100% hasta registrar esta
+  evidencia en un telefono real.

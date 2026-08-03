@@ -11,6 +11,14 @@ Basic server flow:
 
 1. Copy or clone the repository to `/var/www/medicore`.
 2. Create `/var/www/medicore/.env` using `.env.production.example`.
+   Keep it readable only by the deployment owner and the service group:
+
+   ```bash
+   sudo chown ubuntu:www-data /var/www/medicore/.env
+   sudo chmod 640 /var/www/medicore/.env
+   ```
+
+   Recheck these permissions after restoring `.env` from a backup.
 3. Create MySQL database and user.
 4. Create Python virtual environment at `/var/www/medicore/venv`.
 5. Install backend requirements and run migrations.

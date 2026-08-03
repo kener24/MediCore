@@ -92,3 +92,19 @@ incluye esta verificacion.
 Por la regla del sprint, la certificacion automatizada y el despliegue estan
 completos, pero el sprint no debe declararse certificado al 100% hasta registrar
 esas dos pruebas manuales.
+
+## Riesgos residuales para Sprint 1.9B
+
+- MySQL no aplica varias restricciones unicas condicionales declaradas por
+  Django. Las validaciones de aplicacion reducen el riesgo, pero se debe disenar
+  una garantia equivalente a nivel de base de datos para los modelos advertidos.
+- La auditoria es append-only en la aplicacion, pero aun no usa almacenamiento
+  WORM ni un privilegio de base de datos separado.
+- La carga de archivos valida tipo, tamano y autorizacion; antivirus/antimalware
+  sigue pendiente y no se declara implementado.
+- El refresh web permanece en almacenamiento del navegador por compatibilidad
+  con la arquitectura actual; una migracion futura a cookie HttpOnly reduciria
+  el impacto potencial de XSS.
+- Permanecen los avisos transitivos de React Router y Expo/Metro ya clasificados.
+- Pruebas de carga, restauracion completa y recuperacion ante desastre
+  corresponden al Sprint 1.9B.

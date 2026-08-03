@@ -25,6 +25,7 @@ export function UsersPage() {
   const [clinics, setClinics] = useState<Clinic[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [deactivatingUser, setDeactivatingUser] = useState<User | null>(null);
+  const [deactivationReason, setDeactivationReason] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -64,10 +65,15 @@ export function UsersPage() {
 
   async function handleDeactivate() {
     if (!deactivatingUser) return;
+    if (deactivationReason.trim().length < 5) {
+      toast.error("Indica un motivo claro para desactivar el usuario.");
+      return;
+    }
     try {
-      await deactivateUser(deactivatingUser.id);
+      await deactivateUser(deactivatingUser.id, deactivationReason.trim());
       toast.success("Usuario desactivado.");
       setDeactivatingUser(null);
+      setDeactivationReason("");
       await load();
     } catch (error) {
       toast.error(getErrorMessage(error));
@@ -136,10 +142,13 @@ export function UsersPage() {
       <Modal
         title="Desactivar usuario"
         open={Boolean(deactivatingUser)}
-        onClose={() => setDeactivatingUser(null)}
-        actions={<><ModalCloseButton onClick={() => setDeactivatingUser(null)} /><Button variant="danger" onClick={handleDeactivate}>Desactivar</Button></>}
+        onClose={() => { setDeactivatingUser(null); setDeactivationReason(""); }}
+        actions={<><ModalCloseButton onClick={() => { setDeactivatingUser(null); setDeactivationReason(""); }} /><Button variant="danger" onClick={handleDeactivate}>Desactivar</Button></>}
       >
-        <p className="text-sm text-slate-600">El usuario {deactivatingUser?.nombre_completo} no podra ingresar al sistema hasta que sea activado nuevamente.</p>
+        <div className="space-y-3">
+          <p className="text-sm text-slate-600">El usuario {deactivatingUser?.nombre_completo} no podrá ingresar al sistema hasta que sea activado nuevamente.</p>
+          <textarea className="min-h-24 w-full rounded-md border px-3 py-2 text-sm" onChange={(event) => setDeactivationReason(event.target.value)} placeholder="Motivo obligatorio" value={deactivationReason} />
+        </div>
       </Modal>
     </div>
   );

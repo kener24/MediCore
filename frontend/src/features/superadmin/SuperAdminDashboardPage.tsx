@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BarChart3, Bell, Building2, CreditCard, FileText, Lock, ShieldCheck, Stethoscope, UserCheck, UserRound, Users } from "lucide-react";
+import { Activity, BarChart3, Bell, Building2, CreditCard, FileText, Lock, ShieldCheck, Stethoscope, UserCheck, UserRound, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -23,7 +23,7 @@ export function SuperAdminDashboardPage() {
     setError("");
     try {
       setData(await getSuperAdminDashboard());
-    } catch (error) {
+    } catch {
       try {
         const [users, clinics] = await Promise.all([getUsers(), getClinics()]);
         setData({
@@ -81,6 +81,8 @@ export function SuperAdminDashboardPage() {
     { label: "Administradores", value: data.total_admins, icon: <ShieldCheck className="h-6 w-6" /> },
     { label: "Medicos", value: data.total_medicos, icon: <Stethoscope className="h-6 w-6" /> },
     { label: "Pacientes", value: data.total_pacientes, icon: <UserRound className="h-6 w-6" /> },
+    { label: "Citas del período", value: data.usage?.appointments ?? 0, icon: <Activity className="h-6 w-6" /> },
+    { label: "Alertas críticas", value: data.critical_alerts ?? 0, icon: <Bell className="h-6 w-6" /> },
   ];
   const modules = [
     { label: "Clinicas", path: "/superadmin/clinics", icon: <Building2 className="h-5 w-5" /> },
@@ -90,6 +92,7 @@ export function SuperAdminDashboardPage() {
     { label: "Notificaciones", path: "/superadmin/notifications", icon: <Bell className="h-5 w-5" /> },
     { label: "Planes SaaS", path: "/superadmin/subscriptions/plans", icon: <CreditCard className="h-5 w-5" /> },
     { label: "Suscripciones", path: "/superadmin/subscriptions/clinics", icon: <ShieldCheck className="h-5 w-5" /> },
+    { label: "Operación SaaS", path: "/superadmin/operations", icon: <Activity className="h-5 w-5" /> },
     { label: "Seguridad", path: "/security/settings", icon: <Lock className="h-5 w-5" /> },
   ];
 

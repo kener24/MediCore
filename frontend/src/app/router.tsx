@@ -31,6 +31,7 @@ import { SuperAdminClinicFormPage } from "../features/superadmin/SuperAdminClini
 import { SuperAdminClinicsPage } from "../features/superadmin/SuperAdminClinicsPage";
 import { SuperAdminDashboardPage } from "../features/superadmin/SuperAdminDashboardPage";
 import { SuperAdminUsersPage } from "../features/superadmin/SuperAdminUsersPage";
+import { SuperAdminOperationsPage } from "../features/superadmin/SuperAdminOperationsPage";
 import { PatientDashboardPage } from "../features/patients/PatientDashboardPage";
 import { PatientDetailsPage } from "../features/patients/PatientDetailsPage";
 import { PatientFormPage } from "../features/patients/PatientFormPage";
@@ -115,6 +116,7 @@ export const router = createBrowserRouter([
               { path: "/superadmin/clinics/new", element: <SuperAdminClinicFormPage /> },
               { path: "/superadmin/clinics/:id/edit", element: <SuperAdminClinicFormPage /> },
               { path: "/superadmin/users", element: <SuperAdminUsersPage /> },
+              { path: "/superadmin/operations", element: <SuperAdminOperationsPage /> },
               { path: "/superadmin/users/new", element: <UserCreatePage /> },
               { path: "/superadmin/reports", element: <SuperAdminReportsPage /> },
               { path: "/superadmin/reports/clinics", element: <SuperAdminReportsPage /> },

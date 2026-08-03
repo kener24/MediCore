@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Eye, Plus, Power, PowerOff } from "lucide-react";
 import { toast } from "sonner";
@@ -27,20 +27,21 @@ export function SuperAdminUsersPage() {
   const [clinics, setClinics] = useState<Clinic[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [confirmUser, setConfirmUser] = useState<User | null>(null);
+  const [statusReason, setStatusReason] = useState("");
   const [search, setSearch] = useState("");
   const [clinicFilter, setClinicFilter] = useState("");
-  const [roleFilter, setRoleFilter] = useState("");
+  const [roleFilter, setRoleFilter] = useState("admin");
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  async function loadCatalogs() {
+  const loadCatalogs = useCallback(async () => {
     const [clinicsData, rolesData] = await Promise.all([getClinics(), getRoles()]);
     setClinics(clinicsData);
     setRoles(rolesData);
-  }
+  }, []);
 
-  async function loadUsers() {
+  const loadUsers = useCallback(async () => {
     setLoading(true);
     try {
       setUsers(
@@ -56,26 +57,36 @@ export function SuperAdminUsersPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [clinicFilter, roleFilter, search, statusFilter]);
 
   useEffect(() => {
     document.title = "Usuarios | Superadmin";
     loadCatalogs().catch((error) => toast.error(getErrorMessage(error)));
-    loadUsers();
-  }, []);
+  }, [loadCatalogs]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => void loadUsers(), 350);
+    return () => window.clearTimeout(timeout);
+  }, [loadUsers]);
 
   async function toggleUser() {
     if (!confirmUser) return;
+    const reason = statusReason.trim();
+    if (reason.length < 5) {
+      toast.error("Indica un motivo claro para auditar esta acción.");
+      return;
+    }
     setSaving(true);
     try {
       if (confirmUser.is_active) {
-        await deactivateUser(confirmUser.id);
+        await deactivateUser(confirmUser.id, reason);
         toast.success("Usuario desactivado correctamente.");
       } else {
-        await activateUser(confirmUser.id);
+        await activateUser(confirmUser.id, reason);
         toast.success("Usuario activado correctamente.");
       }
       setConfirmUser(null);
+      setStatusReason("");
       await loadUsers();
     } catch (error) {
       toast.error(getErrorMessage(error));
@@ -88,15 +99,15 @@ export function SuperAdminUsersPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Usuarios globales</h1>
-          <p className="mt-1 text-sm text-slate-500">Usuarios de todas las clinicas y roles.</p>
+          <h1 className="text-2xl font-bold text-slate-900">Administradores de clínica</h1>
+          <p className="mt-1 text-sm text-slate-500">Gestión exclusiva de administradores asignados a clínicas.</p>
         </div>
         <Link
           className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700"
           to="/superadmin/users/new"
         >
           <Plus className="h-4 w-4" />
-          Nuevo usuario
+          Nuevo administrador
         </Link>
       </div>
       <Card>
@@ -170,9 +181,19 @@ export function SuperAdminUsersPage() {
         confirmLabel={confirmUser?.is_active ? "Desactivar" : "Activar"}
         tone={confirmUser?.is_active ? "danger" : "primary"}
         isLoading={saving}
-        onClose={() => setConfirmUser(null)}
+        onClose={() => { setConfirmUser(null); setStatusReason(""); }}
         onConfirm={toggleUser}
-      />
+      >
+        <label className="mt-4 block space-y-1.5">
+          <span className="text-sm font-medium text-slate-700">Motivo obligatorio</span>
+          <textarea
+            className="min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100"
+            onChange={(event) => setStatusReason(event.target.value)}
+            placeholder="Ej. Cambio solicitado por la clínica"
+            value={statusReason}
+          />
+        </label>
+      </ConfirmModal>
     </div>
   );
 }

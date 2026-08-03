@@ -1,4 +1,4 @@
-import { BarChart3, Bed, Bell, Building2, CalendarClock, ChevronDown, FileText, Gauge, KeyRound, LogOut, Menu, Package, ScrollText, ShieldCheck, Stethoscope, UserCircle, Users, Wallet, X } from "lucide-react";
+import { BarChart3, Bed, Bell, Building2, CalendarClock, ChevronDown, FileText, Gauge, KeyRound, LogOut, Menu, Package, ScrollText, ShieldCheck, Stethoscope, UserCircle, Wallet, X } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import clsx from "clsx";
 import { useEffect, useState } from "react";
@@ -333,6 +333,7 @@ const superAdminGroups: NavGroup[] = [
     items: [
       { label: "Clinicas", path: "/superadmin/clinics" },
       { label: "Usuarios", path: "/superadmin/users" },
+      { label: "Operacion SaaS", path: "/superadmin/operations" },
       { label: "Roles", path: "/roles" },
       { label: "Reportes globales", path: "/superadmin/reports" },
       { label: "Bitacora global", path: "/superadmin/audit" },

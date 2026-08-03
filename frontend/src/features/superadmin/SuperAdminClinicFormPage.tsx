@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -15,6 +15,7 @@ export function SuperAdminClinicFormPage() {
   const [clinic, setClinic] = useState<Clinic | null>(null);
   const [loading, setLoading] = useState(Boolean(id));
   const [saving, setSaving] = useState(false);
+  const createKey = useRef(crypto.randomUUID());
   const isEditing = Boolean(id);
 
   useEffect(() => {
@@ -39,7 +40,7 @@ export function SuperAdminClinicFormPage() {
         await updateClinic(id, payload);
         toast.success("Clinica actualizada correctamente.");
       } else {
-        await createClinic(payload);
+        await createClinic(payload, createKey.current);
         toast.success("Clinica creada correctamente.");
       }
       navigate("/superadmin/clinics");

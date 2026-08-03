@@ -1,9 +1,9 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { CreditCard } from "lucide-react";
 
-import { changeClinicPlan, createSubscriptionPlan, getClinicPlanUsage, getClinicSubscription, getClinicSubscriptions, getMyPlanUsage, getMySubscription, getSubscriptionPlans, reactivateClinicSubscription, suspendClinicSubscription, updateSubscriptionPlan } from "../../api/subscriptionsApi";
+import { cancelClinicSubscription, changeClinicPlan, createSubscriptionPlan, extendClinicTrial, getClinicPlanUsage, getClinicSubscription, getClinicSubscriptions, getMyPlanUsage, getMySubscription, getSubscriptionPlans, reactivateClinicSubscription, renewClinicSubscription, suspendClinicSubscription, updateSubscriptionPlan } from "../../api/subscriptionsApi";
 import { getErrorMessage } from "../../api/axios";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -49,8 +49,11 @@ export function ClinicSubscriptionDetailsPage() {
   const [usage, setUsage] = useState<PlanUsage | null>(null);
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [plan, setPlan] = useState("");
+  const [reason, setReason] = useState("");
+  const [trialDays, setTrialDays] = useState("7");
+  const [renewDate, setRenewDate] = useState("");
   const [error, setError] = useState("");
-  async function load() {
+  const load = useCallback(async () => {
     if (!clinicId) return;
     setError("");
     try {
@@ -61,15 +64,19 @@ export function ClinicSubscriptionDetailsPage() {
       setError(message);
       toast.error(message);
     }
-  }
-  useEffect(() => { load(); }, [clinicId]);
+  }, [clinicId]);
+  useEffect(() => { void load(); }, [load]);
   if (error) return <EmptyState title="No se pudo cargar la suscripcion." description={error} />;
   if (!subscription || !usage) return <Loader />;
   const currentSubscription = subscription;
-  async function change() { if (!clinicId || !plan) return; try { await changeClinicPlan(clinicId, { plan, billing_cycle: currentSubscription.billing_cycle }); toast.success("Plan actualizado."); await load(); } catch (e) { toast.error(getErrorMessage(e)); } }
-  async function suspend() { if (!clinicId) return; try { await suspendClinicSubscription(clinicId, "Suspendida desde panel SaaS"); toast.success("Suscripcion suspendida."); await load(); } catch (e) { toast.error(getErrorMessage(e)); } }
-  async function reactivate() { if (!clinicId) return; try { await reactivateClinicSubscription(clinicId); toast.success("Suscripcion reactivada."); await load(); } catch (e) { toast.error(getErrorMessage(e)); } }
-  return <div className="space-y-6"><PageHeader title={subscription.clinic_nombre ?? "Suscripcion"} description={`${subscription.plan_nombre} - ${subscription.status}`} actions={<div className="flex gap-2"><Button variant="outline" onClick={suspend}>Suspender</Button><Button onClick={reactivate}>Reactivar</Button></div>} /><Card title="Cambiar plan"><div className="flex gap-2"><select className="h-10 rounded-md border px-3 text-sm" value={plan} onChange={(e) => setPlan(e.target.value)}>{plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select><Button onClick={change}>Cambiar plan</Button></div></Card><UsagePanel usage={usage} /></div>;
+  function validReason() { if (reason.trim().length >= 5) return true; toast.error("Indica un motivo claro para auditar la acción."); return false; }
+  async function change() { if (!clinicId || !plan || !validReason()) return; try { await changeClinicPlan(clinicId, { plan, billing_cycle: currentSubscription.billing_cycle, reason: reason.trim() }); toast.success("Plan actualizado."); setReason(""); await load(); } catch (e) { toast.error(getErrorMessage(e)); } }
+  async function suspend() { if (!clinicId || !validReason()) return; try { await suspendClinicSubscription(clinicId, reason.trim()); toast.success("Suscripción suspendida."); setReason(""); await load(); } catch (e) { toast.error(getErrorMessage(e)); } }
+  async function reactivate() { if (!clinicId || !validReason()) return; try { await reactivateClinicSubscription(clinicId, reason.trim()); toast.success("Suscripción reactivada."); setReason(""); await load(); } catch (e) { toast.error(getErrorMessage(e)); } }
+  async function extendTrial() { const days = Number(trialDays); if (!clinicId || !validReason() || !Number.isInteger(days) || days < 1 || days > 365) return toast.error("Indica entre 1 y 365 días."); try { await extendClinicTrial(clinicId, days, reason.trim()); toast.success("Prueba extendida."); setReason(""); await load(); } catch (e) { toast.error(getErrorMessage(e)); } }
+  async function renew() { if (!clinicId || !renewDate || !validReason()) return; try { await renewClinicSubscription(clinicId, renewDate, reason.trim()); toast.success("Suscripción renovada."); setReason(""); await load(); } catch (e) { toast.error(getErrorMessage(e)); } }
+  async function cancel() { if (!clinicId || !validReason() || !window.confirm("¿Cancelar la suscripción? Los datos de la clínica se conservarán.")) return; try { await cancelClinicSubscription(clinicId, reason.trim()); toast.success("Suscripción cancelada sin eliminar información."); setReason(""); await load(); } catch (e) { toast.error(getErrorMessage(e)); } }
+  return <div className="space-y-6"><PageHeader title={subscription.clinic_nombre ?? "Suscripción"} description={`${subscription.plan_nombre} - ${subscription.status}`} actions={<div className="flex gap-2"><Button variant="outline" onClick={suspend}>Suspender</Button><Button onClick={reactivate}>Reactivar</Button><Button variant="danger" onClick={cancel}>Cancelar</Button></div>} /><Card title="Motivo de la acción"><textarea className="min-h-24 w-full rounded-md border px-3 py-2 text-sm" onChange={(e) => setReason(e.target.value)} placeholder="Motivo obligatorio para cambios de suscripción" value={reason} /></Card><Card title="Cambiar plan"><div className="flex flex-wrap gap-2"><select className="h-10 rounded-md border px-3 text-sm" value={plan} onChange={(e) => setPlan(e.target.value)}>{plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select><Button onClick={change}>Cambiar plan</Button></div></Card><Card title="Renovación y prueba"><div className="flex flex-wrap gap-2"><input className="h-10 rounded-md border px-3 text-sm" min="1" max="365" type="number" value={trialDays} onChange={(e) => setTrialDays(e.target.value)} /><Button variant="outline" onClick={extendTrial}>Extender prueba</Button><input className="h-10 rounded-md border px-3 text-sm" type="date" value={renewDate} onChange={(e) => setRenewDate(e.target.value)} /><Button onClick={renew}>Renovar</Button></div></Card><UsagePanel usage={usage} /></div>;
 }
 
 function UsagePanel({ usage }: { usage: PlanUsage }) {

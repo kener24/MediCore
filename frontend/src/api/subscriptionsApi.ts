@@ -10,11 +10,12 @@ export async function getMySubscription() { const { data } = await api.get<Clini
 export async function getClinicSubscriptions(filters?: Record<string, string>) { const { data } = await api.get<ClinicSubscription[]>("/subscriptions/clinics/", { params: filters }); return data; }
 export async function getClinicSubscription(clinicId: number | string) { const { data } = await api.get<ClinicSubscription>(`/subscriptions/clinics/${clinicId}/`); return data; }
 export async function updateClinicSubscription(clinicId: number | string, payload: Partial<ClinicSubscription>) { const { data } = await api.patch<ClinicSubscription>(`/subscriptions/clinics/${clinicId}/`, payload); return data; }
-export async function changeClinicPlan(clinicId: number | string, payload: { plan: number | string; billing_cycle: string; end_date?: string | null }) { const { data } = await api.patch<ClinicSubscription>(`/subscriptions/clinics/${clinicId}/change-plan/`, payload); return data; }
+export async function changeClinicPlan(clinicId: number | string, payload: { plan: number | string; billing_cycle: string; end_date?: string | null; reason: string }) { const { data } = await api.patch<ClinicSubscription>(`/subscriptions/clinics/${clinicId}/change-plan/`, payload); return data; }
 export async function suspendClinicSubscription(clinicId: number | string, reason: string) { const { data } = await api.patch<ClinicSubscription>(`/subscriptions/clinics/${clinicId}/suspend/`, { reason }); return data; }
-export async function reactivateClinicSubscription(clinicId: number | string) { const { data } = await api.patch<ClinicSubscription>(`/subscriptions/clinics/${clinicId}/reactivate/`); return data; }
+export async function reactivateClinicSubscription(clinicId: number | string, reason: string) { const { data } = await api.patch<ClinicSubscription>(`/subscriptions/clinics/${clinicId}/reactivate/`, { reason }); return data; }
 export async function cancelClinicSubscription(clinicId: number | string, reason: string) { const { data } = await api.patch<ClinicSubscription>(`/subscriptions/clinics/${clinicId}/cancel/`, { reason }); return data; }
+export async function extendClinicTrial(clinicId: number | string, days: number, reason: string) { const { data } = await api.patch<ClinicSubscription>(`/subscriptions/clinics/${clinicId}/extend-trial/`, { days, reason }); return data; }
+export async function renewClinicSubscription(clinicId: number | string, end_date: string, reason: string) { const { data } = await api.patch<ClinicSubscription>(`/subscriptions/clinics/${clinicId}/renew/`, { end_date, reason }); return data; }
 export async function getMyPlanUsage() { const { data } = await api.get<PlanUsage>("/subscriptions/usage/"); return data; }
 export async function getClinicPlanUsage(clinicId: number | string) { const { data } = await api.get<PlanUsage>(`/subscriptions/clinics/${clinicId}/usage/`); return data; }
 export async function getEnabledFeatures() { const { data } = await api.get<SubscriptionFeatures>("/subscriptions/features/"); return data; }
-

@@ -4,6 +4,8 @@ import type { Clinic, ClinicPayload } from "../types/clinic";
 export interface ClinicFilters {
   search?: string;
   is_active?: string;
+  plan?: string;
+  subscription?: string;
 }
 
 export async function getClinics(filters?: ClinicFilters) {
@@ -16,8 +18,8 @@ export async function getClinic(id: string | number) {
   return data;
 }
 
-export async function createClinic(payload: ClinicPayload) {
-  const { data } = await api.post<Clinic>("/clinics/", payload);
+export async function createClinic(payload: ClinicPayload, idempotencyKey = crypto.randomUUID()) {
+  const { data } = await api.post<Clinic>("/clinics/", payload, { headers: { "Idempotency-Key": idempotencyKey } });
   return data;
 }
 

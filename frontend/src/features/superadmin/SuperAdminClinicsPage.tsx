@@ -1,35 +1,31 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pencil, Plus, Power, PowerOff } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
-import { activateClinic, createClinic, deactivateClinic, getClinics, updateClinic } from "../../api/clinicsApi";
+import { activateClinic, deactivateClinic, getClinics } from "../../api/clinicsApi";
 import { getErrorMessage } from "../../api/axios";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { ConfirmModal } from "../../components/ui/ConfirmModal";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { Loader } from "../../components/ui/Loader";
-import { Modal, ModalCloseButton } from "../../components/ui/Modal";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { SelectFilter } from "../../components/ui/SelectFilter";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import { Table } from "../../components/ui/Table";
-import type { Clinic, ClinicPayload } from "../../types/clinic";
-import { ClinicForm } from "../clinics/ClinicForm";
+import type { Clinic } from "../../types/clinic";
 
 export function SuperAdminClinicsPage() {
   const [clinics, setClinics] = useState<Clinic[]>([]);
-  const [selectedClinic, setSelectedClinic] = useState<Clinic | null>(null);
   const [confirmClinic, setConfirmClinic] = useState<Clinic | null>(null);
   const [statusReason, setStatusReason] = useState("");
-  const [modalOpen, setModalOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       setClinics(await getClinics({ search: search || undefined, is_active: statusFilter || undefined }));
@@ -38,33 +34,18 @@ export function SuperAdminClinicsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [search, statusFilter]);
 
   useEffect(() => {
     document.title = "Clinicas | Superadmin";
-    load();
   }, []);
 
-  const hasFilters = useMemo(() => Boolean(search || statusFilter), [search, statusFilter]);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => void load(), 350);
+    return () => window.clearTimeout(timeout);
+  }, [load]);
 
-  async function handleSubmit(payload: ClinicPayload) {
-    setSaving(true);
-    try {
-      if (selectedClinic) {
-        await updateClinic(selectedClinic.id, payload);
-        toast.success("Clinica actualizada correctamente.");
-      } else {
-        await createClinic(payload);
-        toast.success("Clinica creada correctamente.");
-      }
-      setModalOpen(false);
-      await load();
-    } catch (error) {
-      toast.error(getErrorMessage(error));
-    } finally {
-      setSaving(false);
-    }
-  }
+  const hasFilters = useMemo(() => Boolean(search || statusFilter), [search, statusFilter]);
 
   async function toggleClinic() {
     if (!confirmClinic) return;
@@ -132,8 +113,9 @@ export function SuperAdminClinicsPage() {
               { key: "nombre", header: "Nombre", render: (clinic) => <span className="font-medium text-slate-900">{clinic.nombre}</span> },
               { key: "rtn", header: "RTN", render: (clinic) => clinic.rtn || "Sin RTN" },
               { key: "correo", header: "Correo", render: (clinic) => clinic.correo || "Sin correo" },
-              { key: "telefono", header: "Telefono", render: (clinic) => clinic.telefono || "Sin telefono" },
-              { key: "direccion", header: "Direccion", render: (clinic) => clinic.direccion || "Sin direccion" },
+              { key: "plan", header: "Plan", render: (clinic) => clinic.plan || "Sin plan" },
+              { key: "subscription", header: "Suscripción", render: (clinic) => clinic.subscription_status || "Pendiente" },
+              { key: "users", header: "Uso", render: (clinic) => `${clinic.users_count ?? 0} usuarios` },
               { key: "estado", header: "Estado", render: (clinic) => <StatusBadge active={clinic.activo} activeText="Activa" inactiveText="Inactiva" /> },
               {
                 key: "actions",
@@ -167,14 +149,6 @@ export function SuperAdminClinicsPage() {
           <EmptyState title="No hay clinicas para mostrar." description={hasFilters ? "Prueba con otros filtros de busqueda." : "Crea la primera clinica desde el boton superior."} />
         )}
       </Card>
-      <Modal
-        title={selectedClinic ? "Editar clinica" : "Nueva clinica"}
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        actions={<ModalCloseButton onClick={() => setModalOpen(false)} />}
-      >
-        <ClinicForm clinic={selectedClinic} isSubmitting={saving} onSubmit={handleSubmit} />
-      </Modal>
       <ConfirmModal
         open={Boolean(confirmClinic)}
         title={confirmClinic?.activo ? "Desactivar clinica" : "Activar clinica"}

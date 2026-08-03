@@ -28,12 +28,12 @@ export async function updateUser(id: string | number, payload: Partial<UserPaylo
   return data;
 }
 
-export async function deactivateUser(id: string | number) {
-  const { data } = await api.patch<User>(`/users/${id}/deactivate/`);
+export async function deactivateUser(id: string | number, reason: string) {
+  const { data } = await api.patch<User>(`/users/${id}/deactivate/`, { reason });
   return data;
 }
 
-export async function activateUser(id: string | number) {
-  const { data } = await api.patch<User>(`/users/${id}/activate/`);
+export async function activateUser(id: string | number, reason: string) {
+  const { data } = await api.patch<User>(`/users/${id}/activate/`, { reason });
   return data;
 }

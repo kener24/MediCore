@@ -10,6 +10,8 @@ import { resolveSupportedAppRole } from '@/core/utils/roleUtils';
 import { getMeService, loginService, logoutService } from '@/features/auth/services/authService';
 import type { AppRole, LoginPayload, RoleName, User } from '@/features/auth/types/auth.types';
 import { clearAllDoctorConsultationDrafts } from '@/features/doctor/services/doctorLocalDraftService';
+import { clearDoctorFavorites } from '@/features/doctor/services/doctorFavoritesService';
+import { clearNurseCache } from '@/features/nurse/utils/nurseCache';
 
 interface AuthContextValue {
   appRole: AppRole | null;
@@ -25,11 +27,13 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 async function clearPrivateState() {
-  await Promise.all([
+  await Promise.allSettled([
     clearSession(),
     clearApiCache(),
     clearPrivateTemporaryFiles(),
     clearAllDoctorConsultationDrafts(),
+    clearDoctorFavorites(),
+    clearNurseCache(),
   ]);
 }
 
@@ -41,10 +45,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setSessionExpiredHandler((message) => {
-      void clearPrivateTemporaryFiles();
-      void clearAllDoctorConsultationDrafts();
-      setSessionExpiredMessage(message || 'Tu sesión expiró por seguridad. Inicia sesión nuevamente para continuar.');
-      setUser(null);
+      void clearPrivateState().finally(() => {
+        setSessionExpiredMessage(message || 'Tu sesión expiró por seguridad. Inicia sesión nuevamente para continuar.');
+        setUser(null);
+      });
     });
 
     let mounted = true;

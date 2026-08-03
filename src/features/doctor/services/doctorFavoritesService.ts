@@ -37,6 +37,13 @@ export async function rememberMedicalOrder(item: CreateMedicalOrderPayload) {
   await writeList(ORDERS_KEY, next);
 }
 
+export async function clearDoctorFavorites() {
+  await Promise.all([
+    SecureStore.deleteItemAsync(MEDICATIONS_KEY),
+    SecureStore.deleteItemAsync(ORDERS_KEY),
+  ]);
+}
+
 async function readList<T>(key: string): Promise<T[]> {
   const payload = await SecureStore.getItemAsync(key);
   if (!payload) return [];

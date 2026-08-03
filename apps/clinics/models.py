@@ -10,10 +10,11 @@ class Clinic(TimeStampedModel):
     correo = models.EmailField(blank=True)
     direccion = models.TextField(blank=True)
     activo = models.BooleanField(default=True)
+    creation_idempotency_key = models.CharField(max_length=100, null=True, blank=True, unique=True, editable=False)
+    creation_fingerprint = models.CharField(max_length=64, null=True, blank=True, unique=True, editable=False)
 
     class Meta:
         ordering = ["nombre"]
 
     def __str__(self):
         return self.nombre
-

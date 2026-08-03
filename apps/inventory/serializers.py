@@ -8,11 +8,11 @@ from apps.inventory.models import InventoryCategory, InventoryItem, InventoryLot
 
 
 def can_manage(user):
-    return get_role_name(user) in ["superadmin", "admin"]
+    return get_role_name(user) == "admin"
 
 
 def can_move(user):
-    return get_role_name(user) in ["superadmin", "admin"]
+    return get_role_name(user) == "admin"
 
 
 class InventoryCategorySerializer(serializers.ModelSerializer):

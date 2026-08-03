@@ -14,6 +14,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from apps.accounts.models import Role, User
 from apps.accounts.clinic_admin_services import build_clinic_admin_alerts, build_clinic_admin_dashboard
 from apps.accounts.permissions import CanManageClinicUsers, IsClinicAdmin, IsOwnerOrAdmin, IsSuperAdmin, get_role_name
+from apps.accounts.superadmin_services import build_global_usage, build_superadmin_alerts, build_superadmin_dashboard, build_system_status
 from apps.accounts.role_permissions import ROLE_PERMISSION_GROUPS
 from apps.accounts.serializers import (
     CLINIC_ADMIN_MANAGED_ROLES,
@@ -195,28 +196,38 @@ class SuperAdminDashboardView(APIView):
     permission_classes = [IsSuperAdmin]
 
     def get(self, request):
-        role_counts = {
-            item["role__nombre"]: item["total"]
-            for item in User.objects.values("role__nombre").annotate(total=Count("id"))
-        }
-        total_users = User.objects.count()
-        active_users = User.objects.filter(is_active=True).count()
-        total_clinics = Clinic.objects.count()
-        active_clinics = Clinic.objects.filter(activo=True).count()
+        return Response(build_superadmin_dashboard(request.query_params))
 
-        return Response(
-            {
-                "total_clinics": total_clinics,
-                "active_clinics": active_clinics,
-                "inactive_clinics": total_clinics - active_clinics,
-                "total_users": total_users,
-                "active_users": active_users,
-                "inactive_users": total_users - active_users,
-                "total_admins": role_counts.get("admin", 0),
-                "total_medicos": role_counts.get("medico", 0),
-                "total_pacientes": role_counts.get("paciente", 0),
-            }
+
+class SuperAdminUsageView(APIView):
+    permission_classes = [IsSuperAdmin]
+
+    def get(self, request):
+        return Response({"count": Clinic.objects.count(), "results": build_global_usage()})
+
+
+class SuperAdminAlertsView(APIView):
+    permission_classes = [IsSuperAdmin]
+
+    def get(self, request):
+        alerts = build_superadmin_alerts()
+        return Response({"count": len(alerts), "results": alerts, "generated_at": timezone.now()})
+
+
+class SuperAdminSystemStatusView(APIView):
+    permission_classes = [IsSuperAdmin]
+
+    def get(self, request):
+        data = build_system_status()
+        log_audit_event(
+            request=request,
+            action=AuditLog.Action.VIEW,
+            module=AuditLog.Module.SYSTEM,
+            model_name="SaaSSystemStatus",
+            description="Estado operativo agregado del SaaS consultado.",
+            metadata={"database": data["database"], "api": data["api"]},
         )
+        return Response(data)
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -273,6 +284,9 @@ class UserViewSet(viewsets.ModelViewSet):
         )
 
     def _deactivate_user(self, request, user):
+        reason = str(request.data.get("reason") or "").strip()
+        if len(reason) < 5:
+            return Response({"reason": "El motivo es obligatorio y debe ser claro."}, status=status.HTTP_400_BAD_REQUEST)
         if user == request.user and self._is_last_active_superadmin(user):
             return Response(
                 {"detail": "No puedes desactivar el ultimo superadmin activo."},
@@ -283,9 +297,20 @@ class UserViewSet(viewsets.ModelViewSet):
                 {"detail": "No se puede desactivar el ultimo superadmin activo."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if (
+            user.is_active
+            and get_role_name(user) == "admin"
+            and user.clinica_id
+            and User.objects.filter(clinica_id=user.clinica_id, role__nombre="admin", is_active=True).exclude(id=user.id).count() == 0
+        ):
+            return Response(
+                {"detail": "No se puede dejar la clínica sin un administrador activo."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         user.is_active = False
         user.save(update_fields=["is_active"])
-        log_audit_event(request=request, clinic=getattr(user, "clinica", None), action=AuditLog.Action.DEACTIVATE, module=AuditLog.Module.USERS, model_name="User", object_id=user.id, object_repr=user.email, description="Usuario desactivado.", new_values={"is_active": False})
+        revoke_all_user_sessions(user, revoked_by=request.user)
+        log_audit_event(request=request, clinic=getattr(user, "clinica", None), action=AuditLog.Action.DEACTIVATE, module=AuditLog.Module.USERS, model_name="User", object_id=user.id, object_repr=user.email, description="Usuario administrativo desactivado y sesiones revocadas.", new_values={"is_active": False}, metadata={"reason": reason})
         return Response(UserDetailSerializer(user).data)
 
     def create(self, request, *args, **kwargs):
@@ -313,10 +338,15 @@ class UserViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["patch"])
     def activate(self, request, pk=None):
+        reason = str(request.data.get("reason") or "").strip()
+        if len(reason) < 5:
+            return Response({"reason": "El motivo es obligatorio y debe ser claro."}, status=status.HTTP_400_BAD_REQUEST)
         user = self.get_object()
+        if user.clinica_id and not user.clinica.activo:
+            return Response({"detail": "La clínica se encuentra suspendida."}, status=status.HTTP_409_CONFLICT)
         user.is_active = True
         user.save(update_fields=["is_active"])
-        log_audit_event(request=request, clinic=getattr(user, "clinica", None), action=AuditLog.Action.ACTIVATE, module=AuditLog.Module.USERS, model_name="User", object_id=user.id, object_repr=user.email, description="Usuario activado.", new_values={"is_active": True})
+        log_audit_event(request=request, clinic=getattr(user, "clinica", None), action=AuditLog.Action.ACTIVATE, module=AuditLog.Module.USERS, model_name="User", object_id=user.id, object_repr=user.email, description="Usuario administrativo activado.", new_values={"is_active": True}, metadata={"reason": reason})
         return Response(UserDetailSerializer(user).data)
 
     @action(detail=True, methods=["patch"])

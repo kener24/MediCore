@@ -15,7 +15,10 @@ from apps.accounts.views import (
     MyClinicView,
     RoleViewSet,
     SessionTokenRefreshView,
+    SuperAdminAlertsView,
     SuperAdminDashboardView,
+    SuperAdminSystemStatusView,
+    SuperAdminUsageView,
     UserViewSet,
 )
 from apps.admissions.views import PatientVisitViewSet
@@ -190,6 +193,9 @@ urlpatterns = [
     path("api/security/password-policy/validate/", PasswordPolicyValidateView.as_view(), name="security-password-policy-validate"),
     path("api/security/settings/", SecuritySettingsView.as_view(), name="security-settings"),
     path("api/admin/dashboard/", SuperAdminDashboardView.as_view(), name="superadmin_dashboard"),
+    path("api/admin/usage/", SuperAdminUsageView.as_view(), name="superadmin_usage"),
+    path("api/admin/alerts/", SuperAdminAlertsView.as_view(), name="superadmin_alerts"),
+    path("api/admin/system-status/", SuperAdminSystemStatusView.as_view(), name="superadmin_system_status"),
     path("api/clinic-admin/dashboard/", ClinicAdminDashboardView.as_view(), name="clinic_admin_dashboard"),
     path("api/clinic-admin/alerts/", ClinicAdminAlertsView.as_view(), name="clinic_admin_alerts"),
     path("api/clinic-admin/operation-status/", ClinicAdminOperationStatusView.as_view(), name="clinic_admin_operation_status"),

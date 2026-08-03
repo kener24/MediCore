@@ -31,10 +31,19 @@ class ChangePlanSerializer(serializers.Serializer):
     plan = serializers.PrimaryKeyRelatedField(queryset=SubscriptionPlan.objects.filter(active=True))
     billing_cycle = serializers.ChoiceField(choices=ClinicSubscription.BillingCycle.choices, default=ClinicSubscription.BillingCycle.MONTHLY)
     end_date = serializers.DateField(required=False, allow_null=True)
+    reason = serializers.CharField(min_length=5, max_length=500)
 
 
 class ReasonSerializer(serializers.Serializer):
-    reason = serializers.CharField(required=False, allow_blank=True)
+    reason = serializers.CharField(min_length=5, max_length=500)
+
+
+class TrialExtensionSerializer(ReasonSerializer):
+    days = serializers.IntegerField(min_value=1, max_value=365)
+
+
+class RenewalSerializer(ReasonSerializer):
+    end_date = serializers.DateField()
 
 
 class PlanUsageSerializer(serializers.Serializer):
@@ -51,4 +60,3 @@ class PlanUsageSerializer(serializers.Serializer):
     appointments_this_month = serializers.IntegerField()
     max_storage_mb = serializers.IntegerField()
     storage_used_mb = serializers.IntegerField()
-

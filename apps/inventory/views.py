@@ -31,14 +31,13 @@ from apps.audit.models import AuditLog
 from apps.audit.services import log_audit_event
 
 
-VIEW_ROLES = ["superadmin", "admin", "medico", "enfermera", "recepcionista"]
+VIEW_ROLES = ["admin", "medico", "enfermera", "recepcionista"]
 
 
 def scope(request, queryset):
     role = get_role_name(request.user)
     if role == "superadmin" or request.user.is_superuser:
-        clinic = request.query_params.get("clinic")
-        return queryset.filter(clinic_id=clinic) if clinic else queryset
+        return queryset.none()
     if role in VIEW_ROLES and request.user.clinica_id:
         return queryset.filter(Q(clinic_id=request.user.clinica_id) | Q(clinic__isnull=True))
     return queryset.none()

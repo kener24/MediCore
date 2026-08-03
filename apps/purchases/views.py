@@ -53,8 +53,7 @@ def parse_bool(value):
 def scope(request, queryset):
     role = get_role_name(request.user)
     if role == "superadmin" or request.user.is_superuser:
-        clinic = request.query_params.get("clinic")
-        return queryset.filter(clinic_id=clinic) if clinic else queryset
+        return queryset.none()
     if can_view_purchases(request.user) and request.user.clinica_id:
         return queryset.filter(clinic_id=request.user.clinica_id)
     return queryset.none()

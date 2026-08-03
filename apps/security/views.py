@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -224,6 +225,7 @@ class AdminSessionsView(APIView):
     def get_queryset(self, request):
         qs = UserSession.objects.select_related("user", "user__clinica")
         if is_superadmin(request.user):
+            qs = qs.filter(Q(user=request.user) | Q(user__role__nombre="admin"))
             if request.query_params.get("clinic"):
                 qs = qs.filter(user__clinica_id=request.query_params["clinic"])
         elif get_role_name(request.user) == "admin" and request.user.clinica_id:

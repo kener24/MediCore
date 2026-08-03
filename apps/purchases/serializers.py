@@ -18,19 +18,19 @@ def user_clinic(user):
 
 
 def can_view_purchases(user):
-    return get_role_name(user) in ["superadmin", "admin"]
+    return get_role_name(user) == "admin"
 
 
 def can_manage_purchases(user):
-    return get_role_name(user) in ["superadmin", "admin"]
+    return get_role_name(user) == "admin"
 
 
 def can_approve_purchase_orders(user):
-    return get_role_name(user) in ["superadmin", "admin"]
+    return get_role_name(user) == "admin"
 
 
 def can_receive_purchase_orders(user):
-    return get_role_name(user) in ["superadmin", "admin"]
+    return get_role_name(user) == "admin"
 
 
 def clinic_for_request(request, attrs=None, fallback=None):

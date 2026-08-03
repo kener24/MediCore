@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -6,9 +7,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.permissions import get_role_name
+from apps.audit.models import AuditLog
+from apps.audit.services import get_object_audit_data, log_audit_event
 from apps.clinics.models import Clinic
 from apps.subscriptions.models import ClinicSubscription, SubscriptionPlan
-from apps.subscriptions.serializers import ChangePlanSerializer, ClinicSubscriptionSerializer, ClinicSubscriptionUpdateSerializer, PlanUsageSerializer, ReasonSerializer, SubscriptionPlanSerializer
+from apps.subscriptions.serializers import ChangePlanSerializer, ClinicSubscriptionSerializer, ClinicSubscriptionUpdateSerializer, PlanUsageSerializer, ReasonSerializer, RenewalSerializer, SubscriptionPlanSerializer, TrialExtensionSerializer
 from apps.subscriptions.services import get_clinic_subscription, get_features, get_plan_usage
 
 
@@ -33,12 +36,20 @@ class SubscriptionPlanViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         if not is_superadmin(request.user):
             return Response({"detail": "Solo superadmin puede crear planes."}, status=status.HTTP_403_FORBIDDEN)
-        return super().create(request, *args, **kwargs)
+        response = super().create(request, *args, **kwargs)
+        if response.status_code == status.HTTP_201_CREATED:
+            log_audit_event(request=request, action=AuditLog.Action.CREATE, module=AuditLog.Module.SUBSCRIPTIONS, model_name="SubscriptionPlan", object_id=response.data.get("id"), object_repr=response.data.get("name", ""), description="Plan SaaS creado.", new_values=response.data)
+        return response
 
     def update(self, request, *args, **kwargs):
         if not is_superadmin(request.user):
             return Response({"detail": "Solo superadmin puede editar planes."}, status=status.HTTP_403_FORBIDDEN)
-        return super().update(request, *args, **kwargs)
+        plan = self.get_object()
+        old_values = get_object_audit_data(plan)
+        response = super().update(request, *args, **kwargs)
+        if response.status_code == status.HTTP_200_OK:
+            log_audit_event(request=request, action=AuditLog.Action.UPDATE, module=AuditLog.Module.SUBSCRIPTIONS, model_name="SubscriptionPlan", object_id=plan.id, object_repr=plan.name, description="Plan SaaS actualizado.", old_values=old_values, new_values=response.data)
+        return response
 
     def destroy(self, request, *args, **kwargs):
         if not is_superadmin(request.user):
@@ -46,6 +57,7 @@ class SubscriptionPlanViewSet(viewsets.ModelViewSet):
         plan = self.get_object()
         plan.active = False
         plan.save(update_fields=["active", "actualizado_en"])
+        log_audit_event(request=request, action=AuditLog.Action.DEACTIVATE, module=AuditLog.Module.SUBSCRIPTIONS, model_name="SubscriptionPlan", object_id=plan.id, object_repr=plan.name, description="Plan SaaS archivado sin eliminar suscripciones.", new_values={"active": False})
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -121,9 +133,16 @@ class ClinicSubscriptionDetailView(APIView):
         subscription = self.get_subscription(clinic_id)
         if not subscription:
             return Response({"detail": "Clinica no encontrada."}, status=status.HTTP_404_NOT_FOUND)
-        serializer = ClinicSubscriptionUpdateSerializer(subscription, data=request.data, partial=True)
+        reason = str(request.data.get("reason") or "").strip()
+        if len(reason) < 5:
+            return Response({"reason": "El motivo es obligatorio y debe ser claro."}, status=status.HTTP_400_BAD_REQUEST)
+        payload = request.data.copy()
+        payload.pop("reason", None)
+        old_values = get_object_audit_data(subscription)
+        serializer = ClinicSubscriptionUpdateSerializer(subscription, data=payload, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        log_audit_event(request=request, clinic=subscription.clinic, action=AuditLog.Action.UPDATE, module=AuditLog.Module.SUBSCRIPTIONS, model_name="ClinicSubscription", object_id=subscription.id, object_repr=str(subscription), description="Suscripción actualizada.", old_values=old_values, new_values=serializer.data, metadata={"reason": reason})
         return Response(ClinicSubscriptionSerializer(subscription).data)
 
 
@@ -141,34 +160,69 @@ class ClinicSubscriptionActionView(APIView):
         subscription = self.get_subscription(clinic_id)
         if not subscription:
             return Response({"detail": "Clinica no encontrada."}, status=status.HTTP_404_NOT_FOUND)
-        if action_name == "change-plan":
-            serializer = ChangePlanSerializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            subscription.plan = serializer.validated_data["plan"]
-            subscription.billing_cycle = serializer.validated_data["billing_cycle"]
-            subscription.end_date = serializer.validated_data.get("end_date")
-            subscription.status = ClinicSubscription.Status.ACTIVE
-            subscription.active = True
-        elif action_name == "suspend":
-            serializer = ReasonSerializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            subscription.status = ClinicSubscription.Status.SUSPENDED
-            subscription.suspension_reason = serializer.validated_data.get("reason", "")
-        elif action_name == "reactivate":
-            subscription.status = ClinicSubscription.Status.ACTIVE
-            subscription.suspension_reason = ""
-            subscription.cancelled_at = None
-            subscription.active = True
-        elif action_name == "cancel":
-            serializer = ReasonSerializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            subscription.status = ClinicSubscription.Status.CANCELLED
-            subscription.suspension_reason = serializer.validated_data.get("reason", "")
-            subscription.cancelled_at = timezone.now()
-            subscription.active = False
-        else:
-            return Response({"detail": "Accion no soportada."}, status=status.HTTP_404_NOT_FOUND)
-        subscription.save()
+        serializer_class = {
+            "change-plan": ChangePlanSerializer,
+            "suspend": ReasonSerializer,
+            "reactivate": ReasonSerializer,
+            "cancel": ReasonSerializer,
+            "extend-trial": TrialExtensionSerializer,
+            "renew": RenewalSerializer,
+        }.get(action_name)
+        if not serializer_class:
+            return Response({"detail": "Acción no soportada."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        with transaction.atomic():
+            subscription = ClinicSubscription.objects.select_for_update().select_related("clinic", "plan").get(pk=subscription.pk)
+            old_values = get_object_audit_data(subscription)
+            values = serializer.validated_data
+            if action_name == "change-plan":
+                subscription.plan = values["plan"]
+                subscription.billing_cycle = values["billing_cycle"]
+                subscription.end_date = values.get("end_date")
+                subscription.status = ClinicSubscription.Status.ACTIVE
+                subscription.active = True
+            elif action_name == "suspend":
+                subscription.status = ClinicSubscription.Status.SUSPENDED
+                subscription.suspension_reason = values["reason"]
+            elif action_name == "reactivate":
+                subscription.status = ClinicSubscription.Status.ACTIVE
+                subscription.suspension_reason = ""
+                subscription.cancelled_at = None
+                subscription.active = True
+            elif action_name == "cancel":
+                subscription.status = ClinicSubscription.Status.CANCELLED
+                subscription.suspension_reason = values["reason"]
+                subscription.cancelled_at = timezone.now()
+                subscription.active = False
+            elif action_name == "extend-trial":
+                base_date = subscription.trial_end_date or subscription.end_date or timezone.localdate()
+                subscription.trial_end_date = base_date + timezone.timedelta(days=values["days"])
+                subscription.end_date = subscription.trial_end_date
+                subscription.status = ClinicSubscription.Status.TRIAL
+                subscription.active = True
+            elif action_name == "renew":
+                if values["end_date"] <= timezone.localdate():
+                    return Response({"end_date": "La nueva fecha debe ser futura."}, status=status.HTTP_400_BAD_REQUEST)
+                subscription.end_date = values["end_date"]
+                subscription.status = ClinicSubscription.Status.ACTIVE
+                subscription.active = True
+                subscription.cancelled_at = None
+            subscription.save()
+            log_audit_event(
+                request=request,
+                clinic=subscription.clinic,
+                action=AuditLog.Action.UPDATE,
+                module=AuditLog.Module.SUBSCRIPTIONS,
+                model_name="ClinicSubscription",
+                object_id=subscription.id,
+                object_repr=str(subscription),
+                description=f"Acción de suscripción: {action_name}.",
+                old_values=old_values,
+                new_values=get_object_audit_data(subscription),
+                metadata={"reason": values["reason"], "action": action_name},
+            )
         return Response(ClinicSubscriptionSerializer(subscription).data)
 
 

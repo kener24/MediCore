@@ -210,3 +210,46 @@ No certificado aun. Debe probarse en un dispositivo con Expo Go o build de desar
 - Bloqueos de agenda persistentes con vacaciones/ausencias y analisis de citas afectadas.
 - Alertas persistentes con reconocimiento/asignacion si el negocio lo requiere.
 - Certificacion Android fisica y accesibilidad con modelos reales de telefono.
+
+---
+
+## Sprint 1.8B - Superadministrador SaaS
+
+Fecha local: 2026-08-03.
+
+### Automatizacion local
+
+- `python manage.py check`: aprobado, 0 errores.
+- Migraciones: consistentes; `makemigrations --check --dry-run` no detecto cambios.
+- Certificacion especifica: 6/6 pruebas aprobadas.
+- Suite completa: 381/381 pruebas aprobadas; 3 omitidas de forma controlada.
+- `npm run build` web: aprobado, 1,852 modulos compilados.
+- Lint web: 0 errores; 44 advertencias historicas fuera de los archivos del sprint.
+- `npx tsc --noEmit`: aprobado.
+- Lint movil: aprobado sin errores ni advertencias.
+- `npx expo-doctor`: 18/18 aprobado.
+- Exportacion Android: aprobada; 1,534 modulos empaquetados.
+
+### Produccion
+
+Desplegado en `https://kp-software.tech` con commit `5ca9c4b`.
+
+- Respaldo verificado: `/var/www/medicore/backups/sprint18b_20260803_164259`.
+- Incluye dump MySQL comprimido, bundle Git, Nginx, `medicore.service`, lockfile previo, cambios locales y manifiesto SHA-256.
+- Migracion `clinics.0002_clinic_creation_safety`: aplicada correctamente en MySQL.
+- `manage.py check`: aprobado.
+- Build Vite: aprobado.
+- `medicore.service` y Nginx: activos; configuracion Nginx valida.
+- HTTPS en dominio raiz y `www`: 200. Dashboard sin sesion: 401 esperado.
+- Endpoints autenticados de dashboard, uso, alertas, estado, clinicas, suscripciones, sesiones y auditoria: 200.
+- Privacidad: pacientes, expedientes y documentos devolvieron 403; recetas y facturas devolvieron colecciones vacias.
+- La sesion tecnica temporal del smoke test fue eliminada al finalizar.
+- Journal de MediCore: 0 trazas, excepciones criticas o errores internos posteriores al despliegue.
+
+### Dependencias web
+
+`npm audit --omit=dev` reporta dos avisos altos heredados de `react-router` sobre RSC/Server Actions. MediCore utiliza React Router como SPA Vite y no habilita RSC, SSR ni Server Actions. El fix automatico propone una degradacion con vulnerabilidades cliente mas amplias, por lo que no se aplico `--force`. Se mantiene `7.18.2` y se debe actualizar cuando exista una version corregida compatible.
+
+### Android fisico
+
+No certificado aun. TypeScript, Expo Doctor y exportacion Android no sustituyen la prueba tactil en un telefono real. Deben verificarse login, navegacion, doble toque, alta de clinica, planes, ciclo de suscripcion, sesiones, offline, restauracion, expiracion y logout antes de declarar certificacion fisica.

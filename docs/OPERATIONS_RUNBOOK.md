@@ -39,6 +39,8 @@ Los logs de aplicación contienen método, ruta sin query string, estado, duraci
 - Readiness o servicio inactivo: crítico inmediato.
 - Respuestas 5xx repetidas: investigar request ID en Gunicorn y Nginx.
 
+Si `OPERATIONS_ALERT_EMAIL` está configurado, un fallo del monitor envía un correo genérico mediante el backend SMTP existente. Se limita a un correo por hora para evitar tormentas de alertas y nunca incluye payloads ni datos de pacientes.
+
 ## Pruebas de carga
 
 `deploy/load/medicore_load_test.py` solo ejecuta GET. Por defecto prueba 5, 10, 25 y 50 usuarios concurrentes en local. En cualquier host no local se detiene si se solicita más de 10, salvo autorización explícita. Nunca se deben realizar pruebas agresivas sobre producción con usuarios reales.

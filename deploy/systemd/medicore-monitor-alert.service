@@ -1,0 +1,12 @@
+[Unit]
+Description=MediCore operational email alert
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/var/www/medicore
+EnvironmentFile=/var/www/medicore/.env
+ExecStart=/var/www/medicore/venv/bin/python manage.py send_operational_alert --source medicore-monitor
+PrivateTmp=true

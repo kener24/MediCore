@@ -5,6 +5,8 @@ from unittest.mock import patch
 
 from django.test import TestCase
 from django.core.management import call_command
+from django.core import mail
+from django.test import override_settings
 from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory
 
@@ -46,3 +48,14 @@ class MediaIntegrityCommandTests(TestCase):
             output = StringIO()
             call_command("audit_media_integrity", "--json", "--media-root", directory, stdout=output)
             self.assertIn('"orphan_count": 1', output.getvalue())
+
+
+class OperationalAlertCommandTests(TestCase):
+    @override_settings(OPERATIONS_ALERT_EMAIL="operations@example.com")
+    def test_alert_is_generic_and_throttled(self):
+        with TemporaryDirectory() as directory:
+            state_file = str(Path(directory) / "last-alert")
+            call_command("send_operational_alert", "--state-file", state_file)
+            call_command("send_operational_alert", "--state-file", state_file)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("no contiene información clínica", mail.outbox[0].body)

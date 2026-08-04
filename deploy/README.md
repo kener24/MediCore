@@ -61,7 +61,7 @@ Install and validate the operational units:
 ```bash
 sudo chmod 700 deploy/scripts/backup.sh deploy/scripts/verify-backup.sh deploy/scripts/restore-test.sh deploy/scripts/operational-check.sh
 sudo cp deploy/systemd/medicore-backup.service deploy/systemd/medicore-backup.timer /etc/systemd/system/
-sudo cp deploy/systemd/medicore-monitor.service deploy/systemd/medicore-monitor.timer /etc/systemd/system/
+sudo cp deploy/systemd/medicore-monitor.service deploy/systemd/medicore-monitor.timer deploy/systemd/medicore-monitor-alert.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl start medicore-backup.service
 sudo /var/www/medicore/deploy/scripts/restore-test.sh

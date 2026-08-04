@@ -1,6 +1,7 @@
 [Unit]
 Description=MediCore operational health verification
 After=network-online.target medicore.service nginx.service mysql.service
+OnFailure=medicore-monitor-alert.service
 
 [Service]
 Type=oneshot

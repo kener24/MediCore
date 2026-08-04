@@ -160,6 +160,7 @@ MEDICORE_BACKUP_STATUS_FILE = config(
     "MEDICORE_BACKUP_STATUS_FILE",
     default="/var/lib/medicore/backup-status.json",
 )
+OPERATIONS_ALERT_EMAIL = config("OPERATIONS_ALERT_EMAIL", default="")
 
 CORS_ALLOWED_ORIGINS = config(
     "CORS_ALLOWED_ORIGINS",

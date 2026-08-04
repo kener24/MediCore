@@ -40,10 +40,8 @@ const SuperAdminClinicsPage = lazyNamed(() => import("../features/superadmin/Sup
 const SuperAdminDashboardPage = lazyNamed(() => import("../features/superadmin/SuperAdminDashboardPage"), "SuperAdminDashboardPage");
 const SuperAdminUsersPage = lazyNamed(() => import("../features/superadmin/SuperAdminUsersPage"), "SuperAdminUsersPage");
 const SuperAdminOperationsPage = lazyNamed(() => import("../features/superadmin/SuperAdminOperationsPage"), "SuperAdminOperationsPage");
-const PatientDashboardPage = lazyNamed(() => import("../features/patients/PatientDashboardPage"), "PatientDashboardPage");
 const PatientDetailsPage = lazyNamed(() => import("../features/patients/PatientDetailsPage"), "PatientDetailsPage");
 const PatientFormPage = lazyNamed(() => import("../features/patients/PatientFormPage"), "PatientFormPage");
-const PatientProfilePage = lazyNamed(() => import("../features/patients/PatientProfilePage"), "PatientProfilePage");
 const PatientsPage = lazyNamed(() => import("../features/patients/PatientsPage"), "PatientsPage");
 const AppointmentDetailsPage = lazyNamed(() => import("../features/appointments/AppointmentDetailsPage"), "AppointmentDetailsPage");
 const AppointmentFormPage = lazyNamed(() => import("../features/appointments/AppointmentFormPage"), "AppointmentFormPage");
@@ -55,7 +53,6 @@ const ConsultationFormPage = lazyNamed(() => import("../features/medicalRecords/
 const ConsultationsPage = lazyNamed(() => import("../features/medicalRecords/ConsultationsPage"), "ConsultationsPage");
 const MedicalRecordDetailsPage = lazyNamed(() => import("../features/medicalRecords/MedicalRecordDetailsPage"), "MedicalRecordDetailsPage");
 const MedicalRecordsPage = lazyNamed(() => import("../features/medicalRecords/MedicalRecordsPage"), "MedicalRecordsPage");
-const PatientMedicalRecordPage = lazyNamed(() => import("../features/medicalRecords/PatientMedicalRecordPage"), "PatientMedicalRecordPage");
 const clinicalData = () => import("../features/prescriptions/ClinicalDataPages");
 const DiagnosesPage = lazyNamed(clinicalData, "DiagnosesPage");
 const MedicalOrdersPage = lazyNamed(clinicalData, "MedicalOrdersPage");

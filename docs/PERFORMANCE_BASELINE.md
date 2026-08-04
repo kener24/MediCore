@@ -28,7 +28,7 @@ Bundle web inicial: 1,017.22 kB (260.08 kB gzip).
 
 El middleware de observabilidad y la paginación introducen costo fijo en la prueba local; por eso algunos tiempos absolutos aumentan aunque las consultas disminuyen. En producción, el beneficio principal es que el costo ya no crece por cada fila.
 
-Bundle inicial después: 531.35 kB (162.53 kB gzip), reducción de 47.8% sin quitar funcionalidad. Facturación, hospitalización, portal, reportes y demás módulos se descargan al entrar a su ruta.
+Después del lazy loading, el bundle inicial quedó en 531.35 kB (162.53 kB gzip), reducción de 47.8% sin quitar funcionalidad. La separación final deja el código propio inicial en 250.33 kB y 74.31 kB gzip; React, formularios, UI y HTTP se sirven en chunks de proveedor reutilizables. La descarga inicial agregada ronda 548.04 kB y 165.43 kB gzip, todavía 46.1% menor que la línea base, y mejora el caché entre despliegues. Facturación, hospitalización, portal, reportes y demás módulos se descargan al entrar a su ruta.
 
 ## Carga local controlada
 
@@ -42,6 +42,17 @@ Prueba de liveness/readiness con cinco solicitudes por worker, sin escrituras:
 | 50 | 250 | 0 | 115.70 | 74 ms | 1,560 ms |
 
 El servidor de desarrollo local no representa los tres workers Gunicorn, pero certifica ausencia de errores hasta 50 hilos. La saturación visible desde 25 concurrentes justifica conservar la prueba de producción en 5/10 y medir endpoints autenticados por rol fuera de horario antes de aumentar capacidad.
+
+## Carga de producción controlada
+
+Prueba HTTPS de solo lectura sobre readiness, con CPU y memoria observadas en paralelo:
+
+| Concurrencia | Solicitudes | Errores | RPS | p50 | p95 | p99 |
+|---:|---:|---:|---:|---:|---:|---:|
+| 5 | 50 | 0 | 16.24 | 260 ms | 473 ms | 596 ms |
+| 10 | 100 | 0 | 28.81 | 326 ms | 403 ms | 524 ms |
+
+La CPU llegó brevemente a 96% en la fase de 10; memoria y swap permanecieron estables. Por ello no se elevó la carga productiva por encima de 10 concurrentes.
 
 ## Decisiones
 

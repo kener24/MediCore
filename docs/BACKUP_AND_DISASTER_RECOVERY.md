@@ -16,7 +16,7 @@
 - RTO objetivo de base de datos: 30 minutos en una instancia sana.
 - RTO objetivo de servidor completo: 2 a 4 horas, incluyendo aprovisionamiento, paquetes, código, Nginx, Gunicorn, restauración y validación.
 
-El RTO real se registra al ejecutar `restore-test.sh`; el resultado debe conservarse en la evidencia del sprint.
+La restauración aislada del 2026-08-04 tardó 11 segundos para el volumen actual. Este tiempo cubre descifrado, importación, conteos, auditoría de media y limpieza; no incluye aprovisionar una instancia nueva.
 
 ## Restauración aislada
 
@@ -46,6 +46,6 @@ El proceso descifra el último backup, crea una base temporal con nombre `medico
 - Si falla después del reinicio, se restaura el commit anterior, se recompila y se reinicia Gunicorn.
 - Una migración destructiva nunca se revierte automáticamente. Se evalúa migración inversa o restauración en una base nueva, conservando la original para análisis.
 
-## Riesgo pendiente
+## Copia externa y riesgo pendiente
 
-Una copia en el mismo servidor no cubre pérdida total de Lightsail. `MEDICORE_OFFSITE_DIR` permite una segunda copia automática cuando exista un volumen o destino externo montado. Hasta configurar y probar ese destino de forma periódica, el RPO ante pérdida total de instancia no puede certificarse como cubierto.
+El backup post-despliegue fue copiado y verificado fuera de Lightsail, con la clave en archivo separado. Esto protege el punto de recuperación del 2026-08-04. `MEDICORE_OFFSITE_DIR` permite una segunda copia automática cuando exista un volumen o destino externo montado. Hasta automatizar y probar cada copia futura, el RPO de 24 horas ante pérdida total de instancia no puede certificarse de forma continua.

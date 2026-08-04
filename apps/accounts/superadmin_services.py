@@ -1,9 +1,13 @@
 import hashlib
+import json
 import os
 from datetime import timedelta
+from pathlib import Path
 
+from django.conf import settings
 from django.db import connection
-from django.db.models import Count, Q
+from django.db.models import Count, IntegerField, OuterRef, Q, Subquery, Value
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
@@ -12,8 +16,10 @@ from apps.appointments.models import Appointment
 from apps.audit.models import AuditLog
 from apps.billing.models import Invoice
 from apps.clinics.models import Clinic
+from apps.doctors.models import DoctorProfile
 from apps.hospitalization.models import Hospitalization
 from apps.medical_records.models import ClinicalConsultation
+from apps.patients.models import Patient
 from apps.security.models import UserSession
 from apps.subscriptions.models import ClinicSubscription
 
@@ -188,16 +194,27 @@ def build_system_status():
     except Exception:
         database_status = "unavailable"
 
-    backup_at = os.environ.get("MEDICORE_LAST_BACKUP_AT", "")
+    backup = {
+        "status": os.environ.get("MEDICORE_LAST_BACKUP_STATUS", "not_monitored"),
+        "last_confirmed_at": os.environ.get("MEDICORE_LAST_BACKUP_AT", "") or None,
+        "verified_at": None,
+    }
+    status_path = Path(settings.MEDICORE_BACKUP_STATUS_FILE)
+    try:
+        status_payload = json.loads(status_path.read_text(encoding="utf-8"))
+        backup.update({
+            "status": status_payload.get("status", backup["status"]),
+            "last_confirmed_at": status_payload.get("created_at", backup["last_confirmed_at"]),
+            "verified_at": status_payload.get("verified_at"),
+        })
+    except (OSError, ValueError, TypeError):
+        pass
     return {
         "api": "operational",
         "database": database_status,
         "task_queue": os.environ.get("MEDICORE_TASK_QUEUE_STATUS", "not_configured"),
         "scheduler": os.environ.get("MEDICORE_SCHEDULER_STATUS", "not_configured"),
-        "backup": {
-            "status": os.environ.get("MEDICORE_LAST_BACKUP_STATUS", "not_monitored"),
-            "last_confirmed_at": backup_at or None,
-        },
+        "backup": backup,
         "version": os.environ.get("MEDICORE_RELEASE", "unknown"),
         "environment": os.environ.get("DJANGO_ENV", "unknown"),
         "checked_at": timezone.now(),
@@ -213,20 +230,27 @@ def build_global_usage():
 
 def _clinics_with_usage():
     month_start = timezone.localdate().replace(day=1)
+    active_admins = User.objects.filter(
+        clinica=OuterRef("pk"), role__nombre="admin", is_active=True
+    ).values("clinica").annotate(total=Count("id")).values("total")
+    active_users = User.objects.filter(
+        clinica=OuterRef("pk"), is_active=True
+    ).values("clinica").annotate(total=Count("id")).values("total")
+    active_doctors = DoctorProfile.objects.filter(
+        clinic=OuterRef("pk"), activo=True
+    ).values("clinic").annotate(total=Count("id")).values("total")
+    active_patients = Patient.objects.filter(
+        clinic=OuterRef("pk"), activo=True
+    ).values("clinic").annotate(total=Count("id")).values("total")
+    monthly_appointments = Appointment.objects.filter(
+        clinic=OuterRef("pk"), scheduled_date__gte=month_start
+    ).values("clinic").annotate(total=Count("id")).values("total")
     return Clinic.objects.select_related("subscription__plan").annotate(
-        active_admins_count=Count(
-            "usuarios",
-            filter=Q(usuarios__role__nombre="admin", usuarios__is_active=True),
-            distinct=True,
-        ),
-        users_count=Count("usuarios", filter=Q(usuarios__is_active=True), distinct=True),
-        doctors_count=Count("doctor_profiles", filter=Q(doctor_profiles__activo=True), distinct=True),
-        patients_count=Count("patients", filter=Q(patients__activo=True), distinct=True),
-        appointments_this_month=Count(
-            "appointments",
-            filter=Q(appointments__scheduled_date__gte=month_start),
-            distinct=True,
-        ),
+        active_admins_count=Coalesce(Subquery(active_admins, output_field=IntegerField()), Value(0)),
+        users_count=Coalesce(Subquery(active_users, output_field=IntegerField()), Value(0)),
+        doctors_count=Coalesce(Subquery(active_doctors, output_field=IntegerField()), Value(0)),
+        patients_count=Coalesce(Subquery(active_patients, output_field=IntegerField()), Value(0)),
+        appointments_this_month=Coalesce(Subquery(monthly_appointments, output_field=IntegerField()), Value(0)),
     )
 
 

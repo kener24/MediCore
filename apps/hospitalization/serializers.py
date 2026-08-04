@@ -92,12 +92,22 @@ class HospitalBedSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["clinic", "bed_code", "current_patient", "current_hospitalization", "creado_en", "actualizado_en"]
 
+    @staticmethod
+    def _active_assignment(obj):
+        cached = getattr(obj, "_active_assignment_cache", None)
+        if cached is not None:
+            return cached
+        assignments = list(obj.assignments.all())
+        assignment = next((item for item in assignments if item.released_at is None), None)
+        obj._active_assignment_cache = assignment or False
+        return assignment
+
     def get_current_hospitalization(self, obj):
-        assignment = obj.assignments.filter(released_at__isnull=True).select_related("hospitalization").first()
+        assignment = self._active_assignment(obj)
         return assignment.hospitalization_id if assignment else None
 
     def get_current_patient(self, obj):
-        assignment = obj.assignments.filter(released_at__isnull=True).select_related("hospitalization__patient").first()
+        assignment = self._active_assignment(obj)
         return assignment.hospitalization.patient.nombre_completo if assignment else ""
 
     def validate_bed_number(self, value):

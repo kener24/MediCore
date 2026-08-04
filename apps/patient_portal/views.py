@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from io import BytesIO
 
 from django.db import transaction
-from django.db.models import Q, Sum
+from django.db.models import Prefetch, Q, Sum
 from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import status
@@ -448,7 +448,19 @@ class PatientPortalInvoicesView(PatientPortalBaseView):
             return portal_denied("Tu clínica no ha habilitado esta información en el portal.")
         qs = Invoice.objects.filter(patient=self.patient, clinic=self.patient.clinic).filter(
             Q(active=True) | Q(status=Invoice.Status.ANULADA) | Q(fiscal_status=Invoice.FiscalStatus.CANCELLED)
-        ).select_related("clinic", "patient").prefetch_related("credit_notes", "items", "payments")
+        ).select_related("clinic", "patient").prefetch_related(
+            Prefetch(
+                "credit_notes",
+                queryset=CreditNote.objects.filter(active=True).order_by("-issue_datetime"),
+                to_attr="portal_credit_notes",
+            ),
+            "items",
+            Prefetch(
+                "payments",
+                queryset=Payment.objects.filter(Q(active=True) | Q(status=Payment.Status.ANULADO)),
+                to_attr="portal_payments",
+            ),
+        )
         if invoice_id:
             item = qs.filter(id=invoice_id).first()
             if not item:

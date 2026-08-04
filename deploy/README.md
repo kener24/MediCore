@@ -46,6 +46,30 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now medicore-notifications.timer
 ```
 
+## Health, backups and monitoring
+
+Generate the encryption key once, outside the repository:
+
+```bash
+sudo install -d -m 700 /root/.config/medicore
+sudo openssl rand -base64 48 | sudo tee /root/.config/medicore/backup.key >/dev/null
+sudo chmod 600 /root/.config/medicore/backup.key
+```
+
+Install and validate the operational units:
+
+```bash
+sudo chmod 700 deploy/scripts/backup.sh deploy/scripts/verify-backup.sh deploy/scripts/restore-test.sh deploy/scripts/operational-check.sh
+sudo cp deploy/systemd/medicore-backup.service deploy/systemd/medicore-backup.timer /etc/systemd/system/
+sudo cp deploy/systemd/medicore-monitor.service deploy/systemd/medicore-monitor.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl start medicore-backup.service
+sudo /var/www/medicore/deploy/scripts/restore-test.sh
+sudo systemctl enable --now medicore-backup.timer medicore-monitor.timer
+```
+
+Do not enable the backup timer until the first encrypted backup and isolated restore both pass. See `docs/BACKUP_AND_DISASTER_RECOVERY.md`.
+
 Use Certbot after the domain points to the server:
 
 ```bash

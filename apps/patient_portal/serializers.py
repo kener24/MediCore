@@ -284,7 +284,10 @@ class PatientPortalInvoiceListSerializer(serializers.ModelSerializer):
         ]
 
     def get_related_credit_note(self, obj):
-        note = obj.credit_notes.filter(active=True).order_by("-issue_datetime").first()
+        prefetched = getattr(obj, "portal_credit_notes", None)
+        note = prefetched[0] if prefetched else None
+        if prefetched is None:
+            note = obj.credit_notes.filter(active=True).order_by("-issue_datetime").first()
         return PatientPortalCreditNoteSerializer(note).data if note else None
 
     def get_pdf_available(self, obj):
@@ -310,9 +313,11 @@ class PatientPortalInvoiceDetailSerializer(PatientPortalInvoiceListSerializer):
         ]
 
     def get_payments(self, obj):
-        payments = obj.payments.filter(patient=obj.patient, clinic=obj.clinic).filter(
-            Q(active=True) | Q(status=Payment.Status.ANULADO)
-        )
+        payments = getattr(obj, "portal_payments", None)
+        if payments is None:
+            payments = obj.payments.filter(patient=obj.patient, clinic=obj.clinic).filter(
+                Q(active=True) | Q(status=Payment.Status.ANULADO)
+            )
         return PatientPortalPaymentSerializer(payments, many=True).data
 
 

@@ -1003,7 +1003,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
 
 class CashSessionViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = CashSession.objects.select_related("clinic", "opened_by", "closed_by").prefetch_related("movements")
+    queryset = CashSession.objects.select_related("clinic", "opened_by", "closed_by").prefetch_related("movements", "payments")
     permission_classes = [IsAuthenticated]
 
     def get_serializer_class(self):

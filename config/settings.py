@@ -55,6 +55,7 @@ MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "apps.core.middleware.RequestIDMiddleware",
+    "apps.core.middleware.RequestPerformanceMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -153,6 +154,12 @@ EMAIL_NOTIFICATION_MODULES = config(
     default="appointments,billing,payments,cash,inventory,purchases,audit,system",
     cast=Csv(),
 )
+REQUEST_METRICS_ENABLED = config("REQUEST_METRICS_ENABLED", default=True, cast=bool)
+SLOW_REQUEST_THRESHOLD_MS = config("SLOW_REQUEST_THRESHOLD_MS", default=750, cast=int)
+MEDICORE_BACKUP_STATUS_FILE = config(
+    "MEDICORE_BACKUP_STATUS_FILE",
+    default="/var/lib/medicore/backup-status.json",
+)
 
 CORS_ALLOWED_ORIGINS = config(
     "CORS_ALLOWED_ORIGINS",
@@ -164,6 +171,7 @@ CORS_ALLOW_CREDENTIALS = config("CORS_ALLOW_CREDENTIALS", default=False, cast=bo
 CORS_ALLOW_HEADERS = list(default_headers) + [
     "x-session-key",
 ]
+CORS_EXPOSE_HEADERS = ["Link", "Server-Timing", "X-Page", "X-Page-Size", "X-Request-ID", "X-Total-Count", "X-Total-Pages"]
 
 SECURE_SSL_REDIRECT = config("SECURE_SSL_REDIRECT", default=False, cast=bool)
 SESSION_COOKIE_SECURE = config("SESSION_COOKIE_SECURE", default=False, cast=bool)
@@ -188,6 +196,8 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "apps.core.exceptions.medicore_exception_handler",
+    "DEFAULT_PAGINATION_CLASS": "apps.core.pagination.LegacyCompatiblePageNumberPagination",
+    "PAGE_SIZE": 50,
     "DEFAULT_THROTTLE_RATES": {
         "login_ip": config("LOGIN_IP_THROTTLE_RATE", default="30/minute"),
         "login_identifier": config("LOGIN_IDENTIFIER_THROTTLE_RATE", default="10/minute"),

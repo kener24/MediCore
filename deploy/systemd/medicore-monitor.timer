@@ -1,0 +1,11 @@
+[Unit]
+Description=Verify MediCore health every five minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+RandomizedDelaySec=30
+Unit=medicore-monitor.service
+
+[Install]
+WantedBy=timers.target

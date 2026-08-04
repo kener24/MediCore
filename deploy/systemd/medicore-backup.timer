@@ -1,0 +1,11 @@
+[Unit]
+Description=Run MediCore encrypted backup daily
+
+[Timer]
+OnCalendar=*-*-* 08:30:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+Unit=medicore-backup.service
+
+[Install]
+WantedBy=timers.target

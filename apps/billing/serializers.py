@@ -446,7 +446,16 @@ class CashSessionListSerializer(serializers.ModelSerializer):
 
     def _totals(self, obj):
         if not hasattr(obj, "_serializer_totals"):
-            obj._serializer_totals = obj.totals()
+            cache = getattr(obj, "_prefetched_objects_cache", {})
+            if "payments" in cache and "movements" in cache:
+                payments = [item for item in obj.payments.all() if item.active and item.status == Payment.Status.APLICADO]
+                movements = [item for item in obj.movements.all() if item.active]
+                cash = sum((item.amount for item in payments if item.method == Payment.Method.EFECTIVO), Decimal("0.00"))
+                income = sum((item.amount for item in movements if item.movement_type == CashMovement.Type.INGRESO), Decimal("0.00"))
+                expense = sum((item.amount for item in movements if item.movement_type == CashMovement.Type.EGRESO), Decimal("0.00"))
+                obj._serializer_totals = (cash, income, expense)
+            else:
+                obj._serializer_totals = obj.totals()
         return obj._serializer_totals
 
     def get_cash_total(self, obj):
@@ -463,12 +472,22 @@ class CashSessionListSerializer(serializers.ModelSerializer):
         return obj.opening_amount + cash + income - expense
 
     def get_payments_count(self, obj):
+        if "payments" in getattr(obj, "_prefetched_objects_cache", {}):
+            return sum(1 for item in obj.payments.all() if item.active and item.status == Payment.Status.APLICADO)
         return obj.payments.filter(active=True, status=Payment.Status.APLICADO).count()
 
     def get_movements_count(self, obj):
+        if "movements" in getattr(obj, "_prefetched_objects_cache", {}):
+            return sum(1 for item in obj.movements.all() if item.active)
         return obj.movements.filter(active=True).count()
 
     def get_payment_method_totals(self, obj):
+        if "payments" in getattr(obj, "_prefetched_objects_cache", {}):
+            totals = {}
+            for payment in obj.payments.all():
+                if payment.active and payment.status == Payment.Status.APLICADO:
+                    totals[payment.method] = totals.get(payment.method, Decimal("0.00")) + payment.amount
+            return totals
         rows = obj.payments.filter(active=True, status=Payment.Status.APLICADO).values("method").annotate(total=Sum("amount"))
         return {row["method"]: row["total"] for row in rows}
 

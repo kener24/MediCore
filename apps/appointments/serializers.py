@@ -52,7 +52,12 @@ class AppointmentListSerializer(serializers.ModelSerializer):
             datetime.combine(obj.scheduled_date, obj.start_time),
             timezone.get_current_timezone(),
         )
-        cancellation_limit = get_or_create_clinic_settings(obj.clinic).cancellation_hours_limit
+        limits = getattr(self, "_cancellation_limits", None)
+        if limits is None:
+            limits = self._cancellation_limits = {}
+        if obj.clinic_id not in limits:
+            limits[obj.clinic_id] = get_or_create_clinic_settings(obj.clinic).cancellation_hours_limit
+        cancellation_limit = limits[obj.clinic_id]
         return scheduled_at >= timezone.now() + timedelta(hours=cancellation_limit)
 
     def get_can_reschedule(self, obj):

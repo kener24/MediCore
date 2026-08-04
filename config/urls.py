@@ -3,6 +3,8 @@ from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework.routers import DefaultRouter
 
+from apps.core.views import HealthView, LivenessView, ReadinessView
+
 from apps.accounts.views import (
     ChangePasswordView,
     ClinicAdminAlertsView,
@@ -170,6 +172,9 @@ router.register("documents/categories", DocumentCategoryViewSet, basename="docum
 router.register("documents", ClinicalDocumentViewSet, basename="documents")
 
 urlpatterns = [
+    path("health/", HealthView.as_view(), name="health"),
+    path("health/live/", LivenessView.as_view(), name="health-live"),
+    path("health/ready/", ReadinessView.as_view(), name="health-ready"),
     path("admin/", admin.site.urls),
     path("api/auth/login/", LoginView.as_view(), name="token_obtain_pair"),
     path("api/auth/refresh/", SessionTokenRefreshView.as_view(), name="token_refresh"),

@@ -1,6 +1,10 @@
+from io import StringIO
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from django.test import TestCase
+from django.core.management import call_command
 from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory
 
@@ -32,3 +36,13 @@ class PaginationContractTests(TestCase):
         self.assertEqual(response.headers["X-Total-Count"], "25")
         self.assertEqual(response.headers["X-Page"], "2")
         self.assertEqual(response.headers["X-Page-Size"], "10")
+
+
+class MediaIntegrityCommandTests(TestCase):
+    def test_explicit_media_root_is_used_for_isolated_restore(self):
+        with TemporaryDirectory() as directory:
+            marker = Path(directory) / "orphan.txt"
+            marker.write_text("test", encoding="utf-8")
+            output = StringIO()
+            call_command("audit_media_integrity", "--json", "--media-root", directory, stdout=output)
+            self.assertIn('"orphan_count": 1', output.getvalue())

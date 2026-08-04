@@ -30,8 +30,8 @@ for table in clinics_clinic accounts_user patients_patient appointments_appointm
   mysql -N -B "$TEST_DB" -e "SELECT '$table', COUNT(*) FROM \`$table\`;"
 done
 
-MEDIA_ROOT="$WORK/media" DB_NAME="$TEST_DB" DB_USER=root DB_PASSWORD='' DB_HOST=localhost \
-  "$APP_DIR/venv/bin/python" "$APP_DIR/manage.py" audit_media_integrity --json
+DB_NAME="$TEST_DB" DB_USER=root DB_PASSWORD='' DB_HOST=localhost \
+  "$APP_DIR/venv/bin/python" "$APP_DIR/manage.py" audit_media_integrity --json --media-root "$WORK/media"
 
 ELAPSED="$(( $(date +%s) - STARTED ))"
 printf '{"status":"passed","database":"isolated","tables":%s,"duration_seconds":%s,"completed_at":"%s"}\n' \

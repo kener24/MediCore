@@ -12,9 +12,10 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--json", action="store_true")
+        parser.add_argument("--media-root", default="")
 
     def handle(self, *args, **options):
-        media_root = Path(settings.MEDIA_ROOT).resolve()
+        media_root = Path(options["media_root"] or settings.MEDIA_ROOT).resolve()
         referenced = set()
         missing = []
         unsafe = []

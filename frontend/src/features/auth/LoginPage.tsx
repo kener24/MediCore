@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Activity, LockKeyhole, Mail } from "lucide-react";
+import { LockKeyhole, Mail } from "lucide-react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -65,9 +65,7 @@ export function LoginPage() {
       <div className="grid min-h-screen lg:grid-cols-[1fr_560px]">
         <section className="hidden bg-ink-900 px-12 py-10 text-white lg:flex lg:flex-col lg:justify-between">
           <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-brand-500 p-3">
-              <Activity className="h-7 w-7" />
-            </div>
+            <img className="h-14 w-14 rounded-lg object-cover ring-1 ring-white/15" src="/medicore-logo.png" alt="Logo de MediCore" />
             <div>
               <h1 className="text-2xl font-bold">MediCore</h1>
               <p className="text-sm text-brand-100">Administración clínica centralizada</p>
@@ -89,9 +87,7 @@ export function LoginPage() {
         <section className="flex items-center justify-center px-5 py-10">
           <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-7 shadow-soft">
             <div className="mb-7">
-              <div className="mb-4 inline-flex rounded-lg bg-brand-50 p-3 text-brand-700 lg:hidden">
-                <Activity className="h-7 w-7" />
-              </div>
+              <img className="mb-4 h-16 w-16 rounded-lg object-cover shadow-sm lg:hidden" src="/medicore-logo.png" alt="Logo de MediCore" />
               <h2 className="text-2xl font-bold text-slate-900">Iniciar sesión</h2>
               <p className="mt-2 text-sm text-slate-500">Accede al panel administrativo de MediCore.</p>
             </div>

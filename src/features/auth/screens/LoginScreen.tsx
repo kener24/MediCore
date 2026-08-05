@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { AppInput } from '@/components/AppInput';
@@ -46,9 +46,11 @@ export function LoginScreen() {
       contentContainerStyle={styles.content}
       keyboardDismissMode="on-drag">
           <View style={styles.brandArea}>
-            <View style={styles.logoMark}>
-              <MaterialCommunityIcons color={colors.white} name="heart-pulse" size={34} />
-            </View>
+            <Image
+              accessibilityLabel="Logo de MediCore"
+              source={require('../../../../assets/images/medicore-logo.png')}
+              style={styles.logoMark}
+            />
             <Text style={styles.brand}>MediCore</Text>
             <Text style={styles.subtitle}>Portal móvil seguro</Text>
           </View>
@@ -172,17 +174,14 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   logoMark: {
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: 22,
-    height: 70,
-    justifyContent: 'center',
+    borderRadius: 20,
+    height: 78,
     marginBottom: 14,
     shadowColor: colors.primary,
     shadowOffset: { height: 14, width: 0 },
     shadowOpacity: 0.22,
     shadowRadius: 20,
-    width: 70,
+    width: 78,
     elevation: 8,
   },
   passwordLabel: {
